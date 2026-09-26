@@ -1025,6 +1025,7 @@
     "imageOf": "第 {i} 张"
   },
   "settings": {
+    "serverBuildStampLabel": "构建时间戳（UTC）",
     "desktopDevelopment": "开发版",
     "desktopInfoLoading": "正在读取版本…",
     "desktopInfoError": "无法读取桌面版本",

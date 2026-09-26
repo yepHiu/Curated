@@ -1025,6 +1025,7 @@
     "imageOf": "{i}枚目"
   },
   "settings": {
+    "serverBuildStampLabel": "ビルドタイムスタンプ（UTC）",
     "desktopDevelopment": "開発版",
     "desktopInfoLoading": "バージョンを読み込み中…",
     "desktopInfoError": "Desktop のバージョンを取得できません",

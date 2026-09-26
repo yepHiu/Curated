@@ -6,16 +6,17 @@ import {
 import type { HealthDTO } from "@/api/types"
 
 describe("formatAboutBackendVersion", () => {
-  it("appends channel when present", () => {
+  it("keeps product version separate from build timestamp and channel", () => {
     const health: HealthDTO = {
       name: "Curated",
-      version: "20260412.165224",
+      version: "1.5.7",
+      buildStamp: "20260412.165224",
       channel: "release",
       transport: "http",
       databasePath: "runtime/curated.db",
     }
 
-    expect(formatAboutBackendVersion(health)).toBe("20260412.165224-release")
+    expect(formatAboutBackendVersion(health)).toBe("1.5.7")
   })
 })
 

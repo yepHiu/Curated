@@ -1025,6 +1025,7 @@
     "imageOf": "Image {i}"
   },
   "settings": {
+    "serverBuildStampLabel": "Build timestamp (UTC)",
     "desktopDevelopment": "Development",
     "desktopInfoLoading": "Reading version…",
     "desktopInfoError": "Could not read Desktop version",

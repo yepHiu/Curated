@@ -1,9 +1,7 @@
 import type { HealthDTO } from "@/api/types"
 
-/** Keep About app-version display aligned with the backend's version.Display() contract. */
+/** Product version and build identity are displayed separately. */
 export function formatAboutBackendVersion(h: HealthDTO): string {
-  const ch = typeof h.channel === "string" ? h.channel.trim() : ""
-  if (ch) return `${h.version}-${ch}`
   return h.version
 }
 

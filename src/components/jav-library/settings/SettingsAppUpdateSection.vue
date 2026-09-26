@@ -14,10 +14,14 @@ import SettingsDesktopUpdateSection from "./SettingsDesktopUpdateSection.vue"
 const props = withDefaults(
   defineProps<{
     backendVersionDisplay?: string | null
+    backendBuildStamp?: string | null
+    backendChannel?: string | null
     backendVersionStatus?: "default" | "loading" | "error"
   }>(),
   {
     backendVersionDisplay: "",
+    backendBuildStamp: "",
+    backendChannel: "",
     backendVersionStatus: "default",
   },
 )
@@ -331,6 +335,10 @@ async function handleInstallUpdate() {
             ]"
           >
             {{ backendVersionDisplay }}
+            <Badge v-if="backendChannel === 'dev'" variant="secondary" class="ml-2 font-sans">{{ t('settings.desktopDevelopment') }}</Badge>
+          </dd>
+          <dd v-if="backendBuildStamp" class="mt-1 break-all text-xs text-muted-foreground" data-server-build-stamp>
+            {{ t('settings.serverBuildStampLabel') }} <span class="font-mono">{{ backendBuildStamp }}</span>
           </dd>
         </div>
 

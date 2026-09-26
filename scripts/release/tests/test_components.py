@@ -21,8 +21,10 @@ class ComponentTests(unittest.TestCase):
     def test_full_keeps_exact_component_versions_without_allocating(self):
         root = Path(__file__).resolve().parents[3]
         sources = list((root / "scripts/release/versions").glob("*.json"))
+        sources.append(root / "backend/internal/version/server.json")
         before = {p: p.read_bytes() for p in sources}
         plan = component_plan(root, "full", "windows", "x64", "exe")
         self.assertEqual(plan["status"], "planned")
         self.assertEqual(plan["components"]["desktop"], "0.1.0")
+        self.assertEqual(plan["components"]["server"], "1.5.7")
         self.assertEqual(before, {p: p.read_bytes() for p in sources})

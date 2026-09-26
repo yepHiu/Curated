@@ -12,8 +12,8 @@ vi.mock("vue-i18n", () => ({
 vi.mock("./SettingsAppUpdateSection.vue", () => ({
   default: {
     name: "SettingsAppUpdateSection",
-    props: ["backendVersionDisplay"],
-    template: "<div data-app-update>{{ backendVersionDisplay }}</div>",
+    props: ["backendVersionDisplay", "backendBuildStamp"],
+    template: "<div data-app-update>{{ backendVersionDisplay }} {{ backendBuildStamp }}</div>",
   },
 }))
 
@@ -45,12 +45,13 @@ describe("SettingsAboutSection", () => {
       props: {
         ...baseProps,
         useWebApi: true,
-        backendVersionDisplay: "20260501.010203",
+        backendVersionDisplay: "1.5.7",
+        aboutHealth: { name: "curated", version: "1.5.7", buildStamp: "20260501.010203", channel: "release", transport: "http", databasePath: "test.db" },
       },
       slots: { updates: "<div data-auto-update>Auto update</div>" },
     })
 
-    expect(wrapper.get("[data-app-update]").text()).toBe("20260501.010203")
+    expect(wrapper.get("[data-app-update]").text()).toBe("1.5.7 20260501.010203")
     expect(wrapper.get("[data-auto-update]").text()).toBe("Auto update")
   })
 
@@ -64,7 +65,7 @@ describe("SettingsAboutSection", () => {
     expect(wrapper.text()).toContain("settings.aboutUsageLicensesTitle")
     expect(wrapper.text()).toContain("settings.aboutLicenseValue")
     expect(wrapper.text()).toContain("settings.aboutHarmonyFontNotice")
-    expect(wrapper.findAll('a[href*="LICENSE"]')).toHaveLength(4)
+    expect(wrapper.findAll('a[href*="LICENSE"]')).toHaveLength(5)
     expect(wrapper.get("details summary").text()).toContain("settings.aboutThirdPartyTitle")
     expect(wrapper.findAll("details li")).toHaveLength(15)
     expect(wrapper.text()).toContain("FFmpeg")

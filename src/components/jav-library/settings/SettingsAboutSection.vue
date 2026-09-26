@@ -166,6 +166,8 @@ const thirdPartyCount = thirdPartyGroups.reduce((count, group) => count + group.
               <SettingsAppUpdateSection
                 v-if="useWebApi"
                 :backend-version-display="backendVersionDisplay"
+                :backend-build-stamp="aboutHealth?.buildStamp"
+                :backend-channel="aboutHealth?.channel"
                 :backend-version-status="backendVersionStatus"
               />
               <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
@@ -248,6 +250,8 @@ const thirdPartyCount = thirdPartyGroups.reduce((count, group) => count + group.
             <SettingsAppUpdateSection
               v-if="useWebApi"
               :backend-version-display="backendVersionDisplay"
+              :backend-build-stamp="aboutHealth?.buildStamp"
+              :backend-channel="aboutHealth?.channel"
               :backend-version-status="backendVersionStatus"
             />
           </template>

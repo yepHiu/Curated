@@ -53,6 +53,10 @@ func TestHandleCommand_SystemHealthIncludesInstallerVersion(t *testing.T) {
 		t.Fatalf("unmarshal health dto: %v", err)
 	}
 
+	if health.Version != version.ProductVersion() || health.BuildStamp != version.Stamp() {
+		t.Fatalf("health must keep product version and build stamp separate: %#v", health)
+	}
+
 	if got, want := health.InstallerVersion, "1.1.3"; got != want {
 		t.Fatalf("health.InstallerVersion = %q, want %q", got, want)
 	}

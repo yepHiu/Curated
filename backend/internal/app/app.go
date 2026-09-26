@@ -2026,7 +2026,8 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 	case contracts.CommandSystemHealth:
 		return a.respondOK(output, command.ID, contracts.HealthDTO{
 			Name:             version.BackendName(),
-			Version:          version.Stamp(),
+			Version:          version.ProductVersion(),
+			BuildStamp:       version.Stamp(),
 			Channel:          version.Channel,
 			InstallerVersion: version.PackageVersion(),
 			Transport:        "stdio-jsonl",

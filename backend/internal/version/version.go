@@ -1,4 +1,4 @@
-// Package version exposes build stamp (date + time), channel (dev vs release), and helpers for health/logs.
+// Package version exposes independent Server SemVer, build stamp, channel, and health/log helpers.
 //
 // Build alignment (same as internal/config data paths):
 //
@@ -16,11 +16,44 @@
 package version
 
 import (
+	_ "embed"
+	"encoding/json"
+	"fmt"
 	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
 )
+
+// serverVersionSource is shared with the component release planner. Embedding keeps
+// plain go run / go build independent from a frontend generation step.
+//
+//go:embed server.json
+var serverVersionSource []byte
+
+var serverVersion = readServerVersion()
+
+func readServerVersion() string {
+	var state struct {
+		Schema  int `json:"schema"`
+		Current struct {
+			Major *int `json:"major"`
+			Minor *int `json:"minor"`
+			Patch *int `json:"patch"`
+		} `json:"current"`
+	}
+	if err := json.Unmarshal(serverVersionSource, &state); err != nil {
+		panic("invalid Server version source: " + err.Error())
+	}
+	v := state.Current
+	if state.Schema != 1 || v.Major == nil || v.Minor == nil || v.Patch == nil || *v.Major < 0 || *v.Minor < 0 || *v.Patch < 0 {
+		panic("invalid Server version source")
+	}
+	return fmt.Sprintf("%d.%d.%d", *v.Major, *v.Minor, *v.Patch)
+}
+
+// ProductVersion returns the independent numeric Curated Server version.
+func ProductVersion() string { return serverVersion }
 
 // BuildStamp is an optional link-time override, compact form YYYYMMDD.HHMMSS (UTC recommended).
 var BuildStamp = ""
@@ -76,9 +109,9 @@ func stampFromBuildInfo() string {
 	return "unknown"
 }
 
-// Display returns stamp and channel in one string, e.g. "20260328.143052-dev" or "...-release".
+// Display includes the product version and retains build identity for logs/exports.
 func Display() string {
-	return Stamp() + "-" + Channel
+	return ProductVersion() + " (" + Stamp() + "; " + Channel + ")"
 }
 
 // PackageVersion returns the packaged release version when embedded into the binary.

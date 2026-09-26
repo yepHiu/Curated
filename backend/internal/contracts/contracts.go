@@ -78,8 +78,9 @@ type AppError struct {
 // HealthDTO reports backend identity, version, and runtime information.
 type HealthDTO struct {
 	Name             string `json:"name"`
-	Version          string `json:"version"` // Build stamp YYYYMMDD.HHMMSS (UTC) or git.* / unknown; see Channel
-	Channel          string `json:"channel"` // "dev" or "release" (-tags release)
+	Version          string `json:"version"`    // Independent numeric Server SemVer
+	BuildStamp       string `json:"buildStamp"` // UTC build stamp; vcs.time / git.* / unknown fallback
+	Channel          string `json:"channel"`    // "dev" or "release" (-tags release)
 	InstallerVersion string `json:"installerVersion,omitempty"`
 	Transport        string `json:"transport"`
 	DatabasePath     string `json:"databasePath"`

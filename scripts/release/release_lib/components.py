@@ -26,7 +26,8 @@ def component_plan(repo_root: Path, component: str, platform: str, arch: str, fo
     if component not in COMPONENTS:
         raise ValueError("Unknown component.")
     def version_of(name: str) -> str:
-        return format_version(read_version_state(repo_root / "scripts/release/versions" / f"{name}.json")["current"])
+        source = repo_root / ("backend/internal/version/server.json" if name == "server" else f"scripts/release/versions/{name}.json")
+        return format_version(read_version_state(source)["current"])
 
     version = version_of(component)
     result = {

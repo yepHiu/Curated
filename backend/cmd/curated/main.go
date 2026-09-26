@@ -156,6 +156,7 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 	}
 
 	startupFields := []zap.Field{
+		zap.String("version", version.ProductVersion()),
 		zap.String("buildStamp", version.Stamp()),
 		zap.String("channel", version.Channel),
 		zap.String("httpAddr", cfg.HttpAddr),
