@@ -5,8 +5,10 @@ import movieCommentSectionSource from "../components/jav-library/MovieCommentSec
 import playerPageSource from "../components/jav-library/PlayerPage.vue?raw"
 import settingsPageSource from "../components/jav-library/SettingsPage.vue?raw"
 import settingsHomepageDevToolsSource from "../components/jav-library/settings/SettingsHomepageDevTools.vue?raw"
+import debugToolsSource from "../components/dev/DevDebugDialog.vue?raw"
 
 const componentSources = [
+  { file: "src/components/dev/DevDebugDialog.vue", source: debugToolsSource },
   { file: "src/components/jav-library/ActorProfileCard.vue", source: actorProfileCardSource },
   { file: "src/components/jav-library/MovieCommentSection.vue", source: movieCommentSectionSource },
   { file: "src/components/jav-library/PlayerPage.vue", source: playerPageSource },

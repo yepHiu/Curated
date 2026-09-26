@@ -50,7 +50,6 @@ const { isServerLocal } = useServerLocalAccess()
 const { withPreservedScroll } = useSettingsScrollPreserve()
 
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
-const isPlaybackTestingEnv = import.meta.env.DEV || import.meta.env.MODE === "test"
 
 const PLAYBACK_HARDWARE_ENCODER_OPTIONS: readonly HardwareEncoderPreference[] = [
   "auto",
@@ -72,7 +71,6 @@ const playbackNativePlayerPresetDraft = ref<NativePlayerPreset>("custom")
 const playbackNativePlayerEnabledDraft = ref(false)
 const playbackNativePlayerProtocolTemplateDraft = ref(defaultNativePlayerBrowserTemplate("custom"))
 const playbackStreamPushEnabledDraft = ref(true)
-const playbackForceStreamPushDraft = ref(false)
 const playbackFfmpegCommandDraft = ref("ffmpeg")
 const playbackPreferNativePlayerDraft = ref(false)
 const playbackSeekForwardStepDraft = ref("10")
@@ -98,10 +96,6 @@ function syncPlaybackDraftFromService() {
     getStoredNativePlayerBrowserTemplate(),
   )
   playbackStreamPushEnabledDraft.value = player.streamPushEnabled !== false
-  playbackForceStreamPushDraft.value = Boolean(player.forceStreamPush)
-  if (!playbackStreamPushEnabledDraft.value) {
-    playbackForceStreamPushDraft.value = false
-  }
   playbackFfmpegCommandDraft.value = (player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg"
   playbackPreferNativePlayerDraft.value = Boolean(player.preferNativePlayer)
   playbackSeekForwardStepDraft.value = String(Math.max(1, Number(player.seekForwardStepSec ?? 10)))
@@ -195,7 +189,7 @@ function buildPlaybackPatchFromDraft(): PatchPlayerSettingsBody | null {
       hardwareEncoder: normalizeHardwareEncoderPreference(playbackHardwareEncoderDraft.value),
       nativePlayerCommand: nextBackendCommand,
       streamPushEnabled: playbackStreamPushEnabledDraft.value,
-      forceStreamPush: playbackForceStreamPushDraft.value,
+      ...(!playbackStreamPushEnabledDraft.value ? { forceStreamPush: false } : {}),
       ffmpegCommand: playbackFfmpegCommandDraft.value.trim() || "ffmpeg",
     } : {}),
     nativePlayerPreset: playbackNativePlayerPresetDraft.value,
@@ -215,7 +209,6 @@ function playbackDraftMatchesServer(): boolean {
       normalizeHardwareEncoderPreference(playbackHardwareEncoderDraft.value) ===
         normalizeHardwareEncoderPreference(player.hardwareEncoder) &&
       playbackStreamPushEnabledDraft.value === (player.streamPushEnabled !== false) &&
-      playbackForceStreamPushDraft.value === Boolean(player.forceStreamPush) &&
       (playbackFfmpegCommandDraft.value.trim() || "ffmpeg") ===
         ((player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg")
     )) &&
@@ -318,7 +311,6 @@ watchDebounced(
       playbackNativePlayerEnabledDraft.value,
       playbackNativePlayerProtocolTemplateDraft.value,
       playbackStreamPushEnabledDraft.value,
-      playbackForceStreamPushDraft.value,
       playbackFfmpegCommandDraft.value,
       playbackPreferNativePlayerDraft.value,
       playbackSeekForwardStepDraft.value,
@@ -350,17 +342,6 @@ watch(
   },
   { immediate: true },
 )
-
-/**
- * 推流开关与「强制 HLS」的关系（单向）：
- * - 关闭推流时：顺带关闭强制（无法在无推流时强制 HLS）。
- * - 开启推流时：绝不自动开启强制（禁止在此处或其它路径把 force 置为 true）。
- */
-watch(playbackStreamPushEnabledDraft, (enabled) => {
-  if (!enabled && playbackForceStreamPushDraft.value) {
-    playbackForceStreamPushDraft.value = false
-  }
-})
 
 onBeforeUnmount(() => {
   if (playbackSavedFlashTimer) clearTimeout(playbackSavedFlashTimer)
@@ -444,26 +425,6 @@ onBeforeUnmount(() => {
               </SettingsHint>
             </div>
             <Switch v-model="playbackStreamPushEnabledDraft" />
-          </div>
-
-          <div
-            v-if="isServerLocal && isPlaybackTestingEnv"
-            class="rounded-lg border border-amber-500/35 bg-amber-500/8 p-4"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <SettingsHint :text="t('settings.playbackForceStreamPushHint')">
-                  <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-                    <span>{{ t("settings.playbackForceStreamPush") }}</span>
-                    <SettingsScopeBadge scope="server" />
-                  </p>
-                </SettingsHint>
-              </div>
-              <Switch
-                v-model="playbackForceStreamPushDraft"
-                :disabled="!playbackStreamPushEnabledDraft"
-              />
-            </div>
           </div>
 
           <div v-if="isServerLocal" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">

@@ -2262,5 +2262,27 @@
     "viewerPrevious": "Previous image",
     "viewerNext": "Next image",
     "viewerMode": "Mode"
+  },
+  "debug": {
+    "title": "Debug tools",
+    "description": "Application diagnostics, performance monitoring and debug actions",
+    "actions": "Actions",
+    "performance": "Performance",
+    "logs": "Logs",
+    "settings": "Configuration",
+    "reload": "Reload",
+    "loading": "Loading…",
+    "loaded": "Latest configuration loaded",
+    "reloadHint": "Reload server configuration without changing saved settings.",
+    "connectivity": "Connectivity",
+    "networkHint": "Test using the proxy configuration saved on the server.",
+    "metadata": "Metadata site",
+    "network": "Global network",
+    "running": "Testing…",
+    "passed": "Passed",
+    "failed": "Failed",
+    "webOnly": "This action requires Web API mode.",
+    "streamDisabled": "Enable streaming in playback settings first.",
+    "retry": "Retry"
   }
 }

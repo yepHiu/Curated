@@ -2262,5 +2262,27 @@
     "viewerPrevious": "上一张",
     "viewerNext": "下一张",
     "viewerMode": "模式"
+  },
+  "debug": {
+    "title": "调试工具",
+    "description": "应用诊断、性能监控与调试操作",
+    "actions": "调试操作",
+    "performance": "性能监控",
+    "logs": "日志",
+    "settings": "程序配置",
+    "reload": "重新读取",
+    "loading": "正在读取…",
+    "loaded": "已读取最新配置",
+    "reloadHint": "重新读取服务器配置，不会修改已保存的设置。",
+    "connectivity": "连通检测",
+    "networkHint": "使用服务器已保存的代理配置发起检测。",
+    "metadata": "元数据站点",
+    "network": "国际网络",
+    "running": "检测中…",
+    "passed": "通过",
+    "failed": "失败",
+    "webOnly": "此操作需要 Web API 模式。",
+    "streamDisabled": "请先在播放设置中开启推流。",
+    "retry": "重试"
   }
 }

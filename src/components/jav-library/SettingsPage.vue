@@ -65,7 +65,6 @@ import SettingsMaintenanceSection from "@/components/jav-library/settings/Settin
 import SettingsMetadataSection from "@/components/jav-library/settings/SettingsMetadataSection.vue"
 import SettingsConnectedClientsSection from "@/components/jav-library/settings/SettingsConnectedClientsSection.vue"
 import SettingsLoggingSection from "@/components/jav-library/settings/SettingsLoggingSection.vue"
-import SettingsHomepageDevTools from "@/components/jav-library/settings/SettingsHomepageDevTools.vue"
 import SettingsAutoUpdateSection from "@/components/jav-library/settings/SettingsAutoUpdateSection.vue"
 /** 浏览器插件联动设置按需加载。 */
 const SettingsWishlistSection = defineAsyncComponent(() => import("@/components/jav-library/settings/SettingsWishlistSection.vue"))
@@ -2358,11 +2357,7 @@ async function runMetadataRefreshForSelected() {
         :health-supported="useWebApi"
         @run-full-scan="runFullScan"
       />
-      <SettingsLoggingSection :auto-save-ready="settingsAutoSaveReady" />
-      <SettingsHomepageDevTools
-        v-if="isViteDev && useWebApi"
-        @refreshed="void loadAboutHealth()"
-      />
+      <SettingsLoggingSection v-if="!isViteDev" :auto-save-ready="settingsAutoSaveReady" />
     </section>
     </TabsContent>
 

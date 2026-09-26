@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest"
 import DevEnvironmentBadge from "./DevEnvironmentBadge.vue"
 
 describe("DevEnvironmentBadge", () => {
+  it("opens debug tools even when the performance bar is visible", async () => {
+    const wrapper = mount(DevEnvironmentBadge)
+    await wrapper.get('[aria-label="Open debug tools"]').trigger("click")
+    expect(wrapper.emitted("showDebugTools")).toHaveLength(1)
+  })
+
   it("keeps the dev watermark visible without the perf restore action by default", () => {
     const wrapper = mount(DevEnvironmentBadge)
 

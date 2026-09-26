@@ -22,7 +22,7 @@ const patchPlayerSettings = vi.fn(async (patch: PatchPlayerSettingsBody) => {
 })
 const advancedLabels = [
   "settings.hardwareDecode", "settings.playbackHardwareEncoder",
-  "settings.playbackStreamPushEnabled", "settings.playbackForceStreamPush",
+  "settings.playbackStreamPushEnabled",
   "settings.playbackFfmpegCommand",
 ]
 let wrapper: ReturnType<typeof render> | undefined
@@ -69,10 +69,14 @@ describe("playback settings visibility and saving", () => {
     for (const label of advancedLabels) expect(wrapper.text()).not.toContain(label)
     await flushPromises()
     for (const label of advancedLabels) expect(wrapper.text()).toContain(label)
+    expect(wrapper.text()).not.toContain("settings.playbackForceStreamPush")
+    playerSettings.value.forceStreamPush = false
     const inputs = wrapper.findAllComponents({ name: "Input" })
     inputs[0]!.vm.$emit("update:modelValue", "/new/ffmpeg")
     await vi.advanceTimersByTimeAsync(600)
     expect(patchPlayerSettings).toHaveBeenCalledWith(expect.objectContaining({ ffmpegCommand: "/new/ffmpeg" }))
+    expect(patchPlayerSettings.mock.calls[0]![0]).not.toHaveProperty("forceStreamPush")
+    expect(playerSettings.value.forceStreamPush).toBe(false)
   })
 
   // 远端、旧服务端和不可确认状态均采用同一精简界面与保存边界。
@@ -100,6 +104,17 @@ describe("playback settings visibility and saving", () => {
     expect(playerSettings.value.ffmpegCommand).toBe("/updated/ffmpeg")
     expect(playerSettings.value.hardwareEncoder).toBe("amf")
     expect(playerSettings.value.nativePlayerCommand).toBe("/server/bin/player")
+  })
+
+  it("clears forced HLS when streaming is explicitly disabled", async () => {
+    wrapper = render()
+    await flushPromises()
+    const switches = wrapper.findAllComponents({ name: "Switch" })
+    switches[1]!.vm.$emit("update:modelValue", false)
+    await vi.advanceTimersByTimeAsync(600)
+    expect(patchPlayerSettings).toHaveBeenCalledWith(expect.objectContaining({
+      streamPushEnabled: false, forceStreamPush: false,
+    }))
   })
 
   it("does not autosave normalized hidden fields when opening remote settings", async () => {

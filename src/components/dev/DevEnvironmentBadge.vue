@@ -10,12 +10,13 @@ withDefaults(
 
 const emit = defineEmits<{
   showPerformanceMonitor: []
+  showDebugTools: []
 }>()
 </script>
 
 <template>
   <div
-    class="pointer-events-none fixed right-3 bottom-3 z-[90] flex items-center gap-1.5"
+    class="pointer-events-none fixed right-3 bottom-3 z-40 flex items-center gap-1.5"
     aria-label="Development environment"
   >
     <span
@@ -33,6 +34,16 @@ const emit = defineEmits<{
       @click="emit('showPerformanceMonitor')"
     >
       perf
+    </button>
+    <button
+      type="button"
+      class="pointer-events-auto select-none rounded-md border border-border bg-background px-2 py-1 font-mono text-[0.65rem] font-bold tracking-widest text-muted-foreground uppercase shadow-sm transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      data-dev-debug-trigger
+      aria-label="Open debug tools"
+      aria-haspopup="dialog"
+      @click="emit('showDebugTools')"
+    >
+      debug
     </button>
   </div>
 </template>

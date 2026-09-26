@@ -2262,5 +2262,27 @@
     "viewerPrevious": "前の画像",
     "viewerNext": "次の画像",
     "viewerMode": "モード"
+  },
+  "debug": {
+    "title": "デバッグツール",
+    "description": "アプリの診断、パフォーマンス監視とデバッグ操作",
+    "actions": "操作",
+    "performance": "パフォーマンス",
+    "logs": "ログ",
+    "settings": "アプリ設定",
+    "reload": "再読み込み",
+    "loading": "読み込み中…",
+    "loaded": "最新の設定を読み込みました",
+    "reloadHint": "保存済みの設定を変更せずにサーバー設定を再読み込みします。",
+    "connectivity": "接続テスト",
+    "networkHint": "サーバーに保存されたプロキシ設定でテストします。",
+    "metadata": "メタデータサイト",
+    "network": "国際ネットワーク",
+    "running": "テスト中…",
+    "passed": "成功",
+    "failed": "失敗",
+    "webOnly": "この操作には Web API モードが必要です。",
+    "streamDisabled": "再生設定でストリーミングを有効にしてください。",
+    "retry": "再試行"
   }
 }

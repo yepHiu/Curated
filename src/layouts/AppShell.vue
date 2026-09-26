@@ -85,6 +85,7 @@ provide(openLibraryFromHomeKey, () => {
 })
 
 const isDev = import.meta.env.DEV
+const debugOpen = ref(false)
 
 /** 与 Tailwind lg 对齐：以下视为「窄屏」，侧栏自动收起，用抽屉进入导航 */
 const isLgUp = useMediaQuery("(min-width: 1024px)")
@@ -1039,7 +1040,7 @@ function clearActorsSearch() {
     </div>
 
     <ScanProgressDock />
-    <DevPerformanceBar v-if="isDev" />
+    <DevPerformanceBar v-if="isDev" v-model:debug-open="debugOpen" />
     <Toaster :theme="resolvedMode" />
 
     <Teleport to="body">
@@ -1076,6 +1077,7 @@ function clearActorsSearch() {
       v-if="isDev"
       :show-perf-restore="devPerformanceBarHidden"
       @show-performance-monitor="setDevPerformanceBarHidden(false)"
+      @show-debug-tools="debugOpen = true"
     />
   </div>
 </template>
