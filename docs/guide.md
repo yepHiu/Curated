@@ -543,3 +543,8 @@ Language/theme, current-session lock/unlock, local capture saving/directory/shor
 实现决定与验证记录：[Debug 工具弹窗](plan/2026-09-26-debug-tools-dialog.md)。
 
 Debug 的「模拟远程端」开关可在本机预览远端限制：三库路径只读，服务器播放高级选项、强制 HLS 与服务器更新操作隐藏。开启后标签显示 `DEBUG · REMOTE`；关闭恢复真实连接判断，切换路由或关闭弹窗不重置，刷新页面重置。仅开发模式有效，不改实际连接、服务端配置或权限。
+
+
+## Media collection empty states
+
+Movie, actor, comic, photo, wishlist, homepage, captured-frame and history pages share the same empty-state layout. A genuinely empty collection shows “Nothing here yet” with a short page-specific hint; searches and filters show “No matching content.” Loading and failures remain separate. An empty default wishlist tab checks for items in other states and offers clearing filters when needed. Device/server ownership and import permissions are unchanged. The shared implementation is `MediaEmptyState.vue`; see the [UI specification](reference/2026-03-24-frontend-ui-spec.md).
