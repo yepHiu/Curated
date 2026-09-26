@@ -145,7 +145,12 @@ jobs:
           cache-dependency-path: backend/go.sum
 
       - name: Run Go tests
-        run: go test ./...
+        id: go-tests
+        run: go test ./... 2>&1 | tee "$RUNNER_TEMP/go-tests.log"
+
+      - name: Report failed Go tests
+        if: failure() && steps.go-tests.outcome == 'failure'
+        run: python ../scripts/build/report-test-failure.py "$RUNNER_TEMP/go-tests.log"
 
       - name: Run go vet
         run: go vet ./...
