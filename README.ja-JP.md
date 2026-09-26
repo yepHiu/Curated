@@ -19,7 +19,7 @@
 
 # Curated
 
-Desktop のサイドバーまたはトレイからサーバー接続を保存・管理・切り替えできます。[接続ガイド](docs/guide.md#desktop-server-connections)を参照してください。
+Desktop の設定またはトレイからサーバー接続を保存・管理・切り替えできます。[接続ガイド](docs/guide.md#desktop-server-connections)を参照してください。
 
 キャプチャのプレビュー・再試行・取り消し、ソースフレーム、GIF/MP4/WebM クリップに対応しています。[操作ガイド](docs/guide.md#curated-capture-and-inspection)を参照してください。
 

@@ -496,3 +496,6 @@ Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed
 
 
 验证：设置相关 22 项单测（含新增区块 7 项）、Electron 58 项、类型检查与相关 ESLint 通过；Web API 生产构建通过，体积无提醒。独立临时 userData 的真实 Electron 验证只读列表 IPC、无效 ID 拒绝、由 Server renderer 发起已保存 ID 切换及既有隔离/失败恢复回归。Playwright 在现有开发页注入 Desktop 桥接，1280×720 / DPR 1 / 默认缩放的深色设置卡片截图检查正常；点击添加、连接分别传入管理入口与准确保存 ID，截图 `.workspace/server-connections/settings.png`。未重启用户现有 Desktop/Server；未运行完整跨平台显示缩放矩阵、未打包发布。
+
+
+2026-09-26 入口收敛：按用户要求移除侧边栏「服务器」按钮；日常连接管理统一从设置 → 网络与设备 → 服务器列表进入，托盘/macOS 应用菜单继续保留离线可用的本地管理入口。连接数据与切换行为不变。

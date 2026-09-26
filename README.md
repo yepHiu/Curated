@@ -19,7 +19,7 @@
 
 # Curated
 
-Desktop can save and switch server connections from the sidebar or tray. See [Desktop server connections](docs/guide.md#desktop-server-connections).
+Desktop can save and switch server connections from Settings or the tray. See [Desktop server connections](docs/guide.md#desktop-server-connections).
 
 Curated is a local-first media library: Vue 3 frontend, Go + SQLite backend, and an Electron desktop shell. The product name is **Curated**. The repository folder and npm package may still use **`jav-shadcn`**.
 
