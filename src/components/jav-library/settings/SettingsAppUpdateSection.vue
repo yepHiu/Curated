@@ -234,7 +234,7 @@ async function handleInstallUpdate() {
           <p :class="cn('text-sm font-medium', statusTextClass(panelTone))">
             {{ title }}
           </p>
-          <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+          <p v-if="status !== 'update-available'" class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
             {{ description }}
           </p>
         </div>

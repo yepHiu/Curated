@@ -192,7 +192,7 @@ describe("SettingsAppUpdateSection", () => {
     expect(text).not.toContain("0.0.0")
     expect(text).toContain("1.2.8")
     expect(text).toContain("发现可用更新")
-    expect(text).toContain("可前往 Release 页面下载安装。")
+    expect(text).not.toContain("可前往 Release 页面下载安装。")
     expect(text).not.toContain("发现可安装的新版本")
     expect(text).not.toContain("settings.appUpdateCurrentVersionLabel")
     expect(text).not.toContain("settings.appUpdateLatestVersionLabel")
