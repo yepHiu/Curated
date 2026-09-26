@@ -28,7 +28,7 @@ function showFromKeyboard(event: KeyboardEvent) {
       </TooltipTrigger>
       <TooltipPortal>
         <TooltipContent
-          side="top"
+          side="bottom"
           :side-offset="6"
           :collision-padding="12"
           class="z-50 max-w-[min(22rem,calc(100vw-2rem))] whitespace-pre-line rounded-xl border border-border/60 bg-popover px-3 py-2 text-xs font-normal leading-relaxed text-pretty text-popover-foreground shadow-lg"
