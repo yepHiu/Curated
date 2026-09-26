@@ -1,34 +1,34 @@
 {
   "schema": 1,
   "component": "server",
-  "version": "1.6.0",
-  "sourceCommit": "ebca8d16559913f180202473531acdd86519602d",
+  "version": "1.7.0",
+  "sourceCommit": "9e3e3de9a2ffacf3d72d0878a679990ee071f5c1",
   "artifacts": [
     {
       "component": "server",
       "variant": "standalone",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "channel": "stable",
       "platform": "windows",
       "arch": "x64",
       "format": "exe",
-      "fileName": "Curated-Server-Setup-1.6.0-windows-x64.exe",
-      "sha256": "9069cc81a9d0c5b525527049f4eb641642d00d828c70f1deee70de5ab2cf347c",
-      "sourceCommit": "ebca8d16559913f180202473531acdd86519602d",
-      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Server-Setup-1.6.0-windows-x64.exe"
+      "fileName": "Curated-Server-Setup-1.7.0-windows-x64.exe",
+      "sha256": "0856a536b672638f8aad374302b32defb74adf4fd459150c7e47e750f949b63b",
+      "sourceCommit": "9e3e3de9a2ffacf3d72d0878a679990ee071f5c1",
+      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.7.1/Curated-Server-Setup-1.7.0-windows-x64.exe"
     },
     {
       "component": "server",
       "variant": "standalone",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "channel": "stable",
       "platform": "windows",
       "arch": "x64",
       "format": "zip",
-      "fileName": "Curated-Server-1.6.0-windows-x64.zip",
-      "sha256": "8fd18dea2afeae184cdd61d6ff33b487ca0f0e953c85b898e56a29c034b6d6a2",
-      "sourceCommit": "ebca8d16559913f180202473531acdd86519602d",
-      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Server-1.6.0-windows-x64.zip"
+      "fileName": "Curated-Server-1.7.0-windows-x64.zip",
+      "sha256": "27d9d61efc45e12c28e705ff461cfd5aabb90b359b8f4e9a18c70064b9820e24",
+      "sourceCommit": "9e3e3de9a2ffacf3d72d0878a679990ee071f5c1",
+      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.7.1/Curated-Server-1.7.0-windows-x64.zip"
     }
   ]
 }
