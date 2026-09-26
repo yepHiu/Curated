@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { ArrowUpRight, Download, Loader2, Play, RefreshCw } from "lucide-vue-next"
+import { TooltipContent, TooltipPortal, TooltipProvider, TooltipRoot, TooltipTrigger } from "reka-ui"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useDesktopUpdate } from "@/composables/use-desktop-update"
 import { useAppUpdate } from "@/composables/use-app-update"
@@ -270,36 +271,56 @@ async function handleInstallUpdate() {
             }}
           </Button>
 
-          <Button
-            v-if="status !== 'unsupported' || desktopAvailable"
-            type="button"
-            variant="outline"
-            class="rounded-2xl"
-            :disabled="checkingUpdates"
-            data-app-update-check
-            @click="handleCheckNow"
-          >
-            <Loader2 v-if="checkingUpdates" class="mr-2 size-4 animate-spin" aria-hidden="true" />
-            <RefreshCw v-else class="mr-2 size-4" aria-hidden="true" />
-            {{ checkingUpdates ? t("settings.appUpdateCheckingAction") : t("settings.appUpdateCheckAction") }}
-          </Button>
+          <TooltipProvider :delay-duration="280">
+            <TooltipRoot v-if="status !== 'unsupported' || desktopAvailable">
+              <TooltipTrigger as-child>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  class="rounded-2xl"
+                  :disabled="checkingUpdates"
+                  :aria-label="checkingUpdates ? t('settings.appUpdateCheckingAction') : t('settings.appUpdateCheckAction')"
+                  data-app-update-check
+                  @click="handleCheckNow"
+                >
+                  <Loader2 v-if="checkingUpdates" class="size-4 animate-spin" aria-hidden="true" />
+                  <RefreshCw v-else class="size-4" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent side="top" :side-offset="6" class="z-50 rounded-xl border border-border/50 bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg">
+                  {{ checkingUpdates ? t("settings.appUpdateCheckingAction") : t("settings.appUpdateCheckAction") }}
+                </TooltipContent>
+              </TooltipPortal>
+            </TooltipRoot>
 
-          <Button
-            v-if="releaseUrl"
-            as-child
-            class="rounded-2xl border border-border"
-            :variant="status === 'update-available' ? 'secondary' : 'outline'"
-          >
-            <a
-              :href="releaseUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              data-app-update-release
-            >
-              <ArrowUpRight class="mr-2 size-4" aria-hidden="true" />
-              {{ t("settings.appUpdateOpenReleaseAction") }}
-            </a>
-          </Button>
+            <TooltipRoot v-if="releaseUrl">
+              <TooltipTrigger as-child>
+                <Button
+                  as-child
+                  size="icon-sm"
+                  class="rounded-2xl border border-border"
+                  :variant="status === 'update-available' ? 'secondary' : 'outline'"
+                >
+                  <a
+                    :href="releaseUrl"
+                    :aria-label="t('settings.appUpdateOpenReleaseAction')"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-app-update-release
+                  >
+                    <ArrowUpRight class="size-4" aria-hidden="true" />
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent side="top" :side-offset="6" class="z-50 rounded-xl border border-border/50 bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg">
+                  {{ t("settings.appUpdateOpenReleaseAction") }}
+                </TooltipContent>
+              </TooltipPortal>
+            </TooltipRoot>
+          </TooltipProvider>
         </div>
       </div>
 

@@ -205,7 +205,12 @@ describe("SettingsAppUpdateSection", () => {
     await download.trigger("click")
     expect(downloadInstallerMock).toHaveBeenCalledTimes(1)
 
+    const check = wrapper.get("[data-app-update-check]")
+    expect(check.text()).toBe("")
+    expect(check.attributes("aria-label")).toBe("检查更新")
     const release = wrapper.get("[data-app-update-release]")
+    expect(release.text()).toBe("")
+    expect(release.attributes("aria-label")).toBe("打开 Release 页面")
     expect(release.attributes("href")).toBe(
       "https://github.com/yepHiu/Curated/releases/tag/v1.2.8",
     )
