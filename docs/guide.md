@@ -499,3 +499,14 @@ Restart Server and Desktop after updating their code to enable the new capabilit
 The Server version source is `backend/internal/version/server.json`, moved from `scripts/release/versions/server.json` so Go can embed the same source during ordinary `go run` / `go build`. The component release planner reads this same file; there is no generated duplicate. Desktop remains `scripts/release/versions/desktop.json` at `0.1.0`. Bump each component only for its own releases.
 
 Release tooling continues injecting `-X curated-backend/internal/version.BuildStamp=<UTC timestamp>`. For direct Go builds without that flag, the existing fallback is Git commit time, then revision / unknown; that fallback is not the actual compilation time. Older clients still receive a string in `version`; consumers that used it as a timestamp must switch to `buildStamp`.
+
+
+### Remote storage directory access
+
+Storage directories are configured on the Server computer. When Desktop or a browser connects remotely, the movie, comic and photo settings show directory names, full Server paths and the default import directory as read-only information. Existing movie storage status is also shown. Add/remove/rename, default target selection, disk rebind, directory pickers, reveal and the path management toolbar are absent. To configure them, open Curated through `localhost` / loopback on the Server computer.
+
+HTTP health now returns request-specific `canManageLibraryPaths` with `Cache-Control: no-store`. Desktop checks its main-process `serverOrigin` against the actual API origin; missing capability fields, old bridges, unreachable servers and ambiguous LAN/proxy connections stay read-only. Both legacy and standalone Desktop can manage a verified local Server. Mock directory settings remain editable. Run the updated Server and restart Desktop after upgrading.
+
+The three root CRUD APIs and movie reveal/rebind reject remote requests with `403 LIBRARY_PATHS_READ_ONLY`. Changing `defaultImportLibraryPathId`, `defaultComicImportLibraryPathId` or `defaultPhotoImportLibraryPathId` through PATCH settings requires the same direct-local access; a mixed request is rejected before any fields are saved. No new configuration fields or migration are required. Reverse proxies must preserve external Host or forwarding headers; do not forward these management routes through a proxy that strips all client evidence.
+
+Remote uploads continue to use the configured Server destination. Directory reads, storage checks and other business actions retain their existing API behavior; this change does not make every scan or metadata operation local-only.

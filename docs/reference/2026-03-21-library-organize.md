@@ -109,3 +109,8 @@ Web 模式的开关和偏好由 `PATCH /api/settings` 原子持久化。写真�
 ## 浏览器插件联动（2026-09-23）
 
 `library-config.cfg` 的 `browserPluginEnabled` 默认为 `false`，在设置 → 网络修改，经 GET/PATCH `/api/settings` 读写。保存后立即控制插件请求，无需重启。开启后无需凭证提交愿望单；关闭保留已有条目并返回 `403 BROWSER_PLUGIN_DISABLED`。该偏好与 `lanEnabled` 独立，不改变 HTTP 监听地址。
+
+
+### 2026-09-26：默认导入目录的本机管理边界
+
+`library-config.cfg` 中 `defaultImportLibraryPathId`、`defaultComicImportLibraryPathId`、`defaultPhotoImportLibraryPathId` 的格式和持久化位置不变。通过 HTTP 修改这三个字段仅允许服务器所在电脑的 loopback 直连；远程请求返回 `403 LIBRARY_PATHS_READ_ONLY`，混合 PATCH 不部分保存。三个库的路径增删改、影片 reveal/rebind 同样限本机。远程界面只展示存储路径和默认目录，上传仍使用服务端配置的目标。参见操作指南 Remote storage directory access。

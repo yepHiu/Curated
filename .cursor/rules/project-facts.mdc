@@ -7,6 +7,12 @@ alwaysApply: true
 
 影片库路径以 SQLite `library_paths` 为准，包括主动删除后的空列表。迁移 `0056_library_paths_initialization.sql` 持久化初始化状态：仅全新数据库首次启动从主运行时配置 `libraryPaths` 导入，导入与标记同事务；已有数据库升级保留原列表（含空列表）。启动不再因列表为空重新填入默认路径，未指定路径的扫描也不再回退到主配置。此前已被旧版重新填回的路径，需要在新版中再次删除；不自动判断哪些现有路径应被移除。
 
+## 2026-09-26 远程存储路径只读
+
+HTTP health 新增请求级 `canManageLibraryPaths`（no-store）。三库设置使用 `useLibraryPathAccess` 联合实际 API、Desktop `serverOrigin` 与服务端本机能力；远程／未知／旧服务端默认只读，Mock 可编辑，同机 standalone Desktop 不受 legacy 更新包限制。只读组件展示名称、服务端路径、默认目录标记及已有影片存储状态，不挂载增删改对话框／目录选择／操作栏。
+
+三库路径 POST/PATCH/DELETE、影片 reveal/rebind 限直接 loopback 请求，否则 403 `LIBRARY_PATHS_READ_ONLY`；PATCH settings 三个默认导入目录字段在任何写入前校验。复用 `local_management.go` 的本机判断，更新限制保持原行为。远程上传仍写服务端默认目录；路径读与其它业务操作不因此禁用。无新增端点、配置或迁移；见拆分计划 §14。
+
 ## 2026-09-26 更新目标隔离
 
 关于页远程／未确认同机时仅显示 Desktop 更新操作，不展示 Server 安装动作、一体包链接／说明和更新徽标；后台自动下载与手动下载／安装／清理共用限制，每次写操作前重新核对权限。`getDesktopInfo()` 新增主进程实际 `serverOrigin`；前端要求页面与 API 均为 loopback、Desktop 为 legacy 且 Server origin 与 API 匹配，再结合 HTTP `localUpdateAllowed === true` 放行旧本机安装器。standalone Desktop 始终走自身通道。旧桥接／旧 Server 缺字段均不放行。

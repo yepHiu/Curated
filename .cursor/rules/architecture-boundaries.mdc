@@ -22,6 +22,10 @@ alwaysApply: true
 - Electron preload/main process IPC remains deliberately narrow: current code exposes `window.javLibrary.pickDirectory()` for native directory selection, a read-only `windowChrome` capability for platform-specific window styling, plus `getDesktopInfo()` / `checkDesktopUpdate()` for local component metadata and manifest checking (current development / legacy builds do not enter standalone update feeds). Business APIs remain on HTTP. Deep business IPC, mpv process control, and broader desktop file/permission bridges remain future desktop concerns unless current code proves otherwise.
 - Vue renderer code must not assume Electron, mpv, PotPlayer, or any native-player executable exists.
 
+## Storage Directory Ownership
+
+- Storage roots belong to Server. HTTP health exposes request-local `canManageLibraryPaths`; remote/unknown clients render read-only movie/comic/photo directory information. Three-library root CRUD, movie reveal/rebind and default import target changes are enforced as direct Server-local operations. Uploads still use Server-configured destinations. Mock remains editable; local standalone Desktop can manage directories independently of its update distribution.
+
 ## Frontend Business Code
 
 - HLS session identity belongs to a playback instance, not a movie: creating a new session must not evict another client's session for the same movie. The renderer releases its previous session after new media data is available and cleans up cancelled/late requests. Startup capacity is bounded and cancellable.

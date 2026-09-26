@@ -97,6 +97,7 @@ icon/       ブランド原資料（wordmark / appicon / mark）
 
 - 現在の段階は Web 優先 + 最小 Electron シェルです。より深い IPC、mpv、広範なネイティブ橋渡しは今後の目標です。
 - `docs/film-scanner/` は参考資料であり、本番モジュールツリーではありません。
+- リモートの保存先は読み取り専用です。設定は Server 側のパソコンで行い、アップロードには Server の保存先を使用します。[ガイド](docs/guide.md#remote-storage-directory-access)を参照。
 - リモート接続時は Desktop の更新のみを提供し、Server のインストール操作は確認済みのローカル接続に限定します。Desktop は現在手動ダウンロード方式です。[更新ガイド](docs/guide.md#update-target-and-remote-connections)を参照。
 - Server と Desktop の独立した 3 要素のバージョンを表示し、Server のビルドタイムスタンプも別途保持します。コンポーネント命名規則は実装済みで、分離インストーラーと移行は未実装です。[ガイド](docs/guide.md#desktop-version-and-component-release-planning)を参照。
 

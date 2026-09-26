@@ -270,13 +270,13 @@ GET    /api/insights/overview               # Bounded local watch/completion/rat
 GET    /api/insights/breakdown              # Bounded canonical actor/studio/tag full-attribution ranking (max 25)
 GET    /api/library/played-movies           # List played movies with timestamps
 POST   /api/library/played-movies/{id}      # Mark movie as played
-POST   /api/library/paths                   # Add library path
+POST   /api/library/paths                   # Add library path (Server-local only)
 POST   /api/library/paths/{id}/reveal       # Open configured library root in OS file manager
 GET    /api/library/paths/storage-status    # List storage availability for configured library roots
 POST   /api/library/paths/storage-status/check # Fresh storage probe; optional body libraryPathIds narrows scope
 POST   /api/library/paths/{id}/storage-binding/rebind # Bind a library path to the currently detected backing volume
-PATCH  /api/library/paths/{id}              # Update library path
-DELETE /api/library/paths/{id}              # Delete library path
+PATCH  /api/library/paths/{id}              # Update library path (Server-local only)
+DELETE /api/library/paths/{id}              # Delete library path (Server-local only)
 POST   /api/library/metadata-scrape         # Batch metadata refresh by library paths
 POST   /api/import/movies/code-check        # Preview catalog-code matches for filenames before import
 POST   /api/import/movies                   # Copy uploaded movie files into the configured default library path (returns import.movies task)
@@ -346,6 +346,8 @@ POST   /api/providers/ping-all              # Ping all providers
 **Actor canonical identities and audited merges:** Migrations `0035`/`0036` add `actors.normalized_name`, globally unique `actor_aliases`, and immutable `actor_merge_audits` whose ID/name snapshots do not pin live actor rows. Identity comparison uses Unicode NFKC, case folding, trim, and whitespace folding. Profile lookup, list search, exact library filtering, avatar/tag/link operations, scraping, and metadata ingestion resolve aliases to the canonical actor. `POST /api/library/actors/merge-preview` is read-only and returns an opaque token covering complete relevant state; `POST /api/library/actors/merge` requires `confirm:true`, rejects stale tokens and unresolved profile conflicts, and atomically preserves/deduplicates movie links, actor tags, ordered external links, profile/avatar state, recommendation feedback, aliases, and curated-frame actor JSON before deleting the source. A canonical target can later merge again without losing earlier audits. The actor detail UI provides the preview/decision/confirmation flow and canonicalizes old alias routes. Mock mode mirrors alias/audit persistence with `curated-actor-merges-v1`.
 
 **Personal Insights:** The lazy `/insights` route calls `GET /api/insights/overview` plus three parallel `GET /api/insights/breakdown` requests for `actor`, `studio`, and `tag`. Ranges are fixed to `30d`, `90d`, `365d`, and `all`, with explicit inclusive `from`/`to` local calendar days and an IANA timezone; Go embeds `time/tzdata` for packaged Windows builds. `watchedSeconds` and started movies come from bounded `playback_daily_watch_time` aggregation. Completed means a movie watched in the selected range whose **current** saved progress reaches 90%; rated/average use the **current** local user rating for started movies, not historical completion/rating event times. Empty denominators return JSON `null`. Breakdowns are capped at 25, use stable ordering and `full-per-entity` attribution, so totals across actors/tags may exceed 100%; canonical actor aliases do not create separate rows. Mock mode performs the same bounded aggregate inside the adapter from local watch-time/progress state and never exposes raw rows to the page. Range changes reject stale responses, and null rates render as `—`, not a misleading `0%`.
+
+**Library path management:** HTTP health exposes request-local `canManageLibraryPaths` (no-store). Three-library root POST/PATCH/DELETE, movie reveal/rebind, and PATCH settings default import ids require direct loopback access; remote writes return `403 LIBRARY_PATHS_READ_ONLY`. Mixed settings requests are rejected before mutations. Frontend checks the API and Desktop main-owned Server origin and shows remote/unknown paths read-only; uploads still use Server destinations.
 
 **Library storage presence:** `GET /api/library/paths/storage-status`, `POST /api/library/paths/storage-status/check`, and `POST /api/library/paths/{id}/storage-binding/rebind` report whether configured library roots are online, offline, mismatched to their previously bound volume, missing, permission denied, or unknown. Windows is the primary supported volume-identity implementation; macOS/Linux currently rely on the fallback path probe and are future adaptation targets. The frontend checks storage on Web API startup, surfaces abnormal paths through the new toast/notification center, blocks scan/import actions when `canRescan` or `canImport` is false, and exposes manual rebind in Settings -> Video library for deliberate disk replacement or path migration.
 
@@ -600,8 +602,8 @@ Both libraries default off. `GET/PATCH /api/settings` reads/persists independent
 
 | Method | Route | Behavior |
 | --- | --- | --- |
-| GET / POST | `/api/library/comics/paths`, `/api/library/photos/paths` | List or add independent roots |
-| PATCH / DELETE | `/api/library/comics/paths/{id}`, `/api/library/photos/paths/{id}` | Update or remove a root |
+| GET / POST | `/api/library/comics/paths`, `/api/library/photos/paths` | List roots; add only on Server computer |
+| PATCH / DELETE | `/api/library/comics/paths/{id}`, `/api/library/photos/paths/{id}` | Update or remove a root on Server computer only |
 | POST | `/api/library/comics/scans`, `/api/library/photos/scans` | Queue ZIP/CBZ scan; optional `paths` restricts to configured roots |
 | POST | `/api/import/comics` | Copy uploaded archives to default comic root; preserve source and reject overwrite |
 | POST | `/api/import/photos` | Upload ZIP/CBZ to default photo root; Beta required; preserve source; no overwrite; queue photo scan |
