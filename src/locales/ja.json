@@ -1028,7 +1028,6 @@
     "desktopDevelopment": "開発版",
     "desktopInfoLoading": "バージョンを読み込み中…",
     "desktopInfoError": "Desktop のバージョンを取得できません",
-    "desktopCheckAction": "Desktop の更新を確認",
     "desktopDownloadAction": "インストーラーをダウンロード",
     "desktopUpdateStatus": {
       "development": "開発版では正式版の更新を受信しません。",
@@ -1476,7 +1475,7 @@
     "appUpdatePublishedAtLabel": "公開日時",
     "appUpdateCheckedAtLabel": "最終確認",
     "appUpdateToastAvailable": "新しいバージョンがあります: {version}",
-    "appUpdateToastCurrent": "すでに最新バージョンです。",
+    "appUpdateToastCurrent": "現在のインストールパッケージは最新です。",
     "curatedShortcutTitle": "キャプチャショートカット",
     "curatedShortcutHelpAria": "キャプチャショートカットの説明を表示",
     "curatedShortcutBody": "プレイヤーで現在のフレームを保存する単一キーのショートカットを設定します。再生用の予約キーは再利用できません：{keys}。",

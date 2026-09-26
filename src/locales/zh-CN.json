@@ -1028,7 +1028,6 @@
     "desktopDevelopment": "开发版",
     "desktopInfoLoading": "正在读取版本…",
     "desktopInfoError": "无法读取桌面版本",
-    "desktopCheckAction": "检查 Desktop 更新",
     "desktopDownloadAction": "下载安装包",
     "desktopUpdateStatus": {
       "development": "开发版不参与正式更新。",
@@ -1476,7 +1475,7 @@
     "appUpdatePublishedAtLabel": "发布时间",
     "appUpdateCheckedAtLabel": "最近检查",
     "appUpdateToastAvailable": "发现新版本：{version}",
-    "appUpdateToastCurrent": "当前已经是最新版本。",
+    "appUpdateToastCurrent": "当前安装包已是最新版本。",
     "curatedShortcutTitle": "萃取帧快捷键",
     "curatedShortcutHelpAria": "查看萃取帧快捷键说明",
     "curatedShortcutBody": "为播放器里的当前帧萃取设置单键快捷键。已被播放器占用的快捷键不能重复使用：{keys}。",

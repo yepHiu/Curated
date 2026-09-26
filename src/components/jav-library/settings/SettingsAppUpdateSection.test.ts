@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { computed, ref } from "vue"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import SettingsAppUpdateSection from "./SettingsAppUpdateSection.vue"
 
@@ -90,7 +90,7 @@ vi.mock("@/composables/use-app-update", () => ({
     appUpdateSummaryRef.current = summary
     return {
       summary: computed(() => summary.value),
-      status: computed(() => "update-available"),
+      status: computed(() => summary.value.status),
       loading: ref(false),
       downloading: ref(false),
       installing: ref(false),
@@ -118,6 +118,48 @@ vi.mock("@/components/ui/badge", () => ({
 }))
 
 describe("SettingsAppUpdateSection", () => {
+  afterEach(() => { delete window.javLibrary })
+
+  it("checks both targets with one button and stays busy until both finish", async () => {
+    let finishDesktop!: () => void
+    const desktopCheck = vi.fn(() => new Promise<{ status: "up-to-date" }>((resolve) => {
+      finishDesktop = () => resolve({ status: "up-to-date" })
+    }))
+    window.javLibrary = {
+      getDesktopInfo: vi.fn().mockResolvedValue({ version: "0.1.0", development: false, distribution: "desktop", platform: "macos", arch: "arm64" }),
+      checkDesktopUpdate: desktopCheck,
+    }
+    checkNowMock.mockResolvedValueOnce(createAppUpdateSummary())
+    const wrapper = mount(SettingsAppUpdateSection)
+    await flushPromises()
+    expect(wrapper.findAll("[data-app-update-check]")).toHaveLength(1)
+    expect(wrapper.find("[data-desktop-update-check]").exists()).toBe(false)
+    const button = wrapper.get("[data-app-update-check]")
+    await button.trigger("click")
+    await flushPromises()
+    expect(checkNowMock).toHaveBeenCalledOnce()
+    expect(desktopCheck).toHaveBeenCalledOnce()
+    expect(button.attributes("disabled")).toBeDefined()
+    finishDesktop()
+    await flushPromises()
+    expect(button.attributes("disabled")).toBeUndefined()
+    expect(wrapper.get("[data-desktop-update-status]").text()).toContain("settings.desktopUpdateStatus.up-to-date")
+  })
+
+  it("keeps the unified button usable when only Desktop supports checking, including failures", async () => {
+    appUpdateSummarySeed.current = createAppUpdateSummary({ supported: false, status: "unsupported" })
+    const desktopCheck = vi.fn().mockRejectedValue(new Error("offline"))
+    window.javLibrary = { getDesktopInfo: vi.fn().mockRejectedValue(new Error("offline")), checkDesktopUpdate: desktopCheck }
+    const wrapper = mount(SettingsAppUpdateSection)
+    await flushPromises()
+    await wrapper.get("[data-app-update-check]").trigger("click")
+    await flushPromises()
+    expect(checkNowMock).not.toHaveBeenCalled()
+    expect(desktopCheck).toHaveBeenCalledOnce()
+    expect(wrapper.get("[data-desktop-update-status]").text()).toContain("settings.desktopUpdateStatus.error")
+    expect(wrapper.get("[data-app-update-check]").attributes("disabled")).toBeUndefined()
+  })
+
   beforeEach(() => {
     checkNowMock.mockReset()
     checkNowSilentMock.mockReset()
@@ -140,6 +182,7 @@ describe("SettingsAppUpdateSection", () => {
     })
     const text = wrapper.text()
 
+    expect(wrapper.find("[data-desktop-update-section]").exists()).toBe(false)
     expect(text).toContain("Curated Server 版本号")
     expect(text).toContain("20260419.102030-dev")
     expect(text).toContain("安装包版本号")

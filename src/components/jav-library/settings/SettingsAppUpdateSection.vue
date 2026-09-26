@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { ArrowUpRight, Download, Loader2, Play, RefreshCw } from "lucide-vue-next"
 import { pushAppToast } from "@/composables/use-app-toast"
+import { useDesktopUpdate } from "@/composables/use-desktop-update"
 import { useAppUpdate } from "@/composables/use-app-update"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -35,10 +36,22 @@ const {
   downloadInstaller,
   installUpdate,
 } = useAppUpdate()
+const {
+  available: desktopAvailable,
+  info: desktopInfo,
+  infoError: desktopInfoError,
+  result: desktopResult,
+  loading: desktopLoading,
+  load: loadDesktopInfo,
+  check: checkDesktopUpdate,
+} = useDesktopUpdate()
+const checkingAll = ref(false)
+const checkingUpdates = computed(() => checkingAll.value || loading.value || desktopLoading.value)
 const releaseNotesExpanded = ref(false)
 
 onMounted(() => {
   ensureLoaded()
+  void loadDesktopInfo()
 })
 
 const panelTone = computed(() => {
@@ -133,6 +146,19 @@ async function toggleReleaseNotes() {
 }
 
 async function handleCheckNow() {
+  if (checkingUpdates.value) return
+  checkingAll.value = true
+  try {
+    await Promise.allSettled([
+      status.value !== "unsupported" ? handleInstallerCheck() : Promise.resolve(),
+      checkDesktopUpdate(),
+    ])
+  } finally {
+    checkingAll.value = false
+  }
+}
+
+async function handleInstallerCheck() {
   const next = await checkNow()
   if (next?.status === "update-available") {
     pushAppToast(
@@ -220,17 +246,17 @@ async function handleInstallUpdate() {
 
         <div class="flex flex-wrap items-center gap-2">
           <Button
-            v-if="status !== 'unsupported'"
+            v-if="status !== 'unsupported' || desktopAvailable"
             type="button"
             variant="outline"
             class="rounded-2xl"
-            :disabled="loading"
+            :disabled="checkingUpdates"
             data-app-update-check
             @click="handleCheckNow"
           >
-            <Loader2 v-if="loading" class="mr-2 size-4 animate-spin" aria-hidden="true" />
+            <Loader2 v-if="checkingUpdates" class="mr-2 size-4 animate-spin" aria-hidden="true" />
             <RefreshCw v-else class="mr-2 size-4" aria-hidden="true" />
-            {{ loading ? t("settings.appUpdateCheckingAction") : t("settings.appUpdateCheckAction") }}
+            {{ checkingUpdates ? t("settings.appUpdateCheckingAction") : t("settings.appUpdateCheckAction") }}
           </Button>
 
           <Button
@@ -282,7 +308,12 @@ async function handleInstallUpdate() {
         </div>
       </div>
 
-      <SettingsDesktopUpdateSection />
+      <SettingsDesktopUpdateSection
+        v-if="desktopAvailable"
+        :info="desktopInfo"
+        :info-error="desktopInfoError"
+        :result="desktopResult"
+      />
 
       <dl class="grid gap-3 sm:grid-cols-2">
         <div

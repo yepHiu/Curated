@@ -1028,7 +1028,6 @@
     "desktopDevelopment": "Development",
     "desktopInfoLoading": "Reading version…",
     "desktopInfoError": "Could not read Desktop version",
-    "desktopCheckAction": "Check Desktop updates",
     "desktopDownloadAction": "Download installer",
     "desktopUpdateStatus": {
       "development": "Development builds do not receive release updates.",
@@ -1488,7 +1487,7 @@
     "appUpdatePublishedAtLabel": "Published",
     "appUpdateCheckedAtLabel": "Last checked",
     "appUpdateToastAvailable": "A newer version is available: {version}",
-    "appUpdateToastCurrent": "You're already on the latest version.",
+    "appUpdateToastCurrent": "The current installation package is up to date.",
     "navJumpTo": "Jump to section…",
     "navAriaLabel": "Settings sections",
     "navOverview": "Overview",
