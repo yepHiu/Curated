@@ -137,9 +137,9 @@
   --scrollbar-track: rgb(15 18 25 / 6%);
   --scrollbar-thumb: rgb(15 18 25 / 18%);
   --scrollbar-thumb-hover: rgb(15 18 25 / 28%);
-  --app-sidebar-width: 304px;
+  --app-sidebar-width: 272px;
   --app-sidebar-collapsed-width: 4.75rem;
-  --app-sidebar-mobile-width: min(304px, 88vw);
+  --app-sidebar-mobile-width: min(272px, 88vw);
   --app-header-min-height: 4.5rem;
   --app-header-px: 1rem;
   --app-header-px-sm: 1.25rem;
@@ -168,9 +168,9 @@
 
 @media (hover: hover) and (pointer: fine) and (min-width: 1024px) and (min-resolution: 2dppx) {
   :root {
-    --app-sidebar-width: 280px;
+    --app-sidebar-width: 248px;
     --app-sidebar-collapsed-width: 4.5rem;
-    --app-sidebar-mobile-width: min(280px, 88vw);
+    --app-sidebar-mobile-width: min(248px, 88vw);
     --app-header-min-height: 4.125rem;
     --app-header-px-lg: 1.25rem;
     --app-header-py-lg: 0.75rem;
