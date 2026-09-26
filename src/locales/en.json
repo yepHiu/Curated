@@ -2264,6 +2264,8 @@
     "viewerMode": "Mode"
   },
   "debug": {
+    "simulateRemote": "Simulate remote client",
+    "simulateRemoteHint": "Apply remote-client UI restrictions: library paths are read-only, server playback controls and updates are hidden. Only affects this page session, not the actual connection or server permissions. Resets on reload.",
     "title": "Debug tools",
     "description": "Application diagnostics, performance monitoring and debug actions",
     "actions": "Actions",

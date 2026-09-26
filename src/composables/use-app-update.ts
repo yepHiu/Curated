@@ -1,4 +1,5 @@
 import { computed, readonly, ref } from "vue"
+import { devRemoteSimulation } from "@/lib/dev-remote-simulation"
 import { api } from "@/api/endpoints"
 import { HttpClientError, resolveApiBaseUrl } from "@/api/http-client"
 import type { AppUpdateInstallBody, AppUpdateStatusDTO } from "@/api/types"
@@ -9,7 +10,7 @@ import type { DesktopInfo } from "../../electron/desktop-contract"
 import { isLocalUpdateTarget } from "@/lib/app-update-target"
 
 const desktopInfo = ref<DesktopInfo | null>(null)
-const localTarget = computed(() => isLocalUpdateTarget(
+const localTarget = computed(() => !devRemoteSimulation.value && isLocalUpdateTarget(
   resolveApiBaseUrl(import.meta.env), window.location.origin, !!window.javLibrary, desktopInfo.value,
 ))
 const localUpdateAllowed = computed(() => localTarget.value && summary.value?.localUpdateAllowed === true)

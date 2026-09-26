@@ -12,6 +12,9 @@ import SettingsLoggingSection from "@/components/jav-library/settings/SettingsLo
 import { useLibraryService } from "@/services/library-service"
 import { useServerLocalAccess } from "@/composables/use-server-local-access"
 
+import { devRemoteSimulation, setDevRemoteSimulation } from "@/lib/dev-remote-simulation"
+
+const isDev = import.meta.env.DEV
 const open = defineModel<boolean>("open", { default: false })
 const tab = defineModel<string>("tab", { default: "actions" })
 const { t } = useI18n()
@@ -44,7 +47,7 @@ function errorMessage(error: unknown) {
 }
 
 async function loadSettings() {
-  if (loading.value || saving.value) return
+  if (!isDev || loading.value || saving.value) return
   loading.value = true
   ready.value = false
   loadError.value = ""
@@ -100,7 +103,7 @@ async function probe(target: "metadata" | "network") {
 </script>
 
 <template>
-  <Dialog v-model:open="open">
+  <Dialog v-if="isDev" v-model:open="open">
     <DialogContent @close-auto-focus="restoreFocus" class="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden p-4 sm:max-w-3xl sm:p-6">
       <DialogHeader class="shrink-0 pr-6">
         <DialogTitle>{{ t("debug.title") }}</DialogTitle>
@@ -114,6 +117,19 @@ async function probe(target: "metadata" | "network") {
         </TabsList>
         <div class="min-h-0 overflow-y-auto overscroll-contain">
           <TabsContent value="actions" class="mt-0 space-y-3">
+            <section class="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
+              <div class="flex flex-wrap items-center gap-2">
+                <SettingsHint :text="t('debug.simulateRemoteHint')">
+                  <h3 id="debug-remote-label" class="text-sm font-semibold">{{ t("debug.simulateRemote") }}</h3>
+                </SettingsHint>
+                <SettingsScopeBadge scope="client" />
+              </div>
+              <Switch
+                :model-value="devRemoteSimulation"
+                aria-labelledby="debug-remote-label"
+                @update:model-value="setDevRemoteSimulation"
+              />
+            </section>
             <section class="rounded-xl border border-border bg-card p-4">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <SettingsHint :text="t('debug.reloadHint')">

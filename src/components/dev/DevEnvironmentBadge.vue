@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { devRemoteSimulation } from "@/lib/dev-remote-simulation"
+
+const isDev = import.meta.env.DEV
 withDefaults(
   defineProps<{
     showPerfRestore?: boolean
@@ -16,6 +19,7 @@ const emit = defineEmits<{
 
 <template>
   <div
+    v-if="isDev"
     class="pointer-events-none fixed right-3 bottom-3 z-40 flex items-center gap-1.5"
     aria-label="Development environment"
   >
@@ -43,7 +47,7 @@ const emit = defineEmits<{
       aria-haspopup="dialog"
       @click="emit('showDebugTools')"
     >
-      debug
+      debug{{ devRemoteSimulation ? " · remote" : "" }}
     </button>
   </div>
 </template>

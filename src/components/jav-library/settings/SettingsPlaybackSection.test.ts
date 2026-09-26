@@ -2,6 +2,7 @@ import { flushPromises, shallowMount } from "@vue/test-utils"
 import { ref } from "vue"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { PatchPlayerSettingsBody, PlayerSettingsDTO } from "@/api/types"
+import { setDevRemoteSimulation } from "@/lib/dev-remote-simulation"
 import SettingsPlaybackSection from "./SettingsPlaybackSection.vue"
 
 const { health, service } = vi.hoisted(() => {
@@ -37,6 +38,7 @@ function render() {
 
 beforeEach(() => {
   // 每例从同一份已保存配置开始，避免去抖和客户端存储相互污染。
+  setDevRemoteSimulation(false)
   vi.useFakeTimers()
   vi.stubEnv("VITE_USE_WEB_API", "true")
   vi.stubEnv("VITE_API_BASE_URL", "http://localhost:8080/api")
@@ -56,12 +58,31 @@ beforeEach(() => {
 afterEach(() => {
   // 卸载组件以取消计时器，再恢复全局运行环境。
   wrapper?.unmount()
+  setDevRemoteSimulation(false)
   vi.useRealTimers()
   vi.unstubAllEnvs()
   delete window.javLibrary
 })
 
 describe("playback settings visibility and saving", () => {
+  it("immediately hides infrastructure in simulated remote mode and omits it from saves", async () => {
+    wrapper = render()
+    await flushPromises()
+    expect(wrapper.text()).toContain("settings.hardwareDecode")
+    setDevRemoteSimulation(true)
+    await flushPromises()
+    expect(wrapper.text()).not.toContain("settings.hardwareDecode")
+    wrapper.findAllComponents({ name: "Input" })[2]!.vm.$emit("update:modelValue", "30")
+    await vi.advanceTimersByTimeAsync(600)
+    const patch = patchPlayerSettings.mock.calls[0]![0]
+    expect(patch.seekForwardStepSec).toBe(30)
+    expect(patch).not.toHaveProperty("hardwareDecode")
+    expect(patch).not.toHaveProperty("ffmpegCommand")
+    setDevRemoteSimulation(false)
+    await flushPromises()
+    expect(wrapper.text()).toContain("settings.hardwareDecode")
+  })
+
   // 覆盖共享页面的两种本机入口，确认探测前不会闪现高级选项。
   it.each(["web", "desktop"])("shows server controls only after verifying local %s", async (client) => {
     if (client === "desktop") window.javLibrary = { getDesktopInfo: vi.fn().mockResolvedValue({ serverOrigin: "http://localhost:8080" }) }

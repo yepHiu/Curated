@@ -1,6 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { defineComponent } from "vue"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { setDevRemoteSimulation } from "@/lib/dev-remote-simulation"
 import { useLibraryPathAccess } from "./use-library-path-access"
 
 const health = vi.hoisted(() => vi.fn())
@@ -14,14 +15,40 @@ function render() {
 }
 
 beforeEach(() => {
+  setDevRemoteSimulation(false)
   vi.stubEnv("VITE_USE_WEB_API", "true")
   vi.stubEnv("VITE_API_BASE_URL", "http://localhost:8080/api")
   delete window.javLibrary
   health.mockReset().mockResolvedValue({ canManageLibraryPaths: true })
 })
-afterEach(() => { vi.unstubAllEnvs(); delete window.javLibrary })
+afterEach(() => { setDevRemoteSimulation(false); vi.unstubAllEnvs(); delete window.javLibrary })
 
 describe("library path access", () => {
+  it.each([true, false])("reacts to simulation in Web API=%s without changing real permission", async (web) => {
+    vi.stubEnv("VITE_USE_WEB_API", String(web))
+    const wrapper = render()
+    await flushPromises()
+    expect(wrapper.text()).toBe("true")
+    setDevRemoteSimulation(true)
+    await flushPromises()
+    expect(wrapper.text()).toBe("false")
+    setDevRemoteSimulation(false)
+    await flushPromises()
+    expect(wrapper.text()).toBe("true")
+    wrapper.unmount()
+  })
+
+  it("never grants local rights to a real remote connection after simulation is disabled", async () => {
+    health.mockResolvedValue({ canManageLibraryPaths: false })
+    setDevRemoteSimulation(true)
+    const wrapper = render()
+    await flushPromises()
+    setDevRemoteSimulation(false)
+    await flushPromises()
+    expect(wrapper.text()).toBe("false")
+    wrapper.unmount()
+  })
+
   it("starts read-only and enables a verified local browser", async () => {
     const wrapper = render()
     expect(wrapper.text()).toBe("false")

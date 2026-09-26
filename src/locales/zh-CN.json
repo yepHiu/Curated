@@ -2264,6 +2264,8 @@
     "viewerMode": "模式"
   },
   "debug": {
+    "simulateRemote": "模拟远程端",
+    "simulateRemoteHint": "按远程连接展示本机管理权限：资料库路径只读，隐藏服务器播放高级选项和更新操作。只影响当前页面会话，不改变实际连接或服务器权限；刷新页面后重置。",
     "title": "调试工具",
     "description": "应用诊断、性能监控与调试操作",
     "actions": "调试操作",

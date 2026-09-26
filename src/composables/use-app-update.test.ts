@@ -62,6 +62,26 @@ afterEach(() => {
 })
 
 describe("useAppUpdate", () => {
+  it("immediately blocks server updates while remote simulation is enabled", async () => {
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    vi.stubEnv("VITE_API_BASE_URL", "http://localhost:8080/api")
+    const { setDevRemoteSimulation } = await import("@/lib/dev-remote-simulation")
+    const state = await loadUseAppUpdate()
+    await state.refreshStatus()
+    expect(state.localUpdateAllowed.value).toBe(true)
+    setDevRemoteSimulation(true)
+    expect(state.localUpdateAllowed.value).toBe(false)
+    await state.downloadInstaller()
+    await state.installUpdate()
+    await state.clearDownloadedInstaller()
+    expect(apiMocks.downloadAppUpdateInstaller).not.toHaveBeenCalled()
+    expect(apiMocks.installAppUpdate).not.toHaveBeenCalled()
+    expect(apiMocks.clearDownloadedAppUpdateInstaller).not.toHaveBeenCalled()
+    setDevRemoteSimulation(false)
+    await state.refreshStatus()
+    expect(state.localUpdateAllowed.value).toBe(true)
+  })
+
   it("reports unsupported when Web API is disabled", async () => {
     vi.stubEnv("VITE_USE_WEB_API", "false")
 

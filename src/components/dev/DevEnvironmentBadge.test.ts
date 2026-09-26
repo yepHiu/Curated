@@ -1,8 +1,15 @@
 import { mount } from "@vue/test-utils"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import DevEnvironmentBadge from "./DevEnvironmentBadge.vue"
 
+afterEach(() => vi.unstubAllEnvs())
+
 describe("DevEnvironmentBadge", () => {
+  it("does not show developer entries in production", () => {
+    vi.stubEnv("DEV", false)
+    expect(mount(DevEnvironmentBadge).find("button").exists()).toBe(false)
+  })
+
   it("opens debug tools even when the performance bar is visible", async () => {
     const wrapper = mount(DevEnvironmentBadge)
     await wrapper.get('[aria-label="Open debug tools"]').trigger("click")

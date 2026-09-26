@@ -1,4 +1,5 @@
-import { onMounted, readonly, ref } from "vue"
+import { computed, onMounted, ref } from "vue"
+import { devRemoteSimulation } from "@/lib/dev-remote-simulation"
 import { api } from "@/api/endpoints"
 import { resolveApiBaseUrl } from "@/api/http-client"
 import { isLocalServerTarget } from "@/lib/app-update-target"
@@ -27,5 +28,5 @@ export function useServerLocalAccess() {
     }
   })
 
-  return { isServerLocal: readonly(isServerLocal) }
+  return { isServerLocal: computed(() => !devRemoteSimulation.value && isServerLocal.value) }
 }

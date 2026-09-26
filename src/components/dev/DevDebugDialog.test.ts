@@ -1,6 +1,7 @@
 import { flushPromises, shallowMount } from "@vue/test-utils"
 import { ref } from "vue"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { devRemoteSimulation, setDevRemoteSimulation } from "@/lib/dev-remote-simulation"
 import DevDebugDialog from "./DevDebugDialog.vue"
 
 const mocks = vi.hoisted(() => ({ service: vi.fn(), access: vi.fn() }))
@@ -25,6 +26,7 @@ function button(key: string) {
   return wrapper!.findAllComponents({ name: "Button" }).find((item) => item.text() === key)!
 }
 beforeEach(() => {
+  setDevRemoteSimulation(false)
   vi.stubEnv("VITE_USE_WEB_API", "true")
   vi.clearAllMocks()
   refreshSettings.mockResolvedValue(undefined)
@@ -34,9 +36,29 @@ beforeEach(() => {
   mocks.access.mockReturnValue({ isServerLocal })
   mocks.service.mockReturnValue({ playerSettings, refreshSettings, patchPlayerSettings, pingProxyJavbus, pingProxyGoogle })
 })
-afterEach(() => { wrapper?.unmount(); vi.unstubAllEnvs() })
+afterEach(() => { wrapper?.unmount(); setDevRemoteSimulation(false); vi.unstubAllEnvs() })
 
 describe("debug tools", () => {
+  it("toggles remote simulation without saving any server settings", async () => {
+    wrapper = render()
+    await flushPromises()
+    wrapper.findAllComponents({ name: "Switch" }).find(item => item.attributes("aria-labelledby") === "debug-remote-label")!.vm.$emit("update:modelValue", true)
+    expect(devRemoteSimulation.value).toBe(true)
+    expect(patchPlayerSettings).not.toHaveBeenCalled()
+    await wrapper.setProps({ open: false })
+    expect(devRemoteSimulation.value).toBe(true)
+    await wrapper.setProps({ open: true })
+    wrapper.findAllComponents({ name: "Switch" }).find(item => item.attributes("aria-labelledby") === "debug-remote-label")!.vm.$emit("update:modelValue", false)
+    expect(devRemoteSimulation.value).toBe(false)
+  })
+
+  it("renders no debug dialog and does not load configuration in production", () => {
+    vi.stubEnv("DEV", false)
+    wrapper = render()
+    expect(wrapper.findComponent({ name: "Dialog" }).exists()).toBe(false)
+    expect(refreshSettings).not.toHaveBeenCalled()
+  })
+
   it("does not fetch while closed or trigger any mutation when opened", async () => {
     wrapper = render(false)
     expect(refreshSettings).not.toHaveBeenCalled()
@@ -54,7 +76,7 @@ describe("debug tools", () => {
     await flushPromises()
     expect(wrapper.text()).toContain("offline")
     expect(wrapper.findComponent({ name: "SettingsLoggingSection" }).exists()).toBe(false)
-    expect(wrapper.findComponent({ name: "Switch" }).attributes("disabled")).toBe("true")
+    expect(wrapper.findAllComponents({ name: "Switch" }).find(item => item.attributes("aria-labelledby") === "debug-force-hls-label")!.attributes("disabled")).toBe("true")
     await button("debug.retry").vm.$emit("click")
     await flushPromises()
     expect(wrapper.findComponent({ name: "SettingsLoggingSection" }).exists()).toBe(true)
@@ -64,7 +86,7 @@ describe("debug tools", () => {
     patchPlayerSettings.mockRejectedValueOnce(new Error("save failed"))
     wrapper = render()
     await flushPromises()
-    wrapper.findComponent({ name: "Switch" }).vm.$emit("update:modelValue", true)
+    wrapper.findAllComponents({ name: "Switch" }).find(item => item.attributes("aria-labelledby") === "debug-force-hls-label")!.vm.$emit("update:modelValue", true)
     await flushPromises()
     expect(patchPlayerSettings).toHaveBeenCalledWith({ forceStreamPush: true })
     expect(playerSettings.value.forceStreamPush).toBe(false)
@@ -75,14 +97,14 @@ describe("debug tools", () => {
     isServerLocal.value = false
     wrapper = render()
     await flushPromises()
-    expect(wrapper.findComponent({ name: "Switch" }).exists()).toBe(false)
+    expect(wrapper.findAllComponents({ name: "Switch" }).some(item => item.attributes("aria-labelledby") === "debug-force-hls-label")).toBe(false)
   })
 
   it("prevents forcing HLS when streaming is disabled", async () => {
     playerSettings.value.streamPushEnabled = false
     wrapper = render()
     await flushPromises()
-    wrapper.findComponent({ name: "Switch" }).vm.$emit("update:modelValue", true)
+    wrapper.findAllComponents({ name: "Switch" }).find(item => item.attributes("aria-labelledby") === "debug-force-hls-label")!.vm.$emit("update:modelValue", true)
     expect(patchPlayerSettings).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain("debug.streamDisabled")
   })
