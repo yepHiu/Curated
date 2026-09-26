@@ -226,7 +226,7 @@ CI 的生产前端构建步骤显式设置 `VITE_USE_WEB_API=true`，与 Windows
 
 ## 9. 生产包版本号
 
-独立组件开发目标维护在 `scripts/release/versions/{desktop,full}.json` 与 `backend/internal/version/server.json`（Go embed 与发行规划共用）；`plan-component` 只读输出包名，尚未替换下述旧一体包发布链路。Electron 编译同时生成 Desktop 本地版本元数据供关于页展示。
+独立组件开发目标维护在 `scripts/release/versions/{desktop,full}.json` 与 `backend/internal/version/server.json`（Go embed 与发行规划共用）；`plan-component` 只读输出包名；实际组件发行使用 `component_cd.py`，下述旧一体包链路作为 legacy 保留。Electron 编译同时生成 Desktop 本地版本元数据供关于页展示。
 
 - 生产包版本的唯一自动化来源是 `scripts/release/version.json`，当前基线为 `1.5.1`。
 - `pnpm release:*` 当前统一调用 `python scripts/release/release_cli.py`。
