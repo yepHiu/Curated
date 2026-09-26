@@ -174,7 +174,7 @@ describe("SettingsAppUpdateSection", () => {
     }
   })
 
-  it("renders backend build version plus a merged installer version summary", async () => {
+  it("renders Server version and build timestamp without an installer version row", async () => {
     const wrapper = mount(SettingsAppUpdateSection, {
       props: {
         backendVersionDisplay: "1.5.7",
@@ -188,8 +188,8 @@ describe("SettingsAppUpdateSection", () => {
     expect(text).toContain("Curated Server 版本号")
     expect(text).toContain("1.5.7")
     expect(wrapper.get("[data-server-build-stamp]").text()).toContain("20260419.102030")
-    expect(text).toContain("安装包版本号")
-    expect(text).toContain("0.0.0")
+    expect(text).not.toContain("安装包版本号")
+    expect(text).not.toContain("0.0.0")
     expect(text).toContain("1.2.8")
     expect(text).toContain("发现可用更新")
     expect(text).toContain("可前往 Release 页面下载安装。")

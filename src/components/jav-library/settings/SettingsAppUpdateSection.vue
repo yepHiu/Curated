@@ -107,15 +107,6 @@ const description = computed(() => {
 })
 
 const backendVersionDisplay = computed(() => props.backendVersionDisplay?.trim() ?? "")
-const installerVersionSummary = computed(() => {
-  const installed = summary.value?.installedVersion?.trim() ?? ""
-  const latest = summary.value?.latestVersion?.trim() ?? ""
-
-  if (installed && latest) {
-    return installed === latest ? installed : `${installed} -> ${latest}`
-  }
-  return installed || latest
-})
 const releaseUrl = computed(() => summary.value?.releaseUrl?.trim() ?? "")
 const installerDownloadUrl = computed(() => summary.value?.installerDownloadUrl?.trim() ?? "")
 const installerSha256 = computed(() => summary.value?.installerSha256?.trim() ?? "")
@@ -319,7 +310,7 @@ async function handleInstallUpdate() {
         :result="desktopResult"
       />
 
-      <dl class="grid gap-3 sm:grid-cols-2">
+      <dl class="grid gap-3">
         <div
           v-if="backendVersionDisplay"
           class="rounded-lg border border-border/50 bg-background/55 px-3 py-2.5"
@@ -339,18 +330,6 @@ async function handleInstallUpdate() {
           </dd>
           <dd v-if="backendBuildStamp" class="mt-1 break-all text-xs text-muted-foreground" data-server-build-stamp>
             {{ t('settings.serverBuildStampLabel') }} <span class="font-mono">{{ backendBuildStamp }}</span>
-          </dd>
-        </div>
-
-        <div
-          v-if="installerVersionSummary"
-          class="rounded-lg border border-border/50 bg-background/55 px-3 py-2.5"
-        >
-          <dt class="text-xs font-medium text-muted-foreground">
-            {{ t("settings.aboutInstallerVersionLabel") }}
-          </dt>
-          <dd class="mt-1 font-mono text-sm text-foreground">
-            {{ installerVersionSummary }}
           </dd>
         </div>
       </dl>
