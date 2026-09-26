@@ -124,6 +124,8 @@ Vite usually serves `http://localhost:5173`.
 
 On macOS, native window buttons sit in a 40px strip above the sidebar brand, with the sidebar background continuing behind them. There is no divider below the brand. In wide windows the content toolbar keeps its original top position and height; narrow windows reserve space for the window buttons. Drag the empty header area to move the window; search and toolbar controls remain interactive. Collapsed navigation reserves space for the system buttons. See [window chrome notes](plan/2026-09-26-macos-integrated-titlebar.md).
 
+The macOS Dock uses `public/Curated-icon-macos.png`, with the original artwork centered at about 84% of a transparent canvas to match typical Mac icon proportions. Fully quit and reopen Electron after changing this asset. Regeneration instructions are in [the icon guide](../icon/README.md).
+
 ```powershell
 pnpm dev:electron
 ```

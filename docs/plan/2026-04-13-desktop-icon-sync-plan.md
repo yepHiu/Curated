@@ -18,6 +18,13 @@
 - 删除未使用的模板 favicon 及本地构建目录中的对应副本，更新入口图标 URL 的版本参数，避免浏览器沿用旧图标缓存。
 - 验收以粉色图案外接框为准：源图上下留白 79 / 79 px、左右 78 / 79 px；栅格尺寸奇偶差允许最多半像素的中心偏差。维护规则见 `icon/README.md`。
 
+### 2026-09-26 macOS Dock 视觉尺寸修正
+
+- 原源图的深色底外接框占满 322 × 322 画布，直接传给 `app.dock.setIcon` 时视觉尺寸偏大。
+- 新增 `public/Curated-icon-macos.png`，把源图原尺寸放在 384 × 384 透明画布中央，四边留 31 px，主体宽度占 83.85%。
+- Electron 仅为 macOS Dock 选择此派生图，缺失时回退现有图标；托盘与 Web / Windows 资源继续使用原图。完整退出并重新启动 Electron 后生效。
+- 生成方法见 `icon/README.md`；验证画布尺寸、透明外接框与原图像素一致性，并运行 Electron 测试及主进程编译。尚无 macOS 安装包构建流程，此次修正运行时 Dock 图标。
+
 ### Task 1: Record the canonical icon source
 
 **Files:**
