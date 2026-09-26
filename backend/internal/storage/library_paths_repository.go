@@ -313,14 +313,30 @@ func (s *SQLiteStore) DeleteLibraryPathAndPruneOrphanMovies(ctx context.Context,
 	return pruned, nil
 }
 
-// SeedLibraryPathsIfEmpty inserts default paths when the table has no rows.
+// SeedLibraryPathsIfEmpty imports configuration paths once for a fresh database.
+// An initialized database's empty list is intentional and must survive restarts.
 func (s *SQLiteStore) SeedLibraryPathsIfEmpty(ctx context.Context, paths []string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var initialized int
+	if err := tx.QueryRowContext(ctx, `SELECT initialized FROM library_paths_initialization WHERE id = 1`).Scan(&initialized); err != nil {
+		return err
+	}
+	if initialized != 0 {
+		return nil
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE library_paths_initialization SET initialized = 1 WHERE id = 1`); err != nil {
+		return err
+	}
 	var count int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM library_paths`).Scan(&count); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM library_paths`).Scan(&count); err != nil {
 		return err
 	}
 	if count > 0 {
-		return nil
+		return tx.Commit()
 	}
 
 	index := 0
@@ -341,7 +357,7 @@ func (s *SQLiteStore) SeedLibraryPathsIfEmpty(ctx context.Context, paths []strin
 		id := fmt.Sprintf("library-%d", index)
 		title := fmt.Sprintf("Library path %d", index)
 		ts := nowUTC()
-		if _, err := s.db.ExecContext(ctx,
+		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO library_paths (id, path, title, created_at, updated_at, first_library_scan_pending) VALUES (?, ?, ?, ?, ?, 0)`,
 			id, p, title, ts, ts,
 		); err != nil {
@@ -351,7 +367,7 @@ func (s *SQLiteStore) SeedLibraryPathsIfEmpty(ctx context.Context, paths []strin
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 func isSQLiteUniqueConstraint(err error) bool {

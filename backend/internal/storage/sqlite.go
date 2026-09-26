@@ -73,6 +73,11 @@ func (s *SQLiteStore) Migrate(ctx context.Context) error {
 		return err
 	}
 
+	var existingMigrations int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&existingMigrations); err != nil {
+		return err
+	}
+
 	entries, err := fs.ReadDir(migrationFiles, "migrations")
 	if err != nil {
 		return err
@@ -105,6 +110,12 @@ func (s *SQLiteStore) Migrate(ctx context.Context) error {
 		if _, err := tx.ExecContext(ctx, string(statement)); err != nil {
 			_ = tx.Rollback()
 			return err
+		}
+		if entry.Name() == "0056_library_paths_initialization.sql" && existingMigrations == 0 {
+			if _, err := tx.ExecContext(ctx, `UPDATE library_paths_initialization SET initialized = 0 WHERE id = 1`); err != nil {
+				_ = tx.Rollback()
+				return err
+			}
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (name) VALUES (?)`, entry.Name()); err != nil {
 			_ = tx.Rollback()

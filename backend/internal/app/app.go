@@ -3092,14 +3092,7 @@ func (a *App) resolveScanPaths(ctx context.Context, paths []string) ([]string, e
 	if len(paths) > 0 {
 		return paths, nil
 	}
-	dbPaths, err := a.store.ListLibraryPathStrings(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if len(dbPaths) > 0 {
-		return dbPaths, nil
-	}
-	return append([]string(nil), a.cfg.LibraryPaths...), nil
+	return a.store.ListLibraryPathStrings(ctx)
 }
 
 // StartAutoScanLoop runs periodic library scans until ctx is cancelled. No-op if AutoScanIntervalSeconds <= 0.

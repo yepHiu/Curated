@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -116,6 +117,118 @@ func TestLibraryPathsEmptySeed(t *testing.T) {
 	n, _ := store.GetLibraryPathCount(ctx)
 	if n != 0 {
 		t.Fatalf("expected 0 rows, got %d", n)
+	}
+}
+
+func TestLibraryPathsStayEmptyAfterRestart(t *testing.T) {
+	for _, initiallyEmpty := range []bool{false, true} {
+		t.Run(fmt.Sprintf("initiallyEmpty=%t", initiallyEmpty), func(t *testing.T) {
+			ctx := context.Background()
+			root := t.TempDir()
+			databasePath := filepath.Join(root, "library.db")
+			defaults := []string{filepath.Join(root, "media")}
+			store, err := NewSQLiteStore(databasePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = store.Close() }()
+			if err := store.Migrate(ctx); err != nil {
+				t.Fatal(err)
+			}
+			initialPaths := defaults
+			if initiallyEmpty {
+				initialPaths = nil
+			}
+			if err := store.SeedLibraryPathsIfEmpty(ctx, initialPaths); err != nil {
+				t.Fatal(err)
+			}
+			paths, err := store.ListLibraryPaths(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, path := range paths {
+				if _, err := store.DeleteLibraryPathAndPruneOrphanMovies(ctx, path.ID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := store.Close(); err != nil {
+				t.Fatal(err)
+			}
+			store, err = NewSQLiteStore(databasePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Migrate(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.SeedLibraryPathsIfEmpty(ctx, defaults); err != nil {
+				t.Fatal(err)
+			}
+			paths, err = store.ListLibraryPaths(ctx)
+			if err != nil || len(paths) != 0 {
+				t.Fatalf("restart restored paths: %#v, err=%v", paths, err)
+			}
+		})
+	}
+}
+
+func TestLibraryPathsUpgradePreservesExistingList(t *testing.T) {
+	for _, hasPath := range []bool{false, true} {
+		t.Run(fmt.Sprintf("hasPath=%t", hasPath), func(t *testing.T) {
+			ctx := context.Background()
+			store := newMigratedTestStore(t)
+			var want []contracts.LibraryPathDTO
+			if hasPath {
+				path, err := store.AddLibraryPath(ctx, filepath.Join(t.TempDir(), "existing"), "Existing")
+				if err != nil {
+					t.Fatal(err)
+				}
+				want = append(want, path)
+			}
+			// Recreate the schema state of an old installation before upgrading.
+			if _, err := store.db.ExecContext(ctx, `DROP TABLE library_paths_initialization;
+				DELETE FROM schema_migrations WHERE name = '0056_library_paths_initialization.sql'`); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Migrate(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.SeedLibraryPathsIfEmpty(ctx, []string{filepath.Join(t.TempDir(), "default")}); err != nil {
+				t.Fatal(err)
+			}
+			paths, err := store.ListLibraryPaths(ctx)
+			if err != nil || len(paths) != len(want) {
+				t.Fatalf("upgrade changed paths: %#v, want %#v, err=%v", paths, want, err)
+			}
+			if hasPath && paths[0] != want[0] {
+				t.Fatalf("upgrade changed existing path: %#v, want %#v", paths[0], want[0])
+			}
+		})
+	}
+}
+
+func TestLibraryPathsSeedFailureCanRetry(t *testing.T) {
+	ctx := context.Background()
+	store := newMigratedTestStore(t)
+	paths := []string{filepath.Join(t.TempDir(), "first"), filepath.Join(t.TempDir(), "second")}
+	if _, err := store.db.ExecContext(ctx, `CREATE TRIGGER fail_library_seed BEFORE INSERT ON library_paths
+		WHEN NEW.id = 'library-2' BEGIN SELECT RAISE(ABORT, 'seed failed'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SeedLibraryPathsIfEmpty(ctx, paths); err == nil {
+		t.Fatal("expected seed failure")
+	}
+	if count, err := store.GetLibraryPathCount(ctx); err != nil || count != 0 {
+		t.Fatalf("seed was not rolled back: count=%d, err=%v", count, err)
+	}
+	if _, err := store.db.ExecContext(ctx, `DROP TRIGGER fail_library_seed`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SeedLibraryPathsIfEmpty(ctx, paths); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := store.GetLibraryPathCount(ctx); err != nil || count != 2 {
+		t.Fatalf("seed retry: count=%d, err=%v", count, err)
 	}
 }
 
