@@ -10,7 +10,7 @@
 - 当前更新检查由 Go `internal/appupdate` 执行，以 `version.PackageVersion()` 比较 GitHub 最新发布。开发态回退值为 `0.0.0`；该值不是本机 Desktop 版本。不能把现有「安装包版本」直接改名为「Desktop 版本」。
 - 现有资产解析只选择 EXE，并优先名称含 setup/installer 的资产，没有按 Desktop / Server、客户端平台和架构独立匹配。因此 macOS Desktop 不能把现有后端检查结果当作自身更新；没有匹配产物时应明确说明未提供更新包。
 - 已落地的 Windows 一体安装包名为 `Curated-Setup-<version>.exe`，便携包为 `Curated-<version>-windows-x64.zip`。当前发布版本文件为 `1.5.7`。打包时 Electron 的 `curated-desktop` package 版本被写成同批发布版本；它是内部包标识，不是独立 Desktop 安装包已实现的证据。
-- 第 10 节的 Full / Server / Desktop 三包名称仍是建议，尚未由脚本实现；macOS 的 DMG/PKG 形式、架构和最终名称也未落地。本次只核对并补记事实，没有实施独立 Desktop 更新器或更改发布命名。
+- 首次核对时，第 10 节的三包名称仍是建议。后续命名规范已在第 11 节落盘；独立 Desktop 更新器、三包构建和 macOS 安装链仍未实现。
 
 用户希望桌面端能够独立连接其他机器上的 Curated 服务端：首次未连接时填写地址和端口，之后能够更换服务器，并增加 SSDP 自动发现。本轮仅讨论需求。
 
@@ -96,11 +96,11 @@ Desktop 在加载页面失败、网络中断或服务器重启时保留本地连
 
 ## 9. 补充讨论：产品命名与发行边界
 
-用户提出：拆分之后需要考虑 Web 端与桌面端的产品关系，服务端可能命名为 servers 或 core，桌面端命名为 desktop。当前已明确界面交付及安装组合方向；下列对外名称仍为建议。
+用户提出：拆分之后需要考虑 Web 端与桌面端的产品关系，服务端可能命名为 servers 或 core，桌面端命名为 desktop。当前已明确界面交付及安装组合方向；2026-09-26 起发布规范采用下列对外名称，文件命名见第 11 节。
 
 ### 9.1 同一品牌下的两个发行产品与一个浏览器入口
 
-| 名称建议 | 定位 | 交付内容 |
+| 发行名称 | 定位 | 交付内容 |
 |---|---|---|
 | Curated Server | 资料库服务端，部署在 NAS、服务器或本机 | Go 服务、数据库与媒体管理、API、SSDP 发布，以及配套 Web UI |
 | Curated Desktop | 安装在用户电脑上的桌面客户端 | 本地连接管理、SSDP 搜索、桌面集成，连接后加载 Server 的资料库界面 |
@@ -116,7 +116,7 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 - Server 独立运行，本机和远程遵循相同生命周期边界，Desktop 不负责拉起或结束 Server 进程。Server 的启动、停止和开机运行由自身的安装及运行机制负责，具体机制待设计。
 - Desktop 是连接已有 Server 的客户端，不内置 Server。“本机一体使用”由完整包默认同时安装 Server 和 Desktop 提供，安装组合不改变独立运行关系。
 - 设置区分“此设备”和“服务器”；更新入口分别显示桌面版本和服务器版本，更新 Desktop 不隐式更新远端 Server。
-- Server 与 Desktop 可独立发布；初期可以同步版本号降低维护成本，但连接兼容性由明确的 API/桥接协议与能力范围决定，不能永久要求产品版本号完全一致。
+- Server 与 Desktop 使用独立版本线，不再要求初期同步版本号；但连接兼容性由明确的 API/桥接协议与能力范围决定，不能永久要求产品版本号完全一致。
 
 ### 9.3 对界面交付方式的影响
 
@@ -124,7 +124,7 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 
 业务功能更新通常只需更新 Server；连接管理、SSDP、本机集成或 Electron 运行时的变化才需要更新 Desktop。仍需维护 Server Web UI 与 Desktop 桥接协议的兼容：可选桌面能力缺失时隐藏或降级相关功能；确有必需能力不兼容时明确提示所需 Desktop 版本，保留连接管理入口。版本不必完全一致。
 
-产品名称仍建议为 Curated Server / Curated Desktop / Curated Web；最终命名及远程网络覆盖范围仍待确认。界面交付方式与安装组合方向不再列为未决选项。
+产品名称确定为 Curated Server / Curated Desktop / Curated Web；远程网络覆盖范围仍待确认。界面交付方式与安装组合方向不再列为未决选项。
 
 ### 9.4 三种安装包与默认安装体验
 
@@ -138,7 +138,7 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 
 建议下载页将完整包作为有桌面环境的普通用户默认推荐，明确标注三个包的组件，避免把“Server 默认安装 Desktop”错误应用于纯 Server 包。完整包若提供组件选择，“安装 Desktop”默认勾选；是否允许取消可在安装器交互阶段确定，不影响三个独立包的要求。
 
-三种包是两个组件的不同组合，不形成三套业务实现。完整包复用与独立包一致的 Server / Desktop 构建产物，并记录各组件版本。容器/NAS 发行物保留纯 Server 形态；具体平台支持及安装文件命名仍待发布设计，不表示每个平台均需生成三种图形安装器。
+三种包是两个组件的不同组合，不形成三套业务实现。完整包复用与独立包一致的 Server / Desktop 构建产物，并记录各组件版本。容器/NAS 发行物保留纯 Server 形态；安装文件命名以第 11 节为准；具体平台支持仍待安装链实现，不表示每个平台均需生成三种图形安装器。
 
 建议组合安装在新装 Desktop 且无连接记录时提供本机实际服务地址，作为明确的连接候选；启动后仍执行身份、可达性及认证检查。此本机入口不依赖 SSDP 多播，服务端只监听 loopback 时也应可用。若已有 Desktop，保留上次服务器与用户偏好，不强制改连本机。
 
@@ -253,9 +253,9 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 
 **构建与安装：**
 
-- CLI 拟增加 `--variant full|server|desktop`；一次发布分配一次版本，分别构建两个组件，再组合三包，不能打三次包递增三次 patch。初期同批版本，manifest 保留组件版本，为将来独立发布留边界。
+- CLI 拟增加 `--variant full|server|desktop`；分别读取组件版本，按第 11 节命名。一次组件发布分配一次版本并复用到各平台和包格式；组装 Full 不递增或重写组件版本。Full 使用单独的分发版本，manifest 必须记录真实组件版本。
 - Server 组件包含 Go、Web UI、FFmpeg 与必需资源；Desktop 组件包含 Electron、本地连接页与桥接资源。建立包内容清单和自动断言，防止纯 Desktop 带进 Go/FFmpeg、纯 Server 带进 Electron。
-- 建议产物名称为 `Curated-Full-Setup-<version>-windows-x64.exe`、`Curated-Server-Setup-<version>-windows-x64.exe`、`Curated-Desktop-Setup-<version>-windows-x64.exe`；最终名称需和旧更新器迁移一起确定。
+- 产物名称按第 11 节执行；新旧 feed 的迁移隔离仍是发布前置条件，不能仅重命名当前一体产物来冒充纯组件包。
 - 两组件各自固定安装身份、安装目录及卸载入口；推荐完整包作为离线组合安装器调用同版本独立安装器，避免三个不同安装身份重复写同一组文件。验证提权后仍保留原用户上下文，用户数据不能落入另一管理员账户。
 - 完整包默认安装两者，检查已有版本，不无条件降级；部分安装失败明确报告已装/失败组件，重试幂等。不得为回滚本次失败删除用户原有组件。
 - Server 安装启动就绪后向新装 Desktop 提供实际本机地址，不覆盖已有连接；桌面快捷方式与 Server 管理入口区分。已出产的 installer/portable 包保留，新增产物不以清理旧包为前提。
@@ -321,3 +321,57 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 - 网络范围是否先验收同机/LAN；异地 HTTPS 地址可手动输入，但公网部署能力不在本轮自动承诺。
 
 当前计划按上述较小范围的建议编排；在开始实施前根据用户反馈调整，不据此假定额外产品需求已获确认。
+
+
+## 11. 2026-09-26：拆分发行命名与版本规范
+
+状态：本节确定拆分发行物的命名规则；Desktop 起点默认按独立 `0.1.0` 测试线、`1.0.0` 首个稳定版规划，未实际写入发行版本，用户可选择沿用旧版本线。当前打包脚本仍是 Windows 一体包实现，不能把规范落盘等同于三包生成和独立更新已经完成。本节取代前文「包名尚未确定」及「两组件初期同批同版本」的建议。
+
+### 11.1 安装包名
+
+文件名区分大小写，产品使用 `Curated`，组件使用 `Full` / `Server` / `Desktop`；版本不带 `v`。平台统一为 `windows` / `macos` / `linux`，架构统一为 `x64` / `arm64`（若实际提供 macOS 双架构包才使用 `universal`），不得将 arm64 产物标成 x64。
+
+| 用途 | 文件名规范 | 示例（版本仅示意） |
+|---|---|---|
+| Windows 完整安装包 | `Curated-Full-Setup-<bundleVersion>-windows-<arch>.exe` | `Curated-Full-Setup-1.6.0-windows-x64.exe` |
+| Windows Server 安装包 | `Curated-Server-Setup-<serverVersion>-windows-<arch>.exe` | `Curated-Server-Setup-1.6.0-windows-x64.exe` |
+| Windows Desktop 安装包 | `Curated-Desktop-Setup-<desktopVersion>-windows-<arch>.exe` | `Curated-Desktop-Setup-1.0.0-windows-x64.exe` |
+| macOS Desktop 磁盘映像 | `Curated-Desktop-<desktopVersion>-macos-<arch>.dmg` | `Curated-Desktop-1.0.0-macos-arm64.dmg` |
+| Windows 便携包 | `Curated-<component>-<version>-windows-<arch>.zip` | `Curated-Desktop-1.0.0-windows-x64.zip` |
+| Linux 归档包（预留） | `Curated-<component>-<version>-linux-<arch>.tar.gz` | `Curated-Server-1.6.0-linux-x64.tar.gz` |
+
+macOS Desktop 首选 DMG；内部应用显示为 `Curated Desktop.app`。若后续提供需要安装服务的 macOS Server / Full 安装器，预留 `Curated-Server-Setup-<version>-macos-<arch>.pkg` 与 `Curated-Full-Setup-<version>-macos-<arch>.pkg`，不能仅改扩展名生成。DMG、PKG、Linux 归档及新架构仍需各自安装/签名/升级验收，不是本次新增可发布平台。
+
+应用身份、安装目录、签名标识、文件名分别管理。内部 npm 包标识 `curated-desktop` 不作为用户下载文件名；Web 随 Server 发布，没有第三套 Web 安装包。
+
+### 11.2 版本归属
+
+- **Server：** 延续现有 `1.5.x` 历史，不因拆分清零。当前 `1.5.7`，首个拆分版可规划为 `1.6.0`，实际发布前按兼容性评审确认；若破坏既有公开协议，应按 SemVer 升主版本。
+- **Desktop：** 单独维护 SemVer，起点方案见 11.3。只在桌面客户端变化时升级，包括本地连接页、窗口/托盘、SSDP 客户端、桥接、安全修复及 Electron 运行时；Server 托管业务页面变化不自动增加 Desktop 版本。
+- **Full：** 使用独立 `bundleVersion`（首批规划 `1.6.0`），表示这次安装组合。manifest 明确记录 `serverVersion` 和 `desktopVersion`，不能以 Full 版本覆盖二者。组件或安装器组合发生变化就发布新的 Full 版本；例如 Server `1.6.0`、Desktop `1.0.0` 组成 Full `1.6.0`，之后仅 Desktop 修复到 `1.0.1`，可组成 Full `1.6.1`，Server 仍是 `1.6.0`。关于页展示实际组件版本，Full 版本只用于安装记录。
+- 同一组件的 Windows/macOS 和 x64/arm64 产物共享一次发行版本；打包格式转换、测试编译、CI 重试不递增版本。已公开版本的资产不得以不同内容覆盖，修复后发布新 patch。
+
+### 11.3 Desktop 版本规划（默认独立起点，未分配发行版本）
+
+推荐独立产品线：本地开发 `0.1.0-dev`，首批对外测试 `0.1.0-beta.1`，迭代为 `0.1.0-beta.2`；完成 Server 解耦、连接切换、桥接隔离、平台安装与独立更新验收后进入 `1.0.0-rc.1`，正式首版为 `1.0.0`。不将当前尚内置/托管后端的开发壳标为已完成的 `1.0.0`。
+
+备选是延续旧一体壳的 `1.5.x` 历史，以 `1.6.0-dev` / `1.6.0-beta.1` 起步，正式拆分版为 `1.6.0`。无论选哪种，之后都与 Server 独立递增。
+
+| 变化 | Desktop 版本动作 |
+|---|---|
+| 窗口按钮、字体/间距、崩溃或安全缺陷修复，兼容的运行时升级 | patch，例如 `1.0.0 → 1.0.1` |
+| 新增兼容的连接功能、发现方式或桌面能力 | minor，例如 `1.0.1 → 1.1.0` |
+| 不兼容的公开桥接/连接配置变化或不兼容平台支持调整 | major，例如 `1.1.0 → 2.0.0` |
+| 未发布的开发改动 | 保持下个目标版本的 `-dev`，构建时间/提交 SHA 单独显示 |
+
+开发版不能拿 `0.0.0` 或 `0.0.1-master` 冒充正式安装版本；测试/预发布默认不进入 stable 更新通道。Electron 自身的 `42.x` 仅是运行时版本，不是 Curated Desktop 产品版本。构建信息不用作更新排序依据。
+
+**旧壳迁移：** 已发布的一体安装包内 Electron 也使用 `1.5.x`。若独立 Desktop 从 `1.0.0` 开始，不能复用旧安装/自动更新身份后直接比较这两个版本；必须使用独立 Desktop 安装身份并通过明确迁移过程识别旧一体包。旧一体更新通道仍按原版本递增。不能让安装器将新独立 Desktop 判断为旧壳降级。
+
+### 11.4 版本来源、更新与验收边界
+
+- 发布实现拟增加独立组件版本源，例如 `scripts/release/versions/server.json`、`desktop.json`、`full.json`；现有 `version.json` 在旧更新通道退役前保留为 legacy 来源。构建读取对应源并生成 Electron package、Server 链接版本及 manifest，不能手工维护多份互相矛盾的版本。
+- manifest 至少含 `component/variant/version/platform/arch/format/url/sha256`；Full 再包含两组件准确版本。更新器按组件、平台、架构及通道匹配，不依靠文件名猜组件、不回退到任意 EXE。
+- Release tag 规划为 `desktop-v<version>`、`server-v<version>`、`full-v<version>`。tag 前缀本身不能隔离 GitHub `/releases/latest`：旧 feed 继续只有兼容完整包，新组件必须使用隔离 feed 或组件 manifest；在迁移前不能把新三包随意放入旧客户端读取的 latest。
+- 关于页分别显示本机 `Curated Desktop`（可信主进程 `app.getVersion()`）和当前连接的 `Curated Server`（health）。浏览器不显示 Desktop 行。Desktop 在可信本地流程检查自身版本，Server 独立检查自身版本；开发态、离线、无匹配系统/架构包均要准确说明。
+- 本次不改当前包的实际版本、不发布安装包、不切换旧更新源。脚本落地应与阶段 5 的组件构建、内容断言、安装身份及更新迁移一起完成；禁止仅改旧打包字符串，产出名称为 Desktop 却仍含 Go/FFmpeg 的错误安装包。

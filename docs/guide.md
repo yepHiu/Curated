@@ -30,6 +30,7 @@ Current architecture is **web-first plus a minimal desktop shell**. Business API
 
 Longer product and architecture writing:
 
+- [Desktop / Server package naming and version policy (planned, packaging migration pending)](plan/2026-09-25-desktop-server-connection-and-ssdp.md#11-2026-09-26拆分发行命名与版本规范)
 - [Product design (current vs target)](product/2026-03-20-jav-libary.md)
 - [Feature inventory](features/2026-05-03-feature-inventory.md)
 - [Architecture and implementation](reference/architecture-and-implementation.html)
