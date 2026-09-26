@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { useServerLocalAccess } from "@/composables/use-server-local-access"
 import { useSettingsScrollPreserve } from "@/composables/use-settings-scroll-preserve"
 import {
   defaultNativePlayerBackendCommand,
@@ -45,6 +46,7 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const libraryService = useLibraryService()
+const { isServerLocal } = useServerLocalAccess()
 const { withPreservedScroll } = useSettingsScrollPreserve()
 
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
@@ -163,6 +165,7 @@ function playbackHardwareEncoderLabel(value: HardwareEncoderPreference): string 
   }
 }
 
+/** 远端只提交可见偏好，避免携带过期的底层服务端配置或原生命令。 */
 function buildPlaybackPatchFromDraft(): PatchPlayerSettingsBody | null {
   const forward = Number.parseInt(playbackSeekForwardStepDraft.value, 10)
   const backward = Number.parseInt(playbackSeekBackwardStepDraft.value, 10)
@@ -187,33 +190,38 @@ function buildPlaybackPatchFromDraft(): PatchPlayerSettingsBody | null {
       ? nextDefault
       : currentCommand
   return {
-    hardwareDecode: playbackHardwareDecodeDraft.value,
-    hardwareEncoder: normalizeHardwareEncoderPreference(playbackHardwareEncoderDraft.value),
+    ...(isServerLocal.value ? {
+      hardwareDecode: playbackHardwareDecodeDraft.value,
+      hardwareEncoder: normalizeHardwareEncoderPreference(playbackHardwareEncoderDraft.value),
+      nativePlayerCommand: nextBackendCommand,
+      streamPushEnabled: playbackStreamPushEnabledDraft.value,
+      forceStreamPush: playbackForceStreamPushDraft.value,
+      ffmpegCommand: playbackFfmpegCommandDraft.value.trim() || "ffmpeg",
+    } : {}),
     nativePlayerPreset: playbackNativePlayerPresetDraft.value,
     nativePlayerEnabled: playbackNativePlayerEnabledDraft.value,
-    nativePlayerCommand: nextBackendCommand,
-    streamPushEnabled: playbackStreamPushEnabledDraft.value,
-    forceStreamPush: playbackForceStreamPushDraft.value,
-    ffmpegCommand: playbackFfmpegCommandDraft.value.trim() || "ffmpeg",
     preferNativePlayer: playbackPreferNativePlayerDraft.value,
     seekForwardStepSec: forward,
     seekBackwardStepSec: backward,
   }
 }
 
+/** 隐藏字段不参与脏值检测，防止远端触发无关的自动保存。 */
 function playbackDraftMatchesServer(): boolean {
   const player = libraryService.playerSettings.value
   return (
-    playbackHardwareDecodeDraft.value === (player.hardwareDecode !== false) &&
-    normalizeHardwareEncoderPreference(playbackHardwareEncoderDraft.value) ===
-      normalizeHardwareEncoderPreference(player.hardwareEncoder) &&
+    (!isServerLocal.value || (
+      playbackHardwareDecodeDraft.value === (player.hardwareDecode !== false) &&
+      normalizeHardwareEncoderPreference(playbackHardwareEncoderDraft.value) ===
+        normalizeHardwareEncoderPreference(player.hardwareEncoder) &&
+      playbackStreamPushEnabledDraft.value === (player.streamPushEnabled !== false) &&
+      playbackForceStreamPushDraft.value === Boolean(player.forceStreamPush) &&
+      (playbackFfmpegCommandDraft.value.trim() || "ffmpeg") ===
+        ((player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg")
+    )) &&
     playbackNativePlayerPresetDraft.value ===
       normalizeNativePlayerPresetForBrowserLaunch(player.nativePlayerPreset, player.nativePlayerCommand) &&
     playbackNativePlayerEnabledDraft.value === (player.nativePlayerEnabled !== false) &&
-    playbackStreamPushEnabledDraft.value === (player.streamPushEnabled !== false) &&
-    playbackForceStreamPushDraft.value === Boolean(player.forceStreamPush) &&
-    (playbackFfmpegCommandDraft.value.trim() || "ffmpeg") ===
-      ((player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg") &&
     playbackPreferNativePlayerDraft.value === Boolean(player.preferNativePlayer) &&
     Number.parseInt(playbackSeekForwardStepDraft.value, 10) ===
       Math.max(1, Number(player.seekForwardStepSec ?? 10)) &&
@@ -379,6 +387,7 @@ onBeforeUnmount(() => {
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
           <div
+            v-if="isServerLocal"
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
@@ -393,6 +402,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div
+            v-if="isServerLocal"
             class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
           >
             <div class="min-w-0 flex-1 flex flex-col gap-3">
@@ -422,6 +432,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div
+            v-if="isServerLocal"
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
@@ -436,7 +447,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div
-            v-if="isPlaybackTestingEnv"
+            v-if="isServerLocal && isPlaybackTestingEnv"
             class="rounded-lg border border-amber-500/35 bg-amber-500/8 p-4"
           >
             <div class="flex items-center justify-between gap-3">
@@ -455,7 +466,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+          <div v-if="isServerLocal" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <div class="flex min-w-0 flex-1 flex-col gap-3">
               <SettingsHint :text="t('settings.playbackFfmpegCommandHint')">
                 <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
