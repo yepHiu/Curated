@@ -109,6 +109,7 @@ func TestBrowserPluginSettings(t *testing.T) {
 	request := func(method, path, body, client string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, "http://localhost"+path, bytes.NewBufferString(body))
 		r.Header.Set("X-Curated-Client", client)
+		r.RemoteAddr = "127.0.0.1:1234"
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		return w

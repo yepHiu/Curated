@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useServerLocalAccess } from "@/composables/use-server-local-access"
 import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onMounted, ref, watch } from "vue"
@@ -37,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { authLockService, isAuthLockEnabled } from "@/services/auth-lock-service"
 
 const { t } = useI18n()
+const { isServerLocal } = useServerLocalAccess()
 
 const pinDraft = ref("")
 const confirmPinDraft = ref("")
@@ -80,11 +82,12 @@ const canChangePIN = computed(() =>
 onMounted(async () => {
   if (authEnabled.value) {
     await refreshAuthStatus()
-    if (status.value.pinEnabled) {
-      await refreshTrustedSessions()
-    }
   }
 })
+
+watch([isServerLocal, () => status.value.pinEnabled], () => {
+  if (isServerLocal.value && status.value.pinEnabled) void refreshTrustedSessions()
+}, { immediate: true })
 
 /** 关闭启用 PIN 对话框时清草稿。 */
 watch(setupDialogOpen, (open) => {
@@ -298,7 +301,7 @@ async function lockNow() {
 
 /** 刷新永久信任会话列表。 */
 async function refreshTrustedSessions() {
-  if (!authEnabled.value || !status.value.pinEnabled) {
+  if (!isServerLocal.value || !authEnabled.value || !status.value.pinEnabled) {
     return
   }
   try {
@@ -384,7 +387,7 @@ async function confirmTrustedSessionRevoke() {
           data-security-block
           class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
         >
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div v-if="isServerLocal" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 flex-col gap-1">
               <SettingsHint :text="status.pinEnabled ? t('settings.securityEnabledHint') : t('settings.securitySetupHint')">
                 <p class="text-sm font-semibold text-foreground">
@@ -433,7 +436,7 @@ async function confirmTrustedSessionRevoke() {
             </div>
           </div>
 
-          <Dialog v-model:open="setupDialogOpen">
+          <Dialog v-if="isServerLocal" v-model:open="setupDialogOpen">
             <DialogContent class="rounded-2xl border-border/70 sm:max-w-md">
               <form
                 data-setup-pin-form
@@ -486,7 +489,7 @@ async function confirmTrustedSessionRevoke() {
             </DialogContent>
           </Dialog>
 
-          <Dialog v-model:open="changeDialogOpen">
+          <Dialog v-if="isServerLocal" v-model:open="changeDialogOpen">
             <DialogContent class="rounded-2xl border-border/70 sm:max-w-md">
               <form
                 data-change-pin-form
@@ -549,7 +552,7 @@ async function confirmTrustedSessionRevoke() {
             </DialogContent>
           </Dialog>
 
-          <Dialog v-model:open="disableDialogOpen">
+          <Dialog v-if="isServerLocal" v-model:open="disableDialogOpen">
             <DialogContent class="rounded-2xl border-border/70 sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>{{ t("settings.securityDisablePinTitle") }}</DialogTitle>
@@ -598,6 +601,7 @@ async function confirmTrustedSessionRevoke() {
         </div>
 
         <div
+          v-if="isServerLocal"
           data-security-block
           class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
         >
@@ -631,6 +635,7 @@ async function confirmTrustedSessionRevoke() {
         </div>
 
         <div
+          v-if="isServerLocal"
           data-security-block
           class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
         >
@@ -650,6 +655,7 @@ async function confirmTrustedSessionRevoke() {
         </div>
 
         <div
+          v-if="isServerLocal"
           data-security-block
           data-trusted-sessions
           class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
@@ -736,7 +742,7 @@ async function confirmTrustedSessionRevoke() {
           </div>
         </div>
 
-        <Dialog v-model:open="trustedSessionDialogOpen">
+        <Dialog v-if="isServerLocal" v-model:open="trustedSessionDialogOpen">
           <DialogContent class="rounded-2xl border-border/70 sm:max-w-md">
             <DialogHeader>
               <DialogTitle>{{ t("settings.securityTrustedSessionsConfirmTitle") }}</DialogTitle>
@@ -771,6 +777,7 @@ async function confirmTrustedSessionRevoke() {
         </Dialog>
 
         <div
+          v-if="isServerLocal"
           data-security-block
           role="note"
           class="flex flex-col gap-2 rounded-2xl border border-border/40 border-l-[3px] border-l-muted-foreground/40 bg-surface-muted px-4 py-3"

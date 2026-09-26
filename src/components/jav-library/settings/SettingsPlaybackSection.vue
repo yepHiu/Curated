@@ -159,7 +159,7 @@ function playbackHardwareEncoderLabel(value: HardwareEncoderPreference): string 
   }
 }
 
-/** 远端只提交可见偏好，避免携带过期的底层服务端配置或原生命令。 */
+/** 仅本机管理可提交服务端默认值；远端只保存浏览器协议模板。 */
 function buildPlaybackPatchFromDraft(): PatchPlayerSettingsBody | null {
   const forward = Number.parseInt(playbackSeekForwardStepDraft.value, 10)
   const backward = Number.parseInt(playbackSeekBackwardStepDraft.value, 10)
@@ -242,7 +242,7 @@ function flashPlaybackSaved() {
 
 async function performSavePlaybackSettings() {
   playbackError.value = ""
-  const shouldPatchServer = !playbackDraftMatchesServer()
+  const shouldPatchServer = isServerLocal.value && !playbackDraftMatchesServer()
   const shouldPersistBrowserTemplate = !playbackBrowserTemplateMatchesPersisted()
   let patch: PatchPlayerSettingsBody | null = null
   if (shouldPatchServer) {
@@ -320,7 +320,7 @@ watchDebounced(
     if (!props.autoSaveReady) {
       return
     }
-    if (playbackDraftMatchesServer() && playbackBrowserTemplateMatchesPersisted()) {
+    if ((!isServerLocal.value || playbackDraftMatchesServer()) && playbackBrowserTemplateMatchesPersisted()) {
       return
     }
     await savePlaybackSettings()
@@ -443,6 +443,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div
+            v-if="isServerLocal"
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
@@ -457,6 +458,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div
+            v-if="isServerLocal"
             class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
           >
             <div class="min-w-0 flex-1 flex flex-col gap-3">
@@ -504,6 +506,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div
+            v-if="isServerLocal"
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
@@ -517,7 +520,7 @@ onBeforeUnmount(() => {
             <Switch v-model="playbackPreferNativePlayerDraft" />
           </div>
 
-          <div class="grid gap-3 md:grid-cols-2">
+          <div v-if="isServerLocal" class="grid gap-3 md:grid-cols-2">
             <div
               class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >

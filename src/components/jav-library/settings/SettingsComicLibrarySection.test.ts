@@ -1,3 +1,4 @@
+import { setDevRemoteSimulation } from "@/lib/dev-remote-simulation"
 import { computed } from "vue"
 import { mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -193,6 +194,18 @@ describe("SettingsComicLibrarySection", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockState.comicService = createComicServiceMock()
+  })
+
+  it("keeps remote client controls without server administration", async () => {
+    setDevRemoteSimulation(true)
+    try {
+      mockState.comicService = createComicServiceMock({ comicLibraryEnabled: computed(() => true) })
+      const wrapper = mount(SettingsComicLibrarySection)
+      expect(wrapper.find("[data-comic-beta-switch]").exists()).toBe(false)
+      expect(wrapper.find("[data-comic-auto-watch]").exists()).toBe(false)
+      expect(wrapper.findComponent({ name: "SettingsComicCacheSection" }).exists()).toBe(false)
+      wrapper.unmount()
+    } finally { setDevRemoteSimulation(false) }
   })
 
   it("renders disabled state with an enable action", () => {

@@ -500,15 +500,15 @@ func (h *Handler) Routes() http.Handler {
 
 	mux.HandleFunc("GET /api/health", h.handleHealth)
 	mux.HandleFunc("GET /api/auth/status", h.handleAuthStatus)
-	mux.HandleFunc("POST /api/auth/setup-pin", h.handleSetupPIN)
+	mux.HandleFunc("POST /api/auth/setup-pin", localServerManagement(h.handleSetupPIN))
 	mux.HandleFunc("POST /api/auth/unlock", h.handleUnlockPIN)
-	mux.HandleFunc("POST /api/auth/change-pin", h.handleChangePIN)
+	mux.HandleFunc("POST /api/auth/change-pin", localServerManagement(h.handleChangePIN))
 	mux.HandleFunc("POST /api/auth/lock", h.handleLockPIN)
-	mux.HandleFunc("PATCH /api/auth/settings", h.handlePatchAuthSettings)
-	mux.HandleFunc("GET /api/auth/sessions", h.handleListAuthSessions)
-	mux.HandleFunc("DELETE /api/auth/sessions/{publicId}", h.handleRevokeAuthSession)
-	mux.HandleFunc("POST /api/auth/sessions/revoke-others", h.handleRevokeOtherAuthSessions)
-	mux.HandleFunc("GET /api/connected-clients", h.handleConnectedClients)
+	mux.HandleFunc("PATCH /api/auth/settings", localServerManagement(h.handlePatchAuthSettings))
+	mux.HandleFunc("GET /api/auth/sessions", localServerManagement(h.handleListAuthSessions))
+	mux.HandleFunc("DELETE /api/auth/sessions/{publicId}", localServerManagement(h.handleRevokeAuthSession))
+	mux.HandleFunc("POST /api/auth/sessions/revoke-others", localServerManagement(h.handleRevokeOtherAuthSessions))
+	mux.HandleFunc("GET /api/connected-clients", localServerManagement(h.handleConnectedClients))
 	mux.HandleFunc("GET /api/events", h.handleEvents)
 	mux.HandleFunc("GET /api/dev/performance", h.handleDevPerformance)
 	mux.HandleFunc("GET /api/app-update/status", h.handleGetAppUpdateStatus)
@@ -516,13 +516,13 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/app-update/download", h.handleDownloadAppUpdateInstaller)
 	mux.HandleFunc("POST /api/app-update/install", h.handleInstallAppUpdate)
 	mux.HandleFunc("DELETE /api/app-update/downloaded-installer", h.handleClearDownloadedAppUpdateInstaller)
-	mux.HandleFunc("POST /api/maintenance/backups", h.handleCreateBackup)
-	mux.HandleFunc("POST /api/maintenance/backups/verify", h.handleVerifyBackup)
-	mux.HandleFunc("POST /api/maintenance/backups/preflight", h.handlePreflightBackupRestore)
-	mux.HandleFunc("POST /api/library/health/scan", h.handleScanLibraryHealth)
-	mux.HandleFunc("POST /api/library/health/repairs", h.handleStartLibraryHealthRepair)
-	mux.HandleFunc("GET /api/library/health/repairs/{repairId}", h.handleGetLibraryHealthRepair)
-	mux.HandleFunc("POST /api/library/health/actions", h.handleStartLibraryHealthAction)
+	mux.HandleFunc("POST /api/maintenance/backups", localServerManagement(h.handleCreateBackup))
+	mux.HandleFunc("POST /api/maintenance/backups/verify", localServerManagement(h.handleVerifyBackup))
+	mux.HandleFunc("POST /api/maintenance/backups/preflight", localServerManagement(h.handlePreflightBackupRestore))
+	mux.HandleFunc("POST /api/library/health/scan", localServerManagement(h.handleScanLibraryHealth))
+	mux.HandleFunc("POST /api/library/health/repairs", localServerManagement(h.handleStartLibraryHealthRepair))
+	mux.HandleFunc("GET /api/library/health/repairs/{repairId}", localServerManagement(h.handleGetLibraryHealthRepair))
+	mux.HandleFunc("POST /api/library/health/actions", localServerManagement(h.handleStartLibraryHealthAction))
 	mux.HandleFunc("GET /api/homepage/recommendations", h.handleGetHomepageRecommendations)
 	mux.HandleFunc("POST /api/homepage/recommendations/refresh", h.handleRefreshHomepageRecommendations)
 	mux.HandleFunc("GET /api/homepage/recommendations/feedback", h.handleListHomepageRecommendationFeedback)
@@ -570,7 +570,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/metadata-scrape", h.handleMetadataScrapeByPaths)
 	mux.HandleFunc("DELETE /api/library/movies/{movieId}", h.handleDeleteMovie)
 	mux.HandleFunc("GET /api/settings", h.handleGetSettings)
-	mux.HandleFunc("PATCH /api/settings", h.handlePatchSettings)
+	mux.HandleFunc("PATCH /api/settings", localServerManagement(h.handlePatchSettings))
 	mux.HandleFunc("POST /api/import/movies", h.handleImportMovies)
 	mux.HandleFunc("POST /api/import/movies/code-check", h.handleCheckImportMovieCodes)
 	mux.HandleFunc("POST /api/import/movies/uploads", h.handleCreateMovieImportUpload)
@@ -609,7 +609,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/library/photos/books/{photoId}/pages/{pageIndex}/thumbnail", h.handleGetPhotoPageThumbnail)
 	mux.HandleFunc("POST /api/library/comics/scans", h.handleStartComicScan)
 	mux.HandleFunc("GET /api/library/comics/cache/status", h.handleGetComicCacheStatus)
-	mux.HandleFunc("POST /api/library/comics/cache/cleanup", h.handleCleanupComicCache)
+	mux.HandleFunc("POST /api/library/comics/cache/cleanup", localServerManagement(h.handleCleanupComicCache))
 	mux.HandleFunc("GET /api/library/comics", h.handleListComics)
 	mux.HandleFunc("GET /api/library/comics/{comicId}", h.handleGetComic)
 	mux.HandleFunc("PATCH /api/library/comics/{comicId}", h.handlePatchComic)
@@ -647,13 +647,13 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/curated-frames/{id}", h.handleDeleteCuratedFrame)
 	mux.HandleFunc("POST /api/curated-frames/export", h.handlePostCuratedFramesExport)
 
-	mux.HandleFunc("POST /api/providers/ping", h.handlePingProvider)
-	mux.HandleFunc("POST /api/providers/ping-all", h.handlePingAllProviders)
+	mux.HandleFunc("POST /api/providers/ping", localServerManagement(h.handlePingProvider))
+	mux.HandleFunc("POST /api/providers/ping-all", localServerManagement(h.handlePingAllProviders))
 
-	mux.HandleFunc("POST /api/proxy/ping-javbus", h.handleProxyPingJavbus)
-	mux.HandleFunc("POST /api/proxy/ping-google", h.handleProxyPingGoogle)
+	mux.HandleFunc("POST /api/proxy/ping-javbus", localServerManagement(h.handleProxyPingJavbus))
+	mux.HandleFunc("POST /api/proxy/ping-google", localServerManagement(h.handleProxyPingGoogle))
 
-	mux.HandleFunc("POST /api/ai/provider/test", h.handleAIProviderTest)
+	mux.HandleFunc("POST /api/ai/provider/test", localServerManagement(h.handleAIProviderTest))
 	mux.HandleFunc("POST /api/ai/chat", h.handleAIChat)
 	mux.HandleFunc("GET /api/ai/sessions", h.handleListAIChatSessions)
 	mux.HandleFunc("POST /api/ai/sessions", h.handleCreateAIChatSession)
@@ -662,10 +662,10 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/ai/actions/{name}", h.handleAIAction)
 	mux.HandleFunc("POST /api/ai/confirm", h.handleAIConfirm)
 	mux.HandleFunc("GET /api/ai/settings", h.handleAIGovernance)
-	mux.HandleFunc("PATCH /api/ai/settings", h.handleAIGovernance)
-	mux.HandleFunc("GET /api/ai/usage", h.handleAIReport)
-	mux.HandleFunc("GET /api/ai/audit", h.handleAIAudit)
-	mux.HandleFunc("POST /api/ai/cleanup", h.handleAICleanup)
+	mux.HandleFunc("PATCH /api/ai/settings", localServerManagement(h.handleAIGovernance))
+	mux.HandleFunc("GET /api/ai/usage", localServerManagement(h.handleAIReport))
+	mux.HandleFunc("GET /api/ai/audit", localServerManagement(h.handleAIAudit))
+	mux.HandleFunc("POST /api/ai/cleanup", localServerManagement(h.handleAICleanup))
 
 	return WithAccessLog(h.logger, withClientTracking(h.withRequestSecurity(h.withAuthLock(mux)), h.clientTracker))
 }
@@ -2255,6 +2255,12 @@ func (h *Handler) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list library paths")
 		return
 	}
+	if !isDirectLocalRequest(r) {
+		dto.Proxy = contracts.ProxySettingsDTO{Enabled: dto.Proxy.Enabled}
+		dto.AIProvider.APIKey = ""
+		dto.AIProvider.BaseURL = ""
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, dto)
 }
 

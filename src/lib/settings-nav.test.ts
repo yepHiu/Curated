@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   SETTINGS_NAV_GROUPS,
+  isSettingsSectionAvailable,
   SETTINGS_NAV_ITEMS,
   isSettingsSectionSlug,
   resolveSettingsSectionSlug,
@@ -26,4 +27,13 @@ describe("settings navigation", () => {
     expect(resolveSettingsSectionSlug("logging")).toBe("maintenance")
     expect(resolveSettingsSectionSlug("libraryBehavior")).toBe("library")
   })
+})
+
+it("keeps Desktop server switching available on remote connections", () => {
+  expect(isSettingsSectionAvailable("network", false, true)).toBe(true)
+  expect(isSettingsSectionAvailable("network", false, false)).toBe(false)
+  for (const slug of ["metadata", "maintenance", "ai"] as const) {
+    expect(isSettingsSectionAvailable(slug, true, false)).toBe(true)
+    expect(isSettingsSectionAvailable(slug, false, true)).toBe(false)
+  }
 })

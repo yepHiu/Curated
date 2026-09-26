@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useServerLocalAccess } from "@/composables/use-server-local-access"
 import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, nextTick, onMounted, ref, watch } from "vue"
@@ -27,6 +28,7 @@ import SettingsComicLibraryPathsSection from "./SettingsComicLibraryPathsSection
 import SettingsComicReaderSection from "./SettingsComicReaderSection.vue"
 
 const { t } = useI18n()
+const { isServerLocal } = useServerLocalAccess()
 const comicService = useComicLibraryService()
 
 const comicLibraryEnabled = computed(() => comicService.comicLibraryEnabled.value)
@@ -290,9 +292,10 @@ async function cleanupCache() {
             </p>
           </div>
           <Switch
+            v-if="isServerLocal"
             data-comic-beta-switch
             :model-value="comicLibraryEnabled"
-            :disabled="enableBusy"
+            :disabled="!isServerLocal || enableBusy"
             :aria-label="t('settings.comicLibraryTitle') + ' Beta'"
             @update:model-value="setComicLibraryEnabled"
           />
@@ -323,7 +326,7 @@ async function cleanupCache() {
           @change-default-import-path="changeDefaultPath"
         />
 
-        <template v-if="comicLibraryEnabled">
+        <template v-if="comicLibraryEnabled && isServerLocal">
           <div
             data-comic-auto-watch
             class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"

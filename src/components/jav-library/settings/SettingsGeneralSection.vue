@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useServerLocalAccess } from "@/composables/use-server-local-access"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
@@ -36,6 +37,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { isServerLocal } = useServerLocalAccess()
 
 const selectedLocaleLabel = computed(() => {
   if (props.locale === "en") return t("settings.langEn")
@@ -123,7 +125,7 @@ function updateLocale(value: unknown) {
           </CardContent>
         </Card>
       </div>
-      <div class="break-inside-avoid">
+      <div v-if="isServerLocal" class="break-inside-avoid">
         <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
           <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
             <span

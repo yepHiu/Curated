@@ -1,3 +1,4 @@
+import { setDevRemoteSimulation } from "@/lib/dev-remote-simulation"
 import { computed } from "vue"
 import { mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -173,6 +174,18 @@ describe("SettingsPhotoLibrarySection", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockState.photoService = createPhotoServiceMock()
+  })
+
+  it("keeps remote client controls without server administration", async () => {
+    setDevRemoteSimulation(true)
+    try {
+      mockState.photoService = createPhotoServiceMock({ photoLibraryEnabled: computed(() => true) })
+      const wrapper = mount(SettingsPhotoLibrarySection)
+      expect(wrapper.find("[data-photo-beta-switch]").exists()).toBe(false)
+      expect(wrapper.find("[data-photo-auto-watch]").exists()).toBe(false)
+      expect(wrapper.findComponent({ name: "SettingsPhotoCacheSection" }).exists()).toBe(false)
+      wrapper.unmount()
+    } finally { setDevRemoteSimulation(false) }
   })
 
   it("hides paths and viewer configuration until beta is enabled", () => {

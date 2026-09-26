@@ -12,6 +12,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/tasks"
 )
@@ -55,7 +56,7 @@ func TestRemoteDefaultLibraryPathPatchRejectsWholeRequest(t *testing.T) {
 		r.RemoteAddr = "192.168.1.30:1234"
 		w := httptest.NewRecorder()
 		h.Routes().ServeHTTP(w, r)
-		if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "LIBRARY_PATHS_READ_ONLY") {
+		if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "SERVER_SETTINGS_READ_ONLY") {
 			t.Fatalf("%s = %d %s", field, w.Code, w.Body.String())
 		}
 		if ctl.id != "unchanged" {
@@ -107,6 +108,11 @@ func TestLibraryPathCapabilityAndManagementShareLocalBoundary(t *testing.T) {
 			if called != tc.allowed {
 				t.Fatalf("handler called = %v", called)
 			}
+			called = false
+			localServerManagement(func(http.ResponseWriter, *http.Request) { called = true })(httptest.NewRecorder(), r)
+			if called != tc.allowed {
+				t.Fatalf("server management called = %v", called)
+			}
 		})
 	}
 }
@@ -143,3 +149,110 @@ func TestRemoteImportStillUsesServerDefaultDirectory(t *testing.T) {
 		t.Fatalf("content = %q", got)
 	}
 }
+
+func TestRemoteServerAdministrationRejected(t *testing.T) {
+	routes := NewHandler(Deps{}).Routes()
+	for _, target := range []string{
+		"PATCH /api/settings", "POST /api/auth/setup-pin", "POST /api/auth/change-pin",
+		"PATCH /api/auth/settings", "GET /api/auth/sessions", "DELETE /api/auth/sessions/other",
+		"POST /api/auth/sessions/revoke-others", "GET /api/connected-clients",
+		"POST /api/maintenance/backups", "POST /api/maintenance/backups/verify", "POST /api/maintenance/backups/preflight",
+		"POST /api/library/health/scan", "POST /api/library/health/repairs", "GET /api/library/health/repairs/repair",
+		"POST /api/library/health/actions", "POST /api/library/comics/cache/cleanup",
+		"POST /api/providers/ping", "POST /api/providers/ping-all", "POST /api/proxy/ping-javbus", "POST /api/proxy/ping-google",
+		"POST /api/ai/provider/test", "PATCH /api/ai/settings", "GET /api/ai/usage", "GET /api/ai/audit", "POST /api/ai/cleanup",
+	} {
+		t.Run(target, func(t *testing.T) {
+			method, path, _ := strings.Cut(target, " ")
+			req := httptest.NewRequest(method, "http://localhost:8081"+path, strings.NewReader(`{}`))
+			req.RemoteAddr = "192.168.1.30:1234"
+			res := httptest.NewRecorder()
+			routes.ServeHTTP(res, req)
+			if res.Code != http.StatusForbidden || !strings.Contains(res.Body.String(), contracts.ErrorCodeServerSettingsReadOnly) {
+				t.Fatalf("remote administration = %d %s", res.Code, res.Body.String())
+			}
+		})
+	}
+}
+
+func TestRemoteSettingsRedactCredentialsAndRejectMutation(t *testing.T) {
+	store := newImportTestStore(t, t.TempDir())
+	settings := &stubAISettingsController{current: contracts.AIProviderSettingsDTO{
+		Kind: "openai-compatible", APIKey: "secret-api-key", BaseURL: "https://user:password@example.com", Model: "model",
+	}}
+	cfg := config.Default()
+	routes := NewHandler(Deps{Store: store, Cfg: cfg, AISettingsCtl: settings, ProxyCtl: &remoteSettingsProxyStub{}}).Routes()
+	for _, local := range []bool{true, false} {
+		req := httptest.NewRequest(http.MethodGet, "http://localhost/api/settings", nil)
+		req.RemoteAddr = "192.168.1.30:1234"
+		if local {
+			req.RemoteAddr = "127.0.0.1:1234"
+		}
+		res := httptest.NewRecorder()
+		routes.ServeHTTP(res, req)
+		var dto contracts.SettingsDTO
+		if res.Code != http.StatusOK {
+			t.Fatalf("read = %d %s", res.Code, res.Body.String())
+		}
+		if err := json.Unmarshal(res.Body.Bytes(), &dto); err != nil {
+			t.Fatal(err)
+		}
+		if dto.AIProvider.Model != "model" {
+			t.Fatal("remote runtime settings lost")
+		}
+		if local && (dto.AIProvider.APIKey != "secret-api-key" || dto.Proxy.Password != "proxy-secret") {
+			t.Fatal("local settings redacted")
+		}
+		if !local && (dto.AIProvider.APIKey != "" || dto.AIProvider.BaseURL != "" || dto.Proxy.URL != "" || dto.Proxy.Password != "" || dto.Proxy.Username != "") {
+			t.Fatal("remote credentials exposed")
+		}
+		if res.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("settings cacheable")
+		}
+	}
+	req := httptest.NewRequest(http.MethodPatch, "http://localhost/api/settings", strings.NewReader(`{"aiProvider":{"apiKey":"changed"},"organizeLibrary":true}`))
+	req.RemoteAddr = "192.168.1.30:1234"
+	res := httptest.NewRecorder()
+	routes.ServeHTTP(res, req)
+	if res.Code != http.StatusForbidden || settings.current.APIKey != "secret-api-key" {
+		t.Fatal("remote patch mutated settings")
+	}
+}
+
+func TestRemoteSessionLockAndUnlockRemainAvailable(t *testing.T) {
+	server, _ := newAuthTestServer(t)
+	resp := postAuthJSON(t, server.Client(), server.URL+"/api/auth/setup-pin", map[string]any{"pin": "1234", "confirmPin": "1234"})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("setup = %d", resp.StatusCode)
+	}
+	// Forwarding metadata makes an otherwise loopback test connection remote.
+	var cookies []*http.Cookie
+	for _, path := range []string{"unlock", "lock"} {
+		req, err := http.NewRequest(http.MethodPost, server.URL+"/api/auth/"+path, strings.NewReader(`{"pin":"1234"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Forwarded-For", "192.168.1.30")
+		for _, cookie := range cookies {
+			req.AddCookie(cookie)
+		}
+		res, err := server.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cookies = res.Cookies()
+		res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("remote %s = %d", path, res.StatusCode)
+		}
+	}
+}
+
+type remoteSettingsProxyStub struct{}
+
+func (*remoteSettingsProxyStub) Proxy() config.ProxyConfig {
+	return config.ProxyConfig{Enabled: true, URL: "http://user:embedded-secret@localhost:7890", Username: "proxy-user", Password: "proxy-secret"}
+}
+func (*remoteSettingsProxyStub) SetProxy(config.ProxyConfig) error { return nil }

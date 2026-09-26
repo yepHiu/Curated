@@ -1,3 +1,4 @@
+import { setDevRemoteSimulation } from "@/lib/dev-remote-simulation"
 import { mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import SettingsGeneralSection from "./SettingsGeneralSection.vue"
@@ -57,6 +58,16 @@ const baseProps = {
 }
 
 describe("SettingsGeneralSection", () => {
+  it("keeps remote client controls without server administration", async () => {
+    setDevRemoteSimulation(true)
+    try {
+      const wrapper = mount(SettingsGeneralSection, { props: baseProps })
+      expect(wrapper.text()).toContain("settings.appearance")
+      expect(wrapper.findComponent({ name: "Switch" }).exists()).toBe(false)
+      wrapper.unmount()
+    } finally { setDevRemoteSimulation(false) }
+  })
+
   it("uses the settings card title and hint layout contract", () => {
     const wrapper = mount(SettingsGeneralSection, {
       props: baseProps,

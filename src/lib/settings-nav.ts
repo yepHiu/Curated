@@ -75,3 +75,10 @@ export function resolveSettingsSectionSlug(value: string): SettingsSectionSlug |
 export function isSettingsSectionSlug(s: string): s is SettingsSectionSlug {
   return SETTINGS_NAV_ITEMS.some((item) => item.slug === s)
 }
+
+/** Remote clients keep personal preferences and read-only library information. */
+export function isSettingsSectionAvailable(slug: SettingsSectionSlug, serverLocal: boolean, desktop: boolean): boolean {
+  if (serverLocal) return true
+  if (slug === "network") return desktop
+  return !(["metadata", "maintenance", "ai"] as SettingsSectionSlug[]).includes(slug)
+}

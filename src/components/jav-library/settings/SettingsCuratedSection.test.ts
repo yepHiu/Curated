@@ -1,3 +1,4 @@
+import { setDevRemoteSimulation } from "@/lib/dev-remote-simulation"
 import { mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import SettingsCuratedSection from "./SettingsCuratedSection.vue"
@@ -96,6 +97,17 @@ const baseProps = {
 }
 
 describe("SettingsCuratedSection", () => {
+  it("keeps remote client controls without server administration", async () => {
+    setDevRemoteSimulation(true)
+    try {
+      const wrapper = mount(SettingsCuratedSection, { props: baseProps })
+      expect(wrapper.text()).not.toContain("settings.curatedExportModeTitle")
+      expect(wrapper.text()).not.toContain("settings.curatedExportFormatTitle")
+      expect(wrapper.find("[data-capture-feedback-row]").exists()).toBe(true)
+      wrapper.unmount()
+    } finally { setDevRemoteSimulation(false) }
+  })
+
   it("renders curated save policy, shortcut and export format controls", () => {
     const wrapper = mount(SettingsCuratedSection, {
       props: baseProps,

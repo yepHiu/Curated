@@ -25,6 +25,7 @@ import type {
   ProviderHealthDTO,
   ProxySettingsDTO,
 } from "@/api/types"
+import { useServerLocalAccess } from "@/composables/use-server-local-access"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import { useConnectedClients } from "@/composables/use-connected-clients"
 import { pushAppToast } from "@/composables/use-app-toast"
@@ -84,6 +85,7 @@ import SettingsSecuritySection from "@/components/jav-library/settings/SettingsS
 import { useLibraryService } from "@/services/library-service"
 import {
   SETTINGS_NAV_GROUPS,
+  isSettingsSectionAvailable,
   SETTINGS_OVERVIEW_NAV_ITEM,
   type SettingsSectionSlug,
   resolveSettingsSectionSlug,
@@ -126,7 +128,12 @@ const route = useRoute()
 const router = useRouter()
 
 const settingsScrollElRef = inject<Ref<HTMLElement | null>>(SETTINGS_SCROLL_EL_KEY, ref(null))
-const settingsNavGroups = SETTINGS_NAV_GROUPS
+const { isServerLocal, isAccessReady } = useServerLocalAccess()
+const isDesktop = !!window.javLibrary
+const sectionAvailable = (slug: SettingsSectionSlug) => isSettingsSectionAvailable(slug, isServerLocal.value, isDesktop)
+const settingsNavGroups = computed(() => SETTINGS_NAV_GROUPS
+  .map((group) => ({ ...group, items: group.items.filter((item) => sectionAvailable(item.slug)) }))
+  .filter((group) => group.items.length > 0))
 const settingsOverviewNavItem = SETTINGS_OVERVIEW_NAV_ITEM
 const activeSlug = ref<SettingsSectionSlug>("overview")
 const renderedSettingsSlugs = ref<SettingsSectionSlug[]>(["overview"])
@@ -138,7 +145,7 @@ function selectSettingsSection(event: Event) {
 }
 
 function shouldRenderSettingsSection(slug: SettingsSectionSlug): boolean {
-  return renderedSettingsSlugs.value.includes(slug)
+  return sectionAvailable(slug) && renderedSettingsSlugs.value.includes(slug)
 }
 
 function bindSettingsScrollRoot(el: unknown) {
@@ -164,7 +171,8 @@ function scrollSettingsRootToTop() {
 function resolveSettingsSlugFromRoute(): SettingsSectionSlug {
   const raw = route.query.section
   const s = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : undefined
-  const resolved = s ? resolveSettingsSectionSlug(s) : null
+  const requested = s ? resolveSettingsSectionSlug(s) : null
+  const resolved = requested && isAccessReady.value && !sectionAvailable(requested) ? "overview" : requested
   if (resolved && resolved !== s) {
     router.replace({ query: { ...route.query, section: resolved } }).catch(() => {})
   }
@@ -198,7 +206,8 @@ watch(
       }
       return
     }
-    const resolved = resolveSettingsSectionSlug(s)
+    const requested = resolveSettingsSectionSlug(s)
+    const resolved = requested && isAccessReady.value && !sectionAvailable(requested) ? "overview" : requested
     if (!resolved) return
     if (resolved !== s) {
       router.replace({ query: { ...route.query, section: resolved } }).catch(() => {})
@@ -209,11 +218,15 @@ watch(
   },
 )
 
+watch([isServerLocal, isAccessReady], () => {
+  if (isAccessReady.value) activeSlug.value = resolveSettingsSlugFromRoute()
+})
+
 const libraryService = useLibraryService()
 const scanTaskTracker = useScanTaskTracker()
 const connectedClientsState = useConnectedClients(
   libraryService,
-  computed(() => activeSlug.value === "network"),
+  computed(() => isServerLocal.value && activeSlug.value === "network"),
 )
 const { withPreservedScroll, withSyncPreservedScroll } = useSettingsScrollPreserve()
 /** Plain object services don't unwrap nested ComputedRefs in templates */
@@ -673,7 +686,7 @@ watchDebounced(
       backendLogLevelDraft.value,
     ] as const,
   async () => {
-    if (!settingsAutoSaveReady.value || !useWebApi) {
+    if (!isServerLocal.value || !settingsAutoSaveReady.value || !useWebApi) {
       return
     }
     if (backendLogDraftMatchesServer()) {
@@ -701,7 +714,7 @@ watchDebounced(
     ] as const,
   async () => {
     try {
-      if (!settingsAutoSaveReady.value) {
+      if (!isServerLocal.value || !settingsAutoSaveReady.value) {
         return
       }
       if (playbackDraftMatchesServer() && playbackBrowserTemplateMatchesPersisted()) {
@@ -1139,7 +1152,7 @@ async function saveProviderChain() {
 watchDebounced(
   providerChainDraft,
   async () => {
-    if (metadataMovieModeUi.value !== "chain") return
+    if (!isServerLocal.value || metadataMovieModeUi.value !== "chain") return
     if (providerChainsEqual(providerChainDraft.value, libraryService.metadataMovieProviderChain.value)) {
       return
     }
@@ -2176,6 +2189,7 @@ async function runMetadataRefreshForSelected() {
       />
 
       <SettingsOrganizeSection
+        v-if="isServerLocal"
         :organize-library="organizeLibrary"
         :organize-library-saving="organizeLibrarySaving"
         :organize-library-error="organizeLibraryError"
@@ -2258,8 +2272,9 @@ async function runMetadataRefreshForSelected() {
     >
     <h2 class="sr-only">{{ t("settings.navNetwork") }}</h2>
       <SettingsServerConnectionsSection v-if="activeSlug === 'network'" />
-      <SettingsWishlistSection />
+      <SettingsWishlistSection v-if="isServerLocal" />
       <SettingsNetworkSection
+        v-if="isServerLocal"
         v-model:proxy-enabled="proxyEnabledDraft"
         v-model:proxy-scheme="proxySchemeDraft"
         v-model:proxy-host="proxyHostDraft"
@@ -2280,6 +2295,7 @@ async function runMetadataRefreshForSelected() {
         @test-proxy-google="testProxyGoogle"
       />
       <SettingsConnectedClientsSection
+        v-if="isServerLocal"
         :clients="connectedClients"
         :total="connectedClientsTotal"
         :local-count="connectedClientsLocalCount"
@@ -2417,6 +2433,7 @@ async function runMetadataRefreshForSelected() {
     >
       <template #updates>
         <SettingsAutoUpdateSection
+          v-if="isServerLocal"
           :enabled="autoDownloadUpdates"
           :saving="autoDownloadUpdatesSaving"
           :error="autoDownloadUpdatesError"

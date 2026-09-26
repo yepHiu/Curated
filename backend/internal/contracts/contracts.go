@@ -1930,6 +1930,7 @@ const (
 	ErrorCodePhotoBookNotFound        = "PHOTO_BOOK_NOT_FOUND"
 	ErrorCodePhotoPageNotFound        = "PHOTO_PAGE_NOT_FOUND"
 
+	ErrorCodeServerSettingsReadOnly  = "SERVER_SETTINGS_READ_ONLY"
 	ErrorCodeLibraryPathsReadOnly    = "LIBRARY_PATHS_READ_ONLY"
 	ErrorCodeAppUpdateRemoteDisabled = "APP_UPDATE_REMOTE_DISABLED"
 	ErrorCodeAppUpdateDownloadFailed = "APP_UPDATE_DOWNLOAD_FAILED"

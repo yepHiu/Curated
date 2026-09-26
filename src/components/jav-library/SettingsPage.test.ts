@@ -1,4 +1,4 @@
-import { computed, nextTick } from "vue"
+import { computed, nextTick, ref } from "vue"
 import { flushPromises, mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { Movie } from "@/domain/movie/types"
@@ -35,9 +35,16 @@ vi.mock("@/i18n", () => ({
   ensureLocaleMessages: vi.fn().mockResolvedValue(undefined),
 }))
 
+const localAccess = ref(true)
+const accessReady = ref(true)
+const routeState = { query: { section: "library" } }
+const replaceRoute = vi.fn().mockResolvedValue(undefined)
+vi.mock("@/composables/use-server-local-access", () => ({
+  useServerLocalAccess: () => ({ isServerLocal: localAccess, isAccessReady: accessReady }),
+}))
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ query: { section: "library" } }),
-  useRouter: () => ({ replace: vi.fn().mockResolvedValue(undefined) }),
+  useRoute: () => routeState,
+  useRouter: () => ({ replace: replaceRoute }),
 }))
 
 vi.mock("@/services/library-service", () => ({
@@ -267,8 +274,41 @@ async function mountSettingsPage() {
 
 describe("SettingsPage movie CSV export", () => {
   beforeEach(() => {
+    localAccess.value = true
+    accessReady.value = true
+    routeState.query.section = "library"
     vi.clearAllMocks()
     mockState.libraryService = createLibraryServiceMock()
+  })
+
+  it.each(["metadata", "maintenance", "logging", "ai", "network"])("redirects remote %s deep links and hides both navigation variants", async (section) => {
+    localAccess.value = false
+    routeState.query.section = section
+    const wrapper = await mountSettingsPage()
+    expect(replaceRoute).toHaveBeenCalledWith({ query: { section: "overview" } })
+    for (const label of ["navMetadata", "navMaintenance", "navAI", "navNetwork"]) {
+      expect(wrapper.text()).not.toContain(`settings.${label}`)
+    }
+    expect(wrapper.find("#settings-section-overview").exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it("waits for local capability before resolving a management deep link", async () => {
+    localAccess.value = false
+    accessReady.value = false
+    routeState.query.section = "metadata"
+    const wrapper = await mountSettingsPage()
+    expect(wrapper.find("#settings-section-metadata").exists()).toBe(false)
+    expect(replaceRoute).not.toHaveBeenCalledWith({ query: { section: "overview" } })
+    localAccess.value = true
+    accessReady.value = true
+    await flushPromises()
+    expect(wrapper.find("#settings-section-metadata").exists()).toBe(true)
+    localAccess.value = false
+    await flushPromises()
+    expect(wrapper.find("#settings-section-metadata").exists()).toBe(false)
+    expect(replaceRoute).toHaveBeenCalledWith({ query: { section: "overview" } })
+    wrapper.unmount()
   })
 
   it("places comic settings in the library navigation", async () => {

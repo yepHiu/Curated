@@ -1,3 +1,5 @@
+const access = vi.hoisted(() => ({ value: true }))
+vi.mock("@/composables/use-server-local-access", () => ({ useServerLocalAccess: () => ({ isServerLocal: computed(() => access.value) }) }))
 import { computed, nextTick, ref } from "vue"
 import { flushPromises, mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -122,6 +124,7 @@ function backendLogLevelSelectValue(wrapper: ReturnType<typeof mount>) {
 
 describe("SettingsLoggingSection", () => {
   beforeEach(() => {
+    access.value = true;
     backendLogState.value = {
       logDir: "",
       logLevel: "info",
@@ -144,4 +147,11 @@ describe("SettingsLoggingSection", () => {
 
     expect(backendLogLevelSelectValue(wrapper)).toBe("debug")
   })
+})
+
+it("hides backend log configuration remotely", async () => {
+  access.value = false
+  const wrapper = await mountComponent(true)
+  expect(wrapper.text()).not.toContain("settings.backendLogTitle")
+  wrapper.unmount()
 })

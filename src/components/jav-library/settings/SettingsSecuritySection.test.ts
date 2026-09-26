@@ -1,4 +1,5 @@
-import { mount } from "@vue/test-utils"
+import { setDevRemoteSimulation } from "@/lib/dev-remote-simulation"
+import { flushPromises, mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import SettingsSecuritySection from "./SettingsSecuritySection.vue"
 
@@ -161,6 +162,19 @@ describe("SettingsSecuritySection", () => {
     authMock.revokeOtherTrustedSessions.mockResolvedValue([])
   })
 
+  it("keeps remote client controls without server administration", async () => {
+    setDevRemoteSimulation(true)
+    try {
+      const wrapper = mount(SettingsSecuritySection)
+      await flushPromises()
+      expect(wrapper.text()).toContain("settings.securityLockNow")
+      expect(wrapper.find("[data-setup-pin-trigger]").exists()).toBe(false)
+      expect(wrapper.find("[data-trusted-sessions]").exists()).toBe(false)
+      expect(authMock.listTrustedSessions).not.toHaveBeenCalled()
+      wrapper.unmount()
+    } finally { setDevRemoteSimulation(false) }
+  })
+
   it("uses the settings card and nested block layout contract", () => {
     const wrapper = mount(SettingsSecuritySection)
 
@@ -283,6 +297,7 @@ describe("SettingsSecuritySection", () => {
     ]
     const wrapper = mount(SettingsSecuritySection)
 
+    await flushPromises()
     expect(wrapper.text()).toContain("Current Browser")
     expect(wrapper.text()).toContain("Other Browser")
     expect(wrapper.text()).toContain("settings.securityTrustedSessionsCurrent")

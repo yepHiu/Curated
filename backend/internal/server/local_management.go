@@ -59,3 +59,14 @@ func localLibraryPathManagement(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+
+// Server-wide settings and administrative operations belong to the Server host.
+func localServerManagement(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !isDirectLocalRequest(r) {
+			writeAppError(w, http.StatusForbidden, contracts.ErrorCodeServerSettingsReadOnly, "Manage server settings on the Server computer")
+			return
+		}
+		next(w, r)
+	}
+}

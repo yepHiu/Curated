@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useServerLocalAccess } from "@/composables/use-server-local-access"
 import SettingsHint from "./SettingsHint.vue"
 import { statusTextClass } from "@/lib/ui/status-tone"
 import { cn } from "@/lib/utils"
@@ -60,6 +61,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { isServerLocal } = useServerLocalAccess()
 </script>
 
 <template>
@@ -185,7 +187,7 @@ const { t } = useI18n()
             </label>
           </fieldset>
 
-          <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+          <fieldset v-if="isServerLocal" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <legend class="sr-only">{{ t("settings.curatedExportModeTitle") }}</legend>
             <div
               class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
@@ -245,7 +247,7 @@ const { t } = useI18n()
             </div>
           </fieldset>
 
-          <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+          <fieldset v-if="isServerLocal" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <legend class="sr-only">{{ t("settings.curatedExportFormatTitle") }}</legend>
             <div
               class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"

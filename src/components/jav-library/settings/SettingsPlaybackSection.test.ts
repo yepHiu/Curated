@@ -25,6 +25,8 @@ const advancedLabels = [
   "settings.hardwareDecode", "settings.playbackHardwareEncoder",
   "settings.playbackStreamPushEnabled",
   "settings.playbackFfmpegCommand",
+  "settings.playbackNativePlayerEnabled", "settings.playbackNativePlayerPreset",
+  "settings.playbackPreferNativePlayer", "settings.playbackSeekForwardStep", "settings.playbackSeekBackwardStep",
 ]
 let wrapper: ReturnType<typeof render> | undefined
 
@@ -72,12 +74,9 @@ describe("playback settings visibility and saving", () => {
     setDevRemoteSimulation(true)
     await flushPromises()
     expect(wrapper.text()).not.toContain("settings.hardwareDecode")
-    wrapper.findAllComponents({ name: "Input" })[2]!.vm.$emit("update:modelValue", "30")
+    wrapper.findAllComponents({ name: "Input" })[0]!.vm.$emit("update:modelValue", "mpv://play/{url}")
     await vi.advanceTimersByTimeAsync(600)
-    const patch = patchPlayerSettings.mock.calls[0]![0]
-    expect(patch.seekForwardStepSec).toBe(30)
-    expect(patch).not.toHaveProperty("hardwareDecode")
-    expect(patch).not.toHaveProperty("ffmpegCommand")
+    expect(patchPlayerSettings).not.toHaveBeenCalled()
     setDevRemoteSimulation(false)
     await flushPromises()
     expect(wrapper.text()).toContain("settings.hardwareDecode")
@@ -109,19 +108,14 @@ describe("playback settings visibility and saving", () => {
     wrapper = render()
     await flushPromises()
     for (const label of advancedLabels) expect(wrapper.text()).not.toContain(label)
-    expect(wrapper.text()).toContain("settings.playbackNativePlayerEnabled")
-    expect(wrapper.text()).toContain("settings.playbackSeekForwardStep")
-
-    // 模拟另一端修改底层配置；远端保存步长不能覆盖这些新值。
+    expect(wrapper.text()).toContain("settings.playbackNativePlayerCommand")
     playerSettings.value = { ...playerSettings.value, hardwareEncoder: "amf", ffmpegCommand: "/updated/ffmpeg" }
     const inputs = wrapper.findAllComponents({ name: "Input" })
-    inputs[2]!.vm.$emit("update:modelValue", "30")
+    expect(inputs).toHaveLength(1)
+    inputs[0]!.vm.$emit("update:modelValue", "mpv://play/{url}")
     await vi.advanceTimersByTimeAsync(600)
-    expect(patchPlayerSettings).toHaveBeenCalledTimes(1)
-    expect(patchPlayerSettings).toHaveBeenCalledWith({
-      nativePlayerPreset: "custom", nativePlayerEnabled: false, preferNativePlayer: false,
-      seekForwardStepSec: 30, seekBackwardStepSec: 10,
-    })
+    expect(patchPlayerSettings).not.toHaveBeenCalled()
+    expect(localStorage.getItem("curated-native-player-browser-template-v1")).toBe("mpv://play/{url}")
     expect(playerSettings.value.ffmpegCommand).toBe("/updated/ffmpeg")
     expect(playerSettings.value.hardwareEncoder).toBe("amf")
     expect(playerSettings.value.nativePlayerCommand).toBe("/server/bin/player")

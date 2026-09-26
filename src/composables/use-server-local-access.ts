@@ -8,6 +8,7 @@ import { isLocalServerTarget } from "@/lib/app-update-target"
 export function useServerLocalAccess() {
   const useWeb = import.meta.env.VITE_USE_WEB_API === "true"
   const isServerLocal = ref(!useWeb)
+  const isAccessReady = ref(!useWeb)
 
   onMounted(async () => {
     // Mock 无服务端；真实连接需等待 health 和 Desktop 主进程确认。
@@ -25,8 +26,13 @@ export function useServerLocalAccess() {
       )
     } catch {
       isServerLocal.value = false
+    } finally {
+      isAccessReady.value = true
     }
   })
 
-  return { isServerLocal: computed(() => !devRemoteSimulation.value && isServerLocal.value) }
+  return {
+    isAccessReady: computed(() => isAccessReady.value),
+    isServerLocal: computed(() => !devRemoteSimulation.value && isServerLocal.value),
+  }
 }

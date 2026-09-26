@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useServerLocalAccess } from "@/composables/use-server-local-access"
 import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, nextTick, onMounted, ref, watch } from "vue"
@@ -22,6 +23,7 @@ import SettingsPhotoLibraryPathsSection from "./SettingsPhotoLibraryPathsSection
 import SettingsPhotoViewerSection from "./SettingsPhotoViewerSection.vue"
 
 const { t } = useI18n()
+const { isServerLocal } = useServerLocalAccess()
 const photoService = usePhotoLibraryService()
 
 const photoLibraryEnabled = computed(() => photoService.photoLibraryEnabled.value)
@@ -272,9 +274,10 @@ async function patchCache(maxBytes: number) {
             </p>
           </div>
           <Switch
+            v-if="isServerLocal"
             data-photo-beta-switch
             :model-value="photoLibraryEnabled"
-            :disabled="enableBusy"
+            :disabled="!isServerLocal || enableBusy"
             :aria-label="t('settings.photoLibraryTitle') + ' Beta'"
             @update:model-value="setPhotoLibraryEnabled"
           />
@@ -305,7 +308,7 @@ async function patchCache(maxBytes: number) {
           @change-default-import-path="changeDefaultPath"
         />
 
-        <template v-if="photoLibraryEnabled">
+        <template v-if="photoLibraryEnabled && isServerLocal">
           <div
             data-photo-auto-watch
             class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
