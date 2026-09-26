@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { ChevronDown, Globe, Loader2, Network } from "lucide-vue-next"
@@ -156,8 +157,9 @@ function updateProxyPassword(value: unknown) {
           >
             <Network class="size-[1.15rem]" />
           </span>
-          <CardTitle class="min-w-0 text-lg tracking-tight">
-            {{ t("settings.lanAccessTitle") }}
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.lanAccessTitle") }}</span>
+            <SettingsScopeBadge scope="server" />
           </CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
@@ -216,8 +218,9 @@ function updateProxyPassword(value: unknown) {
           >
             <Globe class="size-[1.15rem]" />
           </span>
-          <CardTitle class="min-w-0 text-lg tracking-tight">
-            {{ t("settings.proxyTitle") }}
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.proxyTitle") }}</span>
+            <SettingsScopeBadge scope="server" />
           </CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">

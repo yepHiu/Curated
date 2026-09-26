@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { Sparkles } from "lucide-vue-next"
@@ -95,8 +96,9 @@ function healthForProvider(name: string): ProviderHealthDTO | undefined {
         >
           <Sparkles class="size-4" />
         </span>
-        <CardTitle class="min-w-0 text-lg tracking-tight">
-          {{ t("settings.metadataMovieProviderTitle") }}
+        <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+          <span>{{ t("settings.metadataMovieProviderTitle") }}</span>
+          <SettingsScopeBadge scope="server" />
         </CardTitle>
       </CardHeader>
       <CardContent class="flex flex-col gap-3 pt-0">

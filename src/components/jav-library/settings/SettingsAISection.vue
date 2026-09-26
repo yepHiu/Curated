@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { BarChart3, RefreshCw, Server, ShieldCheck } from "lucide-vue-next"
@@ -250,7 +251,10 @@ function auditLine(entry: AIAuditEntry) {
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-governance-card>
         <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0">
           <span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><ShieldCheck class="size-4" /></span>
-          <CardTitle class="min-w-0 text-lg tracking-tight">{{ t('aiSettings.governance') }}</CardTitle>
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t('aiSettings.governance') }}</span>
+            <SettingsScopeBadge scope="server" />
+          </CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
           <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" data-ai-settings-block="policy">
@@ -295,7 +299,10 @@ function auditLine(entry: AIAuditEntry) {
         </CardContent>
       </Card>
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-provider-card>
-        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0"><span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><Server class="size-4" /></span><CardTitle class="min-w-0 text-lg tracking-tight">{{ t('aiSettings.provider') }}</CardTitle></CardHeader>
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0"><span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><Server class="size-4" /></span><CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t('aiSettings.provider') }}</span>
+            <SettingsScopeBadge scope="server" />
+          </CardTitle></CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
           <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <FieldGroup class="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -335,7 +342,10 @@ function auditLine(entry: AIAuditEntry) {
         </CardContent>
       </Card>
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-statistics-card>
-        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0"><span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><BarChart3 class="size-4" /></span><CardTitle class="min-w-0 text-lg tracking-tight">{{ t('aiSettings.statistics') }}</CardTitle></CardHeader>
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0"><span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><BarChart3 class="size-4" /></span><CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t('aiSettings.statistics') }}</span>
+            <SettingsScopeBadge scope="server" />
+          </CardTitle></CardHeader>
         <CardContent class="flex min-w-0 flex-col gap-4">
           <p v-if="!useWebApi" class="text-sm text-muted-foreground">{{ t('aiSettings.mockHint') }}</p>
           <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" data-ai-settings-block="filters">

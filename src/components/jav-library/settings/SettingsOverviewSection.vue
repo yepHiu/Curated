@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { useI18n } from "vue-i18n"
 import { LayoutDashboard } from "lucide-vue-next"
 import {
@@ -41,8 +42,9 @@ const { t } = useI18n()
           >
             <LayoutDashboard class="size-[1.15rem]" />
           </span>
-          <CardTitle class="min-w-0 text-lg tracking-tight">
-            {{ t("settings.navOverview") }}
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.navOverview") }}</span>
+            <SettingsScopeBadge scope="server" />
           </CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">

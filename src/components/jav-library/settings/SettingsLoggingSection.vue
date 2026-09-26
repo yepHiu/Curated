@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { watchDebounced } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
@@ -259,8 +260,9 @@ onBeforeUnmount(() => {
           >
             <ScrollText class="size-4" />
           </span>
-          <CardTitle class="min-w-0 text-lg tracking-tight">
-            {{ t("settings.backendLogTitle") }}
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.backendLogTitle") }}</span>
+            <SettingsScopeBadge scope="server" />
           </CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
@@ -404,8 +406,9 @@ onBeforeUnmount(() => {
           >
             <Activity class="size-4" />
           </span>
-          <CardTitle class="min-w-0 text-lg tracking-tight">
-            {{ t("settings.clientLogTitle") }}
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.clientLogTitle") }}</span>
+            <SettingsScopeBadge scope="client" />
           </CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">

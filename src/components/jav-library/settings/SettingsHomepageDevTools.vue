@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { CalendarDays, Loader2, RefreshCw } from "lucide-vue-next"
@@ -51,8 +52,9 @@ async function refreshHomepageRecommendations() {
       >
         <CalendarDays class="size-[1.15rem]" />
       </span>
-      <CardTitle class="min-w-0 text-lg tracking-tight">
-        {{ t("settings.aboutHomepageRefreshTitle") }}
+      <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+        <span>{{ t("settings.aboutHomepageRefreshTitle") }}</span>
+        <SettingsScopeBadge scope="server" />
       </CardTitle>
     </CardHeader>
     <CardContent class="pt-0">

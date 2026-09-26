@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onBeforeUnmount, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { CircleHelp, RotateCcw } from "lucide-vue-next"
@@ -92,8 +93,9 @@ onBeforeUnmount(() => {
         class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4"
       >
         <div class="min-w-0 flex-1 space-y-1">
-          <div class="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+          <div class="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-foreground">
             <span>{{ t("settings.curatedShortcutTitle") }}</span>
+            <SettingsScopeBadge scope="client" />
             <TooltipProvider :delay-duration="280">
               <TooltipRoot>
                 <TooltipTrigger as-child>

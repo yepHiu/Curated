@@ -2,6 +2,10 @@ import { mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import SettingsCuratedSection from "./SettingsCuratedSection.vue"
 
+vi.mock("@/components/ui/badge", () => ({
+  Badge: { name: "Badge", template: "<span><slot /></span>" },
+}))
+
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     t: (key: string, params?: Record<string, string>) =>
@@ -101,7 +105,7 @@ describe("SettingsCuratedSection", () => {
     expect(wrapper.text()).toContain("C")
     expect(wrapper.text()).toContain("settings.savePolicy")
     expect(wrapper.find("[data-shortcut-section]").exists()).toBe(true)
-    expect(wrapper.get('label[for="capture-feedback-sound"]').text()).toBe("settings.captureFeedbackSoundTitle")
+    expect(wrapper.get('label[for="capture-feedback-sound"] > span').text()).toBe("settings.captureFeedbackSoundTitle")
     expect(wrapper.get("#capture-feedback-sound").attributes("aria-checked")).toBe("true")
     expect(wrapper.text()).not.toContain("settings.curatedExportModeHint")
     expect(wrapper.text()).not.toContain("settings.captureFeedbackSoundHint")

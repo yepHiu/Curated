@@ -2,6 +2,10 @@ import { mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import SettingsOrganizeSection from "./SettingsOrganizeSection.vue"
 
+vi.mock("@/components/ui/badge", () => ({
+  Badge: { name: "Badge", template: "<span><slot /></span>" },
+}))
+
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     t: (key: string) => key,

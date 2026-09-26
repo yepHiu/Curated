@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { useI18n } from "vue-i18n"
 import { FolderOpen, ImageDown, Info } from "lucide-vue-next"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
@@ -74,8 +75,9 @@ const { t } = useI18n()
           >
             <ImageDown class="size-[1.15rem]" />
           </span>
-          <CardTitle class="min-w-0 text-lg tracking-tight">
-            {{ t("settings.curatedCardTitle") }}
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.curatedCardTitle") }}</span>
+            <SettingsScopeBadge scope="mixed" />
           </CardTitle>
           <div class="col-start-2 flex flex-col gap-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm">
             <p>
@@ -105,9 +107,9 @@ const { t } = useI18n()
           <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <legend class="sr-only">{{ t("settings.savePolicy") }}</legend>
             <div class="mb-0.5 flex items-center gap-3">
-              <span class="text-sm font-semibold text-foreground">{{
+              <span class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground"><span>{{
                 t("settings.savePolicy")
-              }}</span>
+              }}</span> <SettingsScopeBadge scope="client" /></span>
               <TooltipProvider :delay-duration="280">
                 <TooltipRoot>
                   <TooltipTrigger as-child>
@@ -202,8 +204,9 @@ const { t } = useI18n()
               class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >
               <div class="min-w-0 flex-1">
-                <p class="text-sm font-semibold text-foreground">
-                  {{ t("settings.curatedExportModeTitle") }}
+                <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                  <span>{{ t("settings.curatedExportModeTitle") }}</span>
+                  <SettingsScopeBadge scope="server" />
                 </p>
               </div>
               <div class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0">
@@ -241,9 +244,10 @@ const { t } = useI18n()
             >
               <Label
                 for="capture-feedback-sound"
-                class="min-w-0 cursor-pointer text-sm leading-relaxed font-semibold text-foreground"
+                class="flex flex-wrap items-center gap-2 min-w-0 cursor-pointer text-sm leading-relaxed font-semibold text-foreground"
               >
-                {{ t("settings.captureFeedbackSoundTitle") }}
+                <span>{{ t("settings.captureFeedbackSoundTitle") }}</span>
+                <SettingsScopeBadge scope="client" />
               </Label>
               <Switch
                 id="capture-feedback-sound"
@@ -260,8 +264,9 @@ const { t } = useI18n()
               class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >
               <div class="min-w-0 flex-1">
-                <p class="text-sm font-semibold text-foreground">
-                  {{ t("settings.curatedExportFormatTitle") }}
+                <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                  <span>{{ t("settings.curatedExportFormatTitle") }}</span>
+                  <SettingsScopeBadge scope="server" />
                 </p>
               </div>
               <div
@@ -303,7 +308,10 @@ const { t } = useI18n()
             v-if="curatedSaveMode === 'directory' && directorySupported"
             class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/20 p-4"
           >
-            <p class="text-sm font-semibold text-foreground">{{ t("settings.exportFolder") }}</p>
+            <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+              <span>{{ t("settings.exportFolder") }}</span>
+              <SettingsScopeBadge scope="client" />
+            </p>
             <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
               {{
                 curatedExportDirLabel

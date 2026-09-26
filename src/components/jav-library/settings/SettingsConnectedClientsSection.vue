@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import {
@@ -158,8 +159,9 @@ function formatTimestamp(value?: string): string {
       >
         <Wifi class="size-[1.15rem]" />
       </span>
-      <CardTitle class="min-w-0 text-lg tracking-tight">
-        {{ t("settings.connectedClientsTitle") }}
+      <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+        <span>{{ t("settings.connectedClientsTitle") }}</span>
+        <SettingsScopeBadge scope="server" />
       </CardTitle>
       <Button
         variant="outline"

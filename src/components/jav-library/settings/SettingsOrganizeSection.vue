@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { useI18n } from "vue-i18n"
 import { CircleHelp, Layers } from "lucide-vue-next"
 import {
@@ -40,8 +41,9 @@ const { t } = useI18n()
         >
           <Layers class="size-[1.15rem]" />
         </span>
-        <CardTitle class="min-w-0 text-lg tracking-tight">
-          {{ t("settings.organizeTitle") }}
+        <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+          <span>{{ t("settings.organizeTitle") }}</span>
+          <SettingsScopeBadge scope="server" />
         </CardTitle>
         <CardDescription
           class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"

@@ -1025,6 +1025,14 @@
     "imageOf": "第 {i} 张"
   },
   "settings": {
+    "scope": {
+      "server": "Server",
+      "desktop": "Desktop",
+      "browser": "Browser",
+      "serverHint": "由当前服务器管理的配置或数据。",
+      "desktopHint": "保存在此桌面端，不随服务器同步。",
+      "clientHint": "保存在当前客户端中，按服务器地址隔离，不同步到其他客户端。"
+    },
     "serverConnections": {
       "addDescription": "填写服务器名称和地址，保存到此电脑。",
       "nameLabel": "名称",

@@ -1025,6 +1025,14 @@
     "imageOf": "Image {i}"
   },
   "settings": {
+    "scope": {
+      "server": "Server",
+      "desktop": "Desktop",
+      "browser": "Browser",
+      "serverHint": "Settings or data managed by the current server.",
+      "desktopHint": "Stored in this desktop app, independently of the server.",
+      "clientHint": "Stored in this client for this server address; not synced to other clients."
+    },
     "serverConnections": {
       "addDescription": "Enter a server name and address to save on this computer.",
       "nameLabel": "Name",

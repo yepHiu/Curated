@@ -1025,6 +1025,14 @@
     "imageOf": "{i}枚目"
   },
   "settings": {
+    "scope": {
+      "server": "Server",
+      "desktop": "Desktop",
+      "browser": "Browser",
+      "serverHint": "現在のサーバーが管理する設定またはデータ。",
+      "desktopHint": "このデスクトップアプリに保存され、サーバーには同期されません。",
+      "clientHint": "サーバーアドレスごとにこのクライアントに保存され、他のクライアントには同期されません。"
+    },
     "serverConnections": {
       "addDescription": "サーバー名とアドレスを入力し、このパソコンに保存します。",
       "nameLabel": "名前",

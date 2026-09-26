@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { CalendarDays } from "lucide-vue-next"
@@ -74,8 +75,9 @@ const metricItems = computed(() => [
       >
         <CalendarDays class="size-[1.15rem]" />
       </span>
-      <CardTitle class="min-w-0 text-lg tracking-tight">
-        {{ t("settings.watchTimeTitle") }}
+      <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+        <span>{{ t("settings.watchTimeTitle") }}</span>
+        <SettingsScopeBadge scope="server" />
       </CardTitle>
       <CardDescription
         class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { BookOpen } from "lucide-vue-next"
@@ -261,8 +262,10 @@ async function cleanupCache() {
         >
           <BookOpen class="size-4" />
         </span>
-        <CardTitle class="min-w-0 text-lg tracking-tight">
-          {{ t("settings.comicLibraryTitle") }} <Badge variant="secondary">Beta</Badge>
+        <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+          <span>{{ t("settings.comicLibraryTitle") }}</span>
+          <SettingsScopeBadge scope="server" />
+          <Badge variant="secondary">Beta</Badge>
         </CardTitle>
         <CardDescription
           class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed } from "vue"
 import { useLibraryPathAccess } from "@/composables/use-library-path-access"
 import SettingsReadOnlyLibraryPaths from "./SettingsReadOnlyLibraryPaths.vue"
@@ -147,8 +148,9 @@ function onDefaultImportPathChange(value: unknown) {
           >
             <Database class="size-[1.15rem]" />
           </span>
-          <CardTitle class="min-w-0 text-lg tracking-tight">
-            {{ t("settings.storageCardTitle") }}
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.storageCardTitle") }}</span>
+            <SettingsScopeBadge scope="server" />
           </CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">

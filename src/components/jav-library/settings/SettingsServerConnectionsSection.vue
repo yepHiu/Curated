@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { RefreshCw, Server } from "lucide-vue-next"
@@ -31,7 +32,10 @@ function recheck() {
       <span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true">
         <Server class="size-[1.15rem]" />
       </span>
-      <CardTitle class="min-w-0 text-lg tracking-tight">{{ t('settings.serverConnections.title') }}</CardTitle>
+      <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+        <span>{{ t('settings.serverConnections.title') }}</span>
+        <SettingsScopeBadge scope="desktop" />
+      </CardTitle>
     </CardHeader>
     <CardContent class="flex min-w-0 flex-col gap-3 pt-0">
       <div v-if="snapshot" class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border/50 bg-muted/5 p-4">

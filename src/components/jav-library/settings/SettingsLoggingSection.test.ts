@@ -9,6 +9,10 @@ const backendLogState = ref({
 
 const patchBackendLog = vi.fn()
 
+vi.mock("@/components/ui/badge", () => ({
+  Badge: { name: "Badge", template: "<span><slot /></span>" },
+}))
+
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     t: (key: string) => key,

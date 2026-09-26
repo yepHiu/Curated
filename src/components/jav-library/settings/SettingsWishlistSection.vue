@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { ref } from "vue"
 import { Plug } from "lucide-vue-next"
 import { useI18n } from "vue-i18n"
@@ -33,7 +34,10 @@ async function save(enabled: boolean) {
       <span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true">
         <Plug class="size-[1.15rem]" />
       </span>
-      <CardTitle class="min-w-0 text-lg tracking-tight">{{ t('wishlist.connect') }}</CardTitle>
+      <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+        <span>{{ t('wishlist.connect') }}</span>
+        <SettingsScopeBadge scope="server" />
+      </CardTitle>
     </CardHeader>
     <CardContent class="flex flex-col gap-3 pt-0">
       <p

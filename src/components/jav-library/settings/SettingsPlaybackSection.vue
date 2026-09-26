@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { watchDebounced } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
@@ -369,8 +370,9 @@ onBeforeUnmount(() => {
           >
             <PlayCircle class="size-[1.15rem]" />
           </span>
-          <CardTitle class="min-w-0 text-lg tracking-tight">
-            {{ t("settings.playbackCardTitle") }}
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.playbackCardTitle") }}</span>
+            <SettingsScopeBadge scope="mixed" />
           </CardTitle>
           <CardDescription
             class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
@@ -383,7 +385,10 @@ onBeforeUnmount(() => {
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-semibold text-foreground">{{ t("settings.hardwareDecode") }}</p>
+              <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                <span>{{ t("settings.hardwareDecode") }}</span>
+                <SettingsScopeBadge scope="server" />
+              </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 {{ t("settings.hardwareDecodeHint") }}
               </p>
@@ -395,8 +400,9 @@ onBeforeUnmount(() => {
             class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
           >
             <div class="min-w-0 flex-1 flex flex-col gap-3">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.playbackHardwareEncoder") }}
+              <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                <span>{{ t("settings.playbackHardwareEncoder") }}</span>
+                <SettingsScopeBadge scope="server" />
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 {{ t("settings.playbackHardwareEncoderHint") }}
@@ -424,8 +430,9 @@ onBeforeUnmount(() => {
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.playbackStreamPushEnabled") }}
+              <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                <span>{{ t("settings.playbackStreamPushEnabled") }}</span>
+                <SettingsScopeBadge scope="server" />
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 {{ t("settings.playbackStreamPushEnabledHint") }}
@@ -440,8 +447,9 @@ onBeforeUnmount(() => {
           >
             <div class="flex items-center justify-between gap-3">
               <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-semibold text-foreground">
-                  {{ t("settings.playbackForceStreamPush") }}
+                <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                  <span>{{ t("settings.playbackForceStreamPush") }}</span>
+                  <SettingsScopeBadge scope="server" />
                 </p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.playbackForceStreamPushHint") }}
@@ -456,8 +464,9 @@ onBeforeUnmount(() => {
 
           <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.playbackFfmpegCommand") }}
+              <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                <span>{{ t("settings.playbackFfmpegCommand") }}</span>
+                <SettingsScopeBadge scope="server" />
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 {{ t("settings.playbackFfmpegCommandHint") }}
@@ -473,8 +482,9 @@ onBeforeUnmount(() => {
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.playbackNativePlayerEnabled") }}
+              <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                <span>{{ t("settings.playbackNativePlayerEnabled") }}</span>
+                <SettingsScopeBadge scope="server" />
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 {{ t("settings.playbackNativePlayerEnabledHint") }}
@@ -487,8 +497,9 @@ onBeforeUnmount(() => {
             class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
           >
             <div class="min-w-0 flex-1 flex flex-col gap-3">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.playbackNativePlayerPreset") }}
+              <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                <span>{{ t("settings.playbackNativePlayerPreset") }}</span>
+                <SettingsScopeBadge scope="server" />
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 {{ t("settings.playbackNativePlayerPresetHint") }}
@@ -517,8 +528,9 @@ onBeforeUnmount(() => {
 
           <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.playbackNativePlayerCommand") }}
+              <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                <span>{{ t("settings.playbackNativePlayerCommand") }}</span>
+                <SettingsScopeBadge scope="client" />
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 {{ t("settings.playbackNativePlayerCommandHint") }}
@@ -534,8 +546,9 @@ onBeforeUnmount(() => {
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.playbackPreferNativePlayer") }}
+              <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                <span>{{ t("settings.playbackPreferNativePlayer") }}</span>
+                <SettingsScopeBadge scope="server" />
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 {{ t("settings.playbackPreferNativePlayerHint") }}
@@ -549,8 +562,9 @@ onBeforeUnmount(() => {
               class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >
               <div class="min-w-0 flex-1 flex flex-col gap-3">
-                <p class="text-sm font-semibold text-foreground">
-                  {{ t("settings.playbackSeekBackwardStep") }}
+                <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                  <span>{{ t("settings.playbackSeekBackwardStep") }}</span>
+                  <SettingsScopeBadge scope="server" />
                 </p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.playbackSeekBackwardStepHint") }}
@@ -571,8 +585,9 @@ onBeforeUnmount(() => {
               class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >
               <div class="min-w-0 flex-1 flex flex-col gap-3">
-                <p class="text-sm font-semibold text-foreground">
-                  {{ t("settings.playbackSeekForwardStep") }}
+                <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                  <span>{{ t("settings.playbackSeekForwardStep") }}</span>
+                  <SettingsScopeBadge scope="server" />
                 </p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.playbackSeekForwardStepHint") }}

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onMounted, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { ArrowUpRight, Download, Loader2, Play, RefreshCw } from "lucide-vue-next"
@@ -239,6 +240,7 @@ async function handleInstallUpdate() {
             <p class="text-sm font-semibold text-foreground">
               {{ t("settings.appUpdateSectionTitle") }}
             </p>
+            <SettingsScopeBadge :scope="desktopOnly ? 'desktop' : 'server'" />
             <Badge
               v-if="showUpdateBadge"
               variant="secondary"

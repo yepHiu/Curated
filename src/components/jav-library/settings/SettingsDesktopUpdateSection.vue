@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { useI18n } from "vue-i18n"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,7 +18,10 @@ defineProps<{
   <div class="min-w-0 rounded-lg border border-border/50 bg-background/55 p-3" data-desktop-update-section>
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0">
-        <p class="text-xs font-medium text-muted-foreground">Curated Desktop</p>
+        <p class="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
+          <span>Curated Desktop</span>
+          <SettingsScopeBadge scope="desktop" />
+        </p>
         <div class="mt-1 flex flex-wrap items-center gap-2">
           <span v-if="info" class="break-all font-mono text-sm text-foreground" data-desktop-version>{{ info.version }}</span>
           <span v-else class="text-xs text-muted-foreground">{{ t(infoError ? 'settings.desktopInfoError' : 'settings.desktopInfoLoading') }}</span>

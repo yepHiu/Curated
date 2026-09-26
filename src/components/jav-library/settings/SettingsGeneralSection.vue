@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { Languages, Power } from "lucide-vue-next"
@@ -67,8 +68,9 @@ function updateLocale(value: unknown) {
             >
               <Languages class="size-4" />
             </span>
-            <CardTitle class="min-w-0 text-lg tracking-tight">
-              {{ t("settings.generalSubsectionLocaleAppearance") }}
+            <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+              <span>{{ t("settings.generalSubsectionLocaleAppearance") }}</span>
+              <SettingsScopeBadge scope="client" />
             </CardTitle>
           </CardHeader>
           <CardContent class="flex flex-col gap-3 pt-0">
@@ -130,8 +132,9 @@ function updateLocale(value: unknown) {
             >
               <Power class="size-4" />
             </span>
-            <CardTitle class="min-w-0 text-lg tracking-tight">
-              {{ t("settings.launchAtLoginTitle") }}
+            <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+              <span>{{ t("settings.launchAtLoginTitle") }}</span>
+              <SettingsScopeBadge scope="server" />
             </CardTitle>
           </CardHeader>
           <CardContent class="flex flex-col gap-3 pt-0">

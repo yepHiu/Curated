@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { LockKeyhole, ShieldCheck } from "lucide-vue-next"
@@ -370,8 +371,9 @@ async function confirmTrustedSessionRevoke() {
         >
           <ShieldCheck class="size-4" />
         </span>
-        <CardTitle class="min-w-0 text-lg tracking-tight">
-          {{ t("settings.securityTitle") }}
+        <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+          <span>{{ t("settings.securityTitle") }}</span>
+          <SettingsScopeBadge scope="server" />
         </CardTitle>
         <CardDescription
           class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"

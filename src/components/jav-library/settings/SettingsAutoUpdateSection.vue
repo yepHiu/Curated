@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { useI18n } from "vue-i18n"
 import { RefreshCw } from "lucide-vue-next"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,8 +33,9 @@ function changePreference(value: boolean) {
       >
         <RefreshCw class="size-4" />
       </span>
-      <CardTitle class="min-w-0 text-lg tracking-tight">
-        {{ t("settings.autoDownloadUpdatesTitle") }}
+      <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+        <span>{{ t("settings.autoDownloadUpdatesTitle") }}</span>
+        <SettingsScopeBadge scope="server" />
       </CardTitle>
     </CardHeader>
     <CardContent class="flex flex-col gap-3 pt-0">

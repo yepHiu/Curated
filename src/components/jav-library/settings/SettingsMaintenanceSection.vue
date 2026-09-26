@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { defineAsyncComponent } from "vue"
 import { useI18n } from "vue-i18n"
 import { ScanSearch, Wrench } from "lucide-vue-next"
@@ -38,8 +39,9 @@ const { t } = useI18n()
         >
           <Wrench class="size-[1.15rem]" />
         </span>
-        <CardTitle class="min-w-0 text-lg tracking-tight">
-          {{ t("settings.navMaintenance") }}
+        <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+          <span>{{ t("settings.navMaintenance") }}</span>
+          <SettingsScopeBadge scope="server" />
         </CardTitle>
       </CardHeader>
 
