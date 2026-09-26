@@ -121,7 +121,7 @@ Vite usually serves `http://localhost:5173`.
 
 ### Electron
 
-On macOS, native window buttons sit in a 40px top strip above the brand and toolbar, with the application background continuing behind them. Drag the empty header area to move the window; search and toolbar controls remain interactive. Collapsed navigation reserves space for the system buttons. See [window chrome notes](plan/2026-09-26-macos-integrated-titlebar.md).
+On macOS, native window buttons sit in a 40px strip above the sidebar brand, with the sidebar background continuing behind them. There is no divider below the brand. In wide windows the content toolbar keeps its original top position and height; narrow windows reserve space for the window buttons. Drag the empty header area to move the window; search and toolbar controls remain interactive. Collapsed navigation reserves space for the system buttons. See [window chrome notes](plan/2026-09-26-macos-integrated-titlebar.md).
 
 ```powershell
 pnpm dev:electron
