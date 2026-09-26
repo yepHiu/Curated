@@ -23,7 +23,7 @@
 - 全局主题令牌定义在 [`src/style.css`](../src/style.css)。
 - 业务界面应优先使用语义化颜色与表面类名，例如 `bg-background`、`text-foreground`、`bg-card`、`border-border`、`text-muted-foreground`。
 - 避免在业务组件中直接硬编码主背景色、正文色和交互色，除非是非常局部的装饰性图形。
-- 全局排版：拉丁字母与数字使用 Noto Sans；中文界面汉字使用 HarmonyOS Sans SC，日语界面假名与汉字使用 Noto Sans JP。`html lang` 控制中日字形顺序，字体资源本地打包并在加载期间回退到系统字体。`font-sans` 跟随全局字体栈；`font-curated` 字标使用 Noto Sans。
+- 全局排版：拉丁字母与数字使用 Noto Sans；中文界面汉字使用 HarmonyOS Sans SC，日语界面假名与汉字使用 Noto Sans JP。`html lang` 控制中日字形顺序，字体资源本地打包并在加载期间回退到系统字体。`font-sans` 跟随全局字体栈；`font-curated` 品牌标题使用本地打包的 Outfit 可变字体，覆盖侧栏、关于页和 Agent 聊天侧栏；字体许可证在「关于」页可查看。
 - 字号、字重、行高与现有页面密度保持原约定。HarmonyOS Sans SC 的未修改原始字体和许可随应用分发，“关于”页展示署名及许可入口。
 
 ## 3. 目录职责

@@ -20,7 +20,7 @@ alwaysApply: false
 
 - **MUST** 使用语义 Tailwind / 主题类：`bg-background`、`text-foreground`、`border-border`、`bg-card`、`text-card-foreground`、`bg-muted`、`text-muted-foreground`、`primary`、`destructive`、`ring` 等。CSS 变量事实源：**`src/style.css`**（`:root` 已为深色主界面）。
 - **MUST NOT** 在业务组件中随意写死 `#rrggbb` 或任意 `rgb()` 作为主色/背景（难以随主题维护）。
-- **字体**：全局正文由 `--app-font-stack` 控制；中文界面汉字使用 HarmonyOS Sans SC，日语界面假名与汉字使用 Noto Sans JP，拉丁字母与数字使用 Noto Sans。`html lang` 选择中日字形顺序，资源均本地打包。侧栏 **Curated** 字标继续使用 **`text-primary`** + **`font-curated`**，字型改为 Noto Sans。
+- **字体**：全局正文由 `--app-font-stack` 控制；中文界面汉字使用 HarmonyOS Sans SC，日语界面假名与汉字使用 Noto Sans JP，拉丁字母与数字使用 Noto Sans。`html lang` 选择中日字形顺序，资源均本地打包。侧栏 **Curated** 字标继续使用 **`text-primary`** + **`font-curated`**，字型使用 Outfit（本地打包的可变字体）。
 
 ## 深色与 `dark:`（MUST 理解）
 
