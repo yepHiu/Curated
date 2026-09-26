@@ -665,3 +665,7 @@ Migration 0055 preserves the original source URL separately from scraped metadat
 
 
 Server 1.7.0 adds public `GET /api/server-info` (product, persistent UUID, version, protocolVersion/desktopBridgeVersion 1) and discovery-gated `GET /discovery/description.xml`. `PATCH /api/settings` accepts local-only `discoveryEnabled`; restart to apply. Desktop connection/device preferences are local IPC, not Server settings. See guide “Desktop discovery and upgrade”.
+
+## Full 1.7.2 compatibility
+
+No API endpoints changed. Windows Full embeds `cmd/curated-migrate` for backup-first internal legacy uninstall and split installation; `internal/installmigration` owns the journal/backup and `internal/launchprofile` preserves external custom data/config on normal Server startup. Full/Server source versions are 1.7.2, Desktop remains 0.2.0. Same-user registered legacy layouts only; running apps and unsafe/ambiguous paths stop preflight. Windows real installer gates include pinned 1.4.13/1.5.8 baselines and remain pending until CD runs. See guide migration section; published 1.7.1 remains manual.

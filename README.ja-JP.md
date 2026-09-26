@@ -29,6 +29,8 @@ Curated はローカルファーストのメディアライブラリです。Vue
 
 ## ダウンロード
 
+Full 1.7.2 のソースには旧一体型から一度の実行で移行する Windows インストーラを追加しています。対応範囲と未実施の Windows 検証は[移行ガイド](docs/guide.md#migrating-an-old-all-in-one-installation)を参照してください。
+
 公式の Windows パッケージは **[GitHub Releases](https://github.com/yepHiu/Curated/releases)** にあります。[最新リリース](https://github.com/yepHiu/Curated/releases/latest) を使ってください。
 
 - コミック / 写真ライブラリ **Beta**：設定 → ライブラリ → 漫画ライブラリ / 写真ライブラリで個別に有効化すると設定を表示します。写真ライブラリではお気に入り、タグ追加、索引削除の一括操作ができます。[利用ガイド](docs/guide.md#comic-and-photo-library-beta)。
