@@ -14,8 +14,9 @@ export function desktopUpdateAsset(payload: unknown, platform: string, arch: str
     if (url === `${downloadPrefix}${encodeURIComponent(release.tag_name)}/${name}`) return { version, url }
   }
 }
-export async function checkDesktopUpdate(): Promise<DesktopUpdate | undefined> {
-  const response = await fetch(releaseAPI, { signal: AbortSignal.timeout(8000), redirect: "error", headers: { Accept: "application/vnd.github+json" } })
+/** 使用调用方的网络栈，使客户端代理同样覆盖更新检查。 */
+export async function checkDesktopUpdate(fetchImpl = fetch): Promise<DesktopUpdate | undefined> {
+  const response = await fetchImpl(releaseAPI, { signal: AbortSignal.timeout(8000), redirect: "error", headers: { Accept: "application/vnd.github+json" } })
   if (!response.ok) throw new Error(`更新检查失败（HTTP ${response.status}）。`)
   const text = await response.text()
   if (text.length > 1024 * 1024) throw new Error("更新响应过大。")

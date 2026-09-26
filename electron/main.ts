@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, session, shell,
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { checkDesktopUpdate } from "./updates.js"
+import { DesktopPreferencesStore, proxyConfiguration, validatePreferences, type DesktopPreferences, type DesktopSettings } from "./settings.js"
 import { discoverServers } from "./discovery.js"
 import { ConnectionStore, connectionPartition, localServerSuggestion, normalizeServerUrl, probeServer, type SavedConnection } from "./connections.js"
 import { resolveAppIconPath, withCuratedDesktopVersion, withCuratedDesktopRequestHeaders } from "./desktop-shell.js"
@@ -18,6 +19,10 @@ let current: SavedConnection | undefined
 let attempt: AbortController | undefined
 let quitting = false
 let discoveryScan: AbortController | undefined
+let preferencesStore: DesktopPreferencesStore
+let runningPreferences: DesktopPreferences
+let networkSession: Electron.Session
+let savingSettings = false
 
 // 展示名称不应改变已使用的连接档案和 Electron 会话目录。
 const existingUserData = app.getPath("userData")
@@ -28,8 +33,12 @@ app.setPath("userData", existingUserData)
 if (!app.requestSingleInstanceLock()) app.quit()
 else {
   app.on("second-instance", () => showWindow())
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     store = new ConnectionStore(app.getPath("userData"))
+    preferencesStore = new DesktopPreferencesStore(app.getPath("userData"))
+    runningPreferences = preferencesStore.read()
+    networkSession = session.fromPartition("curated-connection-probes")
+    await networkSession.setProxy(proxyConfiguration(runningPreferences))
     registerIPC()
     const icon = resolveAppIconPath(app.getAppPath())
     if (icon) {
@@ -93,10 +102,47 @@ function requireLauncher(event: IpcMainInvokeEvent): void {
 function requireLibrary(event: IpcMainInvokeEvent): void {
   if (!library || !current || event.sender !== library.webContents || event.senderFrame !== library.webContents.mainFrame || new URL(event.senderFrame.url).origin !== current.url) throw new Error("Unauthorized desktop request")
 }
+/** Windows 开发启动需传项目目录，macOS 登录启动由开发 bundle 内入口承接。 */
+function loginOptions(): Electron.LoginItemSettingsOptions {
+  return { path: process.execPath, args: !app.isPackaged && process.platform === "win32" ? [app.getAppPath()] : [] }
+}
+/** 查询 OS 的真实登录启动状态，并提示网络配置是否仍待重启。 */
+function readDesktopSettings(): DesktopSettings {
+  const preferences = preferencesStore.read()
+  const loginSupported = process.platform === "darwin" || process.platform === "win32"
+  return { ...preferences, loginSupported, launchAtLogin: loginSupported && app.getLoginItemSettings(loginOptions()).openAtLogin,
+    restartRequired: JSON.stringify(preferences) !== JSON.stringify(runningPreferences) }
+}
+/** 身份探测与更新检查共用 Chromium 代理，且不携带业务会话 Cookie。 */
+const desktopFetch: typeof fetch = (input, init) => networkSession.fetch(input instanceof URL ? input.href : input, { ...init, credentials: "omit" })
 function registerIPC(): void {
+  // 仅本地连接窗口可读取或更改客户端配置。
+  ipcMain.handle("curated:settings-read", event => { requireLauncher(event); return readDesktopSettings() })
+  // 保存过程串行；网络配置下次启动应用，避免中断正在播放或上传的页面。
+  ipcMain.handle("curated:settings-save", (event, value: unknown) => {
+    requireLauncher(event)
+    if (savingSettings) throw new Error("设置正在保存，请稍后重试。")
+    const preferences = validatePreferences(value)
+    const launchAtLogin = (value as Record<string, unknown>).launchAtLogin
+    if (typeof launchAtLogin !== "boolean") throw new Error("无效的自启动设置。")
+    const previous = readDesktopSettings()
+    if (!previous.loginSupported && launchAtLogin) throw new Error("此平台暂不支持登录启动。")
+    savingSettings = true
+    try {
+      if (previous.loginSupported && launchAtLogin !== previous.launchAtLogin) {
+        app.setLoginItemSettings({ ...loginOptions(), openAtLogin: launchAtLogin })
+        if (app.getLoginItemSettings(loginOptions()).openAtLogin !== launchAtLogin) throw new Error("系统未应用登录启动设置，请检查系统登录项。")
+      }
+      preferencesStore.write(preferences)
+      return readDesktopSettings()
+    } catch (error) {
+      if (previous.loginSupported) app.setLoginItemSettings({ ...loginOptions(), openAtLogin: previous.launchAtLogin })
+      throw error
+    } finally { savingSettings = false }
+  })
   ipcMain.handle("curated:desktop-update", async event => {
     requireLauncher(event)
-    const update = await checkDesktopUpdate()
+    const update = await checkDesktopUpdate(desktopFetch)
     if (!update) return "当前发布中没有适用于此设备的 Desktop 安装包。"
     const answer = await dialog.showMessageBox(launcher!, { message: `Curated Desktop ${update.version}`, detail: "打开官方 Desktop 安装包下载。不会更新 Server。", buttons: ["取消", "下载"], cancelId: 0 })
     if (answer.response === 1) await shell.openExternal(update.url)
@@ -146,7 +192,7 @@ async function connect(raw: string): Promise<{ ok: boolean; error?: string }> {
   let candidate: BrowserWindow | undefined
   try {
     const url = normalizeServerUrl(raw)
-    const info = await probeServer(url, controller.signal)
+    const info = await probeServer(url, controller.signal, desktopFetch)
     controller.signal.throwIfAborted()
     const previous = store.read().connections.find(item => item.url === url)
     if (previous && previous.serverId !== info.serverId) {
@@ -163,6 +209,8 @@ async function connect(raw: string): Promise<{ ok: boolean; error?: string }> {
       partition: connectionPartition(selected), preload: path.join(directory, "preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false,
     } })
     const window = candidate
+    await window.webContents.session.setProxy(proxyConfiguration(runningPreferences))
+    controller.signal.throwIfAborted()
     window.webContents.session.setPermissionCheckHandler(() => false)
     window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
     window.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {

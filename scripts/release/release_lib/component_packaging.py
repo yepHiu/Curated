@@ -66,7 +66,7 @@ def stage_components(repo: Path, output: Path, version: str, *, server_binary: P
         # Explicit whitelist: no obsolete backend process launcher in the client package.
         main = app / "electron-dist"
         main.mkdir()
-        for name in ("main.js", "desktop-shell.js", "connections.js", "discovery.js", "updates.js", "preload.cjs", "launcher-preload.cjs"):
+        for name in ("main.js", "desktop-shell.js", "connections.js", "discovery.js", "updates.js", "settings.js", "preload.cjs", "launcher-preload.cjs"):
             shutil.copy2(electron_main / name, main / name)
         shutil.copytree(electron_main / "launcher", main / "launcher")
         shutil.copy2(icon, app / "curated.ico")

@@ -10,10 +10,12 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useTheme } from "@/composables/use-theme"
+import DesktopSettingsDialog from "./DesktopSettingsDialog.vue"
+import type { DesktopSettingsAPI } from "./settings-contract"
 
 interface Connection { url: string; name: string; serverId: string }
 interface Discovered { serverId: string; name: string; version: string; urls: string[]; expiresAt: number }
-interface ConnectionAPI {
+interface ConnectionAPI extends DesktopSettingsAPI {
   platform?: string
   checkUpdate(): Promise<string>
   discover(): Promise<Discovered[]>
@@ -33,6 +35,7 @@ const error = ref("")
 const version = ref("")
 const updateMessage = ref("")
 const updating = ref(false)
+const settingsOpen = ref(false)
 const found = ref<Discovered[]>([])
 const scanning = ref(false)
 const discoveryError = ref("")
@@ -226,10 +229,12 @@ onMounted(async () => {
           <div class="flex flex-wrap items-center gap-2">
             <span class="truncate text-xs text-muted-foreground">Desktop {{ version }}</span>
             <Button variant="link" size="sm" class="h-auto rounded-none px-0 py-0 text-xs has-[>svg]:px-0" :disabled="updating || !api" @click="checkUpdate"><RefreshCw v-if="updating" class="motion-safe:animate-spin" aria-hidden="true" />{{ updating ? t('updating') : t('update') }}</Button>
+            <Button variant="link" size="sm" class="h-auto rounded-none px-0 py-0 text-xs" :disabled="!api" @click="settingsOpen = true">{{ t('openSettings') }}</Button>
           </div>
           <p v-if="updateMessage" role="status" class="max-h-16 overflow-y-auto break-words text-xs text-muted-foreground">{{ updateMessage }}</p>
         </div>
       </div>
     </main>
+    <DesktopSettingsDialog v-if="api" v-model:open="settingsOpen" :api="api" />
   </div>
 </template>

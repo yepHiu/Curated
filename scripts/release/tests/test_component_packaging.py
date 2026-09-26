@@ -23,7 +23,7 @@ class ComponentPackagingTest(unittest.TestCase):
         runtime = self.root / "electron"; runtime.mkdir(); (runtime / "electron.exe").write_bytes(b"desktop")
         (runtime / "resources.pak").write_bytes(b"runtime")
         main = self.root / "main"; main.mkdir()
-        for file in ("main.js", "desktop-shell.js", "connections.js", "discovery.js", "updates.js", "preload.cjs", "launcher-preload.cjs", "backend-process.js"):
+        for file in ("main.js", "desktop-shell.js", "connections.js", "discovery.js", "updates.js", "settings.js", "preload.cjs", "launcher-preload.cjs", "backend-process.js"):
             (main / file).write_text("fixture")
         (main / "launcher").mkdir(); (main / "launcher/index.html").write_text("Connect")
         return binary, web, runtime, main
