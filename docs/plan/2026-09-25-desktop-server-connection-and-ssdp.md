@@ -385,3 +385,13 @@ macOS 窗口集成：按用户要求，连接窗口采用原生 `titleBarStyle: 
 - 自启动：读取 macOS/Windows OS 登录项，保存立即生效；失败尝试恢复原登录项。启动的是 Desktop。macOS 开发 bundle 内新增默认入口，确保系统无项目参数启动可用；组件打包显式包含 settings.js。
 - 验证：Electron 8 文件 42 项、连接页/设置弹窗 2 文件 5 项、组件打包 3 项通过；typecheck、定向 ESLint、Electron/连接页构建通过。真实 Electron + 临时 HTTP 代理验证身份探测及页面经过代理、本机/私网 bypass、更新请求注入；macOS 默认入口启动与 520px 弹窗实测通过。
 - 限制：未更改用户现有代理/登录项做验收；真实注销/登录、Windows 自启动和系统禁用登录项场景尚未实测。未运行需用户明确同意的 display-scaling 专项套件。
+
+### 11.6 GitHub Actions 打包建议（待实施）
+
+当前仅有 `.github/workflows/ci.yml` 质量检查，未接入 Windows 三包安装器构建。可新增手动触发的 `workflow_dispatch` 工作流，使用 Windows x64 runner，提供明确版本号与 `all/server/desktop/full` 输入。
+
+- 准备 Node、pnpm、Python、Go、Inno Setup 和真实 Windows FFmpeg/ffprobe；锁文件安装依赖，并校验依赖来源和版本。Windows runner 安装的 Electron 直接提供 Windows runtime。
+- 复用 `python scripts/release/release_cli.py publish --version <version> --variant <variant>`；显式版本避免每次临时 checkout 自动递增后产生重复版本误解，不自动提交版本文件。
+- 强制核验 manifest 的 `status=built`、预期 EXE 数量与 SHA-256，不能把 `scripts-only` 判为成功；默认 all 生成 Full、Server、Desktop 三包。
+- 将 EXE、manifest 和诊断日志上传为 Actions artifacts，用户在该次运行中下载。现阶段不创建 GitHub Release、不上传旧 latest feed，维持最小只读仓库权限。
+- 工作流需要先提交并推送至 GitHub，首次手动入口通常需在默认分支提供工作流定义；届时可选择目标分支构建。Windows 安装/升级/迁移验收仍独立执行；编译成功不等价于生产发布完成。签名需另外配置证书及 secrets，普通打包无需签名凭据。
