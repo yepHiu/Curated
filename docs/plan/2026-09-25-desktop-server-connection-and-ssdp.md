@@ -325,7 +325,7 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 
 ## 11. 2026-09-26：拆分发行命名与版本规范
 
-状态：用户已确认本节安装包命名与独立版本方案，Desktop 从 `0.1.0` 起步，完整稳定版为 `1.0.0`；展示不使用 beta 后缀，开发环境单独标注。尚未实际写入发行版本。当前打包脚本仍是 Windows 一体包实现，不能把规范落盘等同于三包生成和独立更新已经完成。本节取代前文「包名尚未确定」及「两组件初期同批同版本」的建议。
+状态：用户已确认本节安装包命名与独立版本方案，Desktop 从 `0.1.0` 起步，完整稳定版为 `1.0.0`；展示不使用 beta 后缀，开发环境单独标注。已建立组件版本源与包名生成器，落地进度见 11.5。当前打包脚本仍是 Windows 一体包实现，不能把规范落盘等同于三包生成和独立更新已经完成。本节取代前文「包名尚未确定」及「两组件初期同批同版本」的建议。
 
 ### 11.1 安装包名
 
@@ -351,7 +351,7 @@ macOS Desktop 首选 DMG；内部应用显示为 `Curated Desktop.app`。若后�
 - **Full：** 使用独立 `bundleVersion`（首批规划 `1.6.0`），表示这次安装组合。manifest 明确记录 `serverVersion` 和 `desktopVersion`，不能以 Full 版本覆盖二者。组件或安装器组合发生变化就发布新的 Full 版本；例如 Server `1.6.0`、Desktop `1.0.0` 组成 Full `1.6.0`，之后仅 Desktop 修复到 `1.0.1`，可组成 Full `1.6.1`，Server 仍是 `1.6.0`。关于页展示实际组件版本，Full 版本只用于安装记录。
 - 同一组件的 Windows/macOS 和 x64/arm64 产物共享一次发行版本；打包格式转换、测试编译、CI 重试不递增版本。已公开版本的资产不得以不同内容覆盖，修复后发布新 patch。
 
-### 11.3 Desktop 版本规划（已确认，未分配发行版本）
+### 11.3 Desktop 版本规划（已确认，开发目标已写入组件源）
 
 采用独立产品线：起始版本 `0.1.0`，早期修复依次为 `0.1.1`、`0.1.2`，新增功能升为 `0.2.0`；完成 Server 解耦、连接切换、桥接隔离、平台安装与独立更新验收后发布 `1.0.0`。不再保留沿用旧一体包 `1.5.x` 的备选方案，也不将当前尚内置/托管后端的开发壳标为已完成的 `1.0.0`。
 
@@ -375,3 +375,19 @@ macOS Desktop 首选 DMG；内部应用显示为 `Curated Desktop.app`。若后�
 - Release tag 规划为 `desktop-v<version>`、`server-v<version>`、`full-v<version>`。tag 前缀本身不能隔离 GitHub `/releases/latest`：旧 feed 继续只有兼容完整包，新组件必须使用隔离 feed 或组件 manifest；在迁移前不能把新三包随意放入旧客户端读取的 latest。
 - 关于页分别显示本机 `Curated Desktop`（可信主进程 `app.getVersion()`）和当前连接的 `Curated Server`（health）。浏览器不显示 Desktop 行。Desktop 在可信本地流程检查自身版本，Server 独立检查自身版本；开发态、离线、无匹配系统/架构包均要准确说明。
 - 本次不改当前包的实际版本、不发布安装包、不切换旧更新源。脚本落地应与阶段 5 的组件构建、内容断言、安装身份及更新迁移一起完成；禁止仅改旧打包字符串，产出名称为 Desktop 却仍含 Go/FFmpeg 的错误安装包。
+
+
+### 11.5 2026-09-26 落地：版本源、命名生成器与 Desktop 关于页
+
+已实现：
+
+- `scripts/release/versions/{desktop,server,full}.json` 分别维护数字版本，当前开发目标为 `0.1.0` / `1.5.7` / `1.6.0`；这不代表这些组件已有公开发行。Server 未提前升至 1.6.0。
+- `release_cli.py plan-component` 只读生成组件包名、tag、平台、架构与格式；Full 同时记录两组件的准确版本。输出带 `status: planned`，不会构建安装包、递增版本或发布。拒绝 beta 后缀及错误平台/格式组合。
+- `pnpm build:electron:main` 从 Desktop 版本源和 `electron/release-config.json` 生成 `electron-dist/desktop-release.json`，随现有一体包复制；主进程通过受当前窗口主 frame / origin 校验的 `getDesktopInfo` IPC 提供 `0.1.0`。关于页独立显示 Desktop 版本与「开发版」标签，浏览器隐藏此块。客户端请求 header 同步使用组件版本。
+- **对 11.4 的过渡期实现修订**：现有一体安装包 `app.getVersion()` 仍属于旧安装身份，不能为了 Desktop 组件显示改成 0.1.0。当前组件版本来自本地构建元数据；根 npm 包版本也不再用作 Desktop 展示版本。独立 Desktop 安装器将来必须从同一组件源写入 Electron package，让 `app.getVersion()` 与组件版本一致。入口缓存参数继续使用原安装身份版本。
+- `checkDesktopUpdate` 由主进程读取本地固定配置，renderer 不可传入更新源。开发版返回 `development`，现有一体包返回 `bundled`，独立包未配源返回 `not-configured`；均不访问正式源。预留的独立包检查使用 HTTPS manifest（禁止重定向、15 秒超时、最大 1 MiB），严格匹配 Desktop / standalone / stable / 当前平台和架构 / EXE 或 DMG，验证数字版本、HTTPS 资产 URL 与 SHA-256 字段后比较版本。不回退任意 EXE，不将无匹配包当成已是最新版。
+- 发现独立包更新后仅提供下载安装包链接；尚不具备 Desktop 下载校验、自动安装和重启。SHA-256 字段校验只是 manifest 格式校验，不等于已经验证下载文件。
+
+当前 `electron/release-config.json` 仍为 `distribution: legacy, updateFeed: null`。旧 `pnpm release:publish` 的包名、版本来源和更新源保持兼容；旧 assembler 拒绝混入独立 Desktop 身份。独立三包生成、安装身份迁移、Server 独立更新、macOS DMG/签名和正式 feed 发布仍待阶段 5，不应通过单独把配置改为 desktop 来宣布拆分完成。
+
+验证：发行 Python 测试 19 项、Electron 测试 43 项、关于页组件测试 7 项通过；Electron 编译、前端 Web API 生产构建和相关 ESLint 通过，构建体积无提醒。已重启 macOS Electron 开发桌面，在关于页实际确认 0.1.0、开发版标识和检查按钮返回的开发态说明；当前深色窗口无文字/按钮重叠。未生成或发布正式安装包；跨平台、DPR、90%–150% 缩放与浅色完整矩阵未执行。

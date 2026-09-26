@@ -224,6 +224,8 @@ CI 的生产前端构建步骤显式设置 `VITE_USE_WEB_API=true`，与 Windows
 
 ## 9. 生产包版本号
 
+独立组件开发目标维护在 `scripts/release/versions/`；`plan-component` 只读输出包名，尚未替换下述旧一体包发布链路。Electron 编译同时生成 Desktop 本地版本元数据供关于页展示。
+
 - 生产包版本的唯一自动化来源是 `scripts/release/version.json`，当前基线为 `1.5.1`。
 - `pnpm release:*` 当前统一调用 `python scripts/release/release_cli.py`。
 - `pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时，都会自动执行 `patch + 1`。

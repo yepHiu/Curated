@@ -30,7 +30,7 @@ Current architecture is **web-first plus a minimal desktop shell**. Business API
 
 Longer product and architecture writing:
 
-- [Desktop / Server package naming and version policy (planned, packaging migration pending)](plan/2026-09-25-desktop-server-connection-and-ssdp.md#11-2026-09-26拆分发行命名与版本规范)
+- [Desktop / Server version sources and naming rules (split packaging pending)](plan/2026-09-25-desktop-server-connection-and-ssdp.md#11-2026-09-26拆分发行命名与版本规范)
 - [Product design (current vs target)](product/2026-03-20-jav-libary.md)
 - [Feature inventory](features/2026-05-03-feature-inventory.md)
 - [Architecture and implementation](reference/architecture-and-implementation.html)
@@ -289,7 +289,7 @@ Recommended packaging entry:
 pnpm release:publish
 ```
 
-Production versioning is owned by `scripts/release/version.json`. `pnpm release:*` is orchestrated by `python scripts/release/release_cli.py`. The installed `Curated.exe` is the Electron shell; the Go backend is `resources/app/curated.exe`.
+Legacy all-in-one production versioning is owned by `scripts/release/version.json`. Independent component targets live in `scripts/release/versions/{desktop,server,full}.json`; split installers are not yet built by the legacy publish command. `pnpm release:*` is orchestrated by `python scripts/release/release_cli.py`. The installed `Curated.exe` is the Electron shell; the Go backend is `resources/app/curated.exe`.
 
 The packaged frontend includes local HarmonyOS Sans SC, Noto Sans, and Noto Sans JP assets. The full `dist` directory must be shipped so Chinese, English, and Japanese typography remains available offline. Settings → About & updates → Open-source project licenses links to the app's MIT license, all three font licenses, and a local notice file for selected frontend, backend, and desktop components. The [license inventory](plan/2026-09-25-open-source-license-inventory.md) records its scope and FFmpeg build-specific terms.
 
@@ -446,3 +446,33 @@ The plugin has one name (**Curated Plugin**) and one output directory (**dist**)
 In plugin settings, enable **开发者模式**, enter **默认服务端地址** such as `http://127.0.0.1:8080`, and save. Disabling the switch uses local port 8081 while retaining the custom address for next time. Existing custom addresses remain valid. No wishlist credential field or saved-token lookup is needed.
 
 Load `dist` in Chrome and reload the extension and source website after code changes. If a previous Dev extension was loaded from `dist-dev`, disable that old entry and use the unified directory. Watch logs are under `.workspace/dev-logs/plugin.out.log` and `plugin.err.log`.
+
+
+### Desktop version and component release planning
+
+About & Updates shows the local Desktop component version (currently `0.1.0`) with a separate development badge, via the trusted main-process bridge. Browsers omit this section. `pnpm build:electron:main` generates `electron-dist/desktop-release.json` from the component source and `electron/release-config.json`; restart Electron after changing it. The old npm/app package version remains the legacy installation identity, not the displayed Desktop component version.
+
+Preview a future package name without building, publishing or incrementing versions:
+
+```sh
+python3 scripts/release/release_cli.py plan-component --component desktop --platform macos --arch arm64 --format dmg
+python3 scripts/release/release_cli.py plan-component --component full --platform windows --arch x64 --format exe
+```
+
+Plans carry `status: planned`; Full includes exact component versions. Unsupported combinations and prerelease version suffixes are rejected. Existing `release:publish` remains on the legacy naming, identity and feed.
+
+Desktop checks run in the main process. Development builds return a development status; legacy bundles update through their existing installer. The checked-in config is `distribution: legacy, updateFeed: null`. Once standalone installation identity and migration are implemented, a separately deployed HTTPS feed can use this schema:
+
+```json
+{
+  "schema": 1,
+  "artifacts": [{
+    "component": "desktop", "variant": "standalone", "channel": "stable",
+    "version": "0.2.0", "platform": "macos", "arch": "arm64", "format": "dmg",
+    "url": "https://downloads.example.com/Curated-Desktop-0.2.0-macos-arm64.dmg",
+    "sha256": "<64 hexadecimal characters from the actual artifact>"
+  }]
+}
+```
+
+This is a format example, not an active feed. The checker rejects redirects, limits the feed to 1 MiB with a 15-second timeout, and matches component, variant, channel, platform, architecture and installer format before numerical version comparison. No matching artifact, no configured feed, and network errors have distinct statuses. Available updates offer a manual installer link; automatic download, file hash verification, installation and restart are not implemented. Keep split feeds isolated from the legacy GitHub latest endpoint.

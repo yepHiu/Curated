@@ -18,7 +18,7 @@ alwaysApply: true
 ## Desktop Shell Boundaries
 
 - Electron now has an MVP shell under `electron/`: it starts or reuses the Go HTTP backend, waits for `/api/health`, starts or reuses Vite at `http://127.0.0.1:5173` in development, uses the Curated app icon and tray, loads the existing Web UI in BrowserWindow, and hides to tray when the window is closed. Packaged runtime still loads the backend-hosted static UI on `http://127.0.0.1:8081`.
-- Electron preload/main process IPC remains deliberately narrow: current code exposes `window.javLibrary.pickDirectory()` for native directory selection and a read-only `windowChrome` capability for platform-specific window styling. Business APIs remain on HTTP. Deep business IPC, mpv process control, and broader desktop file/permission bridges remain future desktop concerns unless current code proves otherwise.
+- Electron preload/main process IPC remains deliberately narrow: current code exposes `window.javLibrary.pickDirectory()` for native directory selection, a read-only `windowChrome` capability for platform-specific window styling, plus `getDesktopInfo()` / `checkDesktopUpdate()` for local component metadata and manifest checking (current development / legacy builds do not enter standalone update feeds). Business APIs remain on HTTP. Deep business IPC, mpv process control, and broader desktop file/permission bridges remain future desktop concerns unless current code proves otherwise.
 - Vue renderer code must not assume Electron, mpv, PotPlayer, or any native-player executable exists.
 
 ## Frontend Business Code

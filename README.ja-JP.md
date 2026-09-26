@@ -97,6 +97,7 @@ icon/       ブランド原資料（wordmark / appicon / mark）
 
 - 現在の段階は Web 優先 + 最小 Electron シェルです。より深い IPC、mpv、広範なネイティブ橋渡しは今後の目標です。
 - `docs/film-scanner/` は参考資料であり、本番モジュールツリーではありません。
+- Desktop のバージョンを個別表示します。コンポーネント命名規則は実装済みで、分離インストーラーと移行は未実装です。[ガイド](docs/guide.md#desktop-version-and-component-release-planning)を参照。
 
 ## このプロジェクトを手伝ったモデル
 

@@ -3,6 +3,10 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-09-26 Desktop 组件版本与检查入口
+
+组件版本源位于 `scripts/release/versions/`：Desktop 0.1.0、Server 1.5.7、Full 1.6.0（开发目标，不代表已发布）。`release_cli.py plan-component` 只读生成新包名和 tag；现有 `release:publish` 仍为旧一体包。Electron 构建生成本地 `desktop-release.json`，preload 新增 `getDesktopInfo()` / `checkDesktopUpdate()`，主进程验证当前主窗口 frame 与 renderer origin；关于页显示数字 Desktop 版本、独立开发版标签，Web 隐藏。检查逻辑按组件/平台/架构/通道筛选 HTTPS manifest；当前配置 legacy + 无 feed，开发版不请求正式更新、一体包仍随原安装器更新。Desktop 自动下载安装、独立三包构建与安装身份迁移未实现。详情见版本计划 §11.5。
+
 ## 2026-09-21 Agent 上下文连续性
 
 - 当前提示词 `agent-system-v7`。聊天近期窗口随 aiProvider.contextWindow 缩放（默认最多 24 条/约 22.4 KiB，候选最多 200 条），另加迁移 `0052_ai_context_checkpoints.sql` 的持久摘要；从检查点位置向前分批回填旧对话，原聊天消息不变，删除会话级联删除摘要。同会话聊天串行，不同会话独立，等待可取消。
