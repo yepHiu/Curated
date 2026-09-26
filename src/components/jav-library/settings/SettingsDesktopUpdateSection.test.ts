@@ -20,7 +20,8 @@ describe("Desktop version and updates", () => {
     expect(wrapper.text()).toContain("开发版")
     expect(wrapper.text()).not.toContain("beta")
     expect(wrapper.find("[data-desktop-update-check]").exists()).toBe(false)
-    expect(wrapper.get("[data-desktop-update-status]").text()).toContain("开发版不参与正式更新")
+    expect(wrapper.find("[data-desktop-update-status]").exists()).toBe(false)
+    expect(wrapper.text()).not.toContain("开发版不参与正式更新")
   })
 
   it("shows bridge failures without claiming up to date", () => {
