@@ -13,7 +13,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="rounded-lg border border-border/50 bg-background/55 p-3" data-desktop-update-section>
+  <div class="min-w-0 rounded-lg border border-border/50 bg-background/55 p-3" data-desktop-update-section>
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0">
         <p class="text-xs font-medium text-muted-foreground">Curated Desktop</p>

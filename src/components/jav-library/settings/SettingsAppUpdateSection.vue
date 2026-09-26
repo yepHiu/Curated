@@ -303,17 +303,17 @@ async function handleInstallUpdate() {
         </div>
       </div>
 
-      <SettingsDesktopUpdateSection
-        v-if="desktopAvailable"
-        :info="desktopInfo"
-        :info-error="desktopInfoError"
-        :result="desktopResult"
-      />
+      <div class="grid gap-3" :class="desktopAvailable && backendVersionDisplay ? 'sm:grid-cols-2' : ''">
+        <SettingsDesktopUpdateSection
+          v-if="desktopAvailable"
+          :info="desktopInfo"
+          :info-error="desktopInfoError"
+          :result="desktopResult"
+        />
 
-      <dl class="grid gap-3">
-        <div
+        <dl
           v-if="backendVersionDisplay"
-          class="rounded-lg border border-border/50 bg-background/55 px-3 py-2.5"
+          class="min-w-0 rounded-lg border border-border/50 bg-background/55 p-3"
         >
           <dt class="text-xs font-medium text-muted-foreground">
             {{ t("settings.aboutVersionLabel") }}
@@ -331,8 +331,8 @@ async function handleInstallUpdate() {
           <dd v-if="backendBuildStamp" class="mt-1 break-all text-xs text-muted-foreground" data-server-build-stamp>
             {{ t('settings.serverBuildStampLabel') }} <span class="font-mono">{{ backendBuildStamp }}</span>
           </dd>
-        </div>
-      </dl>
+        </dl>
+      </div>
 
       <div
         v-if="releaseTitle || releaseNotesSnippet"
