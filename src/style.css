@@ -377,8 +377,8 @@
   }
 }
 
-/* Native macOS controls sit above the brand and workspace toolbar.
-   The strip inherits each column's surface rather than drawing a separate titlebar. */
+/* Native macOS controls sit above the sidebar brand; the workspace keeps its
+   original toolbar height. Narrow windows reserve space when the sidebar is absent. */
 .desktop-fallback-titlebar {
   display: none;
 }
@@ -392,8 +392,7 @@ html[data-window-chrome="macos"] [data-shell-sidebar] {
   padding-top: var(--app-window-controls-height);
 }
 
-html[data-window-chrome="macos"] [data-shell-sidebar]::before,
-html[data-window-chrome="macos"] [data-shell-workspace]::before {
+html[data-window-chrome="macos"] [data-shell-sidebar]::before {
   content: "";
   display: block;
   height: var(--app-window-controls-height);
@@ -427,6 +426,15 @@ html[data-window-chrome="macos"] body:not(:has([data-shell-layout])) .desktop-fa
 
 html[data-window-chrome="macos"] [data-shell-mobile-drawer] {
   padding-top: var(--app-window-controls-height);
+}
+
+@media (width < 1024px) {
+  html[data-window-chrome="macos"] [data-shell-workspace]::before {
+    content: "";
+    height: var(--app-window-controls-height);
+    flex-shrink: 0;
+    -webkit-app-region: drag;
+  }
 }
 
 @layer components {

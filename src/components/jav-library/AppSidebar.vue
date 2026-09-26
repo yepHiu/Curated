@@ -284,7 +284,7 @@ const getNavigationTarget = (page: AppPage) => {
   >
     <div
       data-sidebar-header
-      class="flex min-h-[var(--app-header-min-height)] shrink-0 items-center border-b border-sidebar-border/80"
+      class="flex min-h-[var(--app-header-min-height)] shrink-0 items-center"
       :class="props.compact ? 'justify-center py-[var(--app-header-py)] lg:py-[var(--app-header-py-lg)]' : 'justify-between gap-2 px-2 py-[var(--app-header-py)] sm:px-2 lg:px-2 lg:py-[var(--app-header-py-lg)]'"
     >
       <div
