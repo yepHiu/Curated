@@ -97,6 +97,7 @@ icon/       品牌源文件（wordmark / appicon / mark）
 
 - 当前阶段是 Web 优先 + 最小 Electron 壳。更深的 IPC、mpv 与广泛原生桥接仍是目标方向。
 - `docs/film-scanner/` 是参考材料，不是生产模块树。
+- 远程 Desktop 仅提供自身更新入口；Server 安装操作仅限明确本机直连。Desktop 目前提供手动下载，见[更新说明](docs/guide.md#update-target-and-remote-connections)。
 - 关于页分别显示 Server 与 Desktop 的独立三段数字版本，并保留 Server 构建时间戳；组件包名规则已落地，独立安装器和迁移仍待完成，见[操作指南](docs/guide.md#desktop-version-and-component-release-planning)。
 
 ## 参与过本仓库的模型

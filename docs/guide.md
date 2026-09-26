@@ -450,7 +450,7 @@ Load `dist` in Chrome and reload the extension and source website after code cha
 
 ### Desktop version and component release planning
 
-About & Updates shows the local Desktop component version (currently `0.1.0`) with a separate development badge and UTC build timestamp, via the trusted main-process bridge. Desktop and Server appear side by side; both headings use their product names. The Desktop timestamp is captured during `build:electron:main` and persisted in local build metadata, so restarting the app does not change it. Browsers omit this section. One shared Check updates button checks both the installation package and Desktop in parallel, stays busy until both settle, and preserves each result separately. `pnpm build:electron:main` generates `electron-dist/desktop-release.json` from the component source and `electron/release-config.json`; restart Electron after changing it. The old npm/app package version remains the legacy installation identity, not the displayed Desktop component version.
+About & Updates shows the local Desktop component version (currently `0.1.0`) with a separate development badge and UTC build timestamp, via the trusted main-process bridge. Desktop and Server appear side by side; both headings use their product names. The Desktop timestamp is captured during `build:electron:main` and persisted in local build metadata, so restarting the app does not change it. Browsers omit this section. One shared Check updates button checks the local legacy installation package and Desktop in parallel only when local updates are allowed. Remote or unverified Desktop connections check Desktop only; Server version information stays visible. `pnpm build:electron:main` generates `electron-dist/desktop-release.json` from the component source and `electron/release-config.json`; restart Electron after changing it. The old npm/app package version remains the legacy installation identity, not the displayed Desktop component version.
 
 Preview a future package name without building, publishing or incrementing versions:
 
@@ -477,6 +477,16 @@ Desktop checks run in the main process. Development builds return a development 
 
 This is a format example, not an active feed. The checker rejects redirects, limits the feed to 1 MiB with a 15-second timeout, and matches component, variant, channel, platform, architecture and installer format before numerical version comparison. No matching artifact, no configured feed, and network errors have distinct statuses. Available updates offer a manual installer link; automatic download, file hash verification, installation and restart are not implemented. Keep split feeds isolated from the legacy GitHub latest endpoint.
 
+
+### Update target and remote connections
+
+About & Updates allows the legacy Server installer only for a confirmed direct local connection. The actual API target and page must be loopback; Desktop additionally supplies its actual `serverOrigin` through `getDesktopInfo()`, which must match the API origin, and must be a legacy distribution. Standalone Desktop always uses its own update channel. Missing fields in older bridges/servers, bridge errors, LAN addresses and ambiguous proxy setups do not grant local update access. To update Server locally, open its loopback address on that computer with the updated Server and frontend.
+
+All HTTP app-update responses include a request-specific `localUpdateAllowed` boolean and `Cache-Control: no-store`. Server checks the socket peer, Host, optional Origin and proxy headers; download, install and downloaded-installer deletion reject nonlocal requests with HTTP 403 `APP_UPDATE_REMOTE_DISABLED`. Reverse proxies must preserve the external Host or forwarding headers; a proxy that erases all client evidence cannot be distinguished from a direct local process. Do not expose these mutation routes through such a proxy. No remote Server update feature is added.
+
+Remote Desktop hides Server installer actions, the Server auto-download preference, legacy release links/notes and Server update badges. Client-triggered automatic installer downloads use the same restriction, and each mutation rechecks permission. A matching independent Desktop artifact appears as **Download Desktop installer**, with manual installation instructions; it does not close or update Server. Current legacy distributions explicitly state that independent Desktop updates are unavailable. No Full/legacy installer fallback, production Desktop feed or automatic Desktop installer was added.
+
+Restart Server and Desktop after updating their code to enable the new capability fields. The frontend treats older versions as unverified and keeps Server update actions unavailable.
 
 ### Server version and build timestamp
 

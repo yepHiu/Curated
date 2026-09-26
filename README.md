@@ -100,6 +100,7 @@ Build size monitoring allows normal growth, warns on unusual increases, and bloc
 
 - Current phase is web-first with a minimal Electron shell. Deeper IPC, mpv, and broad native bridges remain target-direction work.
 - `docs/film-scanner/` is reference material, not the production module tree.
+- Remote Desktop connections expose only Desktop updates; Server installer actions require a confirmed local connection. Desktop installation currently uses manual downloads. See [update behavior](docs/guide.md#update-target-and-remote-connections).
 - About shows independent numeric Server and Desktop versions, with the Server build timestamp retained separately; component naming rules are implemented, while split installers and migration remain pending. See [the guide](docs/guide.md#desktop-version-and-component-release-planning).
 
 ## Models that helped build this project
