@@ -524,3 +524,11 @@ Remote uploads continue to use the configured Server destination. Directory read
 - Desktop stores records and the last successful target in `app.getPath("userData")/servers.json` (development and installed app identities can have different directories). Authentication is stored separately in Electron persistent sessions partitioned by normalized origin, including port. Upgrading from the old shared session can require a fresh PIN unlock; old cookies are not copied between targets. Deleted records do not erase the partition's cached session.
 - Startup restores the last successful target. The legacy bundle still starts/reuses its default local Server (and Vite in development); remote targets and explicit environment addresses do not start a local backend on failure. No-record standalone Desktop opens the list. A failed connection remains recoverable from the local window. Health timeout is 8 seconds; page loading is capped at 15 seconds.
 - Connections load the Server-hosted business UI. Run `pnpm build:electron:main` to include local assets, then fully quit and reopen Desktop to activate new IPC handlers (including in-page add); rebuild Server Web UI for the settings card. This change does not deliver SSDP, independent installers, automatic Desktop installation, or the final Server lifecycle split. Legacy-owned local processes still follow legacy quit behavior.
+
+## Development debug tools
+
+开发环境右下角 `DEBUG` 打开调试弹窗，包含配置重新读取、使用服务器已保存代理的连通检测、首页每日推荐刷新，以及确认同机后可用的强制 HLS 测试开关。强制 HLS 需先启用推流，保存立即生效；普通播放设置不会覆盖该调试值，关闭推流仍同步关闭强制 HLS。
+
+`性能监控` 分区复用当前采样器，支持暂停/恢复、清空、复制摘要和隐藏底部条；点击底部 Perf 条直接进入这个分区。`日志` 分区提供服务端日志配置与当前客户端日志级别，读取配置失败时可重试。打开弹窗只读取配置，不会自动执行检测或刷新推荐。正式构建没有 DEBUG，普通日志配置保留在设置的维护分区。
+
+实现决定与验证记录：[Debug 工具弹窗](plan/2026-09-26-debug-tools-dialog.md)。
