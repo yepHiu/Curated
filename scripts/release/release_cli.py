@@ -23,11 +23,18 @@ from scripts.release.release_lib.build_steps import (
     show_version,
     utc_build_stamp,
 )
+from scripts.release.release_lib.components import COMPONENTS, component_plan
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Curated release tooling")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    plan_parser = subparsers.add_parser("plan-component", help="Inspect split release names without building or allocating versions")
+    plan_parser.add_argument("--component", choices=COMPONENTS, required=True)
+    plan_parser.add_argument("--platform", choices=("windows", "macos", "linux"), required=True)
+    plan_parser.add_argument("--arch", choices=("x64", "arm64", "universal"), required=True)
+    plan_parser.add_argument("--format", choices=("exe", "zip", "dmg", "pkg", "tar.gz"), required=True)
 
     # Version inspection and manual base-line management.
     show_parser = subparsers.add_parser("show-version")
@@ -83,6 +90,14 @@ def main() -> None:
     migrate_parser.add_argument("--csv-path", default="docs/ops/package-build-history.csv")
 
     args = parser.parse_args()
+
+    if args.command == "plan-component":
+        try:
+            result = component_plan(REPO_ROOT, args.component, args.platform, args.arch, args.format)
+        except ValueError as error:
+            parser.error(str(error))
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
 
     # Keep dispatch explicit so each subcommand stays easy to trace and debug.
     if args.command == "show-version":

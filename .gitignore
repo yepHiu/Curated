@@ -43,6 +43,8 @@ scripts/prd/*
 !scripts/prd/tests/
 !scripts/prd/tests/**
 !scripts/release/version.json
+!scripts/release/versions/
+!scripts/release/versions/*.json
 !scripts/release/windows/
 !scripts/release/windows/**
 *.tsbuildinfo
@@ -119,4 +121,3 @@ openspec/
 
 # Repo-local caches (e.g. Go build cache when GOCACHE points here)
 .cache/
-
