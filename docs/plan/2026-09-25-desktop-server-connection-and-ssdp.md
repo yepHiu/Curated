@@ -571,3 +571,25 @@ Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed
 合并 `codex/desktop-server-split`（c2164011）全部提交到 master，保留主分支已发布三包身份、独立版本、更新 manifest 和 CD 恢复。整合 worktree 的 Server 身份、SSDP、Vue 本地连接页、代理与登录启动设置、开发品牌 bundle；重复的旧单版本打包器由已验证的组件链路取代，不重新引入错名、Mac Server/Full 或旧 latest 更新。
 
 验收重点：0.1.0 的 servers.json 与已存连接/会话保留；新版 Desktop 连接旧 health-only Server；旧一体包安全迁移边界；已有数据库/自定义配置不被覆盖；remote 操作限制、身份变更提示、发现不可用时手动连接。完成全量 CI、真实 macOS 打包启动，以及 Windows CD 干净安装和上一版本原地升级测试后发布新版本。保留 worktree 中未提交的生产打包计划草稿，不擅自提交过时文档。
+
+合并完成：merge commit `264b2cd2` 的第二父提交为 worktree tip `c2164011`；`git rev-list --left-right --count master...codex/desktop-server-split` 右侧为 0。保留 worktree 未提交草稿及主仓库 `.playwright-cli/`。
+
+已修复的兼容问题：
+
+- PIN 已启用的旧 Server 对未知 `/api/server-info` 返回 423，而非 404；新 Desktop 仅对确认属于旧版本的 Curated health 回复允许回退，仍进入原 PIN 解锁页面。
+- 已发布 `servers.json` 的 ID、名称、上次连接和 origin partition 不变；legacy → UUID 首次绑定不清会话，已知 UUID 改变才确认并隔离。
+- 开发 `connections.json` 导入改为完整校验后一次写入；原文件保留，损坏记录不造成半迁移。
+- 原先 worktree 的 preload 与发布链路会覆盖主仓库可信 IPC、独立版本与三包安装身份；合并改为保留已发布协议并接入新 launcher/discovery/settings。
+- Full 的本机提示保留 `schema: 1` 与自定义端口；原生服务端操作使用主仓库更严格的直接 loopback/Host/Origin/forwarded 校验。
+
+本地验收：前端 295 文件 / 1502 测试、Electron 74 测试、5 个 runtime e2e、52 项发布脚本测试，typecheck/lint、Web/Electron 构建、Go 全量 test/vet、actionlint 均通过。Mac 新 DMG/ZIP 构建、签名与卷校验、独立启动通过。真实已发布 Desktop 0.1.0 → 新 0.2.0 使用同一隔离 profile，保留连接 ID/名称/last、localStorage 与 Cookie；先连接旧 PIN-locked Server，再切换新 Server UUID 均通过。没有新增 SQLite migration。此验证使用真实旧/新 Electron 与受限本机 Server API fixture；真实旧 Server 数据库升级另由 Windows CD 验收。
+
+发布源：`1d2e4afc`，不可变标签 `full-v1.7.0`；Server/Full 1.7.0、Desktop 0.2.0。CD run `36264740672` 通过固定源码全套 CI 和 Mac 构建/旧配置升级检查；Windows 真实旧版安装升级与发布结果待下文补记。
+
+风险结论：拆分 1.6.0 → 1.7.0 使用相同 AppID/路径且无新数据库迁移，备份后可覆盖；legacy ≤1.5.8 的跨安装身份迁移仍为手动，跨账户/自定义配置和旧共享认证令牌不自动迁移。UUID sidecar 损坏会阻止启动，应保留并修复，不能盲目删除。LAN discovery 默认仅在已启用 LAN 的主机广告名称/地址，可关；防火墙/VLAN 限制未改变，手动连接为回退。Mac 仍未公证，仅 Apple Silicon。不能将这些明确边界宣称为“零风险”或全部自动兼容。
+
+首轮 CD 拦截：Windows 新增的 SQLite 兼容性 fixture 使用 `with sqlite3.connect(...)`，该上下文只提交/回滚事务并不关闭连接；Windows 清理临时目录时仍持有文件句柄。改为 `contextlib.closing` 并显式提交测试标记，扩大失败诊断为聚合报告。`full-v1.7.0` 未公开，不移动该标签。修复提交 `b01e16b6`，新发行源 `9e3e3de9` / `full-v1.7.1`；仅 Full 版本调整为 1.7.1，Server 1.7.0 与 Desktop 0.2.0 不变。
+
+最终闭环：CD run **36265609782** 所有作业成功，包括 Windows 真实旧版安装 → 新版覆盖升级、旧数据库标记与 `PRAGMA integrity_check`、安装位置/AppID 保留，以及干净安装、Full 部分失败后重试、防降级、卸载数据保留、Desktop 退出后 Server 存活；Mac 真实旧/新 Desktop 的连接记录/Cookie/localStorage 保留通过。修复后的 Windows SQLite 句柄清理通过。
+
+正式发布：https://github.com/yepHiu/Curated/releases/tag/full-v1.7.1 。公开资产独立复核 **8 个分发包**齐全，GitHub 资产 SHA-256 与 `release.json` 一致，来源 commit 为 `9e3e3de9a2ffacf3d72d0878a679990ee071f5c1`；Server 1.7.0、Desktop 0.2.0、Full 1.7.1 三个在线更新通道与公开 manifest 完全一致，legacy `/releases/latest` 仍为 `v1.5.8`。已解决本次识别出的兼容回归，保留前述 legacy 手动迁移、初次身份信任、LAN 多播与 Mac 未公证边界。
