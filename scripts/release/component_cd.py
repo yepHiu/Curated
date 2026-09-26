@@ -192,7 +192,7 @@ def publish(root: Path, meta: dict, output: Path, mode: str) -> None:
     release = legacy.check_release(meta)
     # The tag is already verified by check_release. Omitting target_commitish
     # avoids asking GITHUB_TOKEN to create a tag at a workflow-changing commit.
-    payload = {'tag_name': meta['tag'], 'name': f"Curated {meta['tag']}",
+    payload = {'tag_name': meta['tag'], 'name': f"Curated v{meta['version']}",
                'body': body(root, meta), 'draft': True, 'prerelease': False, 'make_latest': 'false'}
     release = legacy.api(f"releases/{release['id']}", payload, 'PATCH') if release else legacy.api('releases', payload)
     subprocess.run(['gh', 'release', 'upload', meta['tag'], '--repo', os.environ['GITHUB_REPOSITORY'],

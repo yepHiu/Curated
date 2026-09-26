@@ -1,4 +1,4 @@
-# Curated Full 1.6.0
+# Curated v1.6.0
 
 ## GitHub Release Body
 

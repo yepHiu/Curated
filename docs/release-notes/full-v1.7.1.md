@@ -1,4 +1,4 @@
-# Curated Full 1.7.1
+# Curated v1.7.1
 
 ## GitHub Release Body
 

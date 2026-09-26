@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Published component tag whose description should match the repository notes
+        description: Published component tag whose title and description should match the repository notes
         required: true
         type: string
 permissions:
@@ -26,7 +26,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Update descriptions and verify unchanged release metadata
+      - name: Update titles and descriptions; verify unchanged artifacts and tags
         env:
           GH_TOKEN: ${{ github.token }}
           BEFORE_SHA: ${{ github.event.before }}

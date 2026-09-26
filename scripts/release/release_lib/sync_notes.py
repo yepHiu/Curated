@@ -1,4 +1,4 @@
-"""Synchronize published component descriptions without changing release artifacts."""
+"""Synchronize published component titles and descriptions without changing release artifacts."""
 import os
 from pathlib import Path
 import re
@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def snapshot(release):
-    fields = ('id', 'tag_name', 'target_commitish', 'name', 'draft', 'prerelease', 'published_at')
+    fields = ('id', 'tag_name', 'target_commitish', 'draft', 'prerelease', 'published_at')
     return ({key: release[key] for key in fields},
             sorted((a['id'], a['name'], a['size'], a.get('digest'), a['browser_download_url']) for a in release['assets']))
 
@@ -38,15 +38,16 @@ def main():
         marker = cd_release.source_marker({'commit': commit})
         if marker not in release['body']:
             raise ValueError(f'Original source marker does not match tag: {tag}')
+        title = f"Curated v{component_cd.PATTERN.fullmatch(tag).group(2)}"
         body = component_cd.body(ROOT, {'tag': tag, 'commit': commit})
         urls = re.findall(r'https://github.com/[^\s)]+/releases/download/[^\s)]+', body)
         available = {a['browser_download_url'] for a in release['assets']}
         if not urls or not set(urls) <= available:
             raise ValueError(f'Notes link to unavailable release assets: {tag}')
         original = snapshot(release)
-        cd_release.api(f"releases/{release['id']}", {'body': body}, 'PATCH')
+        cd_release.api(f"releases/{release['id']}", {'name': title, 'body': body}, 'PATCH')
         updated = cd_release.api(f"releases/{release['id']}")
-        if updated['body'] != body or snapshot(updated) != original:
+        if updated['name'] != title or updated['body'] != body or snapshot(updated) != original:
             raise ValueError(f'Release verification failed: {tag}')
         if cd_release.api('releases/latest')['id'] != latest_id:
             raise ValueError('Latest changed during description update')

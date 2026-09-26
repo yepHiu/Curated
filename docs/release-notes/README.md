@@ -17,4 +17,6 @@ Convention:
 
 Public descriptions are written in English and follow the structure used by v1.5.8: opening summary, What's Changed, Upgrade Notes, Downloads, and Full Changelog. Component releases use `<component>-vX.Y.Z.md`; each file contains a `## GitHub Release Body` section. Keep internal implementation and build diagnostics in project documentation.
 
-Published component descriptions can be updated from the corresponding note files through the Release notes workflow. It updates only the body, preserves the original source marker, and checks that assets, tags, publication state and Latest remain unchanged.
+Published component descriptions can be updated from the corresponding note files through the Release notes workflow. It updates the display title and body, preserves the original source marker, and checks that assets, tags, publication state and Latest remain unchanged.
+
+GitHub Release titles use `Curated vX.Y.Z`. Component prefixes belong in tags and asset filenames, not the display title.
