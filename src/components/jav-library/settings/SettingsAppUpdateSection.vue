@@ -241,20 +241,6 @@ async function handleInstallUpdate() {
 
         <div class="flex flex-wrap items-center gap-2">
           <Button
-            v-if="status !== 'unsupported' || desktopAvailable"
-            type="button"
-            variant="outline"
-            class="rounded-2xl"
-            :disabled="checkingUpdates"
-            data-app-update-check
-            @click="handleCheckNow"
-          >
-            <Loader2 v-if="checkingUpdates" class="mr-2 size-4 animate-spin" aria-hidden="true" />
-            <RefreshCw v-else class="mr-2 size-4" aria-hidden="true" />
-            {{ checkingUpdates ? t("settings.appUpdateCheckingAction") : t("settings.appUpdateCheckAction") }}
-          </Button>
-
-          <Button
             v-if="installReady"
             type="button"
             class="rounded-2xl"
@@ -282,6 +268,20 @@ async function handleInstallUpdate() {
                 ? t("settings.appUpdateDownloadingAction")
                 : t("settings.appUpdateDownloadAndInstallAction")
             }}
+          </Button>
+
+          <Button
+            v-if="status !== 'unsupported' || desktopAvailable"
+            type="button"
+            variant="outline"
+            class="rounded-2xl"
+            :disabled="checkingUpdates"
+            data-app-update-check
+            @click="handleCheckNow"
+          >
+            <Loader2 v-if="checkingUpdates" class="mr-2 size-4 animate-spin" aria-hidden="true" />
+            <RefreshCw v-else class="mr-2 size-4" aria-hidden="true" />
+            {{ checkingUpdates ? t("settings.appUpdateCheckingAction") : t("settings.appUpdateCheckAction") }}
           </Button>
 
           <Button
