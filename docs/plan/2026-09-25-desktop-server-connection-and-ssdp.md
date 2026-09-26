@@ -404,3 +404,5 @@ Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed
 验证：Go version/server/app 测试及 release 标签的 version 测试通过；前端相关 18 项测试、类型检查、ESLint 通过；发行脚本 19 项测试通过。关于页许可测试同步补齐此前已添加的 Outfit 许可数量。完整跨平台显示缩放矩阵未执行。
 
 已重新编译并重启开发桌面：实际 `/api/health` 返回 `version: 1.5.7`、`buildStamp: 20260926.123433`（UTC）、`channel: dev`，侧栏显示 `1.5.7 (dev)`。Web API 生产构建通过且体积无提醒。
+
+2026-09-26 展示补充：Desktop 构建脚本将编译时 UTC 时间戳写入 `desktop-release.json.buildStamp`，由 `getDesktopInfo()` 提供，关于页与 Server 一样在版本下独立显示；重启不改变构建时间，不参与版本比较。两区块并列，Server 标题简化为「Curated Server」，不再附加「版本号」。

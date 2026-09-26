@@ -9,7 +9,7 @@ alwaysApply: true
 
 ## 2026-09-26 Desktop 组件版本与检查入口
 
-Desktop/Full 版本源位于 `scripts/release/versions/`，Server 位于 `backend/internal/version/server.json`：Desktop 0.1.0、Server 1.5.7、Full 1.6.0（开发目标，不代表已发布）。`release_cli.py plan-component` 只读生成新包名和 tag；现有 `release:publish` 仍为旧一体包。Electron 构建生成本地 `desktop-release.json`，preload 新增 `getDesktopInfo()` / `checkDesktopUpdate()`，主进程验证当前主窗口 frame 与 renderer origin；关于页显示数字 Desktop 版本、独立开发版标签，Web 隐藏。检查逻辑按组件/平台/架构/通道筛选 HTTPS manifest；当前配置 legacy + 无 feed，开发版不请求正式更新、一体包仍随原安装器更新。Desktop 自动下载安装、独立三包构建与安装身份迁移未实现。详情见版本计划 §11.5。
+Desktop/Full 版本源位于 `scripts/release/versions/`，Server 位于 `backend/internal/version/server.json`：Desktop 0.1.0、Server 1.5.7、Full 1.6.0（开发目标，不代表已发布）。`release_cli.py plan-component` 只读生成新包名和 tag；现有 `release:publish` 仍为旧一体包。Electron 构建生成本地 `desktop-release.json`，preload 新增 `getDesktopInfo()` / `checkDesktopUpdate()`，主进程验证当前主窗口 frame 与 renderer origin；关于页并列显示 Desktop/Server；Desktop 显示数字版本、独立开发版标签和构建时生成的 UTC `buildStamp`（由本地 metadata 经 getDesktopInfo 提供），Server 标题仅为 Curated Server；Web 隐藏 Desktop。检查逻辑按组件/平台/架构/通道筛选 HTTPS manifest；当前配置 legacy + 无 feed，开发版不请求正式更新、一体包仍随原安装器更新。Desktop 自动下载安装、独立三包构建与安装身份迁移未实现。详情见版本计划 §11.5。
 
 ## 2026-09-21 Agent 上下文连续性
 
