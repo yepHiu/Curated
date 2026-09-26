@@ -197,10 +197,10 @@ describe("SettingsLibraryPathsSection", () => {
     })
 
     expect(wrapper.text()).toContain("settings.storageCardTitle")
-    expect(wrapper.text()).toContain("settings.storageCardDesc")
+    expect(wrapper.text()).not.toContain("settings.storageCardDesc")
     expect(wrapper.text()).toContain("settings.defaultImportPathLabel")
     expect(wrapper.text()).toContain("Primary archive · D:/Media/JAV/Main")
-    expect(wrapper.text()).toContain("settings.defaultImportPathDesc")
+    expect(wrapper.text()).not.toContain("settings.defaultImportPathDesc")
     expect(wrapper.text()).toContain("scan failed")
     expect(wrapper.text()).toContain("metadata queued")
     expect(wrapper.text()).toContain("metadata failed")

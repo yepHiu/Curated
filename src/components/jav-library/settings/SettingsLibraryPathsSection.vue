@@ -6,7 +6,6 @@ import type { LibraryPathDTO, LibraryPathStorageStatusDTO } from "@/api/types"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -141,11 +140,6 @@ function onDefaultImportPathChange(value: unknown) {
           <CardTitle class="min-w-0 text-lg tracking-tight">
             {{ t("settings.storageCardTitle") }}
           </CardTitle>
-          <CardDescription
-            class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-          >
-            {{ t("settings.storageCardDesc") }}
-          </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
           <div
@@ -155,9 +149,6 @@ function onDefaultImportPathChange(value: unknown) {
             <div class="min-w-0 space-y-1">
               <p class="text-sm font-semibold text-foreground">
                 {{ t("settings.defaultImportPathLabel") }}
-              </p>
-              <p class="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm">
-                {{ t("settings.defaultImportPathDesc") }}
               </p>
               <p
                 v-if="defaultImportPathSaving"
