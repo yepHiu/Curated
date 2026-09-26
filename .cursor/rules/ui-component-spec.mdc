@@ -56,6 +56,8 @@ alwaysApply: false
 - **`CardHeader`** 内采用 **`grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5`**：左侧 **`size-9`** 图标区（`rounded-lg border border-primary/25 bg-primary/10 text-primary`），右侧 **`CardTitle`**：`min-w-0 text-lg tracking-tight`（字重沿用 `CardTitle` 默认 `font-semibold`）。
 - 纯装饰图标使用 **`aria-hidden="true"`**。
 
+设置归属标签统一复用 `SettingsScopeBadge`（outline Badge），置于卡片短标题右侧，标题行 `flex flex-wrap items-center gap-2`。`Server` 按当前服务器的真实配置/数据归属判断；桌面壳配置为 `Desktop`；客户端存储偏好在桌面显示 `Desktop`，浏览器显示 `Browser`。播放、萃取帧等混合卡片用双标签并标明内部字段；同一归属的 nested 块不重复堆标签。标签用语义边框/弱底色/次要文字，不采用在线状态色，不改变权限和保存逻辑。许可证等通用信息不强行归类。
+
 ### 大卡片垂直节奏（SHOULD）
 
 - 单张业务 `Card` 可收紧 **标题栏与 `CardContent` 首行** 的间距：在 **`SettingsMetadataSection`** 范式下——**`Card` 追加 `gap-2`**（覆盖基类较大 `gap`）、**`CardHeader` 使用 `pb-0`**、**`CardContent` 使用 `pt-0`**。
