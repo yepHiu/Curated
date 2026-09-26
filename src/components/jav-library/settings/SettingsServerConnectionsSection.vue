@@ -33,18 +33,16 @@ function recheck() {
       <CardTitle class="min-w-0 text-lg tracking-tight">{{ t('settings.serverConnections.title') }}</CardTitle>
     </CardHeader>
     <CardContent class="flex min-w-0 flex-col gap-3 pt-0">
-      <div v-if="snapshot" class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 class="text-sm font-semibold">{{ t('settings.serverConnections.current') }}</h3>
-          <span class="inline-flex items-center gap-2 text-xs text-muted-foreground" role="status">
-            <span class="size-2 rounded-full" :class="snapshot.currentServerUrl ? dotClass : 'bg-muted-foreground'" aria-hidden="true" />
-            {{ statusLabel }}
-          </span>
-        </div>
-        <div v-if="snapshot.currentServerUrl" class="min-w-0">
-          <p class="break-words text-sm font-medium">{{ currentServer?.name || t('settings.serverConnections.unnamed') }}</p>
-          <p class="mt-1 break-all font-mono text-xs text-muted-foreground">{{ snapshot.currentServerUrl }}</p>
-        </div>
+      <div v-if="snapshot" class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border/50 bg-muted/5 p-4">
+        <h3 class="shrink-0 text-xs font-medium text-muted-foreground">{{ t('settings.serverConnections.current') }}</h3>
+        <template v-if="snapshot.currentServerUrl">
+          <p class="min-w-0 max-w-full truncate text-sm font-medium" :title="currentServer?.name || t('settings.serverConnections.unnamed')">{{ currentServer?.name || t('settings.serverConnections.unnamed') }}</p>
+          <p class="min-w-0 flex-1 basis-40 truncate text-xs text-muted-foreground" :title="snapshot.currentServerUrl">{{ snapshot.currentServerUrl }}</p>
+        </template>
+        <span class="ml-auto inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground" role="status">
+          <span class="size-2 rounded-full" :class="snapshot.currentServerUrl ? dotClass : 'bg-muted-foreground'" aria-hidden="true" />
+          {{ statusLabel }}
+        </span>
       </div>
       <p v-else-if="loading" class="text-sm text-muted-foreground" role="status">{{ t('settings.serverConnections.loading') }}</p>
       <p v-if="failed" class="text-sm text-destructive" role="alert">{{ t('settings.serverConnections.loadError') }}</p>
