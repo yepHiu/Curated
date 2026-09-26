@@ -25,6 +25,7 @@ export type TrayMenuActionId =
   | "open-curated"
   | "open-browser"
   | "open-settings"
+  | "open-servers"
   | "quit"
 
 export type TrayMenuModelItem =
@@ -96,6 +97,7 @@ export function buildTrayMenuModel(options: {
       label: "Open Settings",
       url: `${baseUrl}/#/settings`,
     },
+    { id: "open-servers", type: "normal", label: "服务器…" },
     { type: "separator" },
     { id: "quit", type: "normal", label: "Quit Curated" },
   ]

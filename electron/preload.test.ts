@@ -40,12 +40,13 @@ describe("Electron preload bridge", () => {
 
     expect(Object.keys(exposed)).toEqual(["javLibrary"])
 
-    const api = exposed.javLibrary as { windowChrome: string; pickDirectory: () => Promise<unknown>; getDesktopInfo: () => Promise<unknown>; checkDesktopUpdate: () => Promise<unknown> }
-    expect(Object.keys(api).sort()).toEqual(["checkDesktopUpdate", "getDesktopInfo", "pickDirectory", "windowChrome"])
+    const api = exposed.javLibrary as { windowChrome: string; openServerConnections: () => Promise<unknown>; pickDirectory: () => Promise<unknown>; getDesktopInfo: () => Promise<unknown>; checkDesktopUpdate: () => Promise<unknown> }
+    expect(Object.keys(api).sort()).toEqual(["checkDesktopUpdate", "getDesktopInfo", "openServerConnections", "pickDirectory", "windowChrome"])
     expect(api.windowChrome).toBe(platform === "darwin" ? "macos" : "native")
     await expect(api.pickDirectory()).resolves.toEqual({ path: "D:/Media" })
     await api.getDesktopInfo()
     await api.checkDesktopUpdate()
-    expect(invokedChannels).toEqual([pickDirectoryChannel, "curated:desktop-info", "curated:desktop-check-update"])
+    await api.openServerConnections()
+    expect(invokedChannels).toEqual([pickDirectoryChannel, "curated:desktop-info", "curated:desktop-check-update", "curated:open-servers"])
   })
 })

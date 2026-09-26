@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>Curated · 服务器</title>
+  <link rel="stylesheet" href="connections-tokens.css">
+  <link rel="stylesheet" href="connections.css">
+  <script src="connections-ui.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><span class="brand">Curated Desktop</span><h1>服务器</h1></header>
+    <p id="status" role="status" aria-live="polite"></p>
+    <section aria-labelledby="list-title">
+      <h2 id="list-title">已保存的服务器</h2>
+      <p id="empty" hidden>还没有服务器，请添加一个连接。</p>
+      <ul id="servers"></ul>
+    </section>
+    <section aria-labelledby="form-title" class="card">
+      <h2 id="form-title">添加服务器</h2>
+      <form id="server-form">
+        <label for="name">名称</label>
+        <input id="name" name="name" maxlength="80" placeholder="例如：家庭 NAS" required>
+        <label for="url">服务器地址</label>
+        <input id="url" name="url" maxlength="2048" placeholder="http://192.168.1.10:8081" spellcheck="false" autocomplete="off" required>
+        <div class="actions"><button id="cancel-edit" type="button" hidden>取消编辑</button><button class="primary" type="submit">保存服务器</button></div>
+      </form>
+    </section>
+    <p class="footnote">连接列表保存在此电脑。连接需要 PIN 的服务器后，请在资料库页面解锁。</p>
+    <dialog id="delete-dialog">
+      <h2>删除连接？</h2><p>仅从此电脑移除保存的连接，服务器资料不受影响。</p>
+      <form method="dialog" class="actions"><button value="cancel" autofocus>取消</button><button value="delete" class="danger">删除</button></form>
+    </dialog>
+  </main>
+</body>
+</html>

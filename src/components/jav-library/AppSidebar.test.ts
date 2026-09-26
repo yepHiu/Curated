@@ -128,6 +128,7 @@ function setActivePlaybackSession() {
 }
 
 beforeEach(() => {
+  delete window.javLibrary
   comicLibraryEnabled.value = false
   photoLibraryEnabled.value = false
   refreshComicSettings.mockReset()
@@ -141,6 +142,19 @@ beforeEach(() => {
 })
 
 describe("AppSidebar", () => {
+  it("hides server management in Web and opens the local manager in Desktop", async () => {
+    const web = mount(AppSidebar)
+    expect(web.find('[aria-label="nav.servers"]').exists()).toBe(false)
+    web.unmount()
+    const openServerConnections = vi.fn().mockResolvedValue(undefined)
+    window.javLibrary = { openServerConnections }
+    const desktop = mount(AppSidebar, { props: { compact: true } })
+    await desktop.get('[aria-label="nav.servers"]').trigger('click')
+    expect(openServerConnections).toHaveBeenCalledOnce()
+    desktop.unmount()
+    delete window.javLibrary
+  })
+
   it("does not show numeric sidebar counts when movie data exists", async () => {
     const wrapper = mount(AppSidebar, { props: { compact: false } })
     await flushPromises()

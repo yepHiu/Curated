@@ -13,6 +13,7 @@ import {
   Play,
   RefreshCw,
   Settings2,
+  Server,
   Sparkles,
   Trash2,
   Users,
@@ -57,6 +58,8 @@ interface SidebarNavSection {
 }
 
 const { t, locale } = useI18n()
+const canManageServers = Boolean(window.javLibrary?.openServerConnections)
+function openServerConnections() { void window.javLibrary?.openServerConnections?.() }
 const route = useRoute()
 const comicService = useComicLibraryService()
 const photoService = usePhotoLibraryService()
@@ -447,6 +450,19 @@ const getNavigationTarget = (page: AppPage) => {
         </span>
       </RouterLink>
     </section>
+
+    <Button
+      v-if="canManageServers"
+      variant="ghost"
+      class="mb-2 w-full min-w-0 text-muted-foreground"
+      :class="props.compact ? 'px-0' : 'justify-start'"
+      :title="t('nav.servers')"
+      :aria-label="t('nav.servers')"
+      @click="openServerConnections"
+    >
+      <Server class="size-4 shrink-0" aria-hidden="true" />
+      <span v-if="!props.compact" class="truncate">{{ t('nav.servers') }}</span>
+    </Button>
 
     <section
       v-if="!props.compact"
