@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -261,6 +262,20 @@ func runHTTP(ctx context.Context, boot *bootstrap) error {
 }
 
 func serverListeningReporter() func(string) {
+	if version.Distribution == "server" && runtime.GOOS == "windows" {
+		return func(addr string) {
+			// Account-local hint, independent of a custom library data root. Desktop
+			// probes this address before saving it and never reads library credentials.
+			directory := filepath.Join(os.Getenv("LOCALAPPDATA"), "Curated")
+			data, _ := json.Marshal(map[string]any{"schema": 1, "url": desktop.ResolveBaseURL(addr)})
+			if err := os.MkdirAll(directory, 0700); err == nil {
+				temporary := filepath.Join(directory, "server-connection.json.tmp")
+				if os.WriteFile(temporary, data, 0600) == nil {
+					_ = os.Rename(temporary, filepath.Join(directory, "server-connection.json"))
+				}
+			}
+		}
+	}
 	if !strings.EqualFold(strings.TrimSpace(os.Getenv("CURATED_HOSTED_BY")), "electron") &&
 		strings.TrimSpace(os.Getenv("CURATED_ELECTRON_READY_EVENT")) != "1" {
 		return nil

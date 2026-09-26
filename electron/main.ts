@@ -101,6 +101,24 @@ if (!singleInstanceLock) {
       showConnections()
       try {
         serverStore = new ServerConnectionStore(path.join(app.getPath("userData"), "servers.json"))
+        // Full only seeds an empty connection profile, using Server's actual bind address.
+        if (desktopInfo.distribution === "desktop" && process.platform === "win32" &&
+            process.argv.includes("--curated-connect-local") && serverStore.snapshot().servers.length === 0) {
+          for (let attempt = 0; attempt < 20; attempt++) {
+            try {
+              const hint = JSON.parse(readFileSync(path.join(process.env.LOCALAPPDATA || "", "Curated", "server-connection.json"), "utf8"))
+              const url = normalizeServerUrl(hint.url)
+              if (hint.schema !== 1 || !["127.0.0.1", "localhost", "[::1]"].includes(new URL(url).hostname)) throw new Error("Invalid local Server hint")
+              await probeServer(url, (input, init) => net.fetch(input instanceof URL ? input.href : input, init))
+              const local = serverStore.save({ name: "本机服务器", url })
+              serverStore.remember(local.id)
+              break
+            } catch {
+              if (attempt === 19) connectionError = "本机服务器尚未就绪，请确认 Server 已启动后添加连接。"
+              else await new Promise(resolve => setTimeout(resolve, 500))
+            }
+          }
+        }
         const state = serverStore.snapshot()
         const last = state.servers.find(s => s.id === state.lastServerId)
         const explicitUrl = process.env.CURATED_ELECTRON_BACKEND_URL || process.env.CURATED_BACKEND_URL
@@ -386,6 +404,16 @@ function registerDesktopIpc(): void {
   ipcMain.handle("curated:connections", async (event, action: unknown, value: unknown) => {
     if (event.sender.id !== connectionWindow?.webContents.id || event.senderFrame !== event.sender.mainFrame || event.senderFrame?.url !== connectionPageUrl) throw new Error("Untrusted connection manager")
     try {
+      if (action === "check-update") {
+        pendingDesktopCheck ??= checkDesktopUpdate(desktopInfo, desktopRelease.updateFeed, net.fetch.bind(net)).finally(() => { pendingDesktopCheck = undefined })
+        return { ok: true, update: await pendingDesktopCheck }
+      }
+      if (action === "download-update") {
+        const update = await checkDesktopUpdate(desktopInfo, desktopRelease.updateFeed, net.fetch.bind(net))
+        if (update.status !== "update-available" || !update.downloadUrl) throw new Error("当前没有可下载的 Desktop 更新。")
+        await shell.openExternal(update.downloadUrl)
+        return { ok: true }
+      }
       if (action === "list") return { ok: true, state: serverStore?.snapshot() ?? { schema: 1, servers: [] }, currentServerUrl, connecting, error: connectionError }
       if (!serverStore) throw new Error(connectionError || "无法读取服务器列表。")
       if (connecting) throw new Error("正在连接，请稍候。")

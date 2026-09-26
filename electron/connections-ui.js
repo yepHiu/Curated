@@ -107,3 +107,21 @@ form.addEventListener('submit', async event => {
 cancelEdit.addEventListener('click', resetForm)
 void refresh()
 setInterval(refresh, 1000)
+
+const updateButton = button('检查 Desktop 更新', async () => {
+  updateButton.disabled = true
+  try {
+    const result = await api.checkUpdate()
+    if (!result.ok) throw new Error(result.error)
+    const labels = { 'up-to-date': 'Desktop 已是最新版本。', development: '当前为开发版。', bundled: '当前使用旧一体包更新。', 'not-configured': '更新源尚未配置。', 'no-artifact': '暂无适合此设备的安装包。', unsupported: '此平台暂不支持更新。', error: '暂时无法检查更新，请稍后重试。' }
+    message(labels[result.update.status] || `Desktop ${result.update.latestVersion} 可供下载。`)
+    downloadButton.hidden = result.update.status !== 'update-available'
+  } catch { message('暂时无法检查更新，请稍后重试。', true) }
+  finally { updateButton.disabled = false }
+})
+const downloadButton = button('下载 Desktop 更新', () => run(() => api.downloadUpdate(), '正在打开官方下载…', '已打开官方下载，请运行安装包完成更新。'))
+downloadButton.hidden = true
+const updateActions = document.createElement('div')
+updateActions.className = 'actions'
+updateActions.append(updateButton, downloadButton)
+status.after(updateActions)
