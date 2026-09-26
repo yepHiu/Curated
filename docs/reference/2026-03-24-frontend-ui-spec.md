@@ -98,6 +98,7 @@
 - 修改壳层布局、海报网格、播放器 HUD、设置页、对话框、全局 typography 或 spacing 后，应按显示缩放检查清单做回归。
 - `pnpm test:display` 和其他 display scaling 冒烟测试耗时较长，代理不得在没有用户明确同意的情况下主动运行。
 - 普通布局以 CSS 像素为基准，不为每一种物理分辨率或 DPR 单独写布局分支。
+- 侧栏展开宽度默认 `272px`，Retina 桌面紧凑密度为 `248px`；抽屉宽度对应为 `min(272px, 88vw)` / `min(248px, 88vw)`。折叠宽度继续使用 `4.75rem` / `4.5rem`，通过 `src/style.css` 令牌统一控制。
 - 桌面 Retina 紧凑密度通过 `src/style.css` 的全局变量实现，只在 `(hover: hover) and (pointer: fine) and (min-width: 1024px) and (min-resolution: 2dppx)` 下覆盖侧栏、壳层 padding、海报网格和卡片 spacing；DPR `1.5` 外接屏继续使用默认密度变量。
 - 显示适配不应把业务逻辑放入页面组件；业务能力判断仍通过服务层与 Composables。
 - 当前阶段不因为显示适配引入全局状态管理重构。Pinia 如需引入，应后续从小模块逐步试点。
