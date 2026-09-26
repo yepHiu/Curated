@@ -37,6 +37,8 @@ def body(root: Path, meta: dict) -> str:
     # Component-specific notes avoid collisions between independently versioned products.
     file = root / 'docs/release-notes' / f"{meta['tag']}.md"
     text = file.read_text(encoding='utf-8').strip()
+    if '## GitHub Release Body' in text:
+        text = text.split('## GitHub Release Body', 1)[1].strip()
     if not text:
         raise ValueError('Component release notes must not be empty')
     return text + '\n\n' + legacy.source_marker(meta) + '\n'
