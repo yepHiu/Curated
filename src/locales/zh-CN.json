@@ -1063,6 +1063,14 @@
     "movieCsvExporting": "正在导出",
     "movieCsvExportSuccess": "已导出 {count} 部影片",
     "movieCsvExportFailed": "导出失败，请稍后重试",
+    "storageStatusMessages": {
+      "online": "存储目录在线。",
+      "offline": "存储设备可能已离线或断开连接。",
+      "volume_mismatch": "当前硬盘与此目录之前绑定的存储设备不匹配。",
+      "path_missing": "存储设备在线，但资料库目录不存在。",
+      "permission_denied": "资料库目录存在，但 Curated 没有读取权限。",
+      "unknown": "无法确认此存储目录的状态。"
+    },
     "storageStatusOnline": "在线",
     "storageStatusOffline": "离线",
     "storageStatusVolumeMismatch": "硬盘不匹配",

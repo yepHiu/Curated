@@ -1063,6 +1063,14 @@
     "movieCsvExporting": "エクスポート中",
     "movieCsvExportSuccess": "{count} 本の影片をエクスポートしました",
     "movieCsvExportFailed": "エクスポートに失敗しました。後でもう一度お試しください。",
+    "storageStatusMessages": {
+      "online": "保存先はオンラインです。",
+      "offline": "ストレージデバイスがオフラインか、接続が切れている可能性があります。",
+      "volume_mismatch": "現在のディスクは、この保存先に以前紐づけられたストレージデバイスと一致しません。",
+      "path_missing": "ストレージデバイスはオンラインですが、ライブラリのフォルダーが見つかりません。",
+      "permission_denied": "ライブラリのフォルダーは存在しますが、Curated に読み取り権限がありません。",
+      "unknown": "この保存先の状態を確認できません。"
+    },
     "storageStatusOnline": "オンライン",
     "storageStatusOffline": "オフライン",
     "storageStatusVolumeMismatch": "別のディスク",

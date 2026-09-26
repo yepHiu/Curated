@@ -177,7 +177,7 @@ function canRebindStorage(status?: LibraryPathStorageStatusDTO): boolean {
                 class="flex flex-col gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
               >
                 <span class="min-w-0 leading-relaxed">
-                  {{ storageStatusFor(path)!.message }}
+                  {{ t(`settings.storageStatusMessages.${storageStatusFor(path)!.status}`) }}
                 </span>
                 <Button
                   v-if="canRebindStorage(storageStatusFor(path))"

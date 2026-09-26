@@ -1063,6 +1063,14 @@
     "movieCsvExporting": "Exporting",
     "movieCsvExportSuccess": "Exported {count} movies",
     "movieCsvExportFailed": "Export failed. Try again later.",
+    "storageStatusMessages": {
+      "online": "Storage path is online.",
+      "offline": "The storage device may be offline or disconnected.",
+      "volume_mismatch": "The current volume does not match the storage device previously bound to this path.",
+      "path_missing": "The storage device is online, but the library directory is missing.",
+      "permission_denied": "The library directory exists, but Curated does not have permission to read it.",
+      "unknown": "Curated could not confirm this storage path."
+    },
     "storageStatusOnline": "Online",
     "storageStatusOffline": "Offline",
     "storageStatusVolumeMismatch": "Different disk",

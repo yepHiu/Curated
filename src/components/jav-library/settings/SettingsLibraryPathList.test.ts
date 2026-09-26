@@ -147,7 +147,8 @@ describe("SettingsLibraryPathList", () => {
 
     expect(wrapper.text()).toContain("settings.storageStatusOnline")
     expect(wrapper.text()).toContain("settings.storageStatusVolumeMismatch")
-    expect(wrapper.text()).toContain("wrong disk")
+    expect(wrapper.text()).toContain("settings.storageStatusMessages.volume_mismatch")
+    expect(wrapper.text()).not.toContain("wrong disk")
 
     await wrapper.get("[data-rebind-storage='b']").trigger("click")
 

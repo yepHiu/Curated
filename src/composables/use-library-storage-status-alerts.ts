@@ -77,7 +77,7 @@ export function useLibraryStorageStatusAlerts() {
       pushAppToast(
         t("toasts.storagePathOffline", {
           title: item.title || item.path,
-          message: item.message,
+          message: t(`settings.storageStatusMessages.${item.status}`),
         }),
         {
           variant: "warning",
