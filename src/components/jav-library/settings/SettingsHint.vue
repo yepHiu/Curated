@@ -19,7 +19,7 @@ function showFromKeyboard(event: KeyboardEvent) {
       <TooltipTrigger
         as-child
         tabindex="0"
-        class="cursor-help rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         data-settings-hint-trigger
         @click="open = !open"
         @keydown="showFromKeyboard"
