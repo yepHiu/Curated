@@ -509,9 +509,18 @@ Storage directories are configured on the Server computer. When Desktop or a bro
 
 HTTP health now returns request-specific `canManageLibraryPaths` with `Cache-Control: no-store`. Desktop checks its main-process `serverOrigin` against the actual API origin; missing capability fields, old bridges, unreachable servers and ambiguous LAN/proxy connections stay read-only. Both legacy and standalone Desktop can manage a verified local Server. Mock directory settings remain editable. Run the updated Server and restart Desktop after upgrading.
 
-The three root CRUD APIs and movie reveal/rebind reject remote requests with `403 LIBRARY_PATHS_READ_ONLY`. Changing `defaultImportLibraryPathId`, `defaultComicImportLibraryPathId` or `defaultPhotoImportLibraryPathId` through PATCH settings requires the same direct-local access; a mixed request is rejected before any fields are saved. No new configuration fields or migration are required. Reverse proxies must preserve external Host or forwarding headers; do not forward these management routes through a proxy that strips all client evidence.
+The three root CRUD APIs and movie reveal/rebind reject remote requests with `403 LIBRARY_PATHS_READ_ONLY`. All PATCH settings writes now return `403 SERVER_SETTINGS_READ_ONLY` remotely. Changing `defaultImportLibraryPathId`, `defaultComicImportLibraryPathId` or `defaultPhotoImportLibraryPathId` through PATCH settings requires the same direct-local access; a mixed request is rejected before any fields are saved. No new configuration fields or migration are required. Reverse proxies must preserve external Host or forwarding headers; do not forward these management routes through a proxy that strips all client evidence.
 
 Remote uploads continue to use the configured Server destination. Directory reads, storage checks and other business actions retain their existing API behavior; this change does not make every scan or metadata operation local-only.
+
+
+### Remote settings access
+
+Server administration must be performed through `localhost` / loopback on the Server computer. Remote clients hide metadata, AI administration, maintenance/backup, server networking/proxy/plugin controls, startup and automatic updates, PIN administration and trusted devices, server logs, library automation, Beta toggles/cache controls, and server-wide playback/reader/capture-export defaults. Existing directory and installer protections still apply. The network page remains available in Desktop for local connection management; a remote browser has no network tab. Unavailable settings deep links return to Overview after connection verification.
+
+Language/theme, current-session lock/unlock, local capture saving/directory/shortcuts/sound, the local native-player protocol template, Desktop connections/updates, and read-only library/version information remain available. Playback, per-book reading preferences, uploads, favorites/ratings and AI chat retain their existing APIs. Global reader and playback defaults cannot currently be edited per device from Settings.
+
+`PATCH /api/settings`, PIN setup/change and auth settings/session administration, connected clients, backup and library-health administration, comic cache cleanup, provider/proxy diagnostics, AI provider tests, governance writes, usage/audit and cleanup require direct local access (`403 SERVER_SETTINGS_READ_ONLY`). `GET /api/settings` is `no-store` and removes AI API keys/Base URL and proxy URL/credentials remotely. Normal runtime configuration is still readable. These are host-management restrictions, not a new user-role system. Restart the updated Server and refresh clients to apply both API and UI changes. Review: [remote settings audit](plan/2026-09-25-settings-information-architecture.md#2026-09-27-远程设置审查与屏蔽已实施).
 
 
 ## Desktop server connections

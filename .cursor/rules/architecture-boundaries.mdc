@@ -28,6 +28,10 @@ alwaysApply: true
 
 - Storage roots belong to Server. HTTP health exposes request-local `canManageLibraryPaths`; remote/unknown clients render read-only movie/comic/photo directory information. Three-library root CRUD, movie reveal/rebind and default import target changes are enforced as direct Server-local operations. Uploads still use Server-configured destinations. Mock remains editable; local standalone Desktop can manage directories independently of its update distribution.
 
+## Server Administration Ownership
+
+- Server-wide settings writes and administrative APIs require direct loopback access. Remote clients retain device preferences, current-session lock/unlock, Desktop connections and ordinary library usage. Settings responses redact AI and proxy credentials remotely; hidden navigation and deep links share the local-access policy. See guide: Remote settings access.
+
 ## Frontend Business Code
 
 - HLS session identity belongs to a playback instance, not a movie: creating a new session must not evict another client's session for the same movie. The renderer releases its previous session after new media data is available and cleans up cancelled/late requests. Startup capacity is bounded and cancellable.

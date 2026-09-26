@@ -3,6 +3,12 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-09-27 远程设置管理边界
+
+远程设置仅保留客户端偏好和只读信息；全局配置、安全、AI 管理及备份维护须在 Server 本机操作，接口同步限制，远程不返回 AI/代理凭据。详见 `docs/guide.md` 的 Remote settings access。
+
+`PATCH /api/settings` 全部写入及管理路由统一要求 `isDirectLocalRequest`，否则 `403 SERVER_SETTINGS_READ_ONLY`（含默认目录字段）；路径 CRUD 保留原错误码。复用已有 health 本机信号，UI 未确认时隐藏管理项、确认远程后回退不可用深链；Desktop 网络页保留本机服务器列表，当前会话锁定及常规业务 API 保留。无新增配置/迁移。
+
 ## 2026-09-26 Desktop 服务器列表与切换
 
 Desktop 自带 `connections.html` 本地管理窗口，设置中的「服务器列表」、托盘与 macOS 应用菜单可打开。名称和 HTTP/HTTPS 根地址保存在 `app.getPath("userData")/servers.json`，支持保存、去重、编辑、删除和重连；上次成功连接启动时恢复。当前连接可改名，需先切换才能改地址或删除。连接前检查 `/api/health` 的 Curated 身份，失败保留原页面；成功加载后销毁旧 renderer，停止旧页面客户端活动。PIN 仍由 Server UI 解锁。会话按 origin（含端口）分配持久 partition，首次升级可能需要重新解锁；不迁移旧共享 Cookie。

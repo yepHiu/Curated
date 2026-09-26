@@ -97,3 +97,7 @@ health 的 `version` 为数字 SemVer（当前 1.5.7），`buildStamp` 单独保
 ## 漫画 / 写真 Beta（2026-09-10）
 
 真实试用需 `VITE_USE_WEB_API=true` 并运行新版后端。进入「设置 → 资料库 → 漫画库 / 写真库」，分别启用对应 Beta，再添加该库的绝对路径并通过路径「更多操作」扫描 ZIP/CBZ。关闭只隐藏内容入口和配置、停止该库监听，保留已有数据；设置入口仍可用于重新启用。Mock 开关仅当前会话有效。
+
+## 远程设置管理（2026-09-27）
+
+远程设置仅保留客户端偏好和只读信息；全局配置、安全、AI 管理及备份维护须在 Server 本机操作，接口同步限制，远程不返回 AI/代理凭据。详见 `docs/guide.md` 的 Remote settings access。 新后端重启、客户端刷新后生效；`PATCH /api/settings` 远程统一返回 `403 SERVER_SETTINGS_READ_ONLY`，当前会话解锁/锁定及上传等业务操作保留。

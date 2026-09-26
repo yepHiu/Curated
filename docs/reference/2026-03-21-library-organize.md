@@ -114,3 +114,7 @@ Web 模式的开关和偏好由 `PATCH /api/settings` 原子持久化。写真�
 ### 2026-09-26：默认导入目录的本机管理边界
 
 `library-config.cfg` 中 `defaultImportLibraryPathId`、`defaultComicImportLibraryPathId`、`defaultPhotoImportLibraryPathId` 的格式和持久化位置不变。通过 HTTP 修改这三个字段仅允许服务器所在电脑的 loopback 直连；远程请求返回 `403 LIBRARY_PATHS_READ_ONLY`，混合 PATCH 不部分保存。三个库的路径增删改、影片 reveal/rebind 同样限本机。远程界面只展示存储路径和默认目录，上传仍使用服务端配置的目标。参见操作指南 Remote storage directory access。
+
+## 远程配置边界（2026-09-27）
+
+`library-config.cfg` 中的全局配置经 `PATCH /api/settings` 修改时要求 Server 本机直连；远程端返回 `403 SERVER_SETTINGS_READ_ONLY`，在任何字段写入前拒绝整个请求。整理、监听、刮削、代理、AI、播放/阅读默认值、缓存、日志、导出及更新开关不再在远程设置提供编辑入口。当前设备偏好和常规业务操作保留。配置格式不变，无迁移；详见 [操作手册](../guide.md#remote-settings-access)。
