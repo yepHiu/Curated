@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { useI18n } from "vue-i18n"
 import { Badge } from "@/components/ui/badge"
@@ -18,10 +19,12 @@ defineProps<{
   <div class="min-w-0 rounded-lg border border-border/50 bg-background/55 p-3" data-desktop-update-section>
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0">
-        <p class="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
-          <span>Curated Desktop</span>
-          <SettingsScopeBadge scope="desktop" />
-        </p>
+        <SettingsHint :text="t('settings.desktopManualInstallHint')">
+          <p class="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
+            <span>Curated Desktop</span>
+            <SettingsScopeBadge scope="desktop" />
+          </p>
+        </SettingsHint>
         <div class="mt-1 flex flex-wrap items-center gap-2">
           <span v-if="info" class="break-all font-mono text-sm text-foreground" data-desktop-version>{{ info.version }}</span>
           <span v-else class="text-xs text-muted-foreground">{{ t(infoError ? 'settings.desktopInfoError' : 'settings.desktopInfoLoading') }}</span>
@@ -38,8 +41,5 @@ defineProps<{
     <Button v-if="result?.status === 'update-available' && result.downloadUrl" as-child variant="outline" class="mt-2 rounded-2xl" data-desktop-download>
       <a :href="result.downloadUrl" target="_blank" rel="noopener noreferrer">{{ t('settings.desktopDownloadAction') }}</a>
     </Button>
-    <p v-if="result?.status === 'update-available' && result.downloadUrl" class="mt-2 text-xs leading-relaxed text-muted-foreground">
-      {{ t('settings.desktopManualInstallHint') }}
-    </p>
   </div>
 </template>

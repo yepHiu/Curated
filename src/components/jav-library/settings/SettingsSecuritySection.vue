@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
@@ -10,7 +11,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -371,15 +371,12 @@ async function confirmTrustedSessionRevoke() {
         >
           <ShieldCheck class="size-4" />
         </span>
-        <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
-          <span>{{ t("settings.securityTitle") }}</span>
-          <SettingsScopeBadge scope="server" />
-        </CardTitle>
-        <CardDescription
-          class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-        >
-          {{ t("settings.securityDesc") }}
-        </CardDescription>
+        <SettingsHint :text="t('settings.securityDesc')">
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.securityTitle") }}</span>
+            <SettingsScopeBadge scope="server" />
+          </CardTitle>
+        </SettingsHint>
       </CardHeader>
 
       <CardContent class="flex flex-col gap-3 pt-0">
@@ -389,12 +386,11 @@ async function confirmTrustedSessionRevoke() {
         >
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 flex-col gap-1">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.securitySetupTitle") }}
-              </p>
-              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {{ status.pinEnabled ? t("settings.securityEnabledHint") : t("settings.securitySetupHint") }}
-              </p>
+              <SettingsHint :text="status.pinEnabled ? t('settings.securityEnabledHint') : t('settings.securitySetupHint')">
+                <p class="text-sm font-semibold text-foreground">
+                  {{ t("settings.securitySetupTitle") }}
+                </p>
+              </SettingsHint>
             </div>
             <div
               v-if="!status.pinEnabled"
@@ -586,19 +582,18 @@ async function confirmTrustedSessionRevoke() {
           </Dialog>
 
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ t("settings.securityLockNowHint") }}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              class="shrink-0 rounded-xl"
-              :disabled="!status.pinEnabled || lockBusy"
-              @click="lockNow"
-            >
-              <LockKeyhole data-icon="inline-start" />
-              {{ t("settings.securityLockNow") }}
-            </Button>
+            <SettingsHint :text="t('settings.securityLockNowHint')">
+              <Button
+                variant="outline"
+                size="sm"
+                class="shrink-0 rounded-xl"
+                :disabled="!status.pinEnabled || lockBusy"
+                @click="lockNow"
+              >
+                <LockKeyhole data-icon="inline-start" />
+                {{ t("settings.securityLockNow") }}
+              </Button>
+            </SettingsHint>
           </div>
         </div>
 
@@ -607,12 +602,11 @@ async function confirmTrustedSessionRevoke() {
           class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
         >
           <div class="flex min-w-0 flex-col gap-1">
-            <p class="text-sm font-semibold text-foreground">
-              {{ t("settings.securitySessionTitle") }}
-            </p>
-            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ t("settings.securitySessionHint") }}
-            </p>
+            <SettingsHint :text="t('settings.securitySessionHint')">
+              <p class="text-sm font-semibold text-foreground">
+                {{ t("settings.securitySessionTitle") }}
+              </p>
+            </SettingsHint>
           </div>
           <Select
             :model-value="sessionTTLValue"
@@ -641,12 +635,11 @@ async function confirmTrustedSessionRevoke() {
           class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
         >
           <div class="flex min-w-0 flex-col gap-1">
-            <p class="text-sm font-semibold text-foreground">
-              {{ t("settings.securityLockOnRestart") }}
-            </p>
-            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ t("settings.securityLockOnRestartHint") }}
-            </p>
+            <SettingsHint :text="t('settings.securityLockOnRestartHint')">
+              <p class="text-sm font-semibold text-foreground">
+                {{ t("settings.securityLockOnRestart") }}
+              </p>
+            </SettingsHint>
           </div>
           <Switch
             :model-value="status.lockOnRestart"
@@ -663,12 +656,11 @@ async function confirmTrustedSessionRevoke() {
         >
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex min-w-0 flex-col gap-1">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.securityTrustedSessionsTitle") }}
-              </p>
-              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {{ t("settings.securityTrustedSessionsHint") }}
-              </p>
+              <SettingsHint :text="t('settings.securityTrustedSessionsHint')">
+                <p class="text-sm font-semibold text-foreground">
+                  {{ t("settings.securityTrustedSessionsTitle") }}
+                </p>
+              </SettingsHint>
             </div>
             <Button
               type="button"
@@ -783,12 +775,11 @@ async function confirmTrustedSessionRevoke() {
           role="note"
           class="flex flex-col gap-2 rounded-2xl border border-border/40 border-l-[3px] border-l-muted-foreground/40 bg-surface-muted px-4 py-3"
         >
-          <p class="text-sm font-semibold text-foreground">
-            {{ t("settings.securityLanPolicyTitle") }}
-          </p>
-          <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-            {{ t("settings.securityLanPolicyHint") }}
-          </p>
+          <SettingsHint :text="t('settings.securityLanPolicyHint')">
+            <p class="text-sm font-semibold text-foreground">
+              {{ t("settings.securityLanPolicyTitle") }}
+            </p>
+          </SettingsHint>
         </div>
 
         <p

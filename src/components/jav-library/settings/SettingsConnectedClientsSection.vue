@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
@@ -17,7 +18,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -159,25 +159,22 @@ function formatTimestamp(value?: string): string {
       >
         <Wifi class="size-[1.15rem]" />
       </span>
-      <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
-        <span>{{ t("settings.connectedClientsTitle") }}</span>
-        <SettingsScopeBadge scope="server" />
-      </CardTitle>
+      <SettingsHint :text="[t('settings.connectedClientsDesc'), t('settings.connectedClientsPrivacy')].join('\n\n')">
+        <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+          <span>{{ t("settings.connectedClientsTitle") }}</span>
+          <SettingsScopeBadge scope="server" />
+        </CardTitle>
+      </SettingsHint>
       <Button
         variant="outline"
         size="sm"
-        class="row-span-2 self-start rounded-xl"
+        class="self-center rounded-xl"
         :disabled="loading"
         @click="emit('refresh')"
       >
         <RefreshCw :class="['size-4', loading ? 'motion-safe:animate-spin' : '']" />
         {{ t("settings.connectedClientsRefresh") }}
       </Button>
-      <CardDescription
-        class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-      >
-        {{ t("settings.connectedClientsDesc") }}
-      </CardDescription>
     </CardHeader>
 
     <CardContent class="flex flex-col gap-3 pt-0">
@@ -249,10 +246,6 @@ function formatTimestamp(value?: string): string {
           </div>
         </div>
       </div>
-
-      <p class="text-xs leading-relaxed text-muted-foreground">
-        {{ t("settings.connectedClientsPrivacy") }}
-      </p>
     </CardContent>
   </Card>
 </template>

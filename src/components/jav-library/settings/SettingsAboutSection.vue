@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { ChevronDown, Info, Loader2, ScrollText, Sparkles } from "lucide-vue-next"
@@ -191,17 +192,16 @@ const thirdPartyCount = computed(() => thirdPartyGroups.value.reduce((count, gro
                 </dd>
               </div>
               <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
-                <dt class="font-semibold text-foreground">
-                  {{ t("settings.aboutFrontendBuildLabel") }}
-                </dt>
+                <SettingsHint :text="t('settings.aboutDevProxyHint')">
+                  <dt class="font-semibold text-foreground">
+                    {{ t("settings.aboutFrontendBuildLabel") }}
+                  </dt>
+                </SettingsHint>
                 <dd class="mt-1.5">
                   {{ t("settings.aboutFrontendBuildDev", { mode: viteMode }) }}
                 </dd>
               </div>
             </div>
-            <p class="text-xs leading-relaxed text-muted-foreground/90 sm:text-sm">
-              {{ t("settings.aboutDevProxyHint") }}
-            </p>
           </template>
           <template v-else>
             <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 p-4">
@@ -331,17 +331,16 @@ const thirdPartyCount = computed(() => thirdPartyGroups.value.reduce((count, gro
                 </li>
               </ul>
             </div>
-            <p class="mt-4 text-xs text-muted-foreground">
-              {{ t("settings.aboutFfmpegBundleNote") }}
-            </p>
-            <a
-              :href="thirdPartyNoticesUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="mt-2 inline-block rounded-sm text-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {{ t("settings.aboutThirdPartyNoticesLink") }}
-            </a>
+            <SettingsHint :text="t('settings.aboutFfmpegBundleNote')">
+              <a
+                :href="thirdPartyNoticesUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="mt-2 inline-block rounded-sm text-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {{ t("settings.aboutThirdPartyNoticesLink") }}
+              </a>
+            </SettingsHint>
           </div>
         </details>
       </CardContent>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import { useI18n } from "vue-i18n"
 import { PanelsTopLeft } from "lucide-vue-next"
 import type { PhotoViewerSettings } from "@/domain/photo/types"
@@ -50,13 +51,12 @@ function onDirection(value: unknown) {
     <div class="flex flex-col gap-2">
       <div class="flex items-center gap-2">
         <PanelsTopLeft class="size-4 text-primary" aria-hidden="true" />
-        <p class="text-sm font-semibold text-foreground">
-          {{ t("settings.photoViewerTitle") }}
-        </p>
+        <SettingsHint :text="t('settings.photoViewerDesc')">
+          <p class="text-sm font-semibold text-foreground">
+            {{ t("settings.photoViewerTitle") }}
+          </p>
+        </SettingsHint>
       </div>
-      <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-        {{ t("settings.photoViewerDesc") }}
-      </p>
     </div>
 
     <div data-photo-viewer-settings-list class="flex flex-col gap-2">

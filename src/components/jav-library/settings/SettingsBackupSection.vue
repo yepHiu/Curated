@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import {
-  ArchiveRestore,
   DatabaseBackup,
   FileCheck2,
   FolderOpen,
@@ -28,7 +28,6 @@ import {
 } from "@/lib/backup-path"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
-import { statusPanelClass } from "@/lib/ui/status-tone"
 import { useLibraryService } from "@/services/library-service"
 
 const props = defineProps<{
@@ -202,23 +201,24 @@ function formatBytes(value: number): string {
   >
     <div class="flex flex-col gap-2">
       <div class="flex min-w-0 flex-wrap items-center gap-2">
-        <h3 id="settings-backup-title" class="min-w-0 text-sm font-semibold text-foreground">
-          {{ t("settings.backupCardTitle") }}
-        </h3>
+        <SettingsHint :text="[t('settings.backupCardDesc'), t('settings.backupOfflineRestoreHint')].join('\n\n')">
+          <h3 id="settings-backup-title" class="min-w-0 text-sm font-semibold text-foreground">
+            {{ t("settings.backupCardTitle") }}
+          </h3>
+        </SettingsHint>
         <Badge v-if="!supported" variant="secondary">
           {{ t("settings.backupWebRequired") }}
         </Badge>
       </div>
-      <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
-        {{ t("settings.backupCardDesc") }}
-      </p>
     </div>
 
     <FieldGroup class="gap-4">
       <Field class="gap-3" :data-invalid="Boolean(directoryError)" :data-disabled="!supported || busy">
-        <FieldLabel for="settings-backup-directory">
-          {{ t("settings.backupDirectoryLabel") }}
-        </FieldLabel>
+        <SettingsHint :text="t('settings.backupDirectoryHint')">
+          <FieldLabel for="settings-backup-directory">
+            {{ t("settings.backupDirectoryLabel") }}
+          </FieldLabel>
+        </SettingsHint>
         <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
           <Input
             id="settings-backup-directory"
@@ -251,9 +251,7 @@ function formatBytes(value: number): string {
         <p v-else-if="pickerHint" id="settings-backup-directory-help" class="text-xs text-muted-foreground">
           {{ pickerHint }}
         </p>
-        <p v-else id="settings-backup-directory-help" class="text-xs leading-relaxed text-muted-foreground">
-          {{ t("settings.backupDirectoryHint") }}
-        </p>
+        <span v-else id="settings-backup-directory-help" class="sr-only">{{ t("settings.backupDirectoryHint") }}</span>
         <div class="flex flex-wrap justify-end gap-2">
           <Button
             type="button"
@@ -274,9 +272,11 @@ function formatBytes(value: number): string {
       <Separator />
 
       <Field class="gap-3" :data-invalid="Boolean(pathError)" :data-disabled="!supported || busy">
-        <FieldLabel for="settings-backup-path">
-          {{ t("settings.backupPathLabel") }}
-        </FieldLabel>
+        <SettingsHint :text="t('settings.backupPathHint')">
+          <FieldLabel for="settings-backup-path">
+            {{ t("settings.backupPathLabel") }}
+          </FieldLabel>
+        </SettingsHint>
         <Input
           id="settings-backup-path"
           v-model="backupPathDraft"
@@ -290,9 +290,7 @@ function formatBytes(value: number): string {
         <p v-if="pathError" id="settings-backup-path-help" class="text-xs text-destructive" role="alert">
           {{ pathError }}
         </p>
-        <p v-else id="settings-backup-path-help" class="text-xs leading-relaxed text-muted-foreground">
-          {{ t("settings.backupPathHint") }}
-        </p>
+        <span v-else id="settings-backup-path-help" class="sr-only">{{ t("settings.backupPathHint") }}</span>
         <div class="flex flex-wrap justify-end gap-2">
           <Button
             type="button"
@@ -385,12 +383,5 @@ function formatBytes(value: number): string {
         </div>
       </div>
     </template>
-
-    <div :class="statusPanelClass('info')">
-      <div class="flex gap-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-        <ArchiveRestore class="mt-0.5 size-4 shrink-0 text-info" aria-hidden="true" />
-        <p>{{ t("settings.backupOfflineRestoreHint") }}</p>
-      </div>
-    </div>
   </section>
 </template>

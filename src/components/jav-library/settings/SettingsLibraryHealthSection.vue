@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import { computed, onBeforeUnmount, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import {
@@ -280,12 +281,11 @@ function downloadDiagnostics() {
     >
       <div class="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div class="flex min-w-0 flex-col gap-2">
-          <h3 id="settings-library-health-title" class="text-sm font-semibold text-foreground">
-            {{ t("settings.libraryHealthTitle") }}
-          </h3>
-          <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
-            {{ t("settings.libraryHealthDescription") }}
-          </p>
+          <SettingsHint :text="t('settings.libraryHealthDescription')">
+            <h3 id="settings-library-health-title" class="text-sm font-semibold text-foreground">
+              {{ t("settings.libraryHealthTitle") }}
+            </h3>
+          </SettingsHint>
         </div>
         <div class="flex flex-wrap justify-end gap-2 xl:shrink-0">
           <Button
@@ -386,8 +386,9 @@ function downloadDiagnostics() {
             <div class="flex items-start gap-3">
               <CheckCircle2 class="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
               <div class="flex min-w-0 flex-col gap-1">
-                <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthHealthyTitle") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t("settings.libraryHealthHealthyHint") }}</p>
+                <SettingsHint :text="t('settings.libraryHealthHealthyHint')">
+                  <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthHealthyTitle") }}</p>
+                </SettingsHint>
               </div>
             </div>
           </div>
@@ -429,8 +430,9 @@ function downloadDiagnostics() {
 
           <div v-if="report.summary.categoryCounts.metadata_missing || report.summary.categoryCounts.metadata_failed" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-4 xl:flex-row xl:items-center xl:justify-between">
             <div class="flex min-w-0 flex-col gap-2">
-              <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthMetadataRepairTitle") }}</p>
-              <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t("settings.libraryHealthMetadataRepairHint") }}</p>
+              <SettingsHint :text="t('settings.libraryHealthMetadataRepairHint')">
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthMetadataRepairTitle") }}</p>
+              </SettingsHint>
             </div>
             <div class="flex min-w-0 flex-wrap justify-end gap-2">
               <Button
@@ -464,8 +466,9 @@ function downloadDiagnostics() {
 
           <div v-if="orphanCleanupFindings.length || stagingCleanupFindings.length" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-4 xl:flex-row xl:items-center xl:justify-between">
             <div class="flex min-w-0 flex-col gap-2">
-              <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthCleanupTitle") }}</p>
-              <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t("settings.libraryHealthCleanupHint") }}</p>
+              <SettingsHint :text="t('settings.libraryHealthCleanupHint')">
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthCleanupTitle") }}</p>
+              </SettingsHint>
             </div>
             <div class="flex min-w-0 flex-wrap justify-end gap-2">
               <Button
@@ -500,8 +503,9 @@ function downloadDiagnostics() {
           <div v-if="visibleFindings.length" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <div class="flex flex-wrap items-end justify-between gap-2">
               <div class="flex min-w-0 flex-col gap-1">
-                <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthFindingsTitle") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t("settings.libraryHealthFindingsHint") }}</p>
+                <SettingsHint :text="t('settings.libraryHealthFindingsHint')">
+                  <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthFindingsTitle") }}</p>
+                </SettingsHint>
               </div>
               <span class="text-xs tabular-nums text-muted-foreground">{{ visibleFindings.length }} / {{ report.summary.totalFindings }}</span>
             </div>

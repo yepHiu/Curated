@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { useI18n } from "vue-i18n"
 import { CircleHelp, Layers } from "lucide-vue-next"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -41,15 +41,12 @@ const { t } = useI18n()
         >
           <Layers class="size-[1.15rem]" />
         </span>
-        <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
-          <span>{{ t("settings.organizeTitle") }}</span>
-          <SettingsScopeBadge scope="server" />
-        </CardTitle>
-        <CardDescription
-          class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-        >
-          {{ t("settings.organizeDesc") }}
-        </CardDescription>
+        <SettingsHint :text="t('settings.organizeDesc')">
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.organizeTitle") }}</span>
+            <SettingsScopeBadge scope="server" />
+          </CardTitle>
+        </SettingsHint>
       </CardHeader>
       <CardContent class="flex flex-col gap-3 pt-0">
         <div

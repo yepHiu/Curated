@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import { useI18n } from "vue-i18n"
 import { RefreshCw } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
@@ -22,12 +23,11 @@ const { t } = useI18n()
       class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
     >
       <div class="min-w-0 flex flex-col gap-3 text-left">
-        <p class="text-sm font-semibold text-foreground">
-          {{ t("settings.triggerScrape") }}
-        </p>
-        <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-          {{ t("settings.triggerScrapeHint") }}
-        </p>
+        <SettingsHint :text="t('settings.triggerScrapeHint')">
+          <p class="text-sm font-semibold text-foreground">
+            {{ t("settings.triggerScrape") }}
+          </p>
+        </SettingsHint>
       </div>
       <Button
         type="button"

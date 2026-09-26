@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { defineAsyncComponent } from "vue"
 import { useI18n } from "vue-i18n"
@@ -56,15 +57,14 @@ const { t } = useI18n()
           data-settings-maintenance-block="manual"
         >
           <div class="flex min-w-0 flex-col gap-2">
-            <h3
-              id="settings-manual-maintenance-title"
-              class="text-sm font-semibold text-foreground"
-            >
-              {{ t("settings.triggerFullScan") }}
-            </h3>
-            <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ t("settings.triggerFullScanHint") }}
-            </p>
+            <SettingsHint :text="t('settings.triggerFullScanHint')">
+              <h3
+                id="settings-manual-maintenance-title"
+                class="text-sm font-semibold text-foreground"
+              >
+                {{ t("settings.triggerFullScan") }}
+              </h3>
+            </SettingsHint>
           </div>
 
           <Button

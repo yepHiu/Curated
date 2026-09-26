@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
@@ -8,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAIGovernanceService } from "@/services/ai-governance-service"
 import { useLibraryService } from "@/services/library-service"
@@ -261,28 +262,33 @@ function auditLine(entry: AIAuditEntry) {
             <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.policy') }}</h3>
             <FieldGroup class="gap-3">
               <Field orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2"><FieldLabel for="ai-enabled">{{ t('aiSettings.enabled') }}</FieldLabel><Switch id="ai-enabled" v-model="settings.enabled" :disabled="busy" data-ai-enabled /></Field>
-              <Field orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2"><FieldLabel for="ai-readonly">{{ t('aiSettings.readOnly') }}</FieldLabel><Switch id="ai-readonly" v-model="settings.readOnly" :disabled="busy" data-ai-readonly /></Field>
-              <FieldDescription>{{ t('aiSettings.confirmationHint') }}</FieldDescription>
+              <Field orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2"><SettingsHint :text="[t('aiSettings.confirmationHint'), t('aiSettings.autoSaveHint')].join('\n\n')">
+                  <FieldLabel for="ai-readonly">{{ t('aiSettings.readOnly') }}</FieldLabel>
+                </SettingsHint><Switch id="ai-readonly" v-model="settings.readOnly" :disabled="busy" data-ai-readonly /></Field>
             </FieldGroup>
           </section>
           <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" data-ai-settings-block="limits">
             <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.limits') }}</h3>
             <FieldGroup class="gap-3">
-              <Field><FieldLabel for="ai-privacy">{{ t('aiSettings.privacy') }}</FieldLabel>
+              <Field><SettingsHint :text="t('aiSettings.privacyHint')">
+                  <FieldLabel for="ai-privacy">{{ t('aiSettings.privacy') }}</FieldLabel>
+                </SettingsHint>
                 <Select v-model="settings.privacy" :disabled="busy"><SelectTrigger id="ai-privacy"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="auto">{{ t('aiSettings.privacyAuto') }}</SelectItem><SelectItem value="minimal">{{ t('aiSettings.privacyMinimal') }}</SelectItem></SelectGroup></SelectContent></Select>
-                <FieldDescription>{{ t('aiSettings.privacyHint') }}</FieldDescription>
               </Field>
               <Field orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2">
-                <FieldLabel for="ai-step-limit-enabled">{{ t('aiSettings.stepLimitEnabled') }}</FieldLabel>
+                <SettingsHint :text="t('aiSettings.stepLimitHint')">
+                  <FieldLabel for="ai-step-limit-enabled">{{ t('aiSettings.stepLimitEnabled') }}</FieldLabel>
+                </SettingsHint>
                 <Switch id="ai-step-limit-enabled" v-model="stepLimitEnabled" :disabled="busy" aria-describedby="ai-step-limit-hint" />
               </Field>
-              <FieldDescription id="ai-step-limit-hint">{{ t('aiSettings.stepLimitHint') }}</FieldDescription>
+              <span id="ai-step-limit-hint" class="sr-only">{{ t('aiSettings.stepLimitHint') }}</span>
               <FieldGroup class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-3" data-ai-limit-fields>
                 <Field v-if="stepLimitEnabled" :data-invalid="!validSettings"><FieldLabel for="ai-steps">{{ t('aiSettings.stepLimit') }}</FieldLabel><Input id="ai-steps" v-model.number="settings.stepLimit" :aria-invalid="!Number.isInteger(settings.stepLimit) || settings.stepLimit < 1 || settings.stepLimit > 30" @blur="settingsAutosave.flush()" type="number" min="1" max="30" :disabled="busy" /></Field>
                 <Field><FieldLabel for="ai-rate">{{ t('aiSettings.writeLimit') }}</FieldLabel><Input id="ai-rate" v-model.number="settings.writePerMinute" :aria-invalid="!Number.isInteger(settings.writePerMinute) || settings.writePerMinute < 1 || settings.writePerMinute > 60" @blur="settingsAutosave.flush()" type="number" min="1" max="60" :disabled="busy" /></Field>
-                <Field><FieldLabel for="ai-retention">{{ t('aiSettings.retention') }}</FieldLabel><Input id="ai-retention" v-model.number="settings.retentionDays" :aria-invalid="!Number.isInteger(settings.retentionDays) || settings.retentionDays < 7 || settings.retentionDays > 365" @blur="settingsAutosave.flush()" type="number" min="7" max="365" :disabled="busy" /></Field>
+                <Field><SettingsHint :text="t('aiSettings.retentionHint')">
+                  <FieldLabel for="ai-retention">{{ t('aiSettings.retention') }}</FieldLabel>
+                </SettingsHint><Input id="ai-retention" v-model.number="settings.retentionDays" :aria-invalid="!Number.isInteger(settings.retentionDays) || settings.retentionDays < 7 || settings.retentionDays > 365" @blur="settingsAutosave.flush()" type="number" min="7" max="365" :disabled="busy" /></Field>
               </FieldGroup>
-              <FieldDescription>{{ t('aiSettings.retentionHint') }}</FieldDescription>
             </FieldGroup>
           </section>
           <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/40 bg-background/30 p-3">
@@ -292,7 +298,7 @@ function auditLine(entry: AIAuditEntry) {
                 <p role="alert" class="break-words text-destructive">{{ t('aiSettings.autoSaveFailed', { message: settingsAutosave.error.value }) }}</p>
                 <Button variant="outline" size="sm" data-ai-policy-retry @click="settingsAutosave.flush()">{{ t('aiSettings.retry') }}</Button>
               </template>
-              <p v-else role="status" class="text-muted-foreground">{{ settingsAutosave.saving.value || settingsAutosave.dirty.value ? t('common.saving') : settingsAutosave.saved.value ? t('settings.autoPersistSaved') : t('aiSettings.autoSaveHint') }}</p>
+              <p v-else-if="settingsAutosave.saving.value || settingsAutosave.dirty.value || settingsAutosave.saved.value" role="status" class="text-muted-foreground">{{ settingsAutosave.saving.value || settingsAutosave.dirty.value ? t('common.saving') : t('settings.autoPersistSaved') }}</p>
             </div>
             <Button variant="outline" size="sm" :disabled="busy" data-ai-cleanup @click="cleanup">{{ t('aiSettings.cleanup') }}</Button>
           </div>
@@ -310,7 +316,10 @@ function auditLine(entry: AIAuditEntry) {
               <Field><FieldLabel for="ai-key">{{ t('settings.experimentalApiKey') }}</FieldLabel><Input id="ai-key" v-model="apiKey" @blur="providerAutosave.flush()" type="password" autocomplete="new-password" :disabled="busy" /></Field>
               <Field><FieldLabel for="ai-model">{{ t('settings.experimentalModel') }}</FieldLabel><Input id="ai-model" v-model="model" @blur="providerAutosave.flush()" autocomplete="off" :disabled="busy" /></Field>
               <Field :data-invalid="!validContext || undefined">
-                <FieldLabel for="ai-context-window">{{ t('aiSettings.contextWindow') }}</FieldLabel>
+                <SettingsHint :text="t('aiSettings.contextHint')">
+                  <FieldLabel for="ai-context-window">{{ t('aiSettings.contextWindow') }}</FieldLabel>
+                  <template #extra><a v-if="selectedContextPreset" :href="selectedContextPreset.source" target="_blank" rel="noopener noreferrer" class="underline underline-offset-4">{{ t('aiSettings.contextSource') }}</a></template>
+                </SettingsHint>
                 <Input id="ai-context-window" v-model="contextWindow" type="number" inputmode="numeric" :min="MIN_AI_CONTEXT_WINDOW" :max="MAX_AI_CONTEXT_WINDOW" :step="1" :disabled="busy" :aria-invalid="!validContext" :aria-describedby="validContext ? 'ai-context-help' : 'ai-context-help ai-context-validation'" @blur="providerAutosave.flush()" />
               </Field>
               <Field>
@@ -323,27 +332,28 @@ function auditLine(entry: AIAuditEntry) {
                   </SelectGroup></SelectContent>
                 </Select>
               </Field>
-              <FieldDescription id="ai-context-help" class="md:col-span-2">
-                {{ t('aiSettings.contextHint') }}
-                <a v-if="selectedContextPreset" :href="selectedContextPreset.source" target="_blank" rel="noopener noreferrer" class="underline underline-offset-4">{{ t('aiSettings.contextSource') }}</a>
-              </FieldDescription>
+              <span id="ai-context-help" class="sr-only">{{ t('aiSettings.contextHint') }}</span>
               <p v-if="!validContext" id="ai-context-validation" role="alert" class="text-sm text-destructive md:col-span-2">{{ t('aiSettings.contextInvalid', { min: MIN_AI_CONTEXT_WINDOW.toLocaleString(locale), max: MAX_AI_CONTEXT_WINDOW.toLocaleString(locale) }) }}</p>
             </FieldGroup>
           </section>
-          <div class="flex min-h-8 min-w-0 flex-wrap items-center gap-2 text-xs" data-ai-provider-save-status>
+          <div v-if="!validContext || providerAutosave.error.value || providerAutosave.saving.value || providerAutosave.dirty.value || providerAutosave.saved.value" class="flex min-h-8 min-w-0 flex-wrap items-center gap-2 text-xs" data-ai-provider-save-status>
             <p v-if="!validContext" role="status" class="text-destructive">{{ t('aiSettings.contextNotSaved') }}</p>
             <template v-else-if="providerAutosave.error.value">
               <p role="alert" class="break-words text-destructive">{{ t('aiSettings.autoSaveFailed', { message: providerAutosave.error.value }) }}</p>
               <Button variant="outline" size="sm" data-ai-provider-retry @click="providerAutosave.flush()">{{ t('aiSettings.retry') }}</Button>
             </template>
-            <p v-else role="status" class="text-muted-foreground">{{ providerAutosave.saving.value || providerAutosave.dirty.value ? t('common.saving') : providerAutosave.saved.value ? t('settings.autoPersistSaved') : t('aiSettings.autoSaveHint') }}</p>
+            <p v-else-if="providerAutosave.saving.value || providerAutosave.dirty.value || providerAutosave.saved.value" role="status" class="text-muted-foreground">{{ providerAutosave.saving.value || providerAutosave.dirty.value ? t('common.saving') : t('settings.autoPersistSaved') }}</p>
           </div>
-          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><FieldDescription>{{ t('aiSettings.providerHint') }}</FieldDescription><div class="flex shrink-0 flex-wrap gap-2"><Button variant="outline" size="sm" :disabled="busy" data-ai-provider-test @click="testProvider">{{ testingProvider ? t('settings.experimentalTestTesting') : t('settings.experimentalTest') }}</Button></div></div><p v-if="providerTestResult" :role="providerTestResult.ok ? 'status' : 'alert'" aria-live="polite" :class="['rounded-md border px-3 py-2 text-sm', providerTestResult.ok ? 'border-success/30 bg-success/10 text-success' : 'border-destructive/30 bg-destructive/10 text-destructive']" :data-status="providerTestResult.ok ? 'success' : 'failed'" data-ai-provider-test-result>{{ providerTestResult.text }}</p></div>
+          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div class="flex shrink-0 flex-wrap gap-2"><SettingsHint :text="[t('aiSettings.providerHint'), t('aiSettings.autoSaveHint')].join('\n\n')">
+                  <Button variant="outline" size="sm" :disabled="busy" data-ai-provider-test @click="testProvider">{{ testingProvider ? t('settings.experimentalTestTesting') : t('settings.experimentalTest') }}</Button>
+                </SettingsHint></div></div><p v-if="providerTestResult" :role="providerTestResult.ok ? 'status' : 'alert'" aria-live="polite" :class="['rounded-md border px-3 py-2 text-sm', providerTestResult.ok ? 'border-success/30 bg-success/10 text-success' : 'border-destructive/30 bg-destructive/10 text-destructive']" :data-status="providerTestResult.ok ? 'success' : 'failed'" data-ai-provider-test-result>{{ providerTestResult.text }}</p></div>
         </CardContent>
       </Card>
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-statistics-card>
         <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0"><span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><BarChart3 class="size-4" /></span><CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
-            <span>{{ t('aiSettings.statistics') }}</span>
+            <SettingsHint :text="t('aiSettings.usageHint')">
+              <span>{{ t('aiSettings.statistics') }}</span>
+            </SettingsHint>
             <SettingsScopeBadge scope="server" />
           </CardTitle></CardHeader>
         <CardContent class="flex min-w-0 flex-col gap-4">
@@ -367,7 +377,6 @@ function auditLine(entry: AIAuditEntry) {
             <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.firstText') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ duration(summary.avgFirstTextMs) }}</dd></div>
             <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.duration') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ duration(summary.avgDurationMs) }}</dd></div>
           </dl>
-          <p class="rounded-lg border border-border/40 bg-background/30 p-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t('aiSettings.usageHint') }}</p>
           <section class="flex min-w-0 flex-col gap-3" :aria-busy="paging === 'runs'" data-ai-settings-block="recent-runs">
             <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.recentRuns') }}</h3>
             <p v-if="pageError?.kind === 'runs'" role="alert" class="text-sm text-destructive">{{ pageError.message }}</p>
@@ -382,9 +391,10 @@ function auditLine(entry: AIAuditEntry) {
             <div v-if="report && report.total > report.limit" class="flex flex-wrap items-center justify-end gap-2"><span class="mr-auto text-xs text-muted-foreground">{{ offset + 1 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}</span><Button variant="outline" size="sm" :disabled="loading || offset === 0" @click="page('runs', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || offset + RUNS_PAGE_SIZE >= report.total" @click="page('runs', 1)">{{ t('aiSettings.next') }}</Button></div>
           </section>
           <section class="flex min-w-0 flex-col gap-3" :aria-busy="paging === 'audit'" data-ai-settings-block="audit">
-            <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.audit') }}</h3>
+            <SettingsHint :text="t('aiSettings.auditHint')">
+              <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.audit') }}</h3>
+            </SettingsHint>
             <p v-if="pageError?.kind === 'audit'" role="alert" class="text-sm text-destructive">{{ pageError.message }}</p>
-            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t('aiSettings.auditHint') }}</p>
             <p v-if="audit && !audit.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
             <ul ref="auditList" class="flex min-w-0 flex-col gap-1.5" :style="{ minHeight: auditMinHeight ? `${auditMinHeight}px` : undefined }"><li v-for="entry in audit?.items ?? []" :key="entry.id" :title="auditLine(entry)" class="flex min-h-9 min-w-0 items-center gap-2 rounded-lg border border-border/50 bg-muted/5 px-3 py-1.5" :data-ai-audit-row="entry.id" :data-status="entry.result"><span class="min-w-0 flex-1 truncate text-sm font-medium">{{ toolLabel(entry.tool) }}</span><span class="hidden min-w-0 truncate text-xs text-muted-foreground md:block">{{ time(entry.createdAt) }} · {{ entry.permission }} · {{ duration(entry.durationMs) }}<template v-if="entry.errorCode"> · {{ entry.errorCode }}</template></span><Badge :variant="auditStatusTone(entry.result)">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge></li></ul>
             <div v-if="audit && audit.total > audit.limit" class="flex flex-wrap justify-end gap-2"><Button variant="outline" size="sm" :disabled="loading || auditOffset === 0" @click="page('audit', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || auditOffset + AUDIT_PAGE_SIZE >= audit.total" @click="page('audit', 1)">{{ t('aiSettings.next') }}</Button></div>

@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { ref } from "vue"
 import { Plug } from "lucide-vue-next"
 import { useI18n } from "vue-i18n"
 import { useLibraryService } from "@/services/library-service"
 import { Switch } from "@/components/ui/switch"
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 
 const { t } = useI18n()
@@ -53,15 +54,12 @@ async function save(enabled: boolean) {
           :aria-busy="busy"
         >
           <FieldContent class="min-w-0 gap-3">
-            <FieldLabel for="browser-plugin-enabled" class="text-sm font-semibold text-foreground">
-              {{ t('wishlist.pluginEnabled') }}
-            </FieldLabel>
-            <FieldDescription
-              id="browser-plugin-description"
-              class="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm group-has-[[data-orientation=horizontal]]/field:text-pretty nth-last-2:mt-0"
-            >
-              {{ t('wishlist.pluginEnabledHint') }}
-            </FieldDescription>
+            <SettingsHint :text="t('wishlist.pluginEnabledHint')">
+              <FieldLabel for="browser-plugin-enabled" class="text-sm font-semibold text-foreground">
+                {{ t('wishlist.pluginEnabled') }}
+              </FieldLabel>
+            </SettingsHint>
+            <span id="browser-plugin-description" class="sr-only">{{ t('wishlist.pluginEnabledHint') }}</span>
             <p v-if="busy" role="status" class="text-xs text-muted-foreground motion-safe:animate-pulse">
               {{ t('common.saving') }}
             </p>

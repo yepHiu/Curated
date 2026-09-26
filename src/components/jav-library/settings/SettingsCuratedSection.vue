@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
+import { statusTextClass } from "@/lib/ui/status-tone"
+import { cn } from "@/lib/utils"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { useI18n } from "vue-i18n"
 import { FolderOpen, ImageDown, Info } from "lucide-vue-next"
@@ -27,11 +30,6 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from "reka-ui"
-import {
-  statusPanelClass,
-  statusTextClass,
-} from "@/lib/ui/status-tone"
-import { cn } from "@/lib/utils"
 import SettingsCuratedShortcutSection from "./SettingsCuratedShortcutSection.vue"
 
 defineProps<{
@@ -75,33 +73,25 @@ const { t } = useI18n()
           >
             <ImageDown class="size-[1.15rem]" />
           </span>
-          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
-            <span>{{ t("settings.curatedCardTitle") }}</span>
-            <SettingsScopeBadge scope="mixed" />
-          </CardTitle>
-          <div class="col-start-2 flex flex-col gap-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm">
-            <p>
-              {{ t("settings.curatedCardDescShort") }}
-            </p>
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="font-normal text-muted-foreground">{{
-                t("settings.curatedCardHow")
-              }}</span>
-              <kbd
-                class="pointer-events-none inline-flex h-7 min-w-7 select-none items-center justify-center rounded-lg border border-border bg-muted px-2 font-mono text-xs font-semibold text-foreground shadow-sm"
+          <SettingsHint :text="t('settings.curatedCardDescShort')">
+            <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+              <span>{{ t("settings.curatedCardTitle") }}</span>
+              <SettingsScopeBadge scope="mixed" />
+            </CardTitle>
+            <template #extra>
+              <p class="mt-2">{{ t('settings.curatedCardHow') }} {{ captureShortcutLabel }} {{ t('settings.curatedCardOr') }} {{ t('player.curatedLabel') }}</p>
+              <p class="mt-2">{{ t('settings.curatedCorsNote') }}</p>
+              <a
+                class="mt-2 inline-flex font-medium text-primary underline-offset-4 hover:underline"
+                href="https://developer.mozilla.org/en-US/docs/Web/HTML/Cross-origin_images_and_canvas"
+                target="_blank"
+                rel="noopener noreferrer"
+                :aria-label="t('settings.curatedCorsLearnAria')"
               >
-                {{ captureShortcutLabel }}
-              </kbd>
-              <span class="font-normal text-muted-foreground">{{
-                t("settings.curatedCardOr")
-              }}</span>
-              <span
-                class="inline-flex items-center rounded-lg border border-border/80 bg-background px-2.5 py-1 text-xs font-semibold tracking-wide text-foreground shadow-xs"
-              >
-                {{ t("player.curatedLabel") }}
-              </span>
-            </div>
-          </div>
+                {{ t('settings.curatedCorsLearnMore') }}
+              </a>
+            </template>
+          </SettingsHint>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
           <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
@@ -147,10 +137,9 @@ const { t } = useI18n()
                 @change="emit('update:curatedSaveMode', 'app')"
               />
               <span class="min-w-0 flex-1">
-                <span class="text-sm font-medium">{{ t("settings.curatedApp") }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.curatedAppHint") }}
-                </span>
+                <SettingsHint :text="t('settings.curatedAppHint')">
+                  <span class="text-sm font-medium">{{ t("settings.curatedApp") }}</span>
+                </SettingsHint>
               </span>
             </label>
             <label
@@ -165,10 +154,9 @@ const { t } = useI18n()
                 @change="emit('update:curatedSaveMode', 'download')"
               />
               <span class="min-w-0 flex-1">
-                <span class="text-sm font-medium">{{ t("settings.curatedDownload") }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.curatedDownloadHint") }}
-                </span>
+                <SettingsHint :text="t('settings.curatedDownloadHint')">
+                  <span class="text-sm font-medium">{{ t("settings.curatedDownload") }}</span>
+                </SettingsHint>
               </span>
             </label>
             <label
@@ -184,10 +172,9 @@ const { t } = useI18n()
                 @change="emit('update:curatedSaveMode', 'directory')"
               />
               <span class="min-w-0 flex-1">
-                <span class="text-sm font-medium">{{ t("settings.curatedDir") }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.curatedDirHint") }}
-                </span>
+                <SettingsHint :text="t('settings.curatedDirHint')">
+                  <span class="text-sm font-medium">{{ t("settings.curatedDir") }}</span>
+                </SettingsHint>
                 <span
                   v-if="!directorySupported"
                   :class="cn('mt-1 block text-xs', statusTextClass('warning'))"
@@ -353,19 +340,18 @@ const { t } = useI18n()
               v-if="curatedExportDirLabel"
               class="flex flex-col gap-3 rounded-xl border border-dashed border-border/60 bg-background/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
             >
-              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {{ t("settings.curatedReauthorizeHelp") }}
-              </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                class="h-8 shrink-0 rounded-xl px-3 text-xs font-medium"
-                :disabled="curatedExportPickBusy"
-                @click="emit('pickExportDirectory')"
-              >
-                {{ t("settings.curatedReauthorizeExport") }}
-              </Button>
+              <SettingsHint :text="t('settings.curatedReauthorizeHelp')">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  class="h-8 shrink-0 rounded-xl px-3 text-xs font-medium"
+                  :disabled="curatedExportPickBusy"
+                  @click="emit('pickExportDirectory')"
+                >
+                  {{ t("settings.curatedReauthorizeExport") }}
+                </Button>
+              </SettingsHint>
             </div>
           </div>
 
@@ -376,26 +362,6 @@ const { t } = useI18n()
             {{ curatedExportFormatError }}
           </p>
 
-          <div
-            :class="statusPanelClass('info')"
-            role="note"
-          >
-            <p :class="cn('text-sm font-medium', statusTextClass('info'))">
-              {{ t("settings.curatedCorsTitle") }}
-            </p>
-            <p class="mt-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ t("settings.curatedCorsNote") }}
-            </p>
-            <a
-              class="mt-2 inline-flex text-xs font-medium text-primary underline-offset-4 hover:underline"
-              href="https://developer.mozilla.org/en-US/docs/Web/HTML/Cross-origin_images_and_canvas"
-              target="_blank"
-              rel="noopener noreferrer"
-              :aria-label="t('settings.curatedCorsLearnAria')"
-            >
-              {{ t("settings.curatedCorsLearnMore") }}
-            </a>
-          </div>
         </CardContent>
       </Card>
     </div>

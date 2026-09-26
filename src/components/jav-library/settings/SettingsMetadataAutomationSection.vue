@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import { useI18n } from "vue-i18n"
 import { RefreshCw } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
@@ -34,10 +35,9 @@ const { t } = useI18n()
   >
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex min-w-0 flex-1 flex-col gap-2">
-        <p class="text-sm font-semibold text-foreground">{{ t("settings.providerHealthTitle") }}</p>
-        <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-          {{ t("settings.providerHealthHint") }}
-        </p>
+        <SettingsHint :text="t('settings.providerHealthHint')">
+          <p class="text-sm font-semibold text-foreground">{{ t("settings.providerHealthTitle") }}</p>
+        </SettingsHint>
       </div>
       <Button
         type="button"
@@ -81,12 +81,11 @@ const { t } = useI18n()
     :aria-busy="autoLibraryWatchSaving"
   >
     <div class="flex min-w-0 flex-1 flex-col gap-3">
-      <p class="text-sm font-semibold text-foreground">{{
-        t("settings.autoScrape")
-      }}</p>
-      <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-        {{ t("settings.autoScrapeHint") }}
-      </p>
+      <SettingsHint :text="t('settings.autoScrapeHint')">
+        <p class="text-sm font-semibold text-foreground">
+          {{ t("settings.autoScrape") }}
+        </p>
+      </SettingsHint>
       <p
         v-if="autoLibraryWatchSaving"
         class="text-xs text-muted-foreground motion-safe:animate-pulse"
@@ -109,12 +108,11 @@ const { t } = useI18n()
     :aria-busy="autoActorProfileScrapeSaving"
   >
     <div class="flex min-w-0 flex-1 flex-col gap-3">
-      <p class="text-sm font-semibold text-foreground">{{
-        t("settings.autoActorProfileScrape")
-      }}</p>
-      <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-        {{ t("settings.autoActorProfileScrapeHint") }}
-      </p>
+      <SettingsHint :text="t('settings.autoActorProfileScrapeHint')">
+        <p class="text-sm font-semibold text-foreground">
+          {{ t("settings.autoActorProfileScrape") }}
+        </p>
+      </SettingsHint>
       <p
         v-if="autoActorProfileScrapeSaving"
         class="text-xs text-muted-foreground motion-safe:animate-pulse"

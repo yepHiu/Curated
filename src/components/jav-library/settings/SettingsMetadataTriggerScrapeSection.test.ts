@@ -33,7 +33,8 @@ describe("SettingsMetadataTriggerScrapeSection", () => {
     })
 
     expect(wrapper.text()).toContain("settings.triggerScrape")
-    expect(wrapper.text()).toContain("settings.triggerScrapeHint")
+    expect(wrapper.text()).not.toContain("settings.triggerScrapeHint")
+    expect(wrapper.findAllComponents({ name: "SettingsHint" }).some(hint => hint.props("text") === "settings.triggerScrapeHint")).toBe(true)
     expect(wrapper.text()).toContain("settings.triggerScrapeRunButton")
 
     await wrapper.get("[data-trigger-scrape-run]").trigger("click")

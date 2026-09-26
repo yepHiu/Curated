@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import { useI18n } from "vue-i18n"
 import { Activity, GripVertical, Loader2, Plus, Save, X } from "lucide-vue-next"
 import type { ProviderHealthDTO, ProviderHealthStatus } from "@/api/types"
@@ -83,12 +84,11 @@ function onProviderToAddChange(value: unknown) {
       {{ t("settings.metadataMovieProviderChainNoList") }}
     </p>
     <div class="flex min-w-0 flex-1 flex-col gap-3 text-left">
-      <p class="text-sm font-semibold text-foreground">
-        {{ t("settings.metadataMovieProviderChainLabel") }}
-      </p>
-      <p class="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm">
-        {{ t("settings.metadataMovieProviderChainHelp") }}
-      </p>
+      <SettingsHint :text="t('settings.metadataMovieProviderChainHelp')">
+        <p class="text-sm font-semibold text-foreground">
+          {{ t("settings.metadataMovieProviderChainLabel") }}
+        </p>
+      </SettingsHint>
     </div>
 
     <div class="flex flex-col gap-3">

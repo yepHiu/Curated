@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { ref } from "vue"
 import { useI18n } from "vue-i18n"
@@ -53,15 +54,14 @@ async function refreshHomepageRecommendations() {
         <CalendarDays class="size-[1.15rem]" />
       </span>
       <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
-        <span>{{ t("settings.aboutHomepageRefreshTitle") }}</span>
+        <SettingsHint :text="t('settings.aboutHomepageRefreshBody')">
+          <span>{{ t("settings.aboutHomepageRefreshTitle") }}</span>
+        </SettingsHint>
         <SettingsScopeBadge scope="server" />
       </CardTitle>
     </CardHeader>
     <CardContent class="pt-0">
       <div class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <p class="min-w-0 text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
-          {{ t("settings.aboutHomepageRefreshBody") }}
-        </p>
 
         <Button
           type="button"

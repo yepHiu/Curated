@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import type { LibraryPathDTO, LibraryPathStorageStatusDTO } from "@/api/types"
@@ -107,9 +108,11 @@ function canRebindStorage(status?: LibraryPathStorageStatusDTO): boolean {
             <p class="break-all font-mono text-sm text-muted-foreground">{{ path.path }}</p>
           </div>
           <div class="flex flex-col gap-3">
-            <label class="text-sm font-medium" :for="`edit-title-${path.id}`">{{
-              t("settings.pathTitleLabel")
-            }}</label>
+            <SettingsHint :text="t('settings.editTitleHint')">
+              <label class="text-sm font-medium" :for="`edit-title-${path.id}`">
+                {{ t("settings.pathTitleLabel") }}
+              </label>
+            </SettingsHint>
             <Input
               :id="`edit-title-${path.id}`"
               :model-value="editLibraryTitleDraft"
@@ -119,9 +122,6 @@ function canRebindStorage(status?: LibraryPathStorageStatusDTO): boolean {
               @update:model-value="updateTitleDraft"
               @keydown.enter.prevent="emit('saveTitle', path.id)"
             />
-            <p class="text-xs text-muted-foreground">
-              {{ t("settings.editTitleHint") }}
-            </p>
             <p v-if="editTitleError" class="text-sm text-destructive">
               {{ editTitleError }}
             </p>

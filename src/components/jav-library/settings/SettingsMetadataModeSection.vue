@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import { useI18n } from "vue-i18n"
 
 type MetadataMovieMode = "auto" | "specified" | "chain"
@@ -28,14 +29,11 @@ const { t } = useI18n()
   >
     <legend class="sr-only">{{ t("settings.metadataMovieProviderMode") }}</legend>
     <div class="flex flex-col gap-3">
-      <span class="text-sm font-semibold text-foreground">{{
-        t("settings.metadataMovieProviderMode")
-      }}</span>
-      <p
-        class="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-      >
-        {{ t("settings.metadataMovieProviderModeTooltip") }}
-      </p>
+      <SettingsHint :text="t('settings.metadataMovieProviderModeTooltip')">
+        <span class="text-sm font-semibold text-foreground">
+          {{ t("settings.metadataMovieProviderMode") }}
+        </span>
+      </SettingsHint>
     </div>
     <label
       class="flex cursor-pointer items-center gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
@@ -50,10 +48,9 @@ const { t } = useI18n()
         @change="emit('selectAuto')"
       />
       <span class="min-w-0 flex-1">
-        <span class="text-sm font-medium">{{ t("settings.metadataMovieProviderAuto") }}</span>
-        <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
-          {{ t("settings.metadataMovieProviderAutoHint") }}
-        </span>
+        <SettingsHint :text="t('settings.metadataMovieProviderAutoHint')">
+          <span class="text-sm font-medium">{{ t("settings.metadataMovieProviderAuto") }}</span>
+        </SettingsHint>
       </span>
     </label>
     <label
@@ -74,12 +71,11 @@ const { t } = useI18n()
         @change="emit('selectSpecified')"
       />
       <span class="min-w-0 flex-1">
-        <span class="text-sm font-medium">{{
-          t("settings.metadataMovieProviderSpecified")
-        }}</span>
-        <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
-          {{ t("settings.metadataMovieProviderSpecifiedHint") }}
-        </span>
+        <SettingsHint :text="t('settings.metadataMovieProviderSpecifiedHint')">
+          <span class="text-sm font-medium">
+            {{ t("settings.metadataMovieProviderSpecified") }}
+          </span>
+        </SettingsHint>
       </span>
     </label>
     <label
@@ -100,10 +96,9 @@ const { t } = useI18n()
         @change="emit('selectChain')"
       />
       <span class="min-w-0 flex-1">
-        <span class="text-sm font-medium">{{ t("settings.metadataMovieProviderChain") }}</span>
-        <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
-          {{ t("settings.metadataMovieProviderChainHint") }}
-        </span>
+        <SettingsHint :text="t('settings.metadataMovieProviderChainHint')">
+          <span class="text-sm font-medium">{{ t("settings.metadataMovieProviderChain") }}</span>
+        </SettingsHint>
       </span>
     </label>
   </fieldset>

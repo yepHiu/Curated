@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { Database } from "lucide-vue-next"
@@ -51,23 +52,21 @@ function onPreset(value: unknown) {
     <div class="flex flex-col gap-2">
       <div class="flex items-center gap-2">
         <Database class="size-4 text-primary" aria-hidden="true" />
-        <p class="text-sm font-semibold text-foreground">
-          {{ t("settings.photoCacheTitle") }}
-        </p>
+        <SettingsHint :text="t('settings.photoCacheDesc')">
+          <p class="text-sm font-semibold text-foreground">
+            {{ t("settings.photoCacheTitle") }}
+          </p>
+        </SettingsHint>
       </div>
-      <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-        {{ t("settings.photoCacheDesc") }}
-      </p>
     </div>
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex min-w-0 flex-col gap-1">
-        <p class="text-sm font-medium text-foreground">
-          {{ t("settings.photoCacheLimit") }}
-        </p>
-        <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-          {{ t("settings.photoCacheLimitDesc") }}
-        </p>
+        <SettingsHint :text="t('settings.photoCacheLimitDesc')">
+          <p class="text-sm font-medium text-foreground">
+            {{ t("settings.photoCacheLimit") }}
+          </p>
+        </SettingsHint>
       </div>
       <Select :model-value="modelValue" :disabled="saving" @update:model-value="onPreset">
         <SelectTrigger

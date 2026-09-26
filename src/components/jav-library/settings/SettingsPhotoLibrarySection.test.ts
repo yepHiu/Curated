@@ -179,7 +179,8 @@ describe("SettingsPhotoLibrarySection", () => {
     const wrapper = mount(SettingsPhotoLibrarySection)
 
     expect(wrapper.text()).toContain("settings.photoLibraryTitle")
-    expect(wrapper.text()).toContain("settings.photoLibraryDisabledDesc")
+    expect(wrapper.text()).not.toContain("settings.photoLibraryDisabledDesc")
+    expect(wrapper.findAllComponents({ name: "SettingsHint" }).some(hint => hint.props("text") === "settings.photoLibraryDisabledDesc")).toBe(true)
     expect(wrapper.text()).not.toContain("settings.photoLibraryPathsEmpty")
     expect(wrapper.find("[data-photo-viewer]").exists()).toBe(false)
     expect(wrapper.find("[data-photo-beta-switch]").exists()).toBe(true)

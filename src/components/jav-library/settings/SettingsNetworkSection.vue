@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
@@ -235,10 +236,9 @@ function updateProxyPassword(value: unknown) {
             :aria-busy="proxySaving"
           >
             <div class="min-w-0 flex-1 space-y-1">
-              <p class="text-sm font-semibold text-foreground">{{ t("settings.proxyEnabled") }}</p>
-              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {{ t("settings.proxyEnabledHint") }}
-              </p>
+              <SettingsHint :text="t('settings.proxyEnabledHint')">
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.proxyEnabled") }}</p>
+              </SettingsHint>
             </div>
             <Switch
               class="motion-safe:transition-colors motion-safe:duration-200"

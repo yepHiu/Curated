@@ -91,7 +91,8 @@ describe("SettingsConnectedClientsSection", () => {
     expect(wrapper.text()).toContain("Safari")
     expect(wrapper.text()).toContain("iphone.lan")
     expect(wrapper.text()).toContain("settings.connectedClientsThisDevice")
-    expect(wrapper.text()).toContain("settings.connectedClientsPrivacy")
+    expect(wrapper.text()).not.toContain("settings.connectedClientsPrivacy")
+    expect(wrapper.findAllComponents({ name: "SettingsHint" }).some(hint => hint.props("text").includes("settings.connectedClientsPrivacy"))).toBe(true)
     expect(wrapper.text()).not.toContain("MAC")
 
     await wrapper.get("button").trigger("click")

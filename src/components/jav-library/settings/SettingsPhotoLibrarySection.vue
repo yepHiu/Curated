@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
@@ -12,7 +13,6 @@ import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -244,16 +244,13 @@ async function patchCache(maxBytes: number) {
         >
           <Images class="size-4" />
         </span>
-        <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
-          <span>{{ t("settings.photoLibraryTitle") }}</span>
-          <SettingsScopeBadge scope="server" />
-          <Badge variant="secondary">Beta</Badge>
-        </CardTitle>
-        <CardDescription
-          class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-        >
-          {{ t("settings.photoLibraryDesc") }}
-        </CardDescription>
+        <SettingsHint :text="t('settings.photoLibraryDesc')">
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.photoLibraryTitle") }}</span>
+            <SettingsScopeBadge scope="server" />
+            <Badge variant="secondary">Beta</Badge>
+          </CardTitle>
+        </SettingsHint>
       </CardHeader>
 
       <CardContent class="flex flex-col gap-3 pt-0">
@@ -262,20 +259,11 @@ async function patchCache(maxBytes: number) {
           :aria-busy="enableBusy"
         >
           <div class="flex min-w-0 flex-col gap-1">
-            <p class="text-sm font-semibold text-foreground">
-              {{
-                photoLibraryEnabled
-                  ? t("settings.photoLibraryEnabledTitle")
-                  : t("settings.photoLibraryDisabledTitle")
-              }}
-            </p>
-            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{
-                photoLibraryEnabled
-                  ? t("settings.photoLibraryEnabledDesc")
-                  : t("settings.photoLibraryDisabledDesc")
-              }}
-            </p>
+            <SettingsHint :text="photoLibraryEnabled ? t('settings.photoLibraryEnabledDesc') : t('settings.photoLibraryDisabledDesc')">
+              <p class="text-sm font-semibold text-foreground">
+                {{ photoLibraryEnabled ? t("settings.photoLibraryEnabledTitle") : t("settings.photoLibraryDisabledTitle") }}
+              </p>
+            </SettingsHint>
             <p
               v-if="enableBusy"
               class="text-xs text-muted-foreground motion-safe:animate-pulse"
@@ -324,12 +312,11 @@ async function patchCache(maxBytes: number) {
             :aria-busy="autoWatchBusy"
           >
             <div class="flex min-w-0 flex-col gap-1">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.photoAutoWatchTitle") }}
-              </p>
-              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {{ t("settings.photoAutoWatchDesc") }}
-              </p>
+              <SettingsHint :text="t('settings.photoAutoWatchDesc')">
+                <p class="text-sm font-semibold text-foreground">
+                  {{ t("settings.photoAutoWatchTitle") }}
+                </p>
+              </SettingsHint>
               <p
                 v-if="autoWatchBusy"
                 class="text-xs text-muted-foreground motion-safe:animate-pulse"

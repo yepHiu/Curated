@@ -71,7 +71,8 @@ describe("SettingsMetadataProviderChainSection", () => {
     })
 
     expect(wrapper.text()).toContain("settings.metadataMovieProviderChainLabel")
-    expect(wrapper.text()).toContain("settings.metadataMovieProviderChainHelp")
+    expect(wrapper.text()).not.toContain("settings.metadataMovieProviderChainHelp")
+    expect(wrapper.findAllComponents({ name: "SettingsHint" }).some(hint => hint.props("text") === "settings.metadataMovieProviderChainHelp")).toBe(true)
     expect(wrapper.text()).toContain("javbus")
     expect(wrapper.text()).toContain("javdb")
     expect(wrapper.text()).toContain("123ms")

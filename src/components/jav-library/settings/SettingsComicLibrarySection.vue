@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
@@ -17,7 +18,6 @@ import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -262,16 +262,13 @@ async function cleanupCache() {
         >
           <BookOpen class="size-4" />
         </span>
-        <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
-          <span>{{ t("settings.comicLibraryTitle") }}</span>
-          <SettingsScopeBadge scope="server" />
-          <Badge variant="secondary">Beta</Badge>
-        </CardTitle>
-        <CardDescription
-          class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-        >
-          {{ t("settings.comicLibraryDesc") }}
-        </CardDescription>
+        <SettingsHint :text="t('settings.comicLibraryDesc')">
+          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
+            <span>{{ t("settings.comicLibraryTitle") }}</span>
+            <SettingsScopeBadge scope="server" />
+            <Badge variant="secondary">Beta</Badge>
+          </CardTitle>
+        </SettingsHint>
       </CardHeader>
 
       <CardContent class="flex flex-col gap-3 pt-0">
@@ -280,20 +277,11 @@ async function cleanupCache() {
           :aria-busy="enableBusy"
         >
           <div class="flex min-w-0 flex-col gap-1">
-            <p class="text-sm font-semibold text-foreground">
-              {{
-                comicLibraryEnabled
-                  ? t("settings.comicLibraryEnabledTitle")
-                  : t("settings.comicLibraryDisabledTitle")
-              }}
-            </p>
-            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{
-                comicLibraryEnabled
-                  ? t("settings.comicLibraryEnabledDesc")
-                  : t("settings.comicLibraryDisabledDesc")
-              }}
-            </p>
+            <SettingsHint :text="comicLibraryEnabled ? t('settings.comicLibraryEnabledDesc') : t('settings.comicLibraryDisabledDesc')">
+              <p class="text-sm font-semibold text-foreground">
+                {{ comicLibraryEnabled ? t("settings.comicLibraryEnabledTitle") : t("settings.comicLibraryDisabledTitle") }}
+              </p>
+            </SettingsHint>
             <p
               v-if="enableBusy"
               class="text-xs text-muted-foreground motion-safe:animate-pulse"
@@ -342,12 +330,11 @@ async function cleanupCache() {
             :aria-busy="autoWatchBusy"
           >
             <div class="flex min-w-0 flex-col gap-1">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.comicAutoWatchTitle") }}
-              </p>
-              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {{ t("settings.comicAutoWatchDesc") }}
-              </p>
+              <SettingsHint :text="t('settings.comicAutoWatchDesc')">
+                <p class="text-sm font-semibold text-foreground">
+                  {{ t("settings.comicAutoWatchTitle") }}
+                </p>
+              </SettingsHint>
               <p
                 v-if="autoWatchBusy"
                 class="text-xs text-muted-foreground motion-safe:animate-pulse"
