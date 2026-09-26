@@ -37,11 +37,11 @@ HTTP health 新增请求级 `canManageLibraryPaths`（no-store）。三库设置
 
 ## 2026-09-26 Server 产品版本与构建时间戳
 
-`GET /api/health` / stdio `system.health` 的 `version` 为 Server 三段数字版本（当前 1.5.7），新增 `buildStamp` 单独保留 UTC 构建戳，`channel` 与 legacy `installerVersion` 保持独立。关于页显示版本、开发版标签和构建时间戳，侧栏显示产品版本。唯一 Server 版本源为 `backend/internal/version/server.json`，由 Go embed，发行命名工具也读取同一文件；Desktop 仍从 `scripts/release/versions/desktop.json` 读取 0.1.0。BuildStamp 仍由正式打包注入，直接 Go 构建未注入时回退 Git 提交时间或 revision/unknown。详情见版本计划 §11.6。
+`GET /api/health` / stdio `system.health` 的 `version` 为 Server 三段数字版本（当前 1.5.8），新增 `buildStamp` 单独保留 UTC 构建戳，`channel` 与 legacy `installerVersion` 保持独立。关于页显示版本、开发版标签和构建时间戳，侧栏显示产品版本。唯一 Server 版本源为 `backend/internal/version/server.json`，由 Go embed，发行命名工具也读取同一文件；Desktop 仍从 `scripts/release/versions/desktop.json` 读取 0.1.0。BuildStamp 仍由正式打包注入，直接 Go 构建未注入时回退 Git 提交时间或 revision/unknown。详情见版本计划 §11.6。
 
 ## 2026-09-26 Desktop 组件版本与检查入口
 
-Desktop/Full 版本源位于 `scripts/release/versions/`，Server 位于 `backend/internal/version/server.json`：Desktop 0.1.0、Server 1.5.7、Full 1.6.0（开发目标，不代表已发布）。`release_cli.py plan-component` 只读生成新包名和 tag；现有 `release:publish` 仍为旧一体包。Electron 构建生成本地 `desktop-release.json`，preload 新增 `getDesktopInfo()` / `checkDesktopUpdate()`，主进程验证当前主窗口 frame 与 renderer origin；关于页并列显示 Desktop/Server；Desktop 显示数字版本、独立开发版标签和构建时生成的 UTC `buildStamp`（由本地 metadata 经 getDesktopInfo 提供），Server 标题仅为 Curated Server；Web 隐藏 Desktop。检查逻辑按组件/平台/架构/通道筛选 HTTPS manifest；当前配置 legacy + 无 feed，开发版不请求正式更新、一体包仍随原安装器更新。Desktop 自动下载安装、独立三包构建与安装身份迁移未实现。详情见版本计划 §11.5。
+Desktop/Full 版本源位于 `scripts/release/versions/`，Server 位于 `backend/internal/version/server.json`：Desktop 0.1.0、Server 1.5.8、Full 1.6.0（开发目标，不代表已发布）。`release_cli.py plan-component` 只读生成新包名和 tag；现有 `release:publish` 仍为旧一体包。Electron 构建生成本地 `desktop-release.json`，preload 新增 `getDesktopInfo()` / `checkDesktopUpdate()`，主进程验证当前主窗口 frame 与 renderer origin；关于页并列显示 Desktop/Server；Desktop 显示数字版本、独立开发版标签和构建时生成的 UTC `buildStamp`（由本地 metadata 经 getDesktopInfo 提供），Server 标题仅为 Curated Server；Web 隐藏 Desktop。检查逻辑按组件/平台/架构/通道筛选 HTTPS manifest；当前配置 legacy + 无 feed，开发版不请求正式更新、一体包仍随原安装器更新。Desktop 自动下载安装、独立三包构建与安装身份迁移未实现。详情见版本计划 §11.5。
 
 ## 2026-09-21 Agent 上下文连续性
 

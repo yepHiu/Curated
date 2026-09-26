@@ -502,7 +502,7 @@ Restart Server and Desktop after updating their code to enable the new capabilit
 
 ### Server version and build timestamp
 
-`GET /api/health` and stdio `system.health` now return `version: "1.5.7"` (independent Server SemVer), `buildStamp: "YYYYMMDD.HHMMSS"` (UTC), and `channel` separately. About shows the numeric Server version, a separate development badge, and the timestamp below it. The sidebar uses the product version; logs and export metadata retain both identities. `installerVersion` remains the legacy installer version used by its updater.
+`GET /api/health` and stdio `system.health` now return `version: "1.5.8"` (independent Server SemVer), `buildStamp: "YYYYMMDD.HHMMSS"` (UTC), and `channel` separately. About shows the numeric Server version, a separate development badge, and the timestamp below it. The sidebar uses the product version; logs and export metadata retain both identities. `installerVersion` remains the legacy installer version used by its updater.
 
 The Server version source is `backend/internal/version/server.json`, moved from `scripts/release/versions/server.json` so Go can embed the same source during ordinary `go run` / `go build`. The component release planner reads this same file; there is no generated duplicate. Desktop remains `scripts/release/versions/desktop.json` at `0.1.0`. Bump each component only for its own releases.
 

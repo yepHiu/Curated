@@ -35,7 +35,7 @@ alwaysApply: true
 
 ## Server 版本
 
-health 的 `version` 为数字 SemVer（当前 1.5.7），`buildStamp` 单独保留构建时间戳；关于页分开展示。Server 源为 `backend/internal/version/server.json`，Desktop 源为 `scripts/release/versions/desktop.json`（0.1.0）。
+health 的 `version` 为数字 SemVer（当前 1.5.8），`buildStamp` 单独保留构建时间戳；关于页分开展示。Server 源为 `backend/internal/version/server.json`，Desktop 源为 `scripts/release/versions/desktop.json`（0.1.0）。
 
 ## 配置与持久化
 
