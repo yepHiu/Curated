@@ -1,4 +1,10 @@
 {
+  "mediaEmpty": {
+    "title": "Nothing here yet",
+    "description": "Make room for the things you love.",
+    "noResultsTitle": "No matching content",
+    "noResultsDescription": "Try another keyword or adjust your filters."
+  },
   "wishlist": {
     "playback": {
       "title": "Watch online",
@@ -36,7 +42,7 @@
     "reload": "Reload",
     "retry": "Retry metadata",
     "empty": "No titles here yet",
-    "emptyHint": "Choose Add to wishlist in the browser plugin. Curated will fetch metadata and images.",
+    "emptyHint": "Save movies you want to watch and look forward to what’s next.",
     "mockHint": "Plugin intake and scraping require a real Curated backend.",
     "total": "{count} titles",
     "firstPage": "First page",
@@ -170,11 +176,12 @@
     "aiReadoutEmpty": "There is no watch data to interpret in this range"
   },
   "actors": {
+    "emptyDescription": "Add movies to discover the actors in your collection.",
     "detailEyebrow": "Actor",
     "detailSubtitle": "Profile and titles from your library.",
     "detailMovieSection": "Movies",
     "detailEmptyTitle": "No movies for this actor",
-    "detailEmptyDesc": "Titles linked to this actor will appear here.",
+    "detailEmptyDesc": "Movies in your collection featuring this actor will appear here.",
     "title": "Actors",
     "subtitle": "Browse by actor and quickly find related titles.",
     "searchLabel": "Search name",
@@ -497,7 +504,7 @@
   },
   "history": {
     "title": "Watch history",
-    "empty": "No entries yet. Watch for a moment in the player and they will appear here.",
+    "empty": "Start watching and find your viewing history here.",
     "goLibrary": "Go to library",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -525,8 +532,8 @@
   "home": {
     "heroEyebrow": "Daily Spotlight",
     "heroFallbackSummary": "A cinematic rotation assembled from your library for tonight.",
-    "emptyTitle": "Your portal is waiting for its first films",
-    "emptyBody": "Import titles into Curated and this homepage will start building daily hero picks, recent arrivals, resume rows, and taste-based recommendations.",
+    "emptyTitle": "Nothing here yet",
+    "emptyBody": "Add your first movie and make this collection your own.",
     "heroProgressLabel": "Today's 8 picks",
     "heroDetailsAction": "Open details",
     "heroPlayAction": "Play now",
@@ -578,7 +585,7 @@
     "title": "Curated Frame",
     "pageSummary": "Showing {shown} of {total}",
     "loadMore": "Load more",
-    "empty": "No curated frames yet. Capture some from the player.",
+    "empty": "Capture a moment while watching and revisit it here.",
     "tabTimeline": "By capture time",
     "tabActors": "By actor",
     "tabMovies": "By movie",
@@ -700,6 +707,9 @@
     "curatedFramesCount": "Curated frames"
   },
   "library": {
+    "recentEmptyDescription": "New additions to your collection will appear here.",
+    "favoritesEmptyDescription": "Favorite a movie you love and find it here.",
+    "emptyDescription": "Add your first movie to start your collection.",
     "backToTop": "Back to top",
     "clearFilter": "Clear filter",
     "filterActive": "Filter:",
@@ -707,7 +717,7 @@
     "tabNew": "Release date",
     "tabTop": "Rating",
     "trashEmptyTitle": "Trash is empty",
-    "trashEmptyDesc": "Titles you move to trash from the library appear here. You can restore them or delete permanently.",
+    "trashEmptyDesc": "Movies you move to the trash will appear here.",
     "loadFailed": "Failed to load the library. Ensure the backend is running and try again.",
     "favoriteToggleFailed": "Failed to update favorite. Try again later.",
     "ariaFilterTag": "Filter by tag {tag}, {count} movies",
@@ -2155,7 +2165,7 @@
     "batchTagSummary": "Comic tag \"{tag}\": {ok} succeeded, {fail} failed",
     "batchDeleteSummary": "Delete comics: {ok} succeeded, {fail} failed",
     "emptyTitle": "No comics found",
-    "emptyDesc": "Import or scan zip/cbz comics, then they will appear here.",
+    "emptyDesc": "Add a comic you love and keep your next story here.",
     "clearSearch": "Clear search",
     "pageCount": "{count} pages",
     "noRating": "NR",
@@ -2237,7 +2247,7 @@
     "sortByFileName": "Filename",
     "sortByFavorite": "Favorites",
     "emptyTitle": "No photo books yet",
-    "emptyDesc": "After adding photo storage paths, scanned or imported zip/cbz photo books will appear here.",
+    "emptyDesc": "Add a photo book you love and keep those moments close.",
     "clearSearch": "Clear search",
     "pageCount": "{count} pages",
     "noRating": "No rating",

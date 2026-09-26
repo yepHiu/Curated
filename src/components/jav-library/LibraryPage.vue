@@ -10,6 +10,9 @@ import LibrarySavedViewsControls from "@/components/jav-library/LibrarySavedView
 import VirtualMovieMasonry from "@/components/jav-library/VirtualMovieMasonry.vue"
 
 const props = defineProps<{
+  hasConstraints?: boolean
+  loading?: boolean
+  loadError?: string | null
   mode: LibraryMode
   visibleMovies: readonly Movie[]
   batchMode?: boolean
@@ -41,6 +44,12 @@ const { t } = useI18n()
 const activeActorTrimmed = computed(() => props.activeActorFilter?.trim() ?? "")
 const activeStudioTrimmed = computed(() => props.activeStudioFilter?.trim() ?? "")
 
+const emptyDescriptionKey = computed(() => {
+  if (props.mode === "favorites") return "library.favoritesEmptyDescription"
+  if (props.mode === "recent") return "library.recentEmptyDescription"
+  if (props.mode === "trash") return "library.trashEmptyDesc"
+  return "library.emptyDescription"
+})
 const batchModeOn = computed(() => props.batchMode === true)
 const pageTitleKey = computed(() => {
   switch (props.mode) {
@@ -153,14 +162,17 @@ const pageTitleKey = computed(() => {
       </template>
     </div>
 
-    <div class="min-h-0 flex-1">
+    <div v-if="loading && !visibleMovies.length && !loadError" role="status" class="py-16 text-center text-sm text-muted-foreground">
+      {{ t('common.loading') }}
+    </div>
+    <div v-else-if="visibleMovies.length || !loadError" class="min-h-0 flex-1">
       <VirtualMovieMasonry
         :movies="props.visibleMovies"
         :batch-mode="batchModeOn"
         :batch-selected-ids="props.batchSelectedIds ?? []"
         :scroll-preserve-key="props.scrollPreserveKey"
-        :empty-title="props.mode === 'trash' ? t('library.trashEmptyTitle') : undefined"
-        :empty-description="props.mode === 'trash' ? t('library.trashEmptyDesc') : undefined"
+        :empty-filtered="props.mode !== 'trash' && props.hasConstraints"
+        :empty-description="t(emptyDescriptionKey)"
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"
         @toggle-favorite="emit('toggleFavorite', $event)"

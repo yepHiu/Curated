@@ -3,6 +3,7 @@ import { computed, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { RouterLink, useRouter } from "vue-router"
 import { CheckSquare, ListChecks, Trash2, X } from "lucide-vue-next"
+import MediaEmptyState from "@/components/jav-library/MediaEmptyState.vue"
 import PlaybackHistoryCard from "@/components/jav-library/PlaybackHistoryCard.vue"
 import { HttpClientError } from "@/api/http-client"
 import { Button } from "@/components/ui/button"
@@ -235,17 +236,11 @@ watch(
           </div>
         </header>
 
-    <div
-      v-if="isEmpty"
-      class="flex flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-border/70 bg-card/50 px-6 py-16 text-center"
-    >
-      <p class="max-w-sm text-sm text-muted-foreground">
-        {{ t("history.empty") }}
-      </p>
-      <Button as-child variant="secondary" class="rounded-2xl">
+    <MediaEmptyState v-if="isEmpty" :description="t('history.empty')">
+      <Button as-child variant="outline" class="min-h-11 rounded-full sm:min-h-8">
         <RouterLink :to="{ name: 'library' }">{{ t("history.goLibrary") }}</RouterLink>
       </Button>
-    </div>
+    </MediaEmptyState>
 
     <template v-else>
       <section

@@ -224,7 +224,7 @@ describe("HomeView", () => {
     expect(wrapper.find("[data-homepage-empty-state]").exists()).toBe(true)
     expect(wrapper.findComponent({ name: "HomepagePortal" }).exists()).toBe(false)
     expect(wrapper.find("[data-homepage-portal-skeleton]").exists()).toBe(false)
-    expect(wrapper.text()).toContain("home.emptyTitle")
+    expect(wrapper.text()).toContain("mediaEmpty.title")
     expect(wrapper.text()).toContain("home.emptyBody")
   })
 

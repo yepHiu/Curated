@@ -1,4 +1,10 @@
 {
+  "mediaEmpty": {
+    "title": "ここはまだ空っぽです",
+    "description": "好きなものを、少しずつ集めていきましょう。",
+    "noResultsTitle": "一致するコンテンツが見つかりません",
+    "noResultsDescription": "別のキーワードや絞り込み条件を試してみてください。"
+  },
   "wishlist": {
     "playback": {
       "title": "オンライン視聴",
@@ -36,7 +42,7 @@
     "reload": "再読み込み",
     "retry": "情報を再取得",
     "empty": "作品はまだありません",
-    "emptyHint": "拡張機能で追加すると、Curated が情報と画像を取得します。",
+    "emptyHint": "観たい作品をウィッシュリストに入れて、次の楽しみに。",
     "mockHint": "拡張機能からの追加には Curated サーバーが必要です。",
     "total": "{count} 作品",
     "firstPage": "最初のページ",
@@ -170,11 +176,12 @@
     "aiReadoutEmpty": "この期間には解釈できる視聴データがありません"
   },
   "actors": {
+    "emptyDescription": "作品を追加すると、コレクションの出演者がここに並びます。",
     "detailEyebrow": "出演者",
     "detailSubtitle": "プロフィールとライブラリ内の作品。",
     "detailMovieSection": "作品",
     "detailEmptyTitle": "この出演者の作品はまだありません",
-    "detailEmptyDesc": "この出演者に紐づく作品がここに表示されます。",
+    "detailEmptyDesc": "この出演者が登場するコレクション内の作品が、ここに表示されます。",
     "title": "出演者ライブラリ",
     "subtitle": "出演者別に作品を探せます。",
     "searchLabel": "名前検索",
@@ -497,7 +504,7 @@
   },
   "history": {
     "title": "視聴履歴",
-    "empty": "まだありません。プレイヤーで少し再生するとここに表示されます。",
+    "empty": "鑑賞を始めると、ここに履歴が残ります。",
     "goLibrary": "ライブラリへ",
     "today": "今日",
     "yesterday": "昨日",
@@ -525,8 +532,8 @@
   "home": {
     "heroEyebrow": "今日のスポットライト",
     "heroFallbackSummary": "今夜の視聴候補を、あなたのライブラリからシネマティックに並べます。",
-    "emptyTitle": "ホームポータルは最初の作品を待っています",
-    "emptyBody": "Curated に作品を取り込むと、毎日の Hero、最近追加、続きから、好みベースの推薦がここに並びます。",
+    "emptyTitle": "ここはまだ空っぽです",
+    "emptyBody": "最初の一本を追加して、自分だけのライブラリを育てましょう。",
     "heroProgressLabel": "今日の 8 本",
     "heroDetailsAction": "詳細を見る",
     "heroPlayAction": "今すぐ再生",
@@ -578,7 +585,7 @@
     "title": "Curated Frame · キュレートフレーム",
     "pageSummary": "{shown} / {total} 件を表示中",
     "loadMore": "さらに読み込む",
-    "empty": "キュレートフレームはまだありません。プレイヤーから保存してください。",
+    "empty": "鑑賞中に好きな瞬間を切り取ると、ここで振り返れます。",
     "tabTimeline": "撮影日時順",
     "tabActors": "出演者別",
     "tabMovies": "作品別",
@@ -700,6 +707,9 @@
     "curatedFramesCount": "萃取フレーム"
   },
   "library": {
+    "recentEmptyDescription": "新しく追加した作品がここに並びます。",
+    "favoritesEmptyDescription": "気に入った作品をお気に入りにすると、ここに表示されます。",
+    "emptyDescription": "最初の一本を追加して、コレクションを始めましょう。",
     "backToTop": "トップへ戻る",
     "clearFilter": "フィルタ解除",
     "filterActive": "現在のフィルタ：",
@@ -707,7 +717,7 @@
     "tabNew": "発売日",
     "tabTop": "評価",
     "trashEmptyTitle": "ゴミ箱は空です",
-    "trashEmptyDesc": "ライブラリからゴミ箱に移した作品がここに表示されます。復元するか完全削除できます。",
+    "trashEmptyDesc": "ゴミ箱に移した作品がここに表示されます。",
     "loadFailed": "ライブラリの読み込みに失敗しました。バックエンドを確認して再試行してください。",
     "favoriteToggleFailed": "お気に入りの更新に失敗しました。後でもう一度お試しください。",
     "ariaFilterTag": "タグで絞り込み：{tag}、{count} 作品",
@@ -2155,7 +2165,7 @@
     "batchTagSummary": "コミックタグ「{tag}」：成功 {ok}、失敗 {fail}",
     "batchDeleteSummary": "コミック削除：成功 {ok}、失敗 {fail}",
     "emptyTitle": "コミックが見つかりません",
-    "emptyDesc": "zip/cbz コミックを取り込みまたはスキャンすると、ここに表示されます。",
+    "emptyDesc": "好きな漫画を追加して、次の物語をここに。",
     "clearSearch": "検索をクリア",
     "pageCount": "{count} ページ",
     "noRating": "未評価",
@@ -2237,7 +2247,7 @@
     "sortByFileName": "ファイル名",
     "sortByFavorite": "お気に入り",
     "emptyTitle": "写真集はまだありません",
-    "emptyDesc": "写真保存パスを追加すると、スキャンまたはインポートした zip/cbz 写真集がここに表示されます。",
+    "emptyDesc": "好きな写真集を追加して、心に残る一枚をここに。",
     "clearSearch": "検索をクリア",
     "pageCount": "{count} ページ",
     "noRating": "未評価",

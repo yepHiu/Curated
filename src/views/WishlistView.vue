@@ -11,7 +11,7 @@ import { buildMovieGridChunkStyle } from "@/lib/movie-grid-template"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
+import MediaEmptyState from "@/components/jav-library/MediaEmptyState.vue"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 const { t } = useI18n()
 const route = useRoute(), router = useRouter(), service = useLibraryService().wishlist
@@ -19,6 +19,15 @@ const page = ref<WishlistPage>({ items: [], total: 0, pendingCount: 0 })
 const loading = ref(true), error = ref(false), draft = ref(String(route.query.q ?? ""))
 const gridStyle = buildMovieGridChunkStyle({ minTrackWidth: "var(--movie-grid-min-track)", gap: "var(--movie-grid-gap)" })
 const status = computed(() => { /* 从 URL 保留用户筛选。 */ return String(route.query.status ?? "pending") })
+const hasOtherItems = ref(false)
+const hasConstraints = computed(() => Boolean(String(route.query.q ?? "").trim() || route.query.cursor ||
+  (status.value !== "all" && (status.value !== "pending" || hasOtherItems.value))))
+/** Return to the entire wishlist so items in other states are visible too. */
+function clearFilters() {
+  clearTimeout(searchTimer)
+  draft.value = ""
+  void router.replace({ query: { ...route.query, q: undefined, cursor: undefined, status: "all" } })
+}
 let alive = true
 let generation = 0, timer: ReturnType<typeof setTimeout> | undefined
 let searchTimer: ReturnType<typeof setTimeout> | undefined
@@ -29,6 +38,14 @@ async function load(quiet = false) {
   try {
     const result = await service.list({ status: status.value, q: String(route.query.q ?? ""), cursor: String(route.query.cursor ?? ""), limit: 60 })
     if (current !== generation) return
+    // An empty default tab may still have completed wishes. Check before calling the collection empty.
+    let otherItems = false
+    if (!result.items.length && status.value === "pending" && !String(route.query.q ?? "").trim() && !route.query.cursor) {
+      const all = await service.list({ status: "all", limit: 1 })
+      otherItems = all.total > 0
+    }
+    if (current !== generation) return
+    hasOtherItems.value = otherItems
     page.value = result; error.value = false
   } catch { if (current === generation) error.value = true }
   finally { if (current === generation) loading.value = false }
@@ -80,12 +97,11 @@ onBeforeUnmount(() => { /* 卸载后禁止迟到写入或重新排队。 */ aliv
       <p>{{ t('wishlist.loadFailed') }}</p>
       <Button variant="outline" class="min-h-11 rounded-full lg:min-h-8" @click="load()">{{ t('wishlist.reload') }}</Button>
     </div>
-    <Empty v-else-if="!page.items.length" class="flex-none rounded-3xl border border-solid border-border/70 bg-card/80">
-      <EmptyHeader>
-        <EmptyTitle>{{ t('wishlist.empty') }}</EmptyTitle>
-        <EmptyDescription>{{ t(service.integrationsAvailable ? 'wishlist.emptyHint' : 'wishlist.mockHint') }}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <MediaEmptyState v-else-if="!page.items.length" :filtered="hasConstraints" :description="t('wishlist.emptyHint')">
+      <template v-if="hasConstraints" #default>
+        <Button variant="outline" class="min-h-11 rounded-full sm:min-h-8" @click="clearFilters">{{ t('bookBrowser.clearFilters') }}</Button>
+      </template>
+    </MediaEmptyState>
     <WishlistGrid v-else :key="route.fullPath" class="min-h-0 flex-1" :items="page.items" :scroll-preserve-key="route.fullPath" @open="open" />
     <div class="mt-auto flex flex-wrap items-center justify-end gap-2">
       <span class="text-xs text-muted-foreground">{{ t('wishlist.total', { count: page.total }) }}</span>

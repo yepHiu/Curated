@@ -52,6 +52,7 @@ vi.mock("@/composables/use-scan-task-tracker", () => ({
 
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
+    moviesLoaded: computed(() => true),
     movies: computed(() => serviceState.movies),
     trashedMovies: computed(() => []),
     loadError: computed(() => serviceState.loadError),
@@ -65,7 +66,7 @@ vi.mock("@/services/library-service", () => ({
 vi.mock("@/components/jav-library/LibraryPage.vue", () => ({
   default: {
     name: "LibraryPage",
-    props: ["visibleMovies", "activeActorFilter"],
+    props: ["visibleMovies", "activeActorFilter", "hasConstraints"],
     emits: ["toggleFavorite", "contextMenu"],
     template: `
       <div data-library-page :data-visible-ids="visibleMovies.map((movie) => movie.id).join(',')" :data-active-actor="activeActorFilter">
@@ -206,4 +207,15 @@ describe("LibraryView feedback", () => {
     )
     expect(wrapper.get("[data-library-page]").attributes("data-visible-ids")).toBe("movie-1")
   })
+})
+
+it.each([
+  [{}, false], [{ sort: "rating" }, false], [{ tab: "new" }, false],
+  [{ q: "missing" }, true], [{ tag: "missing" }, true], [{ playState: "unwatched" }, true],
+  [{ unrated: "1" }, true], [{ year: "2026" }, true],
+])("classifies actual content filters separately from ordering: %j", (query, constrained) => {
+  routeState.query = query
+  const wrapper = mount(LibraryView)
+  expect(wrapper.findComponent({ name: "LibraryPage" }).props("hasConstraints")).toBe(constrained)
+  wrapper.unmount()
 })

@@ -1450,13 +1450,13 @@ defineExpose({
   >
     <Button v-if="rowsLoadError && isLibraryEmpty" variant="outline" class="mx-auto" @click="reloadFromDb">{{ t('curated.retryLoad') }}</Button>
     <CuratedFrameEmptyState
-      v-if="isLibraryEmpty"
+      v-if="isLibraryEmpty && !rowsLoadError"
       variant="library"
       :show-clear-filter="false"
     />
 
     <Tabs
-      v-else
+      v-else-if="!isLibraryEmpty"
       v-model="mainTab"
       class="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-4 overflow-hidden"
     >
@@ -1486,7 +1486,7 @@ defineExpose({
         @scroll.passive="maybeAutoLoadMoreRows"
       >
       <CuratedFrameEmptyState
-        v-if="isFilteredEmpty"
+        v-if="isFilteredEmpty && !rowsLoadError"
         variant="filtered"
         :show-clear-filter="activeTagFilters.length > 0"
         @clear-filter="clearCuratedFrameTagFilters"

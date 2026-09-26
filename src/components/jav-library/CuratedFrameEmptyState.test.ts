@@ -29,7 +29,7 @@ describe("CuratedFrameEmptyState", () => {
       },
     })
 
-    expect(wrapper.text()).toContain("curated.tagFilterNoMatches")
+    expect(wrapper.text()).toContain("mediaEmpty.noResultsTitle")
     expect(wrapper.get("button").text()).toContain("curated.tagFilterAll")
 
     await wrapper.get("button").trigger("click")

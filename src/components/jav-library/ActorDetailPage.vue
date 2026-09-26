@@ -149,7 +149,7 @@ async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) 
         <div class="min-h-0 flex-1 overflow-hidden">
           <VirtualMovieMasonry
             :movies="actorMovies"
-            :empty-title="t('actors.detailEmptyTitle')"
+            :empty-title="t('mediaEmpty.title')"
             :empty-description="t('actors.detailEmptyDesc')"
             :scroll-preserve-key="scrollPreserveKey"
             @open-details="openDetails"

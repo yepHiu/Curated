@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue
 import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import type { ActorListItemDTO } from "@/api/types"
+import MediaEmptyState from "@/components/jav-library/MediaEmptyState.vue"
 import ActorLibraryCard from "@/components/jav-library/ActorLibraryCard.vue"
 import { useLibraryScrollPreserve } from "@/composables/use-library-scroll-preserve"
 import { getActorsSearchQuery } from "@/lib/actors-route-query"
@@ -163,14 +164,11 @@ onBeforeUnmount(() => {
       {{ loadError }}
     </div>
 
-    <div
+    <MediaEmptyState
       v-else-if="!loading && actors.length === 0"
-      class="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-muted/20 px-6 py-16 text-center text-muted-foreground"
-    >
-      <p class="text-sm">
-        {{ t("actors.empty") }}
-      </p>
-    </div>
+      :filtered="Boolean(listBase.q)"
+      :description="t('actors.emptyDescription')"
+    />
 
     <div
       v-else

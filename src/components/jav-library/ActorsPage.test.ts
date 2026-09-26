@@ -24,6 +24,8 @@ vi.mock("vue-router", () => ({
 }))
 
 vi.mock("lucide-vue-next", () => ({
+  Inbox: { template: "<span />" },
+  SearchX: { template: "<span />" },
   X: { name: "X", template: "<span />" },
 }))
 
@@ -97,4 +99,20 @@ describe("ActorsPage", () => {
     expect(wrapper.text()).not.toContain("Hidden Actor Tag")
     expect(wrapper.text()).not.toContain("actors.clearTagFilter")
   })
+})
+
+it("uses collection copy only without a search", async () => {
+  const { default: ActorsPage } = await import("./ActorsPage.vue")
+  listActors.mockResolvedValue({ actors: [], total: 0 })
+  routeState.query = {}
+  const empty = mount(ActorsPage)
+  await flushPromises()
+  expect(empty.text()).toContain("mediaEmpty.title")
+  empty.unmount()
+  routeState.query = { actorsQ: "missing" }
+  const searched = mount(ActorsPage)
+  await flushPromises()
+  expect(searched.text()).toContain("mediaEmpty.noResultsTitle")
+  searched.unmount()
+  routeState.query = {}
 })

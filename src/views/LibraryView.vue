@@ -675,6 +675,14 @@ const queryFilteredMovies = computed(() => {
   })
 })
 
+/** Only filters that affect membership count; sorting and navigation metadata do not. */
+const hasContentConstraints = computed(() => {
+  const f = savedViewFilters.value
+  return Boolean(f.q || f.tag || f.actor || f.studio ||
+    (f.playState && f.playState !== "all") || f.userRating !== undefined || f.unrated ||
+    f.resolution || f.addedWithinDays !== undefined || f.year || f.runtime || f.catalog)
+})
+
 const visibleMovies = computed(() => {
   const sort = getLibrarySortQuery(route.query)
   return queryFilteredMovies.value
@@ -747,6 +755,9 @@ const activeStudioForPage = computed(() =>
       <LibraryPage
         :mode="libraryMode"
         :visible-movies="visibleMovies"
+        :has-constraints="hasContentConstraints"
+        :loading="!libraryService.moviesLoaded.value"
+        :load-error="libraryLoadError"
         :batch-mode="batchMode"
         :batch-selected-ids="batchSelectedIdsList"
         :active-actor-filter="activeActorForPage"

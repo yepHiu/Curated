@@ -8,7 +8,7 @@ import BookLibraryToolbar from "@/components/jav-library/books/BookLibraryToolba
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import MediaEmptyState from "@/components/jav-library/MediaEmptyState.vue"
 import VirtualComicGrid from "@/components/jav-library/comics/VirtualComicGrid.vue"
 
 const props = withDefaults(
@@ -58,12 +58,6 @@ const emit = defineEmits<{
 const { t } = useI18n()
 /** 批量模式由父级持有；页面只负责把开关投影到工具栏与网格。 */
 const batchModeOn = computed(() => props.batchMode === true)
-const emptyTitle = computed(() =>
-  props.hasConstraints ? "bookBrowser.noResults" : "comics.emptyTitle",
-)
-const emptyHint = computed(() =>
-  props.hasConstraints ? "bookBrowser.noResultsHint" : "comics.emptyDesc",
-)
 
 /** 把网格的阅读入口转发给资料库页。 */
 function openReader(comicId: string, pageIndex: number) {
@@ -146,14 +140,10 @@ function openReader(comicId: string, pageIndex: number) {
       />
     </div>
 
-    <Card v-else class="rounded-3xl border-border/70 bg-card/80">
-      <CardHeader>
-        <CardTitle>{{ t(emptyTitle) }}</CardTitle>
-        <CardDescription>{{ t(emptyHint) }}</CardDescription>
-      </CardHeader>
-      <CardContent v-if="hasConstraints">
+    <MediaEmptyState v-else-if="!props.loadError" :filtered="hasConstraints" :description="t('comics.emptyDesc')">
+      <template v-if="hasConstraints" #default>
         <Button variant="outline" class="min-h-11 rounded-full sm:min-h-8" @click="emit('clearFilters')">{{ t('bookBrowser.clearFilters') }}</Button>
-      </CardContent>
-    </Card>
+      </template>
+    </MediaEmptyState>
   </div>
 </template>

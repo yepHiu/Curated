@@ -1,4 +1,10 @@
 {
+  "mediaEmpty": {
+    "title": "目前这里空空如也",
+    "description": "把喜欢的内容收进来，慢慢填满这里。",
+    "noResultsTitle": "没有找到匹配的内容",
+    "noResultsDescription": "试试其他关键词，或调整一下筛选条件。"
+  },
   "wishlist": {
     "playback": {
       "title": "在线观看",
@@ -36,7 +42,7 @@
     "reload": "重新加载",
     "retry": "重试资料",
     "empty": "这里还没有影片",
-    "emptyHint": "在浏览器插件中点击“加入愿望单”，Curated 会自动补齐资料和图片。",
+    "emptyHint": "把想看的影片加入愿望单，留给下一次期待。",
     "mockHint": "插件接收与后台刮削需要连接真实 Curated 后端。",
     "total": "共 {count} 部",
     "firstPage": "回到第一页",
@@ -170,11 +176,12 @@
     "aiReadoutEmpty": "这个范围还没有可解读的观看数据"
   },
   "actors": {
+    "emptyDescription": "添加影片后，相关演员会出现在这里。",
     "detailEyebrow": "演员",
     "detailSubtitle": "演员资料与已入库影片。",
     "detailMovieSection": "影片",
     "detailEmptyTitle": "这个演员暂无影片",
-    "detailEmptyDesc": "与这个演员关联的影片会显示在这里。",
+    "detailEmptyDesc": "收藏的影片中有这位演员时，会显示在这里。",
     "title": "演员库",
     "subtitle": "按演员浏览片单，快速找到相关影片。",
     "searchLabel": "搜索演员名",
@@ -497,7 +504,7 @@
   },
   "history": {
     "title": "观看历史",
-    "empty": "暂无记录。在播放器中观看片刻后，会出现在这里。",
+    "empty": "开始观看后，你的足迹会留在这里。",
     "goLibrary": "去资料库",
     "today": "今天",
     "yesterday": "昨天",
@@ -525,8 +532,8 @@
   "home": {
     "heroEyebrow": "今日放映",
     "heroFallbackSummary": "从你的影片库里挑出的今夜轮播，会在这里开始。",
-    "emptyTitle": "首页门户还在等待第一批影片",
-    "emptyBody": "先把影片导入 Curated，首页就会自动生成每日 Hero、最近导入、继续观看和偏好推荐。",
+    "emptyTitle": "目前这里空空如也",
+    "emptyBody": "添加第一部影片，让这里慢慢变成你的私人片库。",
     "heroProgressLabel": "今日 8 部精选",
     "heroDetailsAction": "查看详情",
     "heroPlayAction": "立即播放",
@@ -578,7 +585,7 @@
     "title": "萃取帧",
     "pageSummary": "已显示 {shown} / 共 {total}",
     "loadMore": "加载更多",
-    "empty": "暂无萃取帧，去播放页截取几张吧。",
+    "empty": "观看时截下喜欢的瞬间，就能在这里重温。",
     "tabTimeline": "按截取时间",
     "tabActors": "按演员",
     "tabMovies": "按影片",
@@ -700,6 +707,9 @@
     "curatedFramesCount": "萃取帧"
   },
   "library": {
+    "recentEmptyDescription": "新加入的影片会出现在这里。",
+    "favoritesEmptyDescription": "遇到喜欢的影片，点一下收藏，就能在这里找到。",
+    "emptyDescription": "添加第一部影片，开始你的收藏。",
     "backToTop": "回到顶部",
     "clearFilter": "清除筛选",
     "filterActive": "当前筛选：",
@@ -707,7 +717,7 @@
     "tabNew": "发售日期",
     "tabTop": "评分",
     "trashEmptyTitle": "回收站是空的",
-    "trashEmptyDesc": "在资料库中将影片移入回收站后，会显示在此；可恢复或彻底删除。",
+    "trashEmptyDesc": "移入回收站的影片会出现在这里。",
     "loadFailed": "加载资料库失败，请确认后端已启动并重试。",
     "favoriteToggleFailed": "更新收藏失败，请稍后重试。",
     "ariaFilterTag": "按标签筛选：{tag}，{count} 部影片",
@@ -2155,7 +2165,7 @@
     "batchTagSummary": "漫画标签「{tag}」：成功 {ok}，失败 {fail}",
     "batchDeleteSummary": "删除漫画：成功 {ok}，失败 {fail}",
     "emptyTitle": "没有找到漫画",
-    "emptyDesc": "导入或扫描 zip/cbz 漫画后，会显示在这里。",
+    "emptyDesc": "添加喜欢的漫画，把下一段故事留在这里。",
     "clearSearch": "清空搜索",
     "pageCount": "{count} 页",
     "noRating": "未评",
@@ -2237,7 +2247,7 @@
     "sortByFileName": "文件名",
     "sortByFavorite": "收藏优先",
     "emptyTitle": "暂无写真集",
-    "emptyDesc": "添加写真存储路径后，扫描或导入的 zip/cbz 写真集会显示在这里。",
+    "emptyDesc": "添加喜欢的写真集，把心动的画面留在这里。",
     "clearSearch": "清除搜索",
     "pageCount": "{count} 页",
     "noRating": "未评",

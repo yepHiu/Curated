@@ -22,6 +22,8 @@ vi.mock("@vueuse/core", () => ({
 }))
 
 vi.mock("lucide-vue-next", () => ({
+  Inbox: { template: "<span />" },
+  SearchX: { template: "<span />" },
   ChevronUp: { template: "<span />" },
 }))
 
@@ -146,7 +148,7 @@ describe("VirtualMovieMasonry", () => {
 
     const html = wrapper.html()
     const headerIndex = html.indexOf("data-masonry-header")
-    const emptyCardIndex = html.indexOf("data-empty-card")
+    const emptyCardIndex = html.indexOf("data-media-empty-state")
 
     expect(wrapper.find("[data-masonry-header]").exists()).toBe(true)
     expect(emptyCardIndex).toBeGreaterThan(headerIndex)

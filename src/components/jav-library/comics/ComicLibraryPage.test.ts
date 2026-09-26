@@ -151,3 +151,20 @@ describe("ComicLibraryPage", () => {
     expect(wrapper.emitted("toggleBatchSelect")).toEqual([["comic-1"]])
   })
 })
+
+it("distinguishes an empty collection, filtered results, loading and errors", async () => {
+  const wrapper = mount(ComicLibraryPage, { props: { comics: [], activeSort: "addedAt" } })
+  expect(wrapper.text()).toContain("mediaEmpty.title")
+  expect(wrapper.text()).toContain("comics.emptyDesc")
+  await wrapper.setProps({ hasConstraints: true })
+  expect(wrapper.text()).toContain("mediaEmpty.noResultsTitle")
+  const action = wrapper.findAll("button").find(button => button.text().includes("bookBrowser.clearFilters"))!
+  await action.trigger("click")
+  expect(wrapper.emitted("clearFilters")).toHaveLength(1)
+  await wrapper.setProps({ loading: true })
+  expect(wrapper.find("[data-media-empty-state]").exists()).toBe(false)
+  await wrapper.setProps({ loading: false, loadError: "offline" })
+  expect(wrapper.find("[data-media-empty-state]").exists()).toBe(false)
+  expect(wrapper.text()).toContain("offline")
+  wrapper.unmount()
+})

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { CheckSquare, ListChecks, X } from "lucide-vue-next"
 import type { PhotoBook } from "@/domain/photo/types"
@@ -8,7 +7,7 @@ import BookLibraryToolbar from "@/components/jav-library/books/BookLibraryToolba
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import MediaEmptyState from "@/components/jav-library/MediaEmptyState.vue"
 import VirtualPhotoGrid from "@/components/jav-library/photos/VirtualPhotoGrid.vue"
 
 const props = withDefaults(
@@ -49,12 +48,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const emptyTitle = computed(() =>
-  props.hasConstraints ? "bookBrowser.noResults" : "photos.emptyTitle",
-)
-const emptyHint = computed(() =>
-  props.hasConstraints ? "bookBrowser.noResultsHint" : "photos.emptyDesc",
-)
 
 /** 把网格的查看入口转发给写真库页。 */
 function openViewer(photoId: string, pageIndex: number) {
@@ -108,14 +101,10 @@ function openViewer(photoId: string, pageIndex: number) {
       />
     </div>
 
-    <Card v-else class="rounded-3xl border-border/70 bg-card/80">
-      <CardHeader>
-        <CardTitle>{{ t(emptyTitle) }}</CardTitle>
-        <CardDescription>{{ t(emptyHint) }}</CardDescription>
-      </CardHeader>
-      <CardContent v-if="hasConstraints">
+    <MediaEmptyState v-else-if="!props.loadError" :filtered="hasConstraints" :description="t('photos.emptyDesc')">
+      <template v-if="hasConstraints" #default>
         <Button variant="outline" class="min-h-11 rounded-full sm:min-h-8" @click="emit('clearFilters')">{{ t('bookBrowser.clearFilters') }}</Button>
-      </CardContent>
-    </Card>
+      </template>
+    </MediaEmptyState>
   </div>
 </template>

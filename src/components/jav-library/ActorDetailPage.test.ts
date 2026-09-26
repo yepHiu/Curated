@@ -148,7 +148,7 @@ describe("ActorDetailPage", () => {
     expect(profile.attributes("data-actor-name")).toBe("Mina Kaze")
     expect(profile.attributes("data-show-clear-filter")).toBe("false")
     expect(masonry.attributes("data-movie-ids")).toBe("movie-1,movie-3")
-    expect(masonry.attributes("data-empty-title")).toBe("actors.detailEmptyTitle")
+    expect(masonry.attributes("data-empty-title")).toBe("mediaEmpty.title")
     expect(masonry.attributes("data-empty-description")).toBe("actors.detailEmptyDesc")
     expect(masonry.attributes("data-scroll-preserve-key")).toBe("actor-detail:Mina Kaze")
     expect(wrapper.text()).toContain("actors.detailMovieSection")

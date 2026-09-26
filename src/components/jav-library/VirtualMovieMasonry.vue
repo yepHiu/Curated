@@ -6,7 +6,7 @@ import { useI18n } from "vue-i18n"
 import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller"
 import type { Movie } from "@/domain/movie/types"
 import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import MediaEmptyState from "@/components/jav-library/MediaEmptyState.vue"
 import MovieCard from "@/components/jav-library/MovieCard.vue"
 import { useLibraryScrollPreserve } from "@/composables/use-library-scroll-preserve"
 import {
@@ -32,6 +32,7 @@ const props = withDefaults(
     movies: readonly Movie[]
     batchMode?: boolean
     batchSelectedIds?: readonly string[]
+    emptyFiltered?: boolean
     emptyTitle?: string
     emptyDescription?: string
     scrollPreserveKey?: string
@@ -39,9 +40,7 @@ const props = withDefaults(
   {
     batchMode: false,
     batchSelectedIds: () => [],
-    emptyTitle: "No matches found",
-    emptyDescription:
-      "Try another query or switch to a different library tab.",
+    emptyFiltered: false,
   },
 )
 
@@ -310,14 +309,7 @@ function posterLoadPolicyForChunk(index: number) {
         <slot name="header" />
       </div>
 
-      <Card class="rounded-3xl border-border/70 bg-card/80">
-        <CardHeader>
-          <CardTitle>{{ props.emptyTitle }}</CardTitle>
-          <CardDescription>
-            {{ props.emptyDescription }}
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <MediaEmptyState :filtered="emptyFiltered" :title="emptyTitle" :description="emptyDescription" />
     </div>
 
     <Button
@@ -335,12 +327,7 @@ function posterLoadPolicyForChunk(index: number) {
     </Button>
   </div>
 
-  <Card v-else class="rounded-3xl border-border/70 bg-card/80">
-    <CardHeader>
-      <CardTitle>{{ props.emptyTitle }}</CardTitle>
-      <CardDescription>
-        {{ props.emptyDescription }}
-      </CardDescription>
-    </CardHeader>
-  </Card>
+  <div v-else class="h-full min-h-0 overflow-y-auto">
+    <MediaEmptyState :filtered="emptyFiltered" :title="emptyTitle" :description="emptyDescription" />
+  </div>
 </template>
