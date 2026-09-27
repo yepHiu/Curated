@@ -102,7 +102,7 @@ Desktop/Full 版本源位于 `scripts/release/versions/`，Server 位于 `backen
 # Project Facts（当前实现）
 
 - **产品正式名称：Curated**（仓库目录 / npm `name` 等可能仍为 `jav-shadcn`）。
-- **品牌家族资源**：`Curated App` 表示 Android / iOS 移动客户端，`Curated Web` 是 Server 托管浏览器入口。名称、Outfit 字体、粉色 `#FE628E`、Server / Web 深色底与 Desktop / App 浅灰白底规范见 `docs/reference/curated-brand-guidelines.md`；五套字标、明确命名图标、移动源图、离线预览与字体许可在 `icon/brand/`，生成入口 `scripts/dev/generate-brand-assets.py`。SVG 是内嵌原字标 PNG + 后缀路径的混合格式，移动资源尚未据此接入其它仓库。
+- **品牌家族资源**：`Curated App` 表示 Android / iOS 移动客户端，`Curated Web` 是 Server 托管浏览器入口。名称、Outfit 字体、粉色 `#FE628E`、Server / Web 深色底与 Desktop / App 浅灰白底规范见 `docs/reference/curated-brand-guidelines.md`；五套字标、明确命名图标、移动源图、离线预览与字体许可在 `icon/brand/`，无底板透明字标与核心图案在 `icon/brand/transparent/`，生成入口 `scripts/dev/generate-brand-assets.py`。SVG 是内嵌原字标 PNG + 后缀路径的混合格式，移动资源尚未据此接入其它仓库。
 
 ## 技术栈与包管理
 

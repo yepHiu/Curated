@@ -59,11 +59,16 @@
 
 资源包：[`icon/brand/`](../../icon/brand/)。可视预览：[`index.html`](../../icon/brand/index.html)；总览图：[`brand-overview.png`](../../icon/brand/brand-overview.png)。机器可读名称、字体、颜色与产品映射在 `brand.json`。
 
+无底板版本集中在 [`icon/brand/transparent/`](../../icon/brand/transparent/index.html)，另有[棋盘格总览图](../../icon/brand/transparent/preview.png)。五套字标 PNG / SVG 均保留透明背景；五个按产品命名的透明图案 PNG 共享同一几何图案，并提供一个通用透明图案混合 SVG。预览页和总览图的棋盘格仅用于显示透明区域，棋盘格不会写进可下载的品牌 PNG / SVG。透明图案从现有 `curated-mark.png` 的 alpha 导出，所有可见 RGB 统一为品牌粉色，避免旧色边。这组资源适合文档、网页和宣传图叠加；Server / Desktop 的正式应用图标仍使用各自底色。移动商店图标仍使用不透明平台源图。
+
 | 资源 | 内容 |
 |---|---|
 | `curated-wordmark.{png,svg}` | 总品牌字标 |
 | `curated-{server,desktop,app,web}-wordmark.{png,svg}` | 四个产品 / 入口组合字标 |
 | `curated-{server,desktop,app,web}-appicon.png` | 对应现有图标的明确命名副本 |
+| `transparent/curated{-server,-desktop,-app,-web}-wordmark.{png,svg}` | 五套透明背景组合字标 |
+| `transparent/curated{-server,-desktop,-app,-web}-mark.png` | 五个按名称导出的透明核心图案；图案内容一致 |
+| `transparent/curated-mark.svg` | 通用透明核心图案，SVG 内嵌 PNG，不是纯矢量 |
 | `curated-app-icon-1024.png` | 1024 px、RGB 无透明、无预制圆角的移动图标源 |
 | `curated-app-android-foreground.png` | 432 px 透明前景；背景颜色使用 `#F5F6F8` |
 | `fonts/outfit-latin-wght-normal.woff2`、`fonts/Outfit-OFL.txt` | 离线预览字体与原许可 |

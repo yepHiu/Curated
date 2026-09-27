@@ -126,7 +126,7 @@ Vite usually serves `http://localhost:5173`.
 
 ### Brand resources
 
-Curated is the umbrella brand; Curated Server and Curated Desktop are the service and desktop client; Curated App names the Android / iOS mobile client; Curated Web is the Server-hosted browser entry. Names, Outfit typography, the existing pink mark, dark Server / Web icons and off-white Desktop / App icons are documented in [the brand guidelines](reference/curated-brand-guidelines.md). The [offline asset preview](../icon/brand/index.html) includes five wordmarks, named icons, mobile sources and font licensing. Generate it with `python scripts/dev/generate-brand-assets.py` after installing Pillow, fonttools and brotli. This resource pack does not imply mobile integration or release.
+Curated is the umbrella brand; Curated Server and Curated Desktop are the service and desktop client; Curated App names the Android / iOS mobile client; Curated Web is the Server-hosted browser entry. Names, Outfit typography, the existing pink mark, dark Server / Web icons and off-white Desktop / App icons are documented in [the brand guidelines](reference/curated-brand-guidelines.md). The [offline asset preview](../icon/brand/index.html) includes five wordmarks, named icons, mobile sources and font licensing; the [transparent asset preview](../icon/brand/transparent/index.html) shows all five wordmarks and the shared mark without an icon background. Generate both with `python scripts/dev/generate-brand-assets.py` after installing Pillow, fonttools and brotli. This resource pack does not imply mobile integration or release.
 
 ### Electron
 
