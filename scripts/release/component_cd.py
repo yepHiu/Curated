@@ -1,4 +1,4 @@
-"""Build and publish the split distribution without changing the legacy latest feed."""
+"""Publish independent component feeds and promote the newest Full to GitHub Latest."""
 from __future__ import annotations
 import argparse
 import json
@@ -14,6 +14,7 @@ from scripts.release.release_lib.components import artifact_name
 from scripts.release.release_lib.windows_components import versions, package_windows
 from scripts.release.release_lib.macos_desktop import package_macos_desktop
 from scripts.release.release_lib.component_channels import reuse_assets, read_channel
+from scripts.release.release_lib.latest_release import reconcile_latest
 
 PATTERN = re.compile(r'(full|server|desktop)-v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))')
 
@@ -42,16 +43,6 @@ def body(root: Path, meta: dict) -> str:
     if not text:
         raise ValueError('Component release notes must not be empty')
     return text + '\n\n' + legacy.source_marker(meta) + '\n'
-
-
-def legacy_latest() -> dict:
-    release = legacy.api('releases/latest')
-    if not re.fullmatch(r'v\d+\.\d+\.\d+', release['tag_name']):
-        raise ValueError('Legacy latest is not a compatible all-in-one release')
-    installers = [a['name'] for a in release['assets'] if a['name'].lower().endswith('.exe')]
-    if installers != [f"Curated-Setup-{release['tag_name'][1:]}.exe"]:
-        raise ValueError('Legacy latest must expose exactly one compatible installer')
-    return release
 
 
 def expected_assets(meta: dict) -> dict[str, dict]:
@@ -188,7 +179,6 @@ def publish(root: Path, meta: dict, output: Path, mode: str) -> None:
     assets = output / 'assets'
     verify_distribution(meta, assets)
     changes = validate_channel_advance(assets)
-    old_latest = legacy_latest()
     release = legacy.check_release(meta)
     # The tag is already verified by check_release. Omitting target_commitish
     # avoids asking GITHUB_TOKEN to create a tag at a workflow-changing commit.
@@ -200,15 +190,11 @@ def publish(root: Path, meta: dict, output: Path, mode: str) -> None:
     legacy.verify_uploaded(legacy.api(f"releases/{release['id']}"), assets)
     if mode == 'publish':
         legacy.check_release(meta)
-        # Explicitly pin the compatible legacy release before adding stable component releases.
-        legacy.api(f"releases/{old_latest['id']}", {'make_latest': 'true'}, 'PATCH')
-        if legacy_latest()['id'] != old_latest['id']:
-            raise ValueError('Legacy latest changed during publication')
         legacy.api(f"releases/{release['id']}", {'draft': False, 'make_latest': 'false'}, 'PATCH')
-        if legacy_latest()['id'] != old_latest['id']:
-            legacy.api(f"releases/{release['id']}", {'draft': True}, 'PATCH')
-            raise ValueError('Legacy feed isolation check failed; component release returned to draft')
         advance_channels(changes, meta)
+        # Latest is independent of update feeds. Failure can be retried without
+        # hiding a public release or replacing already verified assets.
+        reconcile_latest(legacy.api)
     print(f"{mode}: {release['html_url']}")
 
 
@@ -229,7 +215,6 @@ def main() -> None:
     if args.command == 'check':
         body(root, meta)
         legacy.check_release(meta)
-        legacy_latest()
         if target := os.environ.get('GITHUB_OUTPUT'):
             with open(target, 'a') as stream:
                 stream.writelines(f'{k}={meta[k]}\n' for k in ('tag', 'component', 'version', 'commit'))
@@ -253,8 +238,8 @@ def main() -> None:
             raise ValueError('Channel recovery requires a published release from this commit')
         verify_distribution(meta, args.output / 'assets')
         legacy.verify_uploaded(release, args.output / 'assets')
-        legacy_latest()
         advance_channels(validate_channel_advance(args.output / 'assets'), meta)
+        reconcile_latest(legacy.api)
     else:
         publish(root, meta, args.output, args.mode)
 

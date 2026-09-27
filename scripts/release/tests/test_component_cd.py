@@ -70,17 +70,6 @@ class ComponentReleaseTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 cd.validate_entries(self.meta, bad, [self.root])
 
-    def test_old_updater_feed_accepts_only_legacy_setup(self):
-        release = {'id': 1, 'tag_name': 'v1.5.8', 'assets': [{'name': 'Curated-Setup-1.5.8.exe'}]}
-        with patch.object(cd.legacy, 'api', return_value=release):
-            self.assertEqual(cd.legacy_latest(), release)
-            release['assets'].append({'name': 'Curated-Desktop-Setup-0.1.0-windows-x64.exe'})
-            with self.assertRaises(ValueError):
-                cd.legacy_latest()
-            release['tag_name'] = 'full-v1.6.0'
-            with self.assertRaises(ValueError):
-                cd.legacy_latest()
-
     def test_channel_cannot_replace_published_component_bytes_or_downgrade(self):
         entries = self.fixture()
         document = {'schema': 1, 'component': 'server', 'version': '1.5.8',
@@ -99,26 +88,65 @@ class ComponentReleaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 cd.validate_channel_advance(self.root)
 
-    def test_publish_pins_legacy_and_does_not_promote_split_to_latest(self):
+    def test_publish_updates_channels_then_reconciles_latest(self):
         entries = self.fixture()
         assets = self.root / 'output/assets'
         assets.mkdir(parents=True)
         for entry in entries:
             (self.root / entry['fileName']).rename(assets / entry['fileName'])
         (assets / 'release.json').write_text(json.dumps({**self.meta, 'artifacts': entries}))
-        latest = {'id': 10}
         release = {'id': 20, 'html_url': 'https://example.test/release'}
         with patch.object(cd.legacy, 'check_release', return_value=None), patch.object(cd, 'body', return_value='Notes'), \
-             patch.object(cd, 'legacy_latest', return_value=latest), patch.object(cd.legacy, 'api', return_value=release) as api, \
+             patch.object(cd, 'reconcile_latest') as reconcile, patch.object(cd.legacy, 'api', return_value=release) as api, \
              patch.object(cd.legacy, 'verify_uploaded'), patch.object(cd.subprocess, 'run'), \
              patch.object(cd, 'verify_distribution'), patch.object(cd, 'validate_channel_advance', return_value={}), patch.object(cd, 'advance_channels'), \
              patch.dict('os.environ', {'GITHUB_REPOSITORY': 'yepHiu/Curated'}):
             cd.publish(self.root, self.meta, self.root / 'output', 'publish')
             payloads = [call.args for call in api.call_args_list if len(call.args) > 1]
             self.assertNotIn('target_commitish', next(args[1] for args in payloads if args[0] == 'releases'))
-            self.assertIn(('releases/10', {'make_latest': 'true'}, 'PATCH'), payloads)
+            reconcile.assert_called_once_with(cd.legacy.api)
             self.assertIn(('releases/20', {'draft': False, 'make_latest': 'false'}, 'PATCH'), payloads)
             self.assertFalse(any(args[0] == 'releases/20' and args[1].get('make_latest') == 'true' for args in payloads))
+
+    def test_preflight_never_requires_or_mutates_latest(self):
+        with patch('sys.argv', ['component_cd', 'check', '--tag', self.meta['tag']]), \
+             patch.object(cd, 'metadata', return_value=self.meta), \
+             patch.object(cd, 'body', return_value='Notes'), \
+             patch.object(cd.legacy, 'check_release') as check, \
+             patch.object(cd.legacy, 'api') as api, \
+             patch.object(cd, 'reconcile_latest') as reconcile:
+            cd.main()
+            check.assert_called_once_with(self.meta)
+            api.assert_not_called()
+            reconcile.assert_not_called()
+
+    def test_public_release_recovery_advances_channels_before_latest(self):
+        calls = []
+        release = {'draft': False, 'body': cd.legacy.source_marker(self.meta)}
+        with patch('sys.argv', ['component_cd', 'channels', '--tag', self.meta['tag']]), \
+             patch.object(cd, 'metadata', return_value=self.meta), \
+             patch.object(cd.legacy, 'find_release', return_value=release), \
+             patch.object(cd, 'verify_distribution'), patch.object(cd.legacy, 'verify_uploaded'), \
+             patch.object(cd, 'validate_channel_advance', return_value={}), \
+             patch.object(cd, 'advance_channels', side_effect=lambda *_: calls.append('channels')), \
+             patch.object(cd, 'reconcile_latest', side_effect=lambda *_: calls.append('latest')):
+            cd.main()
+        self.assertEqual(calls, ['channels', 'latest'])
+
+    def test_draft_does_not_change_channels_or_latest(self):
+        assets = self.root / 'assets'
+        assets.mkdir()
+        with patch.object(cd.legacy, 'check_release', return_value=None), patch.object(cd, 'body', return_value='Notes'), \
+             patch.object(cd.legacy, 'api', return_value={'id': 20, 'html_url': 'fixture'}) as api, \
+             patch.object(cd.legacy, 'verify_uploaded'), patch.object(cd.subprocess, 'run'), \
+             patch.object(cd, 'verify_distribution'), patch.object(cd, 'validate_channel_advance', return_value={}), \
+             patch.object(cd, 'advance_channels') as advance, patch.object(cd, 'reconcile_latest') as reconcile, \
+             patch.dict('os.environ', {'GITHUB_REPOSITORY': 'yepHiu/Curated'}):
+            cd.publish(self.root, self.meta, self.root, 'draft')
+            advance.assert_not_called()
+            reconcile.assert_not_called()
+            payloads = [call.args[1] for call in api.call_args_list if len(call.args) > 1]
+            self.assertTrue(all(p.get('draft') is True and p.get('make_latest') == 'false' for p in payloads))
 
     def test_initial_channel_branch_contains_only_manifests_without_source_history(self):
         def response(endpoint, payload=None, method=None):

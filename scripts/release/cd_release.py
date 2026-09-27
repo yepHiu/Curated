@@ -251,7 +251,9 @@ def publish(root: Path, tag: str, output: Path, mode: str, macos: Path | None = 
     verify_uploaded(release, output / "assets")
     if mode == "publish":
         check_release(metadata)
-        release = api(f"releases/{release['id']}", {"draft": False, "make_latest": "true"}, "PATCH")
+        release = api(f"releases/{release['id']}", {"draft": False, "make_latest": "false"}, "PATCH")
+        from scripts.release.release_lib.latest_release import reconcile_latest
+        reconcile_latest(api)
     print(f"Release {'published' if mode == 'publish' else 'draft ready'}: {release['html_url']}")
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(summary, "a", encoding="utf-8") as stream:

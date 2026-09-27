@@ -154,10 +154,12 @@ class CDReleaseTests(unittest.TestCase):
         with patch.object(cd, 'source_commit', return_value=self.commit), \
              patch.object(cd, 'api', side_effect=[ref, None, [], release, release, ref, None, [release], release]) as api, \
              patch.object(cd.subprocess, 'run') as run, \
+             patch('scripts.release.release_lib.latest_release.reconcile_latest') as reconcile, \
              patch.dict(os.environ, {'GITHUB_REPOSITORY': 'owner/repo'}):
             cd.publish(self.root, self.tag, self.output, 'publish')
         self.assertIn('--clobber', run.call_args.args[0])
-        self.assertEqual(api.call_args.args[1], {'draft': False, 'make_latest': 'true'})
+        self.assertEqual(api.call_args.args[1], {'draft': False, 'make_latest': 'false'})
+        reconcile.assert_called_once_with(api)
 
     def test_manual_draft_does_not_publish(self):
         cd.stage(self.root, self.tag, self.output)

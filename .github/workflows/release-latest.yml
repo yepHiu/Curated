@@ -1,0 +1,28 @@
+name: Release - Reconcile Latest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Share the publication lock with component, legacy and recovery jobs.
+concurrency:
+  group: curated-release-publication
+  cancel-in-progress: false
+
+jobs:
+  latest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Select the highest public Full version and verify Latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m scripts.release.release_lib.latest_release
