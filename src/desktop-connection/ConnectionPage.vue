@@ -18,6 +18,7 @@ interface Discovered { serverId: string; name: string; version: string; urls: st
 interface ConnectionAPI extends DesktopSettingsAPI {
   onError?(callback: (message: string) => void): () => void
   platform?: string
+  updateTitleBar?(colors: { background: string; foreground: string }): Promise<void>
   checkUpdate(): Promise<string>
   discover(): Promise<Discovered[]>
   list(): Promise<{ connections: Connection[]; lastUrl?: string; activeUrl?: string; suggestedUrl?: string; desktopVersion: string; error?: string }>
@@ -45,6 +46,18 @@ let hintTimer: ReturnType<typeof setTimeout> | undefined
 let hintAttempts = 0
 let disposed = false
 const removeErrorListener = api?.onError?.(message => { error.value = message })
+const integratedWindowControls = api?.platform === "darwin" || api?.platform === "win32"
+let titleBarObserver: MutationObserver | undefined
+
+/** 原生 Windows 按钮使用页面的实际主题令牌，含系统主题切换。 */
+function syncTitleBar() {
+  if (api?.platform !== "win32" || !api.updateTitleBar) return
+  const theme = getComputedStyle(document.documentElement)
+  void api.updateTitleBar({
+    background: theme.getPropertyValue("--background").trim(),
+    foreground: theme.getPropertyValue("--foreground").trim(),
+  }).catch(reason => console.warn("Could not synchronize window controls", reason))
+}
 
 /** 更新结果留在客户端页脚，不干扰服务器连接表单。 */
 async function checkUpdate() {
@@ -127,9 +140,14 @@ function toggleTheme() {
 }
 
 // 卸载时停止本地提示轮询与发现过期计时。
-onUnmounted(() => { removeErrorListener?.(); disposed = true; clearTimeout(expiry); clearTimeout(hintTimer) })
+onUnmounted(() => { removeErrorListener?.(); titleBarObserver?.disconnect(); disposed = true; clearTimeout(expiry); clearTimeout(hintTimer) })
 // 首屏加载记录与发现；已存目标保持自动重连行为。
 onMounted(async () => {
+  if (api?.platform === "win32") {
+    syncTitleBar()
+    titleBarObserver = new MutationObserver(syncTitleBar)
+    titleBarObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] })
+  }
   try {
     const state = await refresh()
     address.value = state.lastUrl ?? state.suggestedUrl ?? ""
@@ -142,8 +160,8 @@ onMounted(async () => {
 
 <template>
   <div class="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-    <div v-if="api?.platform === 'darwin'" class="desktop-window-controls h-11 shrink-0" aria-hidden="true" />
-    <div class="desktop-window-heading mx-auto flex w-full max-w-xl shrink-0 items-center justify-between gap-3 px-5 pb-4 sm:px-6" :class="api?.platform === 'darwin' ? 'pt-2' : 'pt-6'">
+    <div v-if="integratedWindowControls" class="desktop-window-controls h-11 shrink-0" aria-hidden="true" />
+    <div class="desktop-window-heading mx-auto flex w-full max-w-xl shrink-0 items-center justify-between gap-3 px-5 pb-4 sm:px-6" :class="integratedWindowControls ? 'pt-2' : 'pt-6'">
       <span class="desktop-wordmark text-xl font-semibold tracking-wide text-primary">Curated Desktop</span>
       <Button variant="ghost" size="icon" class="size-11 sm:size-8" :aria-label="resolvedMode === 'dark' ? t('light') : t('dark')" @click="toggleTheme">
         <Sun v-if="resolvedMode === 'dark'" aria-hidden="true" />

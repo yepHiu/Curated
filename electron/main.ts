@@ -431,6 +431,19 @@ function registerDesktopIpc(): void {
   const requireLauncher = (event: Electron.IpcMainInvokeEvent) => {
     if (event.sender.id !== connectionWindow?.webContents.id || event.senderFrame !== event.sender.mainFrame || event.senderFrame?.url !== connectionPageUrl) throw new Error("Untrusted connection manager")
   }
+  ipcMain.handle("curated:connection-titlebar", (event, colors: unknown) => {
+    requireLauncher(event)
+    if (typeof colors !== "object" || colors === null) throw new Error("Invalid titlebar colors")
+    const { background, foreground } = colors as Record<string, unknown>
+    if (typeof background !== "string" || typeof foreground !== "string" ||
+        !/^#[\da-f]{6}$/i.test(background) || !/^#[\da-f]{6}$/i.test(foreground)) {
+      throw new Error("Invalid titlebar colors")
+    }
+    if (process.platform === "win32") {
+      connectionWindow?.setTitleBarOverlay({ color: background, symbolColor: foreground, height: 44 })
+      connectionWindow?.setBackgroundColor(background)
+    }
+  })
   const loginOptions = () => ({ path: process.execPath, args: !app.isPackaged && process.platform === "win32" ? [app.getAppPath()] : [] })
   const readSettings = () => {
     const preferences = preferencesStore.read()
@@ -582,6 +595,10 @@ function showConnections(): void {
   connectionWindow = new BrowserWindow({
     width: 520, height: 740, minWidth: 520, minHeight: 540,
     ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 20, y: 16 } } : {}),
+    ...(process.platform === "win32" ? {
+      titleBarStyle: "hidden" as const,
+      titleBarOverlay: { color: "#00000000", height: 44 },
+    } : {}),
     title: "Curated · 服务器", autoHideMenuBar: true,
     ...(appIconPath ? { icon: appIconPath } : {}),
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, preload: path.join(__dirname, "launcher-preload.cjs") },
