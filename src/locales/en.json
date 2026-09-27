@@ -1983,6 +1983,7 @@
     "expandSummary": "Expand summary",
     "collapseSummary": "Collapse summary",
     "fieldReleaseDate": "Release date",
+    "releaseDate": "Release date",
     "fieldRuntimeMinutes": "Runtime (minutes)",
     "saveMovieEdit": "Save",
     "movieEditSaving": "Saving…",

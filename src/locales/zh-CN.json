@@ -1983,6 +1983,7 @@
     "expandSummary": "展开简介",
     "collapseSummary": "收起简介",
     "fieldReleaseDate": "发行日",
+    "releaseDate": "发售日期",
     "fieldRuntimeMinutes": "时长（分钟）",
     "saveMovieEdit": "保存",
     "movieEditSaving": "保存中…",

@@ -143,6 +143,7 @@ const canRevealInFileManager = computed(
 )
 
 const metadataProvider = computed(() => props.movie.metadataProvider?.trim() ?? "")
+const releaseDate = computed(() => props.movie.releaseDate?.trim() ?? "")
 const sourceLink = computed(() => sourcePageLink(props.sourceUrl))
 
 const javdbSearchUrl = computed(
@@ -394,7 +395,11 @@ function removeMetadataTag(tag: string) {
               <template v-else>
                 <span>—</span>
               </template>
-              <span v-if="movie.year" aria-hidden="true"> · {{ movie.year }}</span>
+              <span v-if="releaseDate" data-release-date>
+                <span aria-hidden="true"> · </span>{{ t("detailPanel.releaseDate") }}
+                <time :datetime="releaseDate">{{ releaseDate }}</time>
+              </span>
+              <span v-else-if="movie.year" aria-hidden="true"> · {{ movie.year }}</span>
               <span v-if="movie.resolution" aria-hidden="true"> · {{ movie.resolution }}</span>
               <span
                 v-if="metadataProvider"
