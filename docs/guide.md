@@ -574,6 +574,8 @@ Language/theme, current-session lock/unlock, local capture saving/directory/shor
 
 实现决定与验证记录：[Debug 工具弹窗](plan/2026-09-26-debug-tools-dialog.md)。
 
+Desktop 开发版连接页也在右下角提供 `DEBUG`，不依赖 Server 在线。状态分区显示 Desktop 版本/构建时间/平台、当前运行代理模式与当前/上次连接；检查分区可对填写的地址进行无会话身份探测，并打开连接页 DevTools。探测不保存记录、不建立连接。随包 launcher 虽然由 Vite build 生成，入口仍以主进程的实际开发状态决定；正式 Desktop 隐藏入口并拒绝调试 IPC。更新后需完全退出并重开 Desktop。
+
 Debug 的「模拟远程端」开关可在本机预览远端限制：三库路径只读，服务器播放高级选项、强制 HLS 与服务器更新操作隐藏。开启后标签显示 `DEBUG · REMOTE`；关闭恢复真实连接判断，切换路由或关闭弹窗不重置，刷新页面重置。仅开发模式有效，不改实际连接、服务端配置或权限。
 
 

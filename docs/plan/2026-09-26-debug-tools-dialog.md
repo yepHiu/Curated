@@ -25,4 +25,10 @@ Debug 操作分区新增客户端开关，使用共享的开发态内存状态�
 
 验证：8 个相关测试文件、71 项通过，覆盖开发/生产开关、真实远端不能提权、Mock/本机即时切换、播放保存不携带隐藏字段，以及更新写操作拦截。类型检查、改动文件 ESLint 和 Web API 生产构建通过。
 
+## 连接页 Debug 工具（2026-09-27）
+
+连接页属于 Desktop 本地壳层，断开 Server 时仍需可用。开发版连接页沿用内容页右下角 `DEBUG` 入口和限高 Dialog，但只提供本机状态与连接诊断：Desktop 构建信息、当前/上次连接、已保存数量、运行中的代理模式、无凭据的服务器身份探测，以及连接页 DevTools。探测复用正常连接的地址规范化与身份校验，不保存地址、不切换连接、不携带会话。正式版隐藏入口，主进程拒绝诊断 IPC；调用者必须是随包连接页主 frame。弹窗有加载、失败、重试和键盘关闭/焦点返回，保持连接表单为页面主任务。
+
+验证：连接页及新 Debug 弹窗 7 项测试、前端类型检查、相关 ESLint、Electron/launcher 构建通过。真实 Windows Electron 独立临时 profile 验证只读探测、本机 fixture 的 `/api/server-info` 无 Cookie、记录/当前连接不变、DevTools 打开、无效地址失败、Escape 焦点恢复和正式状态 IPC 拒绝。深浅色及 520×540 最小窗口、当前系统 DPR 1.5 下无横向越界且内容可滚动；截图 `.workspace/connection-debug/`。未运行 `pnpm test:display` 或完整跨平台缩放矩阵；未生成安装包或发布。
+
 独立 Chrome 1280×720 验证开关即时生效、DEBUG · REMOTE 状态、关闭重开保留、强制 HLS 隐藏/恢复、刷新页面重置；截图 `.workspace/debug-remote.png`。未运行完整显示缩放套件。
