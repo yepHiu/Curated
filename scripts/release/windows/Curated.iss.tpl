@@ -6,6 +6,9 @@
 #define MyOutputDir "__OUTPUT_DIR__"
 #define MySetupBaseName "__SETUP_BASENAME__"
 
+#define CuratedWindowsSupport "__WINDOWS_SUPPORT__"
+#include "__WINDOWS_SUPPORT__\Languages.iss"
+
 [Setup]
 AppId={{8C9E9E66-7058-4D09-9F9A-8AFD060A7E1B}
 AppName={#MyAppName}
@@ -19,14 +22,14 @@ OutputBaseFilename={#MySetupBaseName}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+ShowLanguageDialog=yes
+LanguageDetectionMethod=uilanguage
 SetupIconFile={#MyAppSourceDir}\curated.ico
 UninstallDisplayIcon={app}\curated.ico
 CloseApplications=yes
 RestartApplications=no
 CloseApplicationsFilter=Curated.exe,curated.exe
 
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -43,4 +46,4 @@ Name: "{autoprograms}\Curated"; Filename: "{app}\{#MyAppExeName}"; IconFilename:
 Name: "{autodesktop}\Curated"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; IconFilename: "{app}\curated.ico"
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch Curated"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchApp,Curated}"; Flags: nowait postinstall skipifsilent

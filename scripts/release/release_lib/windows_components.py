@@ -70,9 +70,9 @@ def compile_installer(root: Path, work: Path, output: Path, component: str, vers
         raise FileNotFoundError('Inno Setup is required; refusing a partial release')
     name = artifact_name(component, version, 'windows', 'x64', 'exe')
     template = 'Full.iss.tpl' if component == 'full' else 'Component.iss.tpl'
-    script = (root / 'scripts/release/windows' / template).read_text()
+    script = (root / 'scripts/release/windows' / template).read_text(encoding='utf-8')
     values = {'VERSION': version, 'COMPONENT': component.title(), 'OUTPUT': str(output),
-              'BASENAME': name[:-4], **values}
+              'BASENAME': name[:-4], 'WINDOWS_SUPPORT': str(root / 'scripts/release/windows'), **values}
     for key, value in values.items():
         script = script.replace(f'__{key}__', value)
     import re

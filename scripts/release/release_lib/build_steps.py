@@ -542,6 +542,7 @@ def package_installer(
         template = template.replace("__APP_DIR__", str(resolved_app_dir).replace("\\", "\\\\"))
         template = template.replace("__OUTPUT_DIR__", str(resolved_output_dir).replace("\\", "\\\\"))
         template = template.replace("__SETUP_BASENAME__", setup_base_name)
+        template = template.replace("__WINDOWS_SUPPORT__", str(repo_root / "scripts/release/windows"))
         generated_iss_path.write_text(template, encoding="utf-8")
 
         iscc_path = _find_iscc()

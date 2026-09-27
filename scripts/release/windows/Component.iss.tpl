@@ -1,3 +1,6 @@
+#define CuratedWindowsSupport "__WINDOWS_SUPPORT__"
+#include "__WINDOWS_SUPPORT__\Languages.iss"
+
 [Setup]
 AppId=__APP_ID__
 AppName=Curated __COMPONENT__
@@ -14,6 +17,8 @@ OutputBaseFilename=__BASENAME__
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+ShowLanguageDialog=yes
+LanguageDetectionMethod=uilanguage
 SetupIconFile=__SOURCE__\curated.ico
 UninstallDisplayIcon={app}\curated.ico
 CloseApplications=yes
@@ -30,7 +35,7 @@ Type: filesandordirs; Name: "{app}\__MANAGED_DELETE__"
 Name: "{autoprograms}\Curated __COMPONENT__"; Filename: "{app}\__EXE__"; Parameters: "__PARAMS__"; IconFilename: "{app}\curated.ico"
 
 [Run]
-Filename: "{app}\__EXE__"; Parameters: "__PARAMS__"; Description: "Launch Curated __COMPONENT__"; Flags: __RUN_FLAGS__; Check: ShouldLaunch
+Filename: "{app}\__EXE__"; Parameters: "__PARAMS__"; Description: "{cm:LaunchApp,Curated __COMPONENT__}"; Flags: __RUN_FLAGS__; Check: ShouldLaunch
 
 [Code]
 function ShouldLaunch: Boolean;
@@ -47,13 +52,13 @@ begin
   if __LEGACY_CHECK__ and (RegKeyExists(HKLM64, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8C9E9E66-7058-4D09-9F9A-8AFD060A7E1B}_is1') or
      RegKeyExists(HKLM32, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8C9E9E66-7058-4D09-9F9A-8AFD060A7E1B}_is1') or
      RegKeyExists(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8C9E9E66-7058-4D09-9F9A-8AFD060A7E1B}_is1')) then begin
-    SuppressibleMsgBox('An older all-in-one Curated installation was found. Use Curated Full 1.7.2 or later to back up and upgrade this installation automatically. Fully exit Curated before running Full. See the migration guide for custom configurations.', mbError, MB_OK, IDOK);
+    SuppressibleMsgBox(CustomMessage('LegacyDetected'), mbError, MB_OK, IDOK);
     exit;
   end;
   if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\__APP_ID___is1', 'DisplayVersion', Installed) then begin
     if not StrToVersion(Installed, OldVersion) or not StrToVersion('__VERSION__', NewVersion) then exit;
     if ComparePackedVersion(OldVersion, NewVersion) > 0 then begin
-      SuppressibleMsgBox('A newer Curated __COMPONENT__ is already installed. Downgrade was cancelled.', mbError, MB_OK, IDOK);
+      SuppressibleMsgBox(FmtMessage(CustomMessage('NewerInstalled'), ['__COMPONENT__']), mbError, MB_OK, IDOK);
       exit;
     end;
   end;

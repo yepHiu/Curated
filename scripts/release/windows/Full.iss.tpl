@@ -1,3 +1,6 @@
+#define CuratedWindowsSupport "__WINDOWS_SUPPORT__"
+#include "__WINDOWS_SUPPORT__\Languages.iss"
+
 [Setup]
 AppName=Curated Full
 AppVersion=__VERSION__
@@ -15,6 +18,8 @@ OutputBaseFilename=__BASENAME__
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+ShowLanguageDialog=yes
+LanguageDetectionMethod=uilanguage
 
 [Files]
 Source: "__MIGRATION_HELPER__"; DestName: "curated-migrate.exe"; Flags: dontcopy
@@ -34,17 +39,17 @@ begin
   if not RegQueryStringValue(HKLM64, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8C9E9E66-7058-4D09-9F9A-8AFD060A7E1B}_is1', 'InstallLocation', LegacyDirectory) then
     if not RegQueryStringValue(HKLM32, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8C9E9E66-7058-4D09-9F9A-8AFD060A7E1B}_is1', 'InstallLocation', LegacyDirectory) then
       RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8C9E9E66-7058-4D09-9F9A-8AFD060A7E1B}_is1', 'InstallLocation', LegacyDirectory);
-  DataPage := CreateInputDirPage(wpWelcome, 'Upgrade your existing Curated',
-    'Keep your original library and settings',
-    'Fully quit Curated from its tray. Confirm the original data directory (containing data and config). Full will verify a backup, remove the old program and install Server and Desktop. Windows may request permission to remove the old program. Your media files stay in place.', False, '');
-  DataPage.Add('Original data directory:');
+  DataPage := CreateInputDirPage(wpWelcome, CustomMessage('UpgradeTitle'),
+    CustomMessage('UpgradeSubtitle'),
+    CustomMessage('UpgradeDetails'), False, '');
+  DataPage.Add(CustomMessage('DataDirectory'));
   DataRoot := GetEnv('CURATED_DATA_DIR');
   if DataRoot = '' then DataRoot := ExpandConstant('{localappdata}\Curated');
   DataPage.Values[0] := ExpandConstant('{param:LEGACYDATADIR|' + DataRoot + '}');
-  ConfigPage := CreateInputFilePage(DataPage.ID, 'Custom Server configuration',
-    'Only needed if the old Server used -config',
-    'Select the same runtime configuration file if you previously started Server with -config. Otherwise leave this blank. Custom filesystem paths must be absolute and outside the old program directory.');
-  ConfigPage.Add('Original runtime configuration (optional):', 'Configuration files|*.json;*.cfg;*.yaml|All files|*.*', '');
+  ConfigPage := CreateInputFilePage(DataPage.ID, CustomMessage('ConfigTitle'),
+    CustomMessage('ConfigSubtitle'),
+    CustomMessage('ConfigDetails'));
+  ConfigPage.Add(CustomMessage('ConfigFile'), CustomMessage('ConfigFilter'), '');
   ConfigPage.Values[0] := ExpandConstant('{param:LEGACYCONFIG|}');
 end;
 
@@ -83,8 +88,8 @@ begin
   Result := Exec(ExpandConstant('{tmp}\curated-migrate.exe'), Parameters, '', SW_HIDE, ewWaitUntilTerminated, Code);
   if Result then Result := Code = 0;
   if not Result then begin
-    Failure := 'The Curated upgrade could not finish. Run Full again after resolving the error.';
-    if LoadStringFromFile(ErrorPath, ErrorText) then Failure := UTF8Decode(ErrorText);
+    Failure := CustomMessage('UpgradeFailed');
+    if LoadStringFromFile(ErrorPath, ErrorText) then Failure := Failure + #13#10 + UTF8Decode(ErrorText);
     SuppressibleMsgBox(Failure, mbError, MB_OK, IDOK);
   end;
 end;
@@ -98,7 +103,7 @@ begin
   Result := False;
   if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Curated.' + Name + '_is1', 'DisplayVersion', Installed) then begin
     if not StrToVersion(Installed, OldVersion) or not StrToVersion(Version, NewVersion) then begin
-      Failure := Name + ': installed version could not be read.';
+      Failure := FmtMessage(CustomMessage('VersionUnreadable'), [Name]);
       exit;
     end;
     if ComparePackedVersion(OldVersion, NewVersion) >= 0 then begin
@@ -108,10 +113,10 @@ begin
     end;
   end;
   ExtractTemporaryFile(Installer);
-  if not Exec(ExpandConstant('{tmp}\') + Installer, '/VERYSILENT /SUPPRESSMSGBOXES /SP- /NORESTART /NOLAUNCH=1 /LOG="' + ExpandConstant('{tmp}\Curated-') + Name + '-install.log"', '', SW_HIDE, ewWaitUntilTerminated, Code) then
-    Failure := Name + ': could not start installer.'
+  if not Exec(ExpandConstant('{tmp}\') + Installer, '/VERYSILENT /SUPPRESSMSGBOXES /SP- /NORESTART /NOLAUNCH=1 /LANG=' + ActiveLanguage + ' /LOG="' + ExpandConstant('{tmp}\Curated-') + Name + '-install.log"', '', SW_HIDE, ewWaitUntilTerminated, Code) then
+    Failure := FmtMessage(CustomMessage('InstallerStartFailed'), [Name])
   else if (Code <> 0) and (Code <> 3010) then
-    Failure := Name + ': installer failed with code ' + IntToStr(Code) + '.'
+    Failure := FmtMessage(CustomMessage('InstallerFailed'), [Name, IntToStr(Code)])
   else Result := True;
 end;
 
@@ -125,12 +130,12 @@ begin
   if not RunMigration('prepare') then exit;
   ServerOK := InstallComponent('Server', '__SERVER_VERSION__', 'server-setup.exe');
   if not ServerOK then begin
-    SuppressibleMsgBox(Failure + ' Desktop was not changed. Existing components and library data were kept. Resolve the error and run Full again.', mbError, MB_OK, IDOK);
+    SuppressibleMsgBox(Failure + #13#10 + CustomMessage('ServerFailed'), mbError, MB_OK, IDOK);
     exit;
   end;
   DesktopOK := InstallComponent('Desktop', '__DESKTOP_VERSION__', 'desktop-setup.exe');
   if not DesktopOK then begin
-    SuppressibleMsgBox(Failure + ' Server is installed. Existing components and library data were kept. Run Full again to retry Desktop.', mbError, MB_OK, IDOK);
+    SuppressibleMsgBox(Failure + #13#10 + CustomMessage('DesktopFailed'), mbError, MB_OK, IDOK);
     exit;
   end;
   if not RunMigration('complete') then exit;
