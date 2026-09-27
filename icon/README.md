@@ -2,6 +2,8 @@
 
 完整的 Curated / Server / Desktop / App（Android / iOS）/ Web 品牌家族规范见 [品牌规范](../docs/reference/curated-brand-guidelines.md)。组合字标、明确产品命名的图标副本、移动图标源、字体许可与离线预览放在 [`brand/`](brand/index.html)，生成入口为 `python scripts/dev/generate-brand-assets.py`（Pillow、fonttools、brotli）。
 
+旧字标边缘预先混入深色背景，在浅色底上会出现暗线。原文件保存为 `brand/source/curated-wordmark-original.png`；`python scripts/dev/clean-brand-wordmark.py` 从旧图恢复粉色覆盖率和透明边缘，同时更新本目录与 `src/icon/` 的运行时副本。已清理字标的尺寸、位置、轮廓和实色粉色像素保持原样。改动字标后按顺序运行该清理脚本与品牌资源生成脚本。
+
 `icon/` 放品牌源文件与 Desktop 的 Windows ICO 派生资源。文件名全部小写 kebab-case。
 
 | 怎么叫 | 文件 | 是什么 |

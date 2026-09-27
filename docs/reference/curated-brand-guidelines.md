@@ -20,7 +20,7 @@
 
 | 用途 | 字体 / 字重 | 来源与约定 |
 |---|---|---|
-| 原 Curated 主字标 | 保留 `icon/curated-wordmark.png` 原始形状 | 主字标原始排版不重新绘制 |
+| Curated 主字标 | 保留 `icon/curated-wordmark.png` 原始形状 | 已去除旧资源边缘预混入的深色；原图归档在 `icon/brand/source/` |
 | 新增 Server / Desktop / App / Web 后缀 | Outfit 600 | 锁定的 `@fontsource-variable/outfit`，随资源包附 OFL |
 | 界面可编辑品牌标题 | Outfit 600 / `font-curated` | 沿用侧栏、关于页的既有字体；使用 `text-primary` |
 | 英文与数字正文 | Noto Sans | 沿用本地可变字体 |
@@ -68,7 +68,9 @@
 | `curated-app-android-foreground.png` | 432 px 透明前景；背景颜色使用 `#F5F6F8` |
 | `fonts/outfit-latin-wght-normal.woff2`、`fonts/Outfit-OFL.txt` | 离线预览字体与原许可 |
 
-PNG 是现有栅格品牌的交付资源。SVG 包含内嵌的原主字标 PNG 与转为路径的后缀，离线使用且无需安装字体；它是混合 SVG，**不是纯矢量重绘**，不能宣称无限分辨率。原有核心图案的真正矢量设计源尚未找到；大幅印刷应先补足原始设计源。
+PNG 是现有栅格品牌的交付资源。SVG 包含内嵌的去暗边主字标 PNG 与转为路径的后缀，离线使用且无需安装字体；它是混合 SVG，**不是纯矢量重绘**，不能宣称无限分辨率。原有核心图案的真正矢量设计源尚未找到；大幅印刷应先补足原始设计源。
+
+历史主字标 `icon/brand/source/curated-wordmark-original.png` 的边缘 RGB 预混入 `#141826`，部分暗边甚至是完全不透明像素。放在白底上会出现黑色轮廓。当前交付文件根据旧图的粉色与深色底恢复边缘覆盖率，仅使用 `#FE628E` 加透明度绘制，保留原有画布、墨迹边界和完整粉色像素。`src/icon/curated-wordmark.png` 与此源同步，避免水印导出保留旧黑边。
 
 移动端图标源单独导出为不透明方图，由系统 / 商店施加圆角或自适应蒙版，不能直接提交带透明圆角的 Desktop PNG。Android 前景保留中心图案比例，另用纯色背景层；实际 mipmap、adaptive icon XML、Android 单色主题图标与 iOS Asset Catalog 由各移动仓库集成时按平台要求导出。本资源包不表示移动端已接入或已发布。
 
@@ -77,11 +79,12 @@ PNG 是现有栅格品牌的交付资源。SVG 包含内嵌的原主字标 PNG �
 在仓库根目录，安装 Python Pillow、fonttools、brotli 并安装锁定的 pnpm 依赖后运行：
 
 ```powershell
+python scripts/dev/clean-brand-wordmark.py
 python scripts/dev/generate-desktop-icon.py
 python scripts/dev/generate-brand-assets.py
 ```
 
-第一个命令同步当前 Desktop PNG、Windows 9 尺寸 ICO 和 macOS Dock 图；第二个生成品牌家族字标、平台命名副本、移动图标源与离线预览。Outfit 源来自锁定的本地 Fontsource 包，不在线下载另一版本。保留其许可及署名。
+第一个命令清理原主字标的深色预混边缘并同步前端水印资源；第二个同步当前 Desktop PNG、Windows 9 尺寸 ICO 和 macOS Dock 图；第三个生成品牌家族字标、平台命名副本、移动图标源与离线预览。Outfit 源来自锁定的本地 Fontsource 包，不在线下载另一版本。保留其许可及署名。
 
 Web favicon / Go Server / Electron / 安装包现有链路见 [`icon/README.md`](../../icon/README.md)。资源更新后完整退出再启动 Desktop；已安装包的快捷方式、Dock bundle 图标须后续重建 / 更新安装包。对其它仓库进行 Android / iOS 或插件引用更新时，再分别检查它们的规则与构建入口。
 
