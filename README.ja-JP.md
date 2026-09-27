@@ -31,15 +31,15 @@ Curated はローカルファーストのメディアライブラリです。Vue
 
 ## ダウンロード
 
-Full/Server 1.7.3、Desktop 0.2.1 のソースでは Windows インストーラの簡体字中国語対応と更新前の自動終了を追加しました。Full はバックアップ検証後に旧一体型をアンインストールします。新パッケージは未公開です。対応範囲と Windows 検証は[移行ガイド](docs/guide.md#migrating-an-old-all-in-one-installation)を参照してください。
+Full/Server 1.7.3、Desktop 0.2.1 では Windows インストーラの簡体字中国語対応と更新前の自動終了を追加しました。Full はバックアップ検証後に旧一体型をアンインストールします。Windows/Mac CD 検証を通過し、公開済みです。対応範囲と Windows 検証は[移行ガイド](docs/guide.md#migrating-an-old-all-in-one-installation)を参照してください。
 
 公式の Windows パッケージは **[GitHub Releases](https://github.com/yepHiu/Curated/releases)** にあります。[最新リリース](https://github.com/yepHiu/Curated/releases/latest) を使ってください。
 
 - コミック / 写真ライブラリ **Beta**：設定 → ライブラリ → 漫画ライブラリ / 写真ライブラリで個別に有効化すると設定を表示します。写真ライブラリではお気に入り、タグ追加、索引削除の一括操作ができます。[利用ガイド](docs/guide.md#comic-and-photo-library-beta)。
-- **インストーラ（推奨）：** `Curated-Setup-<version>.exe`
-- **ポータブル：** `Curated-<version>-windows-x64.zip`
+- **インストーラ（推奨）：** `Curated-Full-Setup-<version>-windows-x64.exe`
+- **オフラインインストーラ一式：** `Curated-Full-<version>-windows-x64.zip`。Server/Desktop 単体 ZIP もあります。
 
-インストール済みのアプリは、設定 → システム → アプリ情報と更新から新しいインストーラを確認・ダウンロードできます。
+Latest は最新の安定版 Full を指します。Server/Desktop は独立した更新チャネルを使います。旧一体型では更新確認エラーが出る場合があります。Latest から Full をダウンロードし、一度手動で実行して元のデータを引き継いでください。
 
 ## ハイライト
 

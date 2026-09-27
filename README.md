@@ -33,14 +33,14 @@ This README is the short public entry. For setup details, configuration, packagi
 
 ## Download
 
-Full/Server 1.7.3 and Desktop 0.2.1 source add Chinese Windows setup and automatic shutdown before upgrading; Full removes registered old all-in-one installations after a verified backup. New packages await release; see the [migration guide](docs/guide.md#migrating-an-old-all-in-one-installation) for supported layouts and Windows acceptance.
+Full/Server 1.7.3 and Desktop 0.2.1 add Chinese Windows setup and automatic shutdown before upgrading; Full removes registered old all-in-one installations after a verified backup. The release passed Windows/Mac CD checks; see the [migration guide](docs/guide.md#migrating-an-old-all-in-one-installation) for supported layouts and Windows acceptance.
 
 Official Windows packages are on **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**. Use the [latest release](https://github.com/yepHiu/Curated/releases/latest).
 
-- **Installer (recommended):** `Curated-Setup-<version>.exe`
-- **Portable:** `Curated-<version>-windows-x64.zip`
+- **Installer (recommended):** `Curated-Full-Setup-<version>-windows-x64.exe`
+- **Offline installer kit:** `Curated-Full-<version>-windows-x64.zip`; standalone Server/Desktop ZIPs are also available.
 
-Installed apps can also check and download a newer installer from Settings → About & updates.
+Latest points to the newest stable Full. Standalone Server/Desktop use independent update channels. Old all-in-one apps may show an update-check error: download and run Full once to migrate, preserving your original data.
 
 ## Highlights
 

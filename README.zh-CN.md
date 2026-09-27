@@ -31,15 +31,15 @@ Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，
 
 ## 下载
 
-Full/Server 1.7.3、Desktop 0.2.1 源码已补齐 Windows 安装器中文与自动退出，Full 在备份校验后自动卸载旧一体版；新包待发布，支持范围与 Windows 验收见[迁移指南](docs/guide.md#migrating-an-old-all-in-one-installation)。
+Full/Server 1.7.3、Desktop 0.2.1 已补齐 Windows 安装器中文与自动退出，Full 在备份校验后自动卸载旧一体版；新包已通过 Windows/Mac CD 验收并发布，支持范围见[迁移指南](docs/guide.md#migrating-an-old-all-in-one-installation)。
 
 正式 Windows 安装包和便携包发布在 **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**。请使用 [最新 Release](https://github.com/yepHiu/Curated/releases/latest)。
 
 - 漫画库 / 写真库 **Beta**：在「设置 → 资料库 → 漫画库 / 写真库」分别开启，开启后才显示配置。写真库页支持批量收藏、追加标签和删除索引。见 [试用说明](docs/guide.md#comic-and-photo-library-beta)。
-- **安装器（推荐）：** `Curated-Setup-<version>.exe`
-- **便携包：** `Curated-<version>-windows-x64.zip`
+- **安装器（推荐）：** `Curated-Full-Setup-<version>-windows-x64.exe`
+- **离线安装包合集：** `Curated-Full-<version>-windows-x64.zip`；另提供独立 Server/Desktop ZIP。
 
-已安装的应用也可以在「设置 → 系统 → 关于与更新」中检查并下载新的安装器。
+Latest 指向最新 Full 正式版，独立 Server/Desktop 使用各自更新渠道。旧一体版可能在应用内显示检查更新失败；请从 Latest 下载并手动运行一次 Full，保留原数据完成迁移。
 
 ## 亮点
 
