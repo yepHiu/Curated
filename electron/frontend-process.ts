@@ -49,6 +49,38 @@ export function resolveFrontendBaseUrl(env: ElectronEnv = process.env): string {
   return normalizeFrontendBaseUrl(value || defaultFrontendBaseUrl())
 }
 
+/** A standalone development Desktop uses the running Vite UI for the local dev Server. */
+export async function resolveRendererBaseUrl(options: {
+  backendBaseUrl: string
+  isPackaged: boolean
+  env?: ElectronEnv
+  fetchImpl?: typeof fetch
+}): Promise<string> {
+  const { backendBaseUrl, isPackaged } = options
+  if (isPackaged) return backendBaseUrl
+  const backend = new URL(backendBaseUrl)
+  if (backend.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(backend.hostname) || backend.port !== "8080") return backendBaseUrl
+
+  const fetchImpl = options.fetchImpl ?? fetch
+  let health: Response
+  try {
+    health = await fetchImpl(`${backendBaseUrl}/api/health`, {
+      signal: AbortSignal.timeout(1500), redirect: "error", credentials: "omit", cache: "no-store",
+    })
+    if (!health.ok || (await health.json() as { name?: unknown }).name !== "curated-dev") return backendBaseUrl
+  } catch { return backendBaseUrl }
+
+  const frontendUrl = resolveFrontendBaseUrl(options.env)
+  try {
+    const response = await fetchImpl(frontendUrl, {
+      signal: AbortSignal.timeout(1500), redirect: "error", credentials: "omit", cache: "no-store",
+    })
+    if (response.ok && response.headers.get("content-type")?.includes("text/html") &&
+        /src="\/src\/main\.ts(?:\?[^\"]*)?"/.test(await response.text())) return frontendUrl
+  } catch { /* The local Vite server is not running. */ }
+  throw new Error(`本机开发 Server 已连接，但开发前端未在 ${frontendUrl} 就绪。请先运行 pnpm dev，再重试连接。`)
+}
+
 export function resolveFrontendLaunchPlan(options: FrontendLaunchPlanOptions): FrontendLaunchPlan {
   const baseUrl = options.baseUrl ?? resolveFrontendBaseUrl(options.env)
   const parsed = new URL(baseUrl)

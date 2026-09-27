@@ -41,6 +41,7 @@ import {
   shouldStartDevFrontend,
   shouldStopFrontendOnQuit,
   startFrontend,
+  resolveRendererBaseUrl,
   type ManagedFrontend,
 } from "./frontend-process.js"
 
@@ -672,7 +673,9 @@ async function connectServer(target: SavedServer, confirm: boolean): Promise<voi
     const selectedPartition = hasServerIdentityChanged(target.serverId, info.serverId, target.url)
       ? connectionPartition({ url: target.url, serverId: info.serverId, name: target.name })
       : target.partition ?? serverSessionPartition(target.url)
-    const renderer = target.url === managedBackend?.baseUrl ? managedFrontend?.baseUrl ?? target.url : target.url
+    const renderer = target.url === managedBackend?.baseUrl && managedFrontend
+      ? managedFrontend.baseUrl
+      : await resolveRendererBaseUrl({ backendBaseUrl: target.url, isPackaged: app.isPackaged, env: process.env, fetchImpl: desktopFetch })
     candidate = createMainWindow(renderer, appIconPath, target.url, selectedPartition)
     await candidate.webContents.session.setProxy(proxyConfiguration(runningPreferences))
     controller.signal.throwIfAborted()
