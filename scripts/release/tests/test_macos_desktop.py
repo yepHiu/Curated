@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import plistlib
 import tempfile
@@ -50,7 +51,9 @@ class MacDesktopTests(unittest.TestCase):
         self.assertEqual({p.name for p in payload.iterdir()}, {'package.json', 'electron-dist', 'public'})
         self.assertFalse((payload / 'electron-dist/main.js.map').exists())
         self.assertFalse((app / 'Contents/Resources/default_app.asar').exists())
-        self.assertEqual((app / 'Contents/MacOS/Curated Desktop').stat().st_mode & 0o777, 0o755)
+        # Windows does not preserve POSIX executable bits in this fixture.
+        if os.name != 'nt':
+            self.assertEqual((app / 'Contents/MacOS/Curated Desktop').stat().st_mode & 0o777, 0o755)
         with (app / 'Contents/Info.plist').open('rb') as stream:
             info = plistlib.load(stream)
         self.assertEqual(info['CFBundleIdentifier'], 'com.curated.desktop')
