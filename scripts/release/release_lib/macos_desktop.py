@@ -50,7 +50,7 @@ def stage_app(root: Path, app: Path, version: str, stamp: str) -> None:
         'type': 'module', 'main': 'electron-dist/main.js',
     }, indent=2) + '\n')
     (payload / 'public').mkdir()
-    for name in ('Curated-icon.png', 'Curated-icon-macos.png'):
+    for name in ('Curated-desktop-icon.png', 'Curated-desktop-icon-macos.png'):
         shutil.copy2(root / 'public' / name, payload / 'public' / name)
     shutil.copy2(root / 'LICENSE', resources / 'LICENSE-Curated.txt')
     for name in ('LICENSE', 'LICENSES.chromium.html'):
@@ -100,7 +100,7 @@ def package_macos_desktop(root: Path, output: Path) -> Path:
             for scale in (1, 2):
                 name = f'icon_{size}x{size}' + ('@2x' if scale == 2 else '') + '.png'
                 _run(['sips', '-z', str(size * scale), str(size * scale),
-                      str(root / 'public/Curated-icon-macos.png'), '--out', str(iconset / name)], cwd=root)
+                      str(root / 'public/Curated-desktop-icon-macos.png'), '--out', str(iconset / name)], cwd=root)
         _run(['iconutil', '-c', 'icns', str(iconset), '-o', str(app / 'Contents/Resources/curated.icns')], cwd=root)
         # Ad-hoc signing supports arm64 execution; this is not Developer ID signing/notarization.
         _run(['codesign', '--force', '--deep', '--sign', '-', str(app)], cwd=root)

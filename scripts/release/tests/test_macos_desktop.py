@@ -34,8 +34,9 @@ class MacDesktopTests(unittest.TestCase):
             self.write('electron-dist/' + name)
         self.write('electron-dist/main.js.map')
         self.write('electron-dist/desktop-release.json', b'{"distribution":"legacy"}')
-        self.write('public/Curated-icon.png')
-        self.write('public/Curated-icon-macos.png')
+        self.write('public/Curated-desktop-icon.png', b'white desktop icon')
+        self.write('public/Curated-desktop-icon-macos.png', b'white desktop dock icon')
+        self.write('public/Curated-icon.png', b'dark server icon')
         self.write('LICENSE')
         self.write('backend/runtime/curated.db')
         self.write('frontend-dist/index.html')
@@ -43,6 +44,9 @@ class MacDesktopTests(unittest.TestCase):
         app = self.root / 'out/Curated Desktop.app'
         stage_app(self.root, app, '0.1.0', '20260927.000000')
         payload = app / 'Contents/Resources/app'
+        self.assertEqual((payload / 'public/Curated-desktop-icon.png').read_bytes(), b'white desktop icon')
+        self.assertEqual((payload / 'public/Curated-desktop-icon-macos.png').read_bytes(), b'white desktop dock icon')
+        self.assertFalse((payload / 'public/Curated-icon.png').exists())
         metadata = json.loads((payload / 'electron-dist/desktop-release.json').read_text())
         self.assertEqual(metadata['distribution'], 'desktop')
         self.assertEqual(metadata['updateFeed'], 'https://raw.githubusercontent.com/yepHiu/Curated/release-channels/desktop.json')

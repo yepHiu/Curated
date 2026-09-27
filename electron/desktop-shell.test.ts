@@ -23,18 +23,19 @@ import {
 } from "./desktop-shell"
 
 describe("Electron desktop shell integration", () => {
-  it("uses the bundled Curated ico as the preferred app icon", () => {
+  it("uses the white Desktop ico even when the Server ico is present", () => {
     const appPath = "C:/repo"
-    const preferredIcon = path.join(appPath, "backend", "internal", "assets", "curated.ico")
+    const preferredIcon = path.join(appPath, "icon", "curated-desktop.ico")
+    const serverIcon = path.join(appPath, "backend", "internal", "assets", "curated.ico")
 
-    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === preferredIcon, "win32")
+    const iconPath = resolveAppIconPath(appPath, (candidate) => [preferredIcon, serverIcon].includes(candidate), "win32")
 
     expect(iconPath).toBe(preferredIcon)
   })
 
   it("uses the packaged app ico when running from Electron resources", () => {
     const appPath = "C:/Program Files/Curated/resources/app"
-    const packagedIcon = path.join(appPath, "curated.ico")
+    const packagedIcon = path.join(appPath, "curated-desktop.ico")
 
     const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === packagedIcon, "win32")
 
@@ -43,7 +44,7 @@ describe("Electron desktop shell integration", () => {
 
   it("falls back to the public png icon when the Windows ico is unavailable", () => {
     const appPath = "C:/repo"
-    const fallbackIcon = path.join(appPath, "public", "Curated-icon.png")
+    const fallbackIcon = path.join(appPath, "public", "Curated-desktop-icon.png")
 
     const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === fallbackIcon, "win32")
 
@@ -53,8 +54,19 @@ describe("Electron desktop shell integration", () => {
   it.each(["darwin", "linux"] as const)("uses PNG instead of unsupported ICO on %s", (platform) => {
     const appPath = "/repo"
     expect(resolveAppIconPath(appPath, () => true, platform))
-      .toBe(path.join(appPath, "public", "Curated-icon.png"))
+      .toBe(path.join(appPath, "public", "Curated-desktop-icon.png"))
     expect(resolveAppIconPath(appPath, (candidate) => candidate.endsWith(".ico"), platform))
+      .toBeUndefined()
+  })
+
+  it("does not fall back to the dark Server icon", () => {
+    const appPath = "C:/repo"
+    const serverIcons = [
+      path.join(appPath, "backend", "internal", "assets", "curated.ico"),
+      path.join(appPath, "public", "Curated-icon.png"),
+      path.join(appPath, "icon", "curated-appicon.png"),
+    ]
+    expect(resolveAppIconPath(appPath, (candidate) => serverIcons.includes(candidate), "win32"))
       .toBeUndefined()
   })
 

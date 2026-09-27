@@ -197,6 +197,12 @@ class BuildStepsTests(unittest.TestCase):
         asset_dir = self.temp_root / "backend" / "internal" / "assets"
         asset_dir.mkdir(parents=True)
         (asset_dir / "curated.ico").write_bytes(b"ico")
+        desktop_icon_dir = self.temp_root / "icon"
+        desktop_icon_dir.mkdir()
+        (desktop_icon_dir / "curated-desktop.ico").write_bytes(b"white desktop ico")
+        public_dir = self.temp_root / "public"
+        public_dir.mkdir()
+        (public_dir / "Curated-desktop-icon.png").write_bytes(b"white desktop png")
 
         config_dir = self.temp_root / "config"
         config_dir.mkdir()
@@ -245,6 +251,9 @@ class BuildStepsTests(unittest.TestCase):
         self.assertEqual((output / "Curated.exe").read_bytes(), b"electron runtime")
         self.assertFalse((output / "electron.exe").exists())
         self.assertEqual((app_dir / "curated.exe").read_bytes(), b"go backend")
+        self.assertEqual((output / "curated.ico").read_bytes(), b"white desktop ico")
+        self.assertEqual((app_dir / "curated-desktop.ico").read_bytes(), b"white desktop ico")
+        self.assertEqual((app_dir / "public/Curated-desktop-icon.png").read_bytes(), b"white desktop png")
         self.assertTrue((app_dir / "frontend-dist" / "index.html").is_file())
         self.assertTrue((app_dir / "electron-dist" / "main.js").is_file())
         self.assertTrue((app_dir / "electron-dist" / "preload.cjs").is_file())

@@ -56,8 +56,9 @@ def stage_desktop(root: Path, destination: Path, version: str, stamp: str) -> No
     metadata.write_text(json.dumps({'schema': 1, 'version': version, 'buildStamp': stamp,
         'distribution': 'desktop', 'updateFeed': f'{FEED_ROOT}/desktop.json'}) + '\n')
     (payload / 'public').mkdir()
-    shutil.copy2(root / 'public/Curated-icon.png', payload / 'public/Curated-icon.png')
-    shutil.copy2(root / 'backend/internal/assets/curated.ico', destination / 'curated.ico')
+    shutil.copy2(root / 'public/Curated-desktop-icon.png', payload / 'public/Curated-desktop-icon.png')
+    shutil.copy2(root / 'icon/curated-desktop.ico', destination / 'curated.ico')
+    shutil.copy2(root / 'icon/curated-desktop.ico', payload / 'curated-desktop.ico')
     shutil.copy2(root / 'LICENSE', destination / 'LICENSE-Curated.txt')
     validate_payload(destination, 'desktop')
 

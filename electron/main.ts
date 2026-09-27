@@ -107,7 +107,7 @@ if (!singleInstanceLock) {
       appIconPath = resolveAppIconPath(app.getAppPath())
       if (process.platform === "darwin" && appIconPath) {
         // Dock artwork needs transparent margins to match other macOS app icons.
-        const dockIconPath = path.join(app.getAppPath(), "public", "Curated-icon-macos.png")
+        const dockIconPath = path.join(app.getAppPath(), "public", "Curated-desktop-icon-macos.png")
         app.dock?.setIcon(existsSync(dockIconPath) ? dockIconPath : appIconPath)
       }
       preferencesStore = new DesktopPreferencesStore(app.getPath("userData"))

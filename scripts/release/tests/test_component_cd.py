@@ -149,14 +149,21 @@ class ComponentReleaseTests(unittest.TestCase):
 
     def test_desktop_stages_only_client_runtime(self):
         for name in ('node_modules/electron/dist/electron.exe', 'electron-dist/main.js', 'electron-dist/desktop-release.json',
-                     'public/Curated-icon.png', 'backend/internal/assets/curated.ico', 'LICENSE', 'backend/curated.exe'):
+                     'public/Curated-desktop-icon.png', 'icon/curated-desktop.ico', 'LICENSE', 'backend/curated.exe'):
             file = self.root / name
             file.parent.mkdir(parents=True, exist_ok=True)
             file.write_text('fixture')
+        server_icon = self.root / 'backend/internal/assets/curated.ico'
+        server_icon.parent.mkdir(parents=True, exist_ok=True)
+        server_icon.write_text('dark server icon')
         stage_desktop(self.root, self.root / 'desktop', '0.1.0', '20260927.000000')
         app = self.root / 'desktop/resources/app'
         self.assertEqual(json.loads((app / 'package.json').read_text())['version'], '0.1.0')
         self.assertEqual((self.root / 'electron-dist/desktop-release.json').read_text(), 'fixture')
+        self.assertEqual((self.root / 'desktop/curated.ico').read_text(), 'fixture')
+        self.assertEqual((app / 'curated-desktop.ico').read_text(), 'fixture')
+        self.assertEqual((app / 'public/Curated-desktop-icon.png').read_text(), 'fixture')
+        self.assertFalse((app / 'public/Curated-icon.png').exists())
         (app / 'curated.exe').write_text('bad')
         with self.assertRaises(ValueError):
             validate_payload(self.root / 'desktop', 'desktop')

@@ -237,9 +237,10 @@ def assemble_release(
     docs_dir.mkdir(parents=True, exist_ok=True)
 
     shutil.copy2(resolved_binary_path, app_dir / "curated.exe")
-    icon_path = repo_root / "backend" / "internal" / "assets" / "curated.ico"
+    icon_path = repo_root / "icon" / "curated-desktop.ico"
     shutil.copy2(icon_path, resolved_output_dir / "curated.ico")
-    shutil.copy2(icon_path, app_dir / "curated.ico")
+    shutil.copy2(icon_path, app_dir / "curated-desktop.ico")
+    shutil.copytree(repo_root / "public", app_dir / "public", dirs_exist_ok=True)
     shutil.copytree(resolved_electron_main_dir, app_dir / "electron-dist", dirs_exist_ok=True)
     _write_electron_app_package(app_dir, version)
 

@@ -50,11 +50,11 @@ export function resolveAppIconPath(
 ): string | undefined {
   const candidates = [
     ...(platform === "win32" ? [
-      path.join(appPath, "curated.ico"),
-      path.join(appPath, "backend", "internal", "assets", "curated.ico"),
+      path.join(appPath, "curated-desktop.ico"),
+      path.join(appPath, "icon", "curated-desktop.ico"),
     ] : []),
-    path.join(appPath, "public", "Curated-icon.png"),
-    path.join(appPath, "icon", "curated-appicon.png"),
+    path.join(appPath, "public", "Curated-desktop-icon.png"),
+    path.join(appPath, "icon", "curated-desktop-appicon.png"),
   ]
 
   return candidates.find((candidate) => pathExists(candidate))

@@ -30,7 +30,11 @@ if (process.platform === "darwin") {
   const projectPackage = require(path.join(repoRoot, "package.json"))
   fs.writeFileSync(path.join(appResources, "package.json"), JSON.stringify({ name: projectPackage.name, version: projectPackage.version, main: "main.mjs", type: "module" }))
   fs.writeFileSync(path.join(appResources, "main.mjs"), `await import(${JSON.stringify(pathToFileURL(path.join(repoRoot, "electron-dist", "main.js")).href)});\n`)
-  fs.copyFileSync(path.join(repoRoot, "public", "Curated-icon.png"), path.join(appResources, "curated.png"))
+  const publicResources = path.join(appResources, "public")
+  fs.mkdirSync(publicResources, { recursive: true })
+  for (const name of ["Curated-desktop-icon.png", "Curated-desktop-icon-macos.png"]) {
+    fs.copyFileSync(path.join(repoRoot, "public", name), path.join(publicResources, name))
+  }
   binary = path.join(destination, "Contents", "MacOS", "Electron")
 }
 
