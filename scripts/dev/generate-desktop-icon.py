@@ -1,7 +1,9 @@
-"""Derive white Desktop assets from the existing Curated artwork (requires Pillow)."""
+"""Derive off-white Desktop assets from the existing artwork (requires Pillow)."""
 from pathlib import Path
 
 from PIL import Image
+
+DESKTOP_BACKGROUND = (245, 246, 248, 255)  # #F5F6F8, a soft cool off-white.
 
 
 def generate(root: Path) -> None:
@@ -10,8 +12,8 @@ def generate(root: Path) -> None:
     if server.size != mark.size:
         raise ValueError('App icon and mark must use the same canvas and alignment')
     # Keep the original rounded silhouette and composite the unchanged transparent
-    # mark on white so its antialiased edges do not retain the dark background.
-    desktop = Image.new('RGBA', server.size, (255, 255, 255, 255))
+    # mark on off-white so its antialiased edges do not retain the dark background.
+    desktop = Image.new('RGBA', server.size, DESKTOP_BACKGROUND)
     desktop.putalpha(server.getchannel('A'))
     desktop.alpha_composite(mark)
     desktop.save(root / 'icon/curated-desktop-appicon.png')

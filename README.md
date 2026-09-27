@@ -19,7 +19,7 @@
 
 # Curated
 
-Server uses a dark icon background; Desktop uses white, with the same central artwork. See [icon assets](icon/README.md).
+Server uses a dark icon background; Desktop uses soft off-white (`#F5F6F8`), with the same central artwork. See [icon assets](icon/README.md).
 
 Desktop can add servers through an in-page Settings dialog, and manage or switch saved connections from Settings or the tray. See [Desktop server connections](docs/guide.md#desktop-server-connections).
 

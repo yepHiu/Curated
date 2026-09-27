@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | **wordmark** | `curated-wordmark.png` | 标志 + “Curated” 文字，透明底。README 顶部用这个。 |
 | **Server appicon** | `curated-appicon.png` | 圆角深色底（`#141826`）+ 标志。Server 托盘、安装包、Web favicon 的源图。 |
-| **Desktop appicon** | `curated-desktop-appicon.png` | 圆角白底（`#FFFFFF`）+ 同一标志。Desktop 窗口、托盘、安装包与快捷方式使用。 |
+| **Desktop appicon** | `curated-desktop-appicon.png` | 圆角浅灰白底（`#F5F6F8`）+ 同一标志。Desktop 窗口、托盘、安装包与快捷方式使用。 |
 | **mark** | `curated-mark.png` | 只有核心标志（四角星 + 加号 + 圆点），透明底。 |
 
 Server 与透明标志的前端副本在 `src/icon/`。Desktop 独立使用 `public/Curated-desktop-icon.png` 与 `icon/curated-desktop.ico`，不回退到 Server 的深色图标。
@@ -22,7 +22,7 @@ Server 与透明标志的前端副本在 `src/icon/`。Desktop 独立使用 `pub
 
 ### Desktop 图标生成
 
-使用现有 `curated-appicon.png` 的透明度保留圆角轮廓，在纯白底上叠加未移动、未缩放的 `curated-mark.png`。核心图案形状、位置与粉色保持不变；边缘透明度在白底重新合成，避免深色描边。修改任一源图后运行（需要 Python + Pillow）：
+使用现有 `curated-appicon.png` 的透明度保留圆角轮廓，在冷调浅灰白底上叠加未移动、未缩放的 `curated-mark.png`。核心图案形状、位置与粉色保持不变；边缘透明度在白底重新合成，避免深色描边。修改任一源图后运行（需要 Python + Pillow）：
 
 ```powershell
 python scripts/dev/generate-desktop-icon.py

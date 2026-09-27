@@ -128,9 +128,9 @@ Vite usually serves `http://localhost:5173`.
 
 On macOS, native window buttons sit in a 40px strip above the sidebar brand, with the sidebar background continuing behind them. There is no divider below the brand. In wide windows the content toolbar keeps its original top position and height; narrow windows reserve space for the window buttons. Drag the empty header area to move the window; search and toolbar controls remain interactive. Collapsed navigation reserves space for the system buttons. See [window chrome notes](plan/2026-09-26-macos-integrated-titlebar.md).
 
-Server uses a dark `#141826` icon background; Desktop uses white `#FFFFFF`. Both keep the same central pink artwork. Desktop windows, trays and Windows installer shortcuts use the white assets; the Server tray, installer and Web favicon keep the dark assets. Regenerate Desktop assets with `python scripts/dev/generate-desktop-icon.py` (Pillow required).
+Server uses a dark `#141826` icon background; Desktop uses soft cool off-white `#F5F6F8`. Both keep the same central pink artwork. Desktop windows, trays and Windows installer shortcuts use the off-white assets; the Server tray, installer and Web favicon keep the dark assets. Regenerate Desktop assets with `python scripts/dev/generate-desktop-icon.py` (Pillow required).
 
-The macOS Dock and packaged ICNS use `public/Curated-desktop-icon-macos.png`, with the white artwork centered at about 84% of a transparent canvas to match typical Mac icon proportions. Fully quit and reopen Desktop after changing these assets; installed shortcuts and bundle icons require rebuilding and updating the package. See [the icon guide](../icon/README.md) and [the implementation record](plan/2026-04-13-desktop-icon-sync-plan.md).
+The macOS Dock and packaged ICNS use `public/Curated-desktop-icon-macos.png`, with the off-white artwork centered at about 84% of a transparent canvas to match typical Mac icon proportions. Fully quit and reopen Desktop after changing these assets; installed shortcuts and bundle icons require rebuilding and updating the package. See [the icon guide](../icon/README.md) and [the implementation record](plan/2026-04-13-desktop-icon-sync-plan.md).
 
 ```powershell
 pnpm dev:electron

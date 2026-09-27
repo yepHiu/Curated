@@ -12,13 +12,13 @@
 
 ### 2026-09-27 Server / Desktop 图标区分（当前规则）
 
-本节取代下文历史记录中两端共用深色图标的约定。
+本节取代下文历史记录中两端共用深色图标的约定。Desktop 底色根据用户反馈由纯白 `#FFFFFF` 调整为冷调浅灰白 `#F5F6F8`，派生资源已同步。
 
 - Server 保留现有 `#141826` 深色底源图、Web favicon 及 Go 内嵌 ICO，源文件字节不变。
-- Desktop 新增 `#FFFFFF` 白底源图，沿用现有圆角透明轮廓与 `curated-mark.png` 的中央图案；无位移、缩放或颜色变更，透明边缘在白底重新合成。
+- Desktop 使用 `#F5F6F8` 冷调浅灰白底源图，沿用现有圆角透明轮廓与 `curated-mark.png` 的中央图案；无位移、缩放或颜色变更，透明边缘在白底重新合成。
 - `scripts/dev/generate-desktop-icon.py`（Python + Pillow）统一派生 Desktop PNG、9 尺寸 ICO 与 384 px macOS Dock 图。
-- Electron 开发 / 打包资源解析仅查找 Desktop 图标；Windows 组件与 legacy 一体包的壳、安装器 / 卸载入口 / 快捷方式使用白底；独立 Server 继续深色。
-- macOS 开发 bundle 同步白底 PNG 与带留白 Dock 图，独立 Desktop 打包用白底生成 ICNS。
+- Electron 开发 / 打包资源解析仅查找 Desktop 图标；Windows 组件与 legacy 一体包的壳、安装器 / 卸载入口 / 快捷方式使用浅灰白底；独立 Server 继续深色。
+- macOS 开发 bundle 同步浅灰白底 PNG 与带留白 Dock 图，独立 Desktop 打包用浅灰白底生成 ICNS。
 - 验证：Electron 80 项测试、相关 release Python 24 项测试、`pnpm build:electron:main` 通过；像素检查确认圆角透明度和中央实色粉色像素一致，ICO 包含全部 9 个尺寸。
 - 生效方式：开发版完整退出并重启 Desktop；安装版本通过后续重建 / 更新安装包生效。本次未重打生产包。
 
