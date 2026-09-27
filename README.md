@@ -33,7 +33,7 @@ This README is the short public entry. For setup details, configuration, packagi
 
 ## Download
 
-Full 1.7.2 source adds a one-run Windows upgrade from registered all-in-one installations; see the [migration guide](docs/guide.md#migrating-an-old-all-in-one-installation) for supported layouts and pending Windows acceptance.
+Full/Server 1.7.3 and Desktop 0.2.1 source add Chinese Windows setup and automatic shutdown before upgrading; Full removes registered old all-in-one installations after a verified backup. New packages await release; see the [migration guide](docs/guide.md#migrating-an-old-all-in-one-installation) for supported layouts and Windows acceptance.
 
 Official Windows packages are on **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**. Use the [latest release](https://github.com/yepHiu/Curated/releases/latest).
 

@@ -31,7 +31,7 @@ Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，
 
 ## 下载
 
-Full 1.7.2 源码已加入旧一体版一次运行安装器升级流程；支持范围与待完成的 Windows 验收见[迁移指南](docs/guide.md#migrating-an-old-all-in-one-installation)。
+Full/Server 1.7.3、Desktop 0.2.1 源码已补齐 Windows 安装器中文与自动退出，Full 在备份校验后自动卸载旧一体版；新包待发布，支持范围与 Windows 验收见[迁移指南](docs/guide.md#migrating-an-old-all-in-one-installation)。
 
 正式 Windows 安装包和便携包发布在 **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**。请使用 [最新 Release](https://github.com/yepHiu/Curated/releases/latest)。
 

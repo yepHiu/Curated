@@ -31,7 +31,7 @@ Curated はローカルファーストのメディアライブラリです。Vue
 
 ## ダウンロード
 
-Full 1.7.2 のソースには旧一体型から一度の実行で移行する Windows インストーラを追加しています。対応範囲と未実施の Windows 検証は[移行ガイド](docs/guide.md#migrating-an-old-all-in-one-installation)を参照してください。
+Full/Server 1.7.3、Desktop 0.2.1 のソースでは Windows インストーラの簡体字中国語対応と更新前の自動終了を追加しました。Full はバックアップ検証後に旧一体型をアンインストールします。新パッケージは未公開です。対応範囲と Windows 検証は[移行ガイド](docs/guide.md#migrating-an-old-all-in-one-installation)を参照してください。
 
 公式の Windows パッケージは **[GitHub Releases](https://github.com/yepHiu/Curated/releases)** にあります。[最新リリース](https://github.com/yepHiu/Curated/releases/latest) を使ってください。
 
