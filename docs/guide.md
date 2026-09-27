@@ -124,6 +124,10 @@ Vite usually serves `http://localhost:5173`.
 - Local loopback Web API development talks to `http://127.0.0.1:8080` directly; the Vite `/api` proxy remains as fallback.
 - Optional `VITE_API_BASE_URL` overrides the API base. Optional `VITE_LOG_LEVEL` sets the default browser log level.
 
+### Brand resources
+
+Curated is the umbrella brand; Curated Server and Curated Desktop are the service and desktop client; Curated App names the Android / iOS mobile client; Curated Web is the Server-hosted browser entry. Names, Outfit typography, the existing pink mark, dark Server / Web icons and off-white Desktop / App icons are documented in [the brand guidelines](reference/curated-brand-guidelines.md). The [offline asset preview](../icon/brand/index.html) includes five wordmarks, named icons, mobile sources and font licensing. Generate it with `python scripts/dev/generate-brand-assets.py` after installing Pillow, fonttools and brotli. This resource pack does not imply mobile integration or release.
+
 ### Electron
 
 On macOS, native window buttons sit in a 40px strip above the sidebar brand, with the sidebar background continuing behind them. There is no divider below the brand. In wide windows the content toolbar keeps its original top position and height; narrow windows reserve space for the window buttons. Drag the empty header area to move the window; search and toolbar controls remain interactive. Collapsed navigation reserves space for the system buttons. See [window chrome notes](plan/2026-09-26-macos-integrated-titlebar.md).

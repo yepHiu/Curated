@@ -19,7 +19,7 @@
 
 # Curated
 
-Server は暗い背景、Desktop はオフホワイト（`#F5F6F8`）の背景のアイコンを使用し、中央の図柄は共通です。[アイコンガイド](icon/README.md)を参照してください。
+Server は暗い背景、Desktop はオフホワイト（`#F5F6F8`）の背景のアイコンを使用し、中央の図柄は共通です。[ブランドガイド](docs/reference/curated-brand-guidelines.md)と[アセット一覧](icon/brand/index.html)を参照してください。
 
 Desktop の設定またはトレイからサーバー接続を保存・管理・切り替えできます。[接続ガイド](docs/guide.md#desktop-server-connections)を参照してください。
 

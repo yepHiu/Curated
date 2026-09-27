@@ -1,5 +1,7 @@
 # Curated 品牌源图
 
+完整的 Curated / Server / Desktop / App（Android / iOS）/ Web 品牌家族规范见 [品牌规范](../docs/reference/curated-brand-guidelines.md)。组合字标、明确产品命名的图标副本、移动图标源、字体许可与离线预览放在 [`brand/`](brand/index.html)，生成入口为 `python scripts/dev/generate-brand-assets.py`（Pillow、fonttools、brotli）。
+
 `icon/` 放品牌源文件与 Desktop 的 Windows ICO 派生资源。文件名全部小写 kebab-case。
 
 | 怎么叫 | 文件 | 是什么 |

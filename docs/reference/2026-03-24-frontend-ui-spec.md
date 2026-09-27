@@ -5,6 +5,7 @@
 ## 1. 总体原则
 
 - 产品正式名称为 `Curated`。
+- 品牌家族的名称、组合字标、Outfit 字体、核心图案和图标身份色统一参照 [Curated 品牌规范](curated-brand-guidelines.md)。`Curated App` 表示 Android / iOS 移动客户端，`Curated Web` 表示浏览器入口；界面语义颜色继续按本文令牌治理。
 - 前端主要是桌面浏览体验，核心流程是浏览资料库、查看详情、播放、设置。
 - 业务组件放在 `src/components/jav-library`，通用基础组件放在 `src/components/ui`。
 - 新增能力优先复用现有主题变量、卡片结构和交互模式，避免随意引入新的视觉体系。

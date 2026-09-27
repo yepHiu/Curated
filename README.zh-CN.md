@@ -19,7 +19,7 @@
 
 # Curated
 
-Server 使用深色底图标，Desktop 使用浅灰白底图标（`#F5F6F8`），中央图案保持一致。详见[图标资源说明](icon/README.md)。
+Server 使用深色底图标，Desktop 使用浅灰白底图标（`#F5F6F8`），中央图案保持一致。详见[品牌规范](docs/reference/curated-brand-guidelines.md)与[资源预览](icon/brand/index.html)。
 
 Desktop 可从设置或托盘保存、管理和切换服务器；详见[服务器连接说明](docs/guide.md#desktop-server-connections)。
 
