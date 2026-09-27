@@ -232,14 +232,7 @@ function createMainWindow(
     },
   })
 
-  window.on("query-session-end", () => {
-    isSystemSessionEnding = true
-    isQuitting = true
-  })
-  window.on("session-end", () => {
-    isSystemSessionEnding = true
-    isQuitting = true
-  })
+  handleWindowsSessionShutdown(window)
   window.on("close", (event) => {
     if (!shouldHideWindowOnClose({ isQuitting, isSystemSessionEnding })) {
       return
@@ -611,6 +604,18 @@ function openExternalUrl(url: string): void {
   } catch { /* Ignore malformed external destinations. */ }
 }
 
+function handleWindowsSessionShutdown(window: BrowserWindow): void {
+  window.on("query-session-end", () => {
+    isSystemSessionEnding = true
+    isQuitting = true
+  })
+  window.on("session-end", () => {
+    isSystemSessionEnding = true
+    isQuitting = true
+    app.quit()
+  })
+}
+
 function showConnections(): void {
   if (connectionWindow && !connectionWindow.isDestroyed()) {
     if (connectionError) connectionWindow.webContents.send("curated:connection-error", connectionError)
@@ -628,6 +633,7 @@ function showConnections(): void {
     ...(appIconPath ? { icon: appIconPath } : {}),
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, preload: path.join(__dirname, "launcher-preload.cjs") },
   })
+  handleWindowsSessionShutdown(connectionWindow)
   connectionWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }))
   connectionWindow.webContents.on("will-navigate", event => event.preventDefault())
   connectionWindow.on("closed", () => {

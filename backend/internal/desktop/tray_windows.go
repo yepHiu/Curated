@@ -37,6 +37,7 @@ const (
 	wmNull             = 0x0000
 	wmClose            = 0x0010
 	wmDestroy          = 0x0002
+	wmQueryEndSession  = 0x0011
 	wmEndSession       = 0x0016
 	wmLButtonUp        = 0x0202
 	wmRButtonUp        = 0x0205
@@ -422,8 +423,13 @@ func (t *nativeTrayRuntime) handleWindowMessage(hWnd windows.Handle, message uin
 		t.removeNotifyIcon()
 		destroyWindowFn(t.window)
 		return 0
+	case wmQueryEndSession:
+		return 1 // Allow Restart Manager to request a graceful shutdown.
 	case wmDestroy, wmEndSession:
 		if message == wmEndSession {
+			if wParam == 0 {
+				return 0 // Shutdown was cancelled; keep the Server running.
+			}
 			t.requestAppCancel()
 		}
 		t.removeNotifyIcon()

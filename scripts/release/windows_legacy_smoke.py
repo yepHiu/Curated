@@ -103,7 +103,18 @@ def main():
             run(setup, '/LEGACYDATADIR=' + str(base / 'missing'), success=False)
             assert legacy_location() and not installed('server')
             assert database.is_file()
-            run(setup, '/LEGACYDATADIR=' + str(data), '/LEGACYCONFIG=' + str(config))
+            # Leave the old tray running: Full must close it before backup/removal.
+            prior = subprocess.Popen([str(old / 'resources/app/curated.exe'), '-mode', 'tray', '-autostart', '-config', str(config)],
+                                     cwd=old / 'resources/app', env=environment)
+            try:
+                wait_health(prior, baseline['version'])
+                run(setup, '/LANG=chinesesimp', '/LEGACYDATADIR=' + str(data), '/LEGACYCONFIG=' + str(config))
+                prior.wait(timeout=30)
+                assert prior.returncode == 0, 'Old Server did not exit gracefully'
+            finally:
+                if prior.poll() is None:
+                    prior.terminate()
+                    prior.wait(timeout=20)
             assert not legacy_location(), 'Old registration survived Full migration'
             for component in ('server', 'desktop'):
                 assert installed(component)[0] == current[component]

@@ -19,6 +19,7 @@ func main() {
 	data := flag.String("data-root", "", "original absolute data directory")
 	config := flag.String("config", "", "original absolute runtime config")
 	errorFile := flag.String("error-file", "", "UTF-8 error output for Full")
+	programDir := flag.String("program-dir", "", "exact installation directory to stop")
 	flag.Parse()
 	local := os.Getenv("LOCALAPPDATA")
 	if !filepath.IsAbs(local) {
@@ -30,6 +31,8 @@ func main() {
 	o := installmigration.Options{StateDir: filepath.Join(local, "Curated", "installer-migrations"), ProfilePath: launchprofile.Path(local), DataRoot: *data, ConfigPath: *config}
 	var err error
 	switch *action {
+	case "stop":
+		err = installmigration.StopInstallation(context.Background(), *programDir)
 	case "prepare":
 		err = installmigration.Prepare(context.Background(), o, installmigration.Windows{})
 	case "complete":

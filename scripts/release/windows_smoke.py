@@ -83,7 +83,26 @@ def main():
                     db.execute('CREATE TABLE upgrade_smoke_marker (value TEXT NOT NULL)')
                     db.execute("INSERT INTO upgrade_smoke_marker VALUES ('original library')")
                     db.commit()
-            run(setup(args.component))
+            running = []
+            try:
+                if 'server' in selected:
+                    running.append(subprocess.Popen([str(old_locations['server'] / 'curated.exe'), '-mode', 'tray', '-autostart', '-config', str(config)], cwd=old_locations['server']))
+                    for attempt in range(60):
+                        try:
+                            with urllib.request.urlopen('http://127.0.0.1:18881/api/health', timeout=2) as response:
+                                assert json.load(response)['version'] == '1.6.0'
+                            break
+                        except Exception:
+                            if running[0].poll() is not None or attempt == 59: raise
+                            time.sleep(0.5)
+                run(setup(args.component), '/LANG=chinesesimp')
+                for process in running:
+                    assert process.wait(timeout=30) == 0, 'Old component did not exit gracefully'
+            finally:
+                for process in running:
+                    if process.poll() is None:
+                        process.terminate()
+                        process.wait(timeout=20)
             for c in selected:
                 assert installed(c) == (current[c], old_locations[c]), (c, installed(c))
             if 'server' in selected:

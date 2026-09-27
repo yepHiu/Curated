@@ -8,7 +8,8 @@ AppPublisher=Curated
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-CloseApplications=yes
+; The migration helper validates installation identity and closes exact processes.
+CloseApplications=no
 RestartApplications=no
 CreateAppDir=no
 Uninstallable=no
@@ -56,19 +57,6 @@ end;
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := (LegacyDirectory = '') and ((PageID = DataPage.ID) or (PageID = ConfigPage.ID));
-end;
-
-procedure RegisterExtraCloseApplicationsResources;
-begin
-  if LegacyDirectory <> '' then begin
-#if VER >= EncodeVer(7, 0, 0)
-    RegisterExtraCloseApplicationsResource(AddBackslash(LegacyDirectory) + 'Curated.exe');
-    RegisterExtraCloseApplicationsResource(AddBackslash(LegacyDirectory) + 'resources\app\curated.exe');
-#else
-    RegisterExtraCloseApplicationsResource(False, AddBackslash(LegacyDirectory) + 'Curated.exe');
-    RegisterExtraCloseApplicationsResource(False, AddBackslash(LegacyDirectory) + 'resources\app\curated.exe');
-#endif
-  end;
 end;
 
 function RunMigration(Action: String): Boolean;

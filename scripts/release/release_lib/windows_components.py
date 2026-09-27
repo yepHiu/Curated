@@ -104,6 +104,8 @@ def package_windows(root: Path, output: Path, component: str = 'full') -> Path:
     reused = {}
     with tempfile.TemporaryDirectory(prefix='curated-components-') as temporary:
         work = Path(temporary)
+        helper = work / 'curated-migrate.exe'
+        _run(['go', 'build', '-tags', 'release', '-o', str(helper), './cmd/curated-migrate'], cwd=root / 'backend')
         for c in selected:
             from .component_channels import reuse_assets
             entries = reuse_assets(c, current[c], 'windows', 'x64', output)
@@ -132,14 +134,13 @@ def package_windows(root: Path, output: Path, component: str = 'full') -> Path:
                 'MANAGED_DELETE': 'frontend-dist' if c == 'server' else 'resources\\app',
                 'LEGACY_CHECK': 'True' if c == 'server' else 'False',
                 'RUN_FLAGS': 'nowait' if c == 'server' else 'nowait postinstall skipifsilent',
+                'MIGRATION_HELPER': str(helper),
             })
             with ZipFile(output / artifact_name(c, current[c], 'windows', 'x64', 'zip'), 'w', ZIP_DEFLATED) as archive:
                 for file in sorted(payload.rglob('*')):
                     if file.is_file():
                         archive.write(file, file.relative_to(payload))
         if component == 'full':
-            helper = work / 'curated-migrate.exe'
-            _run(['go', 'build', '-tags', 'release', '-o', str(helper), './cmd/curated-migrate'], cwd=root / 'backend')
             installers = {c: output / artifact_name(c, current[c], 'windows', 'x64', 'exe') for c in selected}
             compile_installer(root, work, output, 'full', current['full'], {
                 'SERVER_INSTALLER': str(installers['server']), 'DESKTOP_INSTALLER': str(installers['desktop']),

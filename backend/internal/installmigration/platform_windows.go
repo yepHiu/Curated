@@ -122,6 +122,9 @@ func (platform Windows) CheckStopped(old *Legacy) error {
 			return fmt.Errorf("Curated startup entry belongs to another location; no program was removed")
 		}
 	}
+	if err := StopInstallation(context.Background(), old.Directory); err != nil {
+		return err
+	}
 	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
 		return err

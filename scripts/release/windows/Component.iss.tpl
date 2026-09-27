@@ -21,11 +21,13 @@ ShowLanguageDialog=yes
 LanguageDetectionMethod=uilanguage
 SetupIconFile=__SOURCE__\curated.ico
 UninstallDisplayIcon={app}\curated.ico
-CloseApplications=yes
+; The scoped helper closes and waits before InstallDelete can remove old files.
+CloseApplications=no
 RestartApplications=no
 CloseApplicationsFilter=__EXE__
 
 [Files]
+Source: "__MIGRATION_HELPER__"; DestName: "curated-migrate.exe"; Flags: dontcopy
 Source: "__SOURCE__\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [InstallDelete]
@@ -38,6 +40,24 @@ Name: "{autoprograms}\Curated __COMPONENT__"; Filename: "{app}\__EXE__"; Paramet
 Filename: "{app}\__EXE__"; Parameters: "__PARAMS__"; Description: "{cm:LaunchApp,Curated __COMPONENT__}"; Flags: __RUN_FLAGS__; Check: ShouldLaunch
 
 [Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Code: Integer;
+  ErrorPath, Parameters: String;
+  ErrorText: AnsiString;
+begin
+  Result := '';
+  ExtractTemporaryFile('curated-migrate.exe');
+  ErrorPath := ExpandConstant('{tmp}\curated-stop-error.txt');
+  DeleteFile(ErrorPath);
+  Parameters := '-action stop -program-dir "' + AddBackslash(ExpandConstant('{app}')) + '." -error-file "' + ErrorPath + '"';
+  if Exec(ExpandConstant('{tmp}\curated-migrate.exe'), Parameters, '', SW_HIDE, ewWaitUntilTerminated, Code) then begin
+    if Code = 0 then exit;
+  end;
+  Result := CustomMessage('CloseFailed');
+  if LoadStringFromFile(ErrorPath, ErrorText) then Result := Result + #13#10 + UTF8Decode(ErrorText);
+end;
+
 function ShouldLaunch: Boolean;
 begin
   Result := ExpandConstant('{param:NOLAUNCH|0}') <> '1';
