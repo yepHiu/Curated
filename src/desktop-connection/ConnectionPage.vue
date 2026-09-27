@@ -11,17 +11,19 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useTheme } from "@/composables/use-theme"
 import DesktopSettingsDialog from "./DesktopSettingsDialog.vue"
+import DesktopDebugDialog from "./DesktopDebugDialog.vue"
+import type { DesktopDebugAPI } from "./debug-contract"
 import type { DesktopSettingsAPI } from "./settings-contract"
 
 interface Connection { url: string; name: string; serverId: string }
 interface Discovered { serverId: string; name: string; version: string; urls: string[]; expiresAt: number }
-interface ConnectionAPI extends DesktopSettingsAPI {
+interface ConnectionAPI extends DesktopSettingsAPI, DesktopDebugAPI {
   onError?(callback: (message: string) => void): () => void
   platform?: string
   updateTitleBar?(colors: { background: string; foreground: string }): Promise<void>
   checkUpdate(): Promise<string>
   discover(): Promise<Discovered[]>
-  list(): Promise<{ connections: Connection[]; lastUrl?: string; activeUrl?: string; suggestedUrl?: string; desktopVersion: string; error?: string }>
+  list(): Promise<{ connections: Connection[]; lastUrl?: string; activeUrl?: string; suggestedUrl?: string; desktopVersion: string; development?: boolean; error?: string }>
   connect(url: string): Promise<{ ok: boolean; error?: string }>
   cancel(): Promise<void>
   forget(url: string): Promise<void>
@@ -35,9 +37,11 @@ const connections = ref<Connection[]>([])
 const busy = ref(false)
 const error = ref("")
 const version = ref("")
+const development = ref(false)
 const updateMessage = ref("")
 const updating = ref(false)
 const settingsOpen = ref(false)
+const debugOpen = ref(false)
 const found = ref<Discovered[]>([])
 const scanning = ref(false)
 const discoveryError = ref("")
@@ -106,6 +110,7 @@ async function refresh() {
   connections.value = state.connections
   activeUrl.value = state.activeUrl ?? ""
   version.value = state.desktopVersion
+  development.value = state.development === true
   return state
 }
 
@@ -169,7 +174,7 @@ onMounted(async () => {
       </Button>
     </div>
     <main class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <div class="mx-auto flex w-full max-w-xl flex-col gap-4 px-5 pb-6 sm:px-6">
+      <div class="mx-auto flex w-full max-w-xl flex-col gap-4 px-5 sm:px-6" :class="development ? 'pb-16' : 'pb-6'">
         <Card class="gap-4 border-0 py-5 shadow-none">
           <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] grid-rows-1 items-center gap-x-2.5 px-5 pb-0">
             <span class="flex size-9 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><Server class="size-4" /></span>
@@ -256,5 +261,15 @@ onMounted(async () => {
       </div>
     </main>
     <DesktopSettingsDialog v-if="api" v-model:open="settingsOpen" :api="api" />
+    <DesktopDebugDialog v-if="api && development" v-model:open="debugOpen" :api="api" :initial-address="address" />
+    <button
+      v-if="development"
+      type="button"
+      class="fixed right-3 bottom-3 z-40 select-none rounded-md border border-border bg-background px-2 py-1 font-mono text-[0.65rem] font-bold tracking-widest text-muted-foreground uppercase shadow-sm transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      data-connection-debug-trigger
+      :aria-label="t('debugOpen')"
+      aria-haspopup="dialog"
+      @click="debugOpen = true"
+    >DEBUG</button>
   </div>
 </template>

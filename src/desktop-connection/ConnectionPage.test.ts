@@ -67,3 +67,14 @@ it("keeps cancellation available during a pending connection", async () => {
   await flushPromises()
   expect(wrapper.get("input").attributes("disabled")).toBeUndefined()
 })
+
+it("shows local debug tools only for a development Desktop", async () => {
+  const production = render()
+  await flushPromises()
+  expect(production.wrapper.find("[data-connection-debug-trigger]").exists()).toBe(false)
+  const development = render({ list: vi.fn().mockResolvedValue({ connections: [], desktopVersion: "0.2.0", development: true }) })
+  await flushPromises()
+  expect(development.wrapper.get("[data-connection-debug-trigger]").attributes("aria-haspopup")).toBe("dialog")
+  await development.wrapper.get("[data-connection-debug-trigger]").trigger("click")
+  expect(development.wrapper.getComponent({ name: "DesktopDebugDialog" }).props("open")).toBe(true)
+})

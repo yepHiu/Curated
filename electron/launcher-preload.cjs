@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require("electron")
 contextBridge.exposeInMainWorld("curatedConnection", {
   platform: process.platform,
   updateTitleBar: (colors) => ipcRenderer.invoke("curated:connection-titlebar", colors),
+  readDebugInfo: () => ipcRenderer.invoke("curated:connection-debug-info"),
+  probeDebugServer: (url) => ipcRenderer.invoke("curated:connection-debug-probe", url),
+  openDebugDevTools: () => ipcRenderer.invoke("curated:connection-debug-devtools"),
   // 设置通道仅暴露给随包本地连接页。
   readSettings: () => ipcRenderer.invoke("curated:settings-read"),
   // 主进程重新校验所有输入，不信任 renderer 的表单约束。

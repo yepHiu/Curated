@@ -431,6 +431,31 @@ function registerDesktopIpc(): void {
   const requireLauncher = (event: Electron.IpcMainInvokeEvent) => {
     if (event.sender.id !== connectionWindow?.webContents.id || event.senderFrame !== event.sender.mainFrame || event.senderFrame?.url !== connectionPageUrl) throw new Error("Untrusted connection manager")
   }
+  const requireDevelopmentLauncher = (event: Electron.IpcMainInvokeEvent) => {
+    requireLauncher(event)
+    if (app.isPackaged) throw new Error("Debug tools are available only in development")
+  }
+  ipcMain.handle("curated:connection-debug-info", event => {
+    requireDevelopmentLauncher(event)
+    const state = serverStore?.snapshot()
+    return {
+      version: desktopInfo.version, buildStamp: desktopInfo.buildStamp,
+      platform: desktopInfo.platform, arch: desktopInfo.arch,
+      activeUrl: currentServerUrl, lastUrl: state?.servers.find(item => item.id === state.lastServerId)?.url,
+      savedCount: state?.servers.length ?? 0, proxyMode: runningPreferences.proxyMode,
+    }
+  })
+  ipcMain.handle("curated:connection-debug-probe", async (event, input: unknown) => {
+    requireDevelopmentLauncher(event)
+    const url = normalizeServerUrl(input)
+    const started = performance.now()
+    const info = await probeIdentity(url, undefined, desktopFetch)
+    return { url, name: info.name, version: info.version, serverId: info.serverId, legacy: info.legacy === true, latencyMs: Math.round(performance.now() - started) }
+  })
+  ipcMain.handle("curated:connection-debug-devtools", event => {
+    requireDevelopmentLauncher(event)
+    connectionWindow?.webContents.openDevTools({ mode: "detach" })
+  })
   ipcMain.handle("curated:connection-titlebar", (event, colors: unknown) => {
     requireLauncher(event)
     if (typeof colors !== "object" || colors === null) throw new Error("Invalid titlebar colors")
@@ -519,11 +544,10 @@ function registerDesktopIpc(): void {
     if (event.sender.id !== connectionWindow?.webContents.id || event.senderFrame !== event.sender.mainFrame || event.senderFrame?.url !== connectionPageUrl) throw new Error("Untrusted connection manager")
     try {
       if (action === undefined) {
-        if (connectionError && !serverStore) throw new Error(connectionError)
         const state = serverStore?.snapshot()
         return { connections: state?.servers.map(item => ({ ...item, serverId: item.serverId ?? `legacy:${item.url}` })) ?? [],
           lastUrl: state?.servers.find(item => item.id === state.lastServerId)?.url, activeUrl: currentServerUrl,
-          suggestedUrl: localServerSuggestion(), desktopVersion: desktopInfo.version, error: connectionError }
+          suggestedUrl: localServerSuggestion(), desktopVersion: desktopInfo.version, development: desktopInfo.development, error: connectionError }
       }
       if (action === "check-update") {
         pendingDesktopCheck ??= checkDesktopUpdate(desktopInfo, desktopRelease.updateFeed, desktopFetch).finally(() => { pendingDesktopCheck = undefined })
