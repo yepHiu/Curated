@@ -1,7 +1,7 @@
 """Generate brand lockups, an offline preview and a contact sheet.
 
 Requires Pillow, fonttools and brotli. Uses the locked local Outfit package.
-The existing Curated master wordmark and mark are retained without redrawing.
+The Curated master geometry and mark are retained without redrawing.
 """
 from base64 import b64encode
 from io import BytesIO

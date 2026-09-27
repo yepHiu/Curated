@@ -31,6 +31,7 @@ scripts/dev/*
 !scripts/dev/start-electron.cjs
 !scripts/dev/generate-desktop-icon.py
 !scripts/dev/generate-brand-assets.py
+!scripts/dev/clean-brand-wordmark.py
 !scripts/release/
 !scripts/prd/
 scripts/release/*
