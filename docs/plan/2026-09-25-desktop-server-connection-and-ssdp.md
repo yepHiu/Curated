@@ -568,6 +568,8 @@ Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed
 
 ## 13. 2026-09-27：worktree 合并与兼容性验收
 
+开发态连接页空白修正：本机 `curated-dev` 在 `127.0.0.1:8080` 仅提供 API 与可能过期的 `backend/frontend-dist/`；曾出现首页 200，但若干 JS/CSS URL 回退为 `text/html`，导致 Electron 空白。独立开发 Desktop 在验证本机 dev health 与 Vite Curated 入口后改用 `5173` 渲染，API 保持 `8080`；Vite 缺失时在连接页提示启动命令。正式包、远程 Server 与其它本机端口不重定向。单元测试覆盖选择边界；真实 Windows Electron 使用独立 profile 连接 `8080` 后完整渲染 Vite 内容页，主窗口 preload 可用且无页面异常。未修改 Server 静态资源或生产包。
+
 合并 `codex/desktop-server-split`（c2164011）全部提交到 master，保留主分支已发布三包身份、独立版本、更新 manifest 和 CD 恢复。整合 worktree 的 Server 身份、SSDP、Vue 本地连接页、代理与登录启动设置、开发品牌 bundle；重复的旧单版本打包器由已验证的组件链路取代，不重新引入错名、Mac Server/Full 或旧 latest 更新。
 
 验收重点：0.1.0 的 servers.json 与已存连接/会话保留；新版 Desktop 连接旧 health-only Server；旧一体包安全迁移边界；已有数据库/自定义配置不被覆盖；remote 操作限制、身份变更提示、发现不可用时手动连接。完成全量 CI、真实 macOS 打包启动，以及 Windows CD 干净安装和上一版本原地升级测试后发布新版本。保留 worktree 中未提交的生产打包计划草稿，不擅自提交过时文档。

@@ -5,6 +5,8 @@ alwaysApply: true
 
 ## 2026-09-27 Apple Silicon Desktop CD
 
+开发态 Desktop 连接本机 `127.0.0.1:8080` 且 health 为 `curated-dev` 时，只有本机 Vite `5173` 提供 Curated 开发入口才加载其内容页；API 仍指向 Server `8080`。正式包与远程 Server 保持各自静态托管，Vite 缺失在连接页反馈错误。
+
 `cd-release.yml` 新增 macos-15 arm64 job，`package-macos-desktop` 生成独立 Desktop DMG/ZIP，版本来自 desktop.json。包内 distribution=desktop，首启服务器列表，不捆绑 Go/FFmpeg/服务器前端。ad-hoc 签名，无 Apple 公证。Windows 和 Mac 均成功后才合并 SHA256SUMS、核对 commit/版本/上传摘要并公开同一 Release；仅 Apple Silicon。独立 Desktop feed 与 Windows 三包现已实现，见末尾 Split release implementation。本机实际包启动验证通过，Mac 云端构建待后续标签验证，旧 v1.5.8 不受此提交影响。
 
 ## 2026-09-27 Windows 自动发布流程

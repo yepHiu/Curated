@@ -115,6 +115,8 @@ Windows Full/Server/Desktop installers and ZIPs are now implemented in `componen
 
 Desktop 0.2.0 uses the bundled Vue launcher and starts independently (`pnpm dev:electron` no longer starts Go/Vite). Server 1.7.0 adds public `/api/server-info`, persistent `<databasePath>.server-id`, optional IPv4 SSDP and `/discovery/description.xml`. `discoveryEnabled` requires LAN listening; changes apply after restart. Released `servers.json` and origin sessions are preserved; development `connections.json` imports atomically only when no released profile exists. Canonical CD/names/version/update isolation remains authoritative; package.yml delegates to it in draft mode. Upgrade details and limitations: docs/guide.md, “Desktop discovery and upgrade”. These facts supersede earlier development/pending notes above.
 
+开发版 Desktop 连接本机 `http://127.0.0.1:8080` 的 `curated-dev` Server 时，使用已运行的 Vite `http://127.0.0.1:5173` 渲染内容页，API 仍连接 `8080`。先分别运行 Go Server 与 `pnpm dev`；Vite 不可用时连接页明确报错。独立 Desktop 不自动启动两者，正式包及远程 Server 仍使用 Server 托管的页面。此规则避免本机过期 `backend/frontend-dist/` 返回 HTML 冒充缺失 JS/CSS 导致空白窗口。
+
 
 ## Full 1.7.2 legacy upgrade implementation (2026-09-27)
 
