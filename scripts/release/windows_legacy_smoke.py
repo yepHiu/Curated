@@ -1,5 +1,6 @@
 """Real all-in-one -> Full acceptance. Run only on the disposable Windows CD host."""
 import argparse
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -88,9 +89,10 @@ def main():
             finally:
                 prior.terminate()
                 prior.wait(timeout=20)
-            with sqlite3.connect(database) as db:
+            with closing(sqlite3.connect(database)) as db:
                 db.execute('CREATE TABLE full_upgrade_marker (favorite INTEGER, rating INTEGER)')
                 db.execute('INSERT INTO full_upgrade_marker VALUES (1, 5)')
+                db.commit()
             settings = data / 'config/library-config.cfg'
             settings.parent.mkdir(parents=True, exist_ok=True)
             settings.write_text(json.dumps({'launchAtLogin': True, 'autoLibraryWatch': False}))
@@ -122,7 +124,7 @@ def main():
                 wait_health(server, current['server'])
                 with urllib.request.urlopen('http://127.0.0.1:18882/', timeout=5) as response:
                     assert b'<html' in response.read().lower()
-                with sqlite3.connect(database) as db:
+                with closing(sqlite3.connect(database)) as db:
                     assert db.execute('SELECT favorite, rating FROM full_upgrade_marker').fetchone() == (1, 5)
                     assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
             finally:
