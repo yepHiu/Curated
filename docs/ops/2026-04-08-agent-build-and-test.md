@@ -253,3 +253,7 @@ Windows Full/Server/Desktop installers and ZIPs are now implemented in `componen
 ## 2026-09-27 worktree integration
 
 Desktop 0.2.0 uses the bundled Vue launcher and starts independently (`pnpm dev:electron` no longer starts Go/Vite). Server 1.7.0 adds public `/api/server-info`, persistent `<databasePath>.server-id`, optional IPv4 SSDP and `/discovery/description.xml`. `discoveryEnabled` requires LAN listening; changes apply after restart. Released `servers.json` and origin sessions are preserved; development `connections.json` imports atomically only when no released profile exists. Canonical CD/names/version/update isolation remains authoritative; package.yml delegates to it in draft mode. Upgrade details and limitations: docs/guide.md, “Desktop discovery and upgrade”. These facts supersede earlier development/pending notes above.
+
+## macOS DMG layout build (Desktop 0.2.1)
+
+Before local Mac packaging, create/activate a Python virtual environment and install `scripts/release/macos/requirements.txt`; see [DMG build instructions](../../scripts/release/macos/README.md). The macOS CD job installs the same pinned dmgbuild/ds_store/mac_alias versions. New builds verify the compressed image, mount it read-only and check the actual Finder layout, app signature and Applications link. Artwork updates also require opening the resulting DMG in Finder. Use a fresh output directory for validation; do not overwrite existing packages.

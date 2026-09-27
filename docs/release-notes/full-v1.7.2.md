@@ -6,6 +6,10 @@ Curated Full 1.7.2 adds a Windows upgrade flow for existing all-in-one installat
 
 ### What's Changed
 
+**A clearer Mac installation window**
+
+- A branded Retina installation window places Curated Desktop beside Applications, with a drag-to-install arrow and concise Chinese and English instructions.
+
 **Upgrade without manually uninstalling first**
 
 - Full detects registered older all-in-one installations and asks for the original data directory and optional custom Server configuration.
@@ -20,13 +24,13 @@ Curated Full 1.7.2 adds a Windows upgrade flow for existing all-in-one installat
 
 ### Upgrade Notes
 
-- Full 1.7.2 includes Server 1.7.2 and Desktop 0.2.0. Existing split installations retain their installation identities; newer installed components are not downgraded.
+- Full 1.7.2 includes Server 1.7.2 and Desktop 0.2.1. Existing split installations retain their installation identities; newer installed components are not downgraded.
 - Fully quit Curated from its tray, then run Full as the same Windows user that owns the library. Windows may ask for permission to remove the old machine-wide program. No separate manual uninstall is required for supported layouts.
 - Automatic migration requires an existing registered all-in-one installation with data and media outside its program directory. Custom filesystem paths must be absolute. Program-local data, portable installations, conflicting installations and cross-account migration need the explicit procedure in the migration guide.
 - Migration backups and configuration snapshots remain under `%LOCALAPPDATA%\Curated\installer-migrations`. Keep this directory and `server-startup.json`; the startup profile may reference a saved custom configuration there.
 - Old authentication sessions are not merged. Unlock again if prompted. After a newer Server has migrated the database, use the verified pre-upgrade backup before returning to an older Server.
 - Old in-app update clients continue to use the legacy update feed. Download and run the Full installer explicitly for this migration.
-- Windows packages remain unsigned. macOS Desktop remains Apple Silicon only, ad-hoc signed and not notarized; its version is unchanged. Verify downloads with `SHA256SUMS.txt`.
+- Windows packages remain unsigned. macOS Desktop remains Apple Silicon only, ad-hoc signed and not notarized. Verify downloads with `SHA256SUMS.txt`.
 
 See the [upgrade and migration guide](https://github.com/yepHiu/Curated/blob/full-v1.7.2/docs/guide.md) for custom configuration and recovery details.
 
@@ -36,10 +40,10 @@ See the [upgrade and migration guide](https://github.com/yepHiu/Curated/blob/ful
 - [Windows Full offline ZIP](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Full-1.7.2-windows-x64.zip)
 - [Windows Server installer](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Server-Setup-1.7.2-windows-x64.exe)
 - [Windows Server portable ZIP](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Server-1.7.2-windows-x64.zip)
-- [Windows Desktop installer](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Desktop-Setup-0.2.0-windows-x64.exe)
-- [Windows Desktop portable ZIP](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Desktop-0.2.0-windows-x64.zip)
-- [macOS Desktop DMG (Apple Silicon)](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Desktop-0.2.0-macos-arm64.dmg)
-- [macOS Desktop ZIP (Apple Silicon)](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Desktop-0.2.0-macos-arm64.zip)
+- [Windows Desktop installer](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Desktop-Setup-0.2.1-windows-x64.exe)
+- [Windows Desktop portable ZIP](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Desktop-0.2.1-windows-x64.zip)
+- [macOS Desktop DMG (Apple Silicon)](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Desktop-0.2.1-macos-arm64.dmg)
+- [macOS Desktop ZIP (Apple Silicon)](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Desktop-0.2.1-macos-arm64.zip)
 - [Release manifest](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/release.json)
 - [SHA-256 checksums](https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/SHA256SUMS.txt)
 
