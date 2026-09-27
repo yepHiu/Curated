@@ -7,6 +7,7 @@ alwaysApply: true
 
 ## 一眼记住
 
+- **两端图标**：Server 保留深色底 `icon/curated-appicon.png` / `backend/internal/assets/curated.ico`；Desktop 用白底 `icon/curated-desktop-appicon.png` / `icon/curated-desktop.ico`，中央粉色图案相同。运行 `python scripts/dev/generate-desktop-icon.py` 同步 Desktop PNG、ICO 与 macOS Dock 图；完整退出 Desktop 再启动生效，已安装包需重新构建 / 更新。详见 `icon/README.md`。
 - **产品正式名称**：`Curated`。仓库目录 / npm `name` 仍可能是 `jav-shadcn`。
 - **前端启动**：仓库根目录运行 `pnpm dev`，默认 `http://localhost:5173`。
 - **后端启动**：`cd backend && go run ./cmd/curated`，开发默认地址 `127.0.0.1:8080`（仅 loopback），健康名 `curated-dev`。

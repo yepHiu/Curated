@@ -108,7 +108,7 @@ Desktop/Full 版本源位于 `scripts/release/versions/`，Server 位于 `backen
 - 根目录：`Vue 3 + TypeScript + Vite`，UI 为 `shadcn-vue` + Tailwind CSS v4，主题变量在 `src/style.css`。
 - 包管理器：**pnpm**；以 `pnpm-lock.yaml` 为准。
 - 路径别名：`@` → `src`。
-- **品牌资源约定**：设计源文件放在 `icon/`，统一小写 kebab-case，按用途命名：`icon/curated-wordmark.png`（标志 + 文字，README 顶部），`icon/curated-appicon.png`（圆角深色底应用图标，托盘 / 安装包 / Web 源图），`icon/curated-mark.png`（仅核心标志，透明底）。应用图标派生到 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`。对照表见 `icon/README.md`。
+- **品牌资源约定**：`icon/curated-wordmark.png` 用于 README；`icon/curated-appicon.png` 是 Server 深色底（`#141826`）源图，派生到 `public/Curated-icon.png` 与 `backend/internal/assets/curated.ico`。Desktop 使用白底（`#FFFFFF`）的 `icon/curated-desktop-appicon.png`、`public/Curated-desktop-icon.png` 与 `icon/curated-desktop.ico`；macOS Dock / ICNS 使用带透明留白的 `public/Curated-desktop-icon-macos.png`。两端核心粉色图案相同，Desktop 不回退到 Server 图标。生成脚本为 `scripts/dev/generate-desktop-icon.py`，详见 `icon/README.md`。
 - **公开文档约定**：根目录 `README.md` 为英文短入口，`README.zh-CN.md` 与 `README.ja-JP.md` 为完整翻译版；详细手册与 `docs/` 文章索引在 **`docs/guide.md`**；根目录 `API.md` 是唯一公开 API 参考文档，README 不再承载完整 API 列表或操作长文。
 
 ## 后端（已实现）

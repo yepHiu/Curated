@@ -19,6 +19,8 @@
 
 # Curated
 
+Server 使用深色底图标，Desktop 使用白色底图标，中央图案保持一致。详见[图标资源说明](icon/README.md)。
+
 Desktop 可从设置或托盘保存、管理和切换服务器；详见[服务器连接说明](docs/guide.md#desktop-server-connections)。
 
 萃取帧现支持截图预览、重试与撤销、源文件高清帧，以及 GIF/MP4/WebM 片段；详见[操作手册](docs/guide.md#curated-capture-and-inspection)。
