@@ -71,6 +71,72 @@ def stage_app(root: Path, app: Path, version: str, stamp: str) -> None:
         plistlib.dump(info, stream)
 
 
+def dmg_settings(root: Path, app: Path) -> dict:
+    """Use real Finder items; all decoration lives in a hidden Retina background."""
+    return {
+        'format': 'UDZO', 'filesystem': 'HFS+',
+        'files': [str(app)], 'symlinks': {'Applications': '/Applications'},
+        'icon': str(app / 'Contents/Resources/curated.icns'),
+        'background': str(root / 'scripts/release/macos/background.png'),
+        'window_rect': ((160, 120), (680, 488)),
+        'default_view': 'icon-view', 'include_icon_view_settings': True,
+        'include_list_view_settings': False,
+        'icon_locations': {'Curated Desktop.app': (190, 244), 'Applications': (490, 244)},
+        'icon_size': 104, 'text_size': 13, 'label_pos': 'bottom',
+        # SetFile extension-hiding adds FinderInfo to the signed app and breaks
+        # strict codesign validation. Leave the app metadata untouched.
+        'arrange_by': None, 'hide_extensions': [],
+        'show_status_bar': False, 'show_tab_view': False, 'show_toolbar': False,
+        'show_pathbar': False, 'show_sidebar': False,
+    }
+
+
+def build_styled_dmg(root: Path, app: Path, destination: Path) -> None:
+    if destination.exists():
+        raise FileExistsError(destination)
+    from dmgbuild import build_dmg
+    for name in ('background.png', 'background@2x.png'):
+        if not (root / 'scripts/release/macos' / name).is_file():
+            raise FileNotFoundError(f'Missing DMG artwork: {name}')
+    build_dmg(str(destination), 'Curated Desktop', settings=dmg_settings(root, app))
+
+
+def verify_styled_dmg(root: Path, destination: Path) -> None:
+    """Inspect the mounted artifact itself, including Finder layout and real items."""
+    from ds_store import DSStore
+    with tempfile.TemporaryDirectory(prefix='curated-dmg-verify-') as temporary:
+        mount = Path(temporary) / 'volume'
+        mount.mkdir()
+        _run(['hdiutil', 'attach', '-readonly', '-nobrowse', '-mountpoint', str(mount),
+              str(destination)], cwd=root)
+        try:
+            if not (mount / 'Curated Desktop.app/Contents/MacOS/Curated Desktop').is_file():
+                raise ValueError('DMG is missing its application')
+            if not (mount / 'Applications').is_symlink() or (mount / 'Applications').readlink() != Path('/Applications'):
+                raise ValueError('DMG Applications link is invalid')
+            if not (mount / '.background.tiff').is_file() or not (mount / '.VolumeIcon.icns').is_file():
+                raise ValueError('DMG artwork is missing')
+            expected = dmg_settings(root, mount / 'Curated Desktop.app')
+            with DSStore.open(str(mount / '.DS_Store'), 'r') as store:
+                if store['.']['icvl'] != (b'type', b'icnv'):
+                    raise ValueError('DMG must open in icon view')
+                options = store['.']['icvp']
+                if options['backgroundType'] != 2 or not options.get('backgroundImageAlias'):
+                    raise ValueError('DMG background is not bound to Finder')
+                if options['iconSize'] != expected['icon_size'] or options['arrangeBy'] != 'none':
+                    raise ValueError('DMG icon layout is invalid')
+                for name, location in expected['icon_locations'].items():
+                    if store[name]['Iloc'] != location:
+                        raise ValueError(f'DMG item moved: {name}')
+                (x, y), (width, height) = expected['window_rect']
+                bounds = '{{%d, %d}, {%d, %d}}' % (x, y, width, height)
+                if store['.']['bwsp']['WindowBounds'] != bounds:
+                    raise ValueError('DMG window bounds are invalid')
+            _run(['codesign', '--verify', '--deep', '--strict', str(mount / 'Curated Desktop.app')], cwd=root)
+        finally:
+            _run(['hdiutil', 'detach', str(mount)], cwd=root)
+
+
 def package_macos_desktop(root: Path, output: Path) -> Path:
     if platform.system() != 'Darwin' or platform.machine() != 'arm64':
         raise RuntimeError('macOS Desktop packaging requires an Apple Silicon macOS host')
@@ -82,6 +148,11 @@ def package_macos_desktop(root: Path, output: Path) -> Path:
     for name in [*names, 'desktop-macos.json']:
         if (output / name).exists():
             raise FileExistsError(f'Release artifact already exists: {output / name}')
+    try:
+        import dmgbuild  # noqa: F401 -- fail before building app/ZIP if not installed
+    except ImportError as error:
+        raise RuntimeError('Install macOS packaging dependencies in this Python environment: '
+                           'python -m pip install -r scripts/release/macos/requirements.txt') from error
     _run(['pnpm', 'build:electron:main'], cwd=root)
     stamp = utc_build_stamp()
     with tempfile.TemporaryDirectory(prefix='curated-desktop-macos-') as temporary:
@@ -106,10 +177,9 @@ def package_macos_desktop(root: Path, output: Path) -> Path:
         _run(['codesign', '--force', '--deep', '--sign', '-', str(app)], cwd=root)
         _run(['codesign', '--verify', '--deep', '--strict', str(app)], cwd=root)
         _run(['ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(app), str(output / names[1])], cwd=root)
-        (volume / 'Applications').symlink_to('/Applications')
-        _run(['hdiutil', 'create', '-volname', 'Curated Desktop', '-srcfolder', str(volume),
-              '-format', 'UDZO', str(output / names[0])], cwd=root)
+        build_styled_dmg(root, app, output / names[0])
         _run(['hdiutil', 'verify', str(output / names[0])], cwd=root)
+        verify_styled_dmg(root, output / names[0])
     artifacts = []
     for name in names:
         with (output / name).open('rb') as stream:

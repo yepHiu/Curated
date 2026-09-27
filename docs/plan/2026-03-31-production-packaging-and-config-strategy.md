@@ -1,5 +1,18 @@
 # Curated 生产打包、配置、版本与发布计划
 
+## 2026-09-27：macOS DMG 安装窗口视觉优化
+
+状态：**已实现并在本机 Finder 挂载验收，尚未发布。** Desktop 源码版本升为 0.2.1，Full 1.7.2 说明同步引用，避免 CD 复用旧 0.2.0 DMG。
+
+- 保留原 Curated 粉色字标，浅色背景、简短中英文安装说明。左侧真实应用图标、右侧 Applications 链接，箭头提示拖动；底部说明从应用程序打开。原生图标标签和键盘操作保留。
+- 背景逻辑尺寸 680 × 440，Finder 窗口 680 × 488，为系统窗口栏预留空间。图标 104 pt，坐标 (190, 244) / (490, 244)。浅色背景为静态资源，不承诺自动跟随深色模式。
+- `scripts/release/macos/render-background.swift` 使用系统字体及既有品牌资源生成 1× / 2× PNG；两个版本均提交，普通打包无须运行 Swift。首轮检查发现 Retina 双重缩放，已修复并重新挂载确认。
+- `dmgbuild` 直接生成 `.DS_Store`、背景别名、Retina 多表示 TIFF 和卷图标，构建无需 Finder/AppleScript 自动化或相关授权。依赖固定在 `scripts/release/macos/requirements.txt`，macOS CD 安装同一版本。
+- 完整包构建先校验依赖，产物拒绝覆盖。`verify_styled_dmg` 只读挂载成品，验证应用、Applications 链接、隐藏背景/卷图标、图标布局、窗口尺寸及 app 签名，最后卸载测试卷。原有 `hdiutil verify`、ZIP 和 manifest 校验保留。
+- 本机已检查 Finder 实际显示：品牌与说明无裁切、箭头与可拖动图标对齐、文件名清楚。完整打包、hdiutil verify、挂载布局与 strict codesign 验证、Desktop 0.2.1 standaloneStartup 测试及 55 项发布脚本测试全部通过，actionlint 通过；此次不改变签名/公证状态，也不修改应用内部界面。
+- 完整挂载验签发现隐藏 app 扩展名会写入 FinderInfo、破坏严格签名校验；已移除对签名 app 的扩展名标志修改，并保留成品验签门禁。
+- 本地依赖安装与再生成步骤见 `scripts/release/macos/README.md`，测试包放在 `.workspace/dmg-verified-0.2.1/`；保留原生产包及早期测试产物。
+
 ## 2026-09-27：Full 1.7.2 旧版一次安装升级可行性与实施范围
 
 状态：**兼容代码已实现并完成本地 Go 测试及 Windows 交叉编译，真实 Windows 安装/UAC 验收待 CD 执行；尚未发布 1.7.2。** 源码目标 Full / Server 1.7.2，Desktop 0.2.0 复用已发布包。下方原方案保留为目标范围，实际实现边界以本节实施记录及 guide 为准。

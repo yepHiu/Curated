@@ -114,3 +114,37 @@ class MacDesktopTests(unittest.TestCase):
         self.write('mac/' + mac_artifact_names('0.1.0')[0], b'corruption')
         with self.assertRaisesRegex(ValueError, 'checksum'):
             cd.merge_macos(self.root, self.root / 'out', self.root / 'mac', metadata)
+
+
+class DMGLayoutTests(unittest.TestCase):
+    def test_real_items_and_retina_artwork_fit_fixed_window(self):
+        import struct
+        from scripts.release.release_lib.macos_desktop import dmg_settings
+        root = Path(__file__).resolve().parents[3]
+        app = root / '.workspace/fixture/Curated Desktop.app'
+        settings = dmg_settings(root, app)
+        self.assertEqual(settings['files'], [str(app)])
+        self.assertEqual(settings['symlinks'], {'Applications': '/Applications'})
+        self.assertEqual(settings['default_view'], 'icon-view')
+        self.assertEqual(settings['hide_extensions'], [])  # no FinderInfo on signed bundle
+        width, frame_height = settings['window_rect'][1]
+        height = frame_height - 48  # room for native title/path bars
+        for name, factor in [('background.png', 1), ('background@2x.png', 2)]:
+            raw = (root / 'scripts/release/macos' / name).read_bytes()
+            self.assertEqual(raw[:8], b'\x89PNG\r\n\x1a\n')
+            self.assertEqual(struct.unpack('>II', raw[16:24]), (width * factor, height * factor))
+        radius = settings['icon_size'] / 2
+        for x, y in settings['icon_locations'].values():
+            self.assertGreater(x - radius, 0)
+            self.assertLess(x + radius, width)
+            self.assertGreater(y - radius, 160)  # instruction area stays clear
+            self.assertLess(y + radius + 35, 352)  # native filename stays above footer
+
+    def test_styled_dmg_never_overwrites_an_existing_artifact(self):
+        from scripts.release.release_lib.macos_desktop import build_styled_dmg
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / 'existing.dmg'
+            destination.write_bytes(b'previous production artifact')
+            with self.assertRaises(FileExistsError):
+                build_styled_dmg(Path(directory), Path(directory) / 'app', destination)
+            self.assertEqual(destination.read_bytes(), b'previous production artifact')
