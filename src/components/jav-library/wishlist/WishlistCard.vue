@@ -3,6 +3,7 @@ import type { WishlistItem } from "@/domain/wishlist/types"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
 import MediaStill from "@/components/jav-library/MediaStill.vue"
+import MovieReleaseBadge from "@/components/jav-library/MovieReleaseBadge.vue"
 import { useI18n } from "vue-i18n"
 defineProps<{ item: WishlistItem; image?: string }>()
 defineEmits<{ open: [id: string] }>()
@@ -23,10 +24,11 @@ const { t } = useI18n()
           <CardTitle class="truncate text-[13px]">{{ item.metadata.title || t('wishlist.awaiting') }}</CardTitle>
           <CardDescription class="truncate text-[11px]">{{ item.metadata.actors.join(' · ') }}</CardDescription>
         </div>
-        <div class="flex min-h-6 min-w-0 items-center gap-1">
+        <div class="flex min-h-6 min-w-0 flex-wrap items-center gap-1">
           <Badge variant="secondary" class="min-w-0 max-w-full shrink truncate rounded-full px-1.5 text-[10px]">
             {{ t(item.enrichmentState !== 'ready' ? `wishlist.states.${item.enrichmentState}` : `wishlist.filters.${item.status}`) }}
           </Badge>
+          <MovieReleaseBadge :release-date="item.metadata.releaseDate" class="px-1.5 text-[10px]" />
         </div>
       </CardContent>
     </button>

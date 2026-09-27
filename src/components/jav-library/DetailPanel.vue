@@ -38,6 +38,7 @@ import MovieDeleteConfirmDialog from "@/components/jav-library/MovieDeleteConfir
 import MovieEditDialog from "@/components/jav-library/MovieEditDialog.vue"
 import MovieMetadataRefreshConfirmDialog from "@/components/jav-library/MovieMetadataRefreshConfirmDialog.vue"
 import MovieRatingStars from "@/components/jav-library/MovieRatingStars.vue"
+import MovieReleaseBadge from "@/components/jav-library/MovieReleaseBadge.vue"
 import ExpandableText from "@/components/jav-library/ExpandableText.vue"
 import { formatMovieSummaryForDisplay } from "@/lib/format-movie-summary"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
@@ -396,10 +397,10 @@ function removeMetadataTag(tag: string) {
                 <span>—</span>
               </template>
               <span v-if="releaseDate" data-release-date>
-                <span aria-hidden="true"> · </span>{{ t("detailPanel.releaseDate") }}
-                <time :datetime="releaseDate">{{ releaseDate }}</time>
+                <span aria-hidden="true"> · </span>{{ t("detailPanel.releaseDate") }} <time :datetime="releaseDate">{{ releaseDate }}</time>
               </span>
               <span v-else-if="movie.year" aria-hidden="true"> · {{ movie.year }}</span>
+              <MovieReleaseBadge :release-date="releaseDate" class="ml-2 align-middle" />
               <span v-if="movie.resolution" aria-hidden="true"> · {{ movie.resolution }}</span>
               <span
                 v-if="metadataProvider"

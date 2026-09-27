@@ -1984,6 +1984,10 @@
     "collapseSummary": "Collapse summary",
     "fieldReleaseDate": "Release date",
     "releaseDate": "Release date",
+    "releaseStatus": {
+      "released": "Released",
+      "unreleased": "Unreleased"
+    },
     "fieldRuntimeMinutes": "Runtime (minutes)",
     "saveMovieEdit": "Save",
     "movieEditSaving": "Saving…",

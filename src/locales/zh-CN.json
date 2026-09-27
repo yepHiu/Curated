@@ -1984,6 +1984,10 @@
     "collapseSummary": "收起简介",
     "fieldReleaseDate": "发行日",
     "releaseDate": "发售日期",
+    "releaseStatus": {
+      "released": "已发售",
+      "unreleased": "未发售"
+    },
     "fieldRuntimeMinutes": "时长（分钟）",
     "saveMovieEdit": "保存",
     "movieEditSaving": "保存中…",
