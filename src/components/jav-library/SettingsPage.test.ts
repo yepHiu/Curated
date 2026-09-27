@@ -168,6 +168,13 @@ vi.mock("@/components/jav-library/settings/SettingsGeneralSection.vue", () => ({
 vi.mock("@/components/jav-library/settings/SettingsMaintenanceSection.vue", () => ({
   default: { name: "SettingsMaintenanceSection", template: "<section />" },
 }))
+vi.mock("@/components/jav-library/settings/SettingsLoggingSection.vue", () => ({
+  default: {
+    name: "SettingsLoggingSection",
+    props: ["autoSaveReady"],
+    template: '<section data-settings-logging :data-ready="String(autoSaveReady)" />',
+  },
+}))
 vi.mock("@/components/jav-library/settings/SettingsMetadataSection.vue", () => ({
   default: { name: "SettingsMetadataSection", template: "<section />" },
 }))
@@ -281,6 +288,14 @@ describe("SettingsPage movie CSV export", () => {
     mockState.libraryService = createLibraryServiceMock()
   })
 
+  it.each(["maintenance", "logging"])("keeps local log settings available via %s in development", async (section) => {
+    routeState.query.section = section
+    const wrapper = await mountSettingsPage()
+    expect(wrapper.find("#settings-section-maintenance").exists()).toBe(true)
+    expect(wrapper.get("[data-settings-logging]").attributes("data-ready")).toBe("true")
+    wrapper.unmount()
+  })
+
   it.each(["metadata", "maintenance", "logging", "ai", "network"])("redirects remote %s deep links and hides both navigation variants", async (section) => {
     localAccess.value = false
     routeState.query.section = section
@@ -290,6 +305,7 @@ describe("SettingsPage movie CSV export", () => {
       expect(wrapper.text()).not.toContain(`settings.${label}`)
     }
     expect(wrapper.find("#settings-section-overview").exists()).toBe(true)
+    expect(wrapper.find("[data-settings-logging]").exists()).toBe(false)
     wrapper.unmount()
   })
 

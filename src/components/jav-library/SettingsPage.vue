@@ -2373,7 +2373,7 @@ async function runMetadataRefreshForSelected() {
         :health-supported="useWebApi"
         @run-full-scan="runFullScan"
       />
-      <SettingsLoggingSection v-if="!isViteDev" :auto-save-ready="settingsAutoSaveReady" />
+      <SettingsLoggingSection :auto-save-ready="settingsAutoSaveReady" />
     </section>
     </TabsContent>
 
