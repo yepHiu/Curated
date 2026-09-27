@@ -14,6 +14,12 @@
     "chineseBody": "HarmonyOS Sans SC",
     "japaneseBody": "Noto Sans JP"
   },
+  "transparentAssets": {
+    "directory": "transparent/",
+    "preview": "transparent/index.html",
+    "previewImage": "transparent/preview.png",
+    "contents": "Five transparent wordmarks (PNG and mixed SVG), five named transparent marks (PNG), and one shared mark SVG. No icon background."
+  },
   "products": [
     { "id": "curated", "name": "Curated", "suffix": "", "role": "umbrella", "icon": "../curated-appicon.png" },
     { "id": "server", "name": "Curated Server", "suffix": "Server", "role": "server", "icon": "../curated-appicon.png" },
