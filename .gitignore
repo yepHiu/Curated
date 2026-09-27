@@ -57,6 +57,8 @@ scripts/prd/*
 !scripts/release/version.json
 !scripts/release/versions/
 !scripts/release/versions/*.json
+!scripts/release/macos/
+!scripts/release/macos/**
 !scripts/release/windows/
 !scripts/release/windows/**
 *.tsbuildinfo

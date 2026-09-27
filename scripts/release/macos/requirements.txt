@@ -1,0 +1,4 @@
+# Finder layout generation without scripting Finder (local builds and macOS CD).
+dmgbuild==1.6.7
+ds_store==1.3.3
+mac_alias==2.2.3

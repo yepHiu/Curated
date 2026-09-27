@@ -221,6 +221,8 @@ jobs:
           test "$(uname -m)" = arm64
           pnpm install --frozen-lockfile
           node node_modules/electron/install.js
+      - name: Install pinned DMG layout tools
+        run: python -m pip install -r scripts/release/macos/requirements.txt
       - name: Build standalone Desktop DMG and ZIP
         env:
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
