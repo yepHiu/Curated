@@ -6,6 +6,10 @@ Public HTTP API remains in root [`API.md`](../API.md). Folder policy for new doc
 
 If this handbook and current code disagree, treat the code as the source of truth.
 
+## Movie release dates
+
+Movie details show the release date (`YYYY-MM-DD`) next to the studio below the title when available; otherwise the existing year is shown. Dates come from scraped metadata, with a manually edited release date taking priority. Use **More actions → Refresh metadata** to try to fill a missing date, or **Edit movie information** to enter it. Provider data may omit dates; Mock dates are demonstration data. See [release date display](plan/2026-09-27-movie-release-date-display.md).
+
 ## Build size monitoring
 
 Builds allow reasonable feature growth. `bundle-policy.json` defines warning levels and generous absolute failure limits for initial JavaScript, all JavaScript, CSS, and the complete frontend output. A spike relative to the latest successful master frontend-quality job or cumulative growth since the reviewed `bundle-baseline.json` produces a warning, not a failure. Only an absolute severe limit blocks a build; named chunks no longer have individual hard caps.
