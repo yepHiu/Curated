@@ -1,42 +1,42 @@
 {
   "schema": 1,
   "component": "full",
-  "version": "1.7.2",
-  "sourceCommit": "36cc306b530be357f6ee24b16dec79be265e9631",
+  "version": "1.7.3",
+  "sourceCommit": "b067e59d087ea00481829604a2711db84582504b",
   "artifacts": [
     {
       "component": "full",
       "variant": "bundle",
-      "version": "1.7.2",
+      "version": "1.7.3",
       "channel": "stable",
       "platform": "windows",
       "arch": "x64",
       "format": "exe",
-      "fileName": "Curated-Full-Setup-1.7.2-windows-x64.exe",
-      "sha256": "0d4c274b5e4219bcbb3b4e0fc96028c7cd7901d953e9d72d5f3100d5d643592d",
-      "sourceCommit": "36cc306b530be357f6ee24b16dec79be265e9631",
+      "fileName": "Curated-Full-Setup-1.7.3-windows-x64.exe",
+      "sha256": "e53bf5fe0b8fd24499fb8844e19754125d6d1cc3153ebde8e909ec929f8b2d20",
+      "sourceCommit": "b067e59d087ea00481829604a2711db84582504b",
       "components": {
-        "server": "1.7.2",
-        "desktop": "0.2.0"
+        "server": "1.7.3",
+        "desktop": "0.2.1"
       },
-      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Full-Setup-1.7.2-windows-x64.exe"
+      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.7.3/Curated-Full-Setup-1.7.3-windows-x64.exe"
     },
     {
       "component": "full",
       "variant": "bundle",
-      "version": "1.7.2",
+      "version": "1.7.3",
       "channel": "stable",
       "platform": "windows",
       "arch": "x64",
       "format": "zip",
-      "fileName": "Curated-Full-1.7.2-windows-x64.zip",
-      "sha256": "f81db52c6ce8381f45019c794a6fdd714b618e0fb527e8cd832b5f7172e205b4",
-      "sourceCommit": "36cc306b530be357f6ee24b16dec79be265e9631",
+      "fileName": "Curated-Full-1.7.3-windows-x64.zip",
+      "sha256": "fd3475ec42c6ad5e004ac950dd42832745e73cc3661683731946723f1f19eac6",
+      "sourceCommit": "b067e59d087ea00481829604a2711db84582504b",
       "components": {
-        "server": "1.7.2",
-        "desktop": "0.2.0"
+        "server": "1.7.3",
+        "desktop": "0.2.1"
       },
-      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.7.2/Curated-Full-1.7.2-windows-x64.zip"
+      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.7.3/Curated-Full-1.7.3-windows-x64.zip"
     }
   ]
 }
