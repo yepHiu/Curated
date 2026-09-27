@@ -595,3 +595,22 @@ Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed
 最终闭环：CD run **36265609782** 所有作业成功，包括 Windows 真实旧版安装 → 新版覆盖升级、旧数据库标记与 `PRAGMA integrity_check`、安装位置/AppID 保留，以及干净安装、Full 部分失败后重试、防降级、卸载数据保留、Desktop 退出后 Server 存活；Mac 真实旧/新 Desktop 的连接记录/Cookie/localStorage 保留通过。修复后的 Windows SQLite 句柄清理通过。
 
 正式发布：https://github.com/yepHiu/Curated/releases/tag/full-v1.7.1 。公开资产独立复核 **8 个分发包**齐全，GitHub 资产 SHA-256 与 `release.json` 一致，来源 commit 为 `9e3e3de9a2ffacf3d72d0878a679990ee071f5c1`；Server 1.7.0、Desktop 0.2.0、Full 1.7.1 三个在线更新通道与公开 manifest 完全一致，legacy `/releases/latest` 仍为 `v1.5.8`。已解决本次识别出的兼容回归，保留前述 legacy 手动迁移、初次身份信任、LAN 多播与 Mac 未公证边界。
+
+## 14. 2026-09-27：Full 1.7.2 旧一体包迁移的本机预验收
+
+**结论：本机开发态隔离测试通过；真实旧版安装 → Full 自动拆分尚未验收，因此不发布 Full 1.7.2，也不把本机结果等同于可安全升级的证明。** 当前机器有正在运行的开发 Server，且缺少可重置的 Windows 安装环境。`windows_legacy_smoke.py` 会安装和卸载真实程序、修改当前用户的注册表登录启动项；它只允许在空白的一次性 Windows 主机运行。此次没有运行它，也没有构建、推送或发布新生产包。
+
+本机结果：
+
+| 检查 | 结果 | 范围 |
+|---|---|---|
+| `go test -tags release ./internal/installmigration ./internal/launchprofile ./internal/backup` | 通过 | 已验证备份先于卸载、失败阻断、取消后重试、迁移记录与自定义路径等隔离逻辑 |
+| `go test ./...` | 通过 | 开发构建后端全量测试 |
+| `pnpm test:electron` | 9 文件、79 测试通过 | Desktop 连接和兼容行为的代码级检查 |
+| `python -m unittest discover -s scripts/release/tests -p "test_*.py"` | 53 测试通过 | 发布脚本与安装器生成逻辑；修复 Windows 上无法保留 POSIX 执行权限导致的 Mac fixture 误报，Mac 权限断言仍在 POSIX 上运行 |
+| 本机 Inno Setup 6.7.1 编译 Full 模板，嵌入隔离的占位文件 | 通过 | 验证实际模板语法和版本占位符；占位文件不是可安装的组件 |
+| 本机 `release/installer/Curated-Setup-1.4.13.exe` 与固定基线 SHA-256 | 一致 | 旧 1.5.8 安装器本机不存在；真实验收脚本会从固定 URL 下载并核对摘要 |
+
+另发现新 `windows_legacy_smoke.py` 在 SQLite 测试标记和升级后校验时只用了 `sqlite3.connect` 的上下文管理；这不会关闭连接，可能导致 Windows 临时目录清理失败。已改为显式关闭连接，并在写标记后提交事务。`go test -tags release ./...` 的两项旧“开发版兜底版本”断言失败，因为这些测试要求无 `release` 构建标签；正式开发测试命令 `go test ./...` 全部通过，迁移相关包在 `release` 标签下也通过。
+
+生产打包前的隔离 Windows 验收门槛：在可重置且无个人 Curated 安装/数据的 Windows x64 主机，从固定 commit 本地构建候选 Full/Server/Desktop；执行 `windows_legacy_smoke.py` 的 1.5.8 和 1.4.13 两条旧一体包升级路径；核对每条路径的备份有效、原数据库标记与完整性、自定义配置和登录启动迁移、Server/ Desktop 独立安装身份、Desktop 连接与重新运行 Full 的幂等性，再执行 `windows_smoke.py --component full` 验证已拆分组件升级、部分失败重试和卸载保留数据。任一检查失败时记录安装日志并修复，在结果全部通过前不触发新的 Full 生产发布。跨账户、便携版和非标准旧卸载命令仍按现有手册处理，不纳入自动迁移承诺。
