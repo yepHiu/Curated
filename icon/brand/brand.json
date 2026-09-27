@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "colors": {
+    "pink": "#FE628E",
+    "serverBackground": "#141826",
+    "clientBackground": "#F5F6F8",
+    "lightText": "#0F1219",
+    "darkText": "#F8F7FB"
+  },
+  "typography": {
+    "brand": "Outfit",
+    "brandWeight": 600,
+    "latinBody": "Noto Sans",
+    "chineseBody": "HarmonyOS Sans SC",
+    "japaneseBody": "Noto Sans JP"
+  },
+  "products": [
+    { "id": "curated", "name": "Curated", "suffix": "", "role": "umbrella", "icon": "../curated-appicon.png" },
+    { "id": "server", "name": "Curated Server", "suffix": "Server", "role": "server", "icon": "../curated-appicon.png" },
+    { "id": "desktop", "name": "Curated Desktop", "suffix": "Desktop", "role": "desktop-client", "icon": "../curated-desktop-appicon.png" },
+    { "id": "app", "name": "Curated App", "suffix": "App", "role": "mobile-client-android-ios", "icon": "curated-app-appicon.png" },
+    { "id": "web", "name": "Curated Web", "suffix": "Web", "role": "browser-entry", "icon": "../curated-appicon.png" }
+  ]
+}
