@@ -13,7 +13,6 @@ import {
   Play,
   RefreshCw,
   Settings2,
-  Sparkles,
   Trash2,
   Users,
   X,
@@ -29,6 +28,7 @@ import { buildBrowseRouteTarget } from "@/lib/library-query"
 import { statusDotClass } from "@/lib/ui/status-tone"
 import { useComicLibraryService } from "@/services/comic-library-service"
 import { usePhotoLibraryService } from "@/services/photo-library-service"
+import curatedMark from "@/icon/curated-mark.png"
 
 const props = withDefaults(
   defineProps<{
@@ -199,6 +199,9 @@ const isActive = (page: AppPage) => {
 }
 
 const brandHomeTarget = computed(() => ({ name: "home" as const }))
+const brandName = typeof window !== "undefined" && window.javLibrary
+  ? "Curated Desktop"
+  : "Curated Web"
 
 function formatSidebarPlaybackClock(seconds: number): string {
   const total = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0))
@@ -298,19 +301,18 @@ const getNavigationTarget = (page: AppPage) => {
           :class="
             props.compact
               ? 'w-full max-w-full justify-center gap-0 text-base'
-              : 'min-w-0 w-fit min-w-0 max-w-full flex-1 gap-2 text-lg sm:text-xl'
+              : 'min-w-0 w-fit max-w-full flex-1 gap-2 text-lg'
           "
-          :title="t('nav.home')"
+          :title="`${brandName} · ${t('nav.home')}`"
+          :aria-label="`${brandName} · ${t('nav.home')}`"
         >
-          <span class="relative inline-flex items-center">
-            <Sparkles class="size-5 shrink-0 text-primary sm:size-[1.35rem]" aria-hidden="true" />
-          </span>
+          <img :src="curatedMark" class="size-7 shrink-0 object-contain" alt="" aria-hidden="true" />
           <span
             class="truncate transition-[opacity,max-width] duration-200 motion-reduce:transition-none"
-            :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'"
+            :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-full opacity-100'"
             :aria-hidden="props.compact"
           >
-            Curated
+            {{ brandName }}
           </span>
         </RouterLink>
       </div>
