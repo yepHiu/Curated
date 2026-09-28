@@ -1986,3 +1986,15 @@ type PingAllProvidersResponse struct {
 	OK        int                 `json:"ok"`
 	Fail      int                 `json:"fail"`
 }
+
+// BackupFileSelectionDTO identifies a package retained on the Server.
+type BackupFileSelectionDTO struct {
+	BackupPath string `json:"backupPath"`
+}
+
+// BackupFileInspectionDTO returns the uploaded package's location and preflight.
+// BackupPath is empty if the package failed verification and was discarded.
+type BackupFileInspectionDTO struct {
+	BackupPath string                    `json:"backupPath"`
+	Preflight  BackupRestorePreflightDTO `json:"preflight"`
+}

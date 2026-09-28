@@ -526,6 +526,8 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/app-update/download", h.handleDownloadAppUpdateInstaller)
 	mux.HandleFunc("POST /api/app-update/install", h.handleInstallAppUpdate)
 	mux.HandleFunc("DELETE /api/app-update/downloaded-installer", h.handleClearDownloadedAppUpdateInstaller)
+	mux.HandleFunc("GET /api/maintenance/backups/latest", localServerManagement(h.handleLatestBackup))
+	mux.HandleFunc("POST /api/maintenance/backups/inspect-file", localServerManagement(h.handleInspectBackupFile))
 	mux.HandleFunc("POST /api/maintenance/backups", localServerManagement(h.handleCreateBackup))
 	mux.HandleFunc("POST /api/maintenance/backups/verify", localServerManagement(h.handleVerifyBackup))
 	mux.HandleFunc("POST /api/maintenance/backups/preflight", localServerManagement(h.handlePreflightBackupRestore))

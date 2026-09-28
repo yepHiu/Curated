@@ -203,6 +203,12 @@ func Create(ctx context.Context, options CreateOptions) (Manifest, error) {
 	return manifest, nil
 }
 
+// RetainVerifiedPackage publishes a verified temporary package without replacing
+// an existing file, including on filesystems without hard-link support.
+func RetainVerifiedPackage(temporary, destination string) error {
+	return commitPackageWithoutOverwrite(temporary, destination, os.Link)
+}
+
 func commitPackageWithoutOverwrite(tempPath, destination string, linkFile func(string, string) error) error {
 	// The temporary package lives beside the destination. A hard link is the
 	// atomic fast path and, unlike os.Rename on Unix, never replaces a racing
