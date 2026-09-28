@@ -3029,6 +3029,22 @@ func TestHandlePatchSettings_BackupDirectoryPersistsInSettingsDTO(t *testing.T) 
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
 
+	initial, err := http.Get(srv.URL + "/api/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var initialDTO contracts.SettingsDTO
+	if err := json.NewDecoder(initial.Body).Decode(&initialDTO); err != nil {
+		t.Fatal(err)
+	}
+	initial.Body.Close()
+	if got, want := initialDTO.BackupDirectory, config.DefaultBackupDirectory(); got != want {
+		t.Fatalf("initial backup destination = %q, want %q", got, want)
+	}
+	if ctl.BackupDirectory() != "" {
+		t.Fatal("reading default persisted a preference")
+	}
+
 	directory := filepath.Join(root, "backups")
 	body, err := json.Marshal(map[string]string{"backupDirectory": "  " + directory + "  "})
 	if err != nil {
@@ -3069,6 +3085,29 @@ func TestHandlePatchSettings_BackupDirectoryPersistsInSettingsDTO(t *testing.T) 
 	}
 	if got := dto.BackupDirectory; got != directory {
 		t.Fatalf("GET BackupDirectory = %q, want %q", got, directory)
+	}
+
+	clearReq, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/settings", strings.NewReader(`{"backupDirectory":""}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	clearReq.Header.Set("Content-Type", "application/json")
+	clearResp, err := http.DefaultClient.Do(clearReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearResp.Body.Close()
+	if clearResp.StatusCode != http.StatusOK {
+		t.Fatalf("clear status = %d", clearResp.StatusCode)
+	}
+	if err := json.NewDecoder(clearResp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := dto.BackupDirectory, config.DefaultBackupDirectory(); got != want {
+		t.Fatalf("cleared destination = %q, want %q", got, want)
+	}
+	if ctl.BackupDirectory() != "" {
+		t.Fatal("clearing should persist empty, not the resolved default")
 	}
 }
 

@@ -2018,6 +2018,9 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if h.backupDirectoryCtl != nil {
 		backupDirectory = strings.TrimSpace(h.backupDirectoryCtl.BackupDirectory())
 	}
+	if backupDirectory == "" {
+		backupDirectory = config.DefaultBackupDirectory()
+	}
 	comicLibraryEnabled := h.cfg.ComicLibraryEnabled
 	autoComicLibraryWatch := h.cfg.AutoComicLibraryWatch
 	defaultComicImportLibraryPathID := strings.TrimSpace(h.cfg.DefaultComicImportLibraryPathID)
