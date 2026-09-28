@@ -16,7 +16,8 @@ const { t } = useI18n()
         <div class="relative aspect-[358/537] w-full overflow-hidden rounded-[0.95rem] border border-border/60 bg-muted/30">
           <MediaStill v-if="image" :src="image" :alt="item.code" />
           <div v-else class="flex size-full items-center justify-center p-4 text-center font-medium text-muted-foreground">{{ item.code }}</div>
-          <Badge class="absolute top-0 left-0 m-[var(--movie-card-padding)] max-w-[calc(100%-1.25rem)] truncate rounded-full border-border/40 bg-background/85 px-1.5 text-[10px] text-foreground shadow-sm backdrop-blur-sm">{{ item.code }}</Badge>
+          <!-- MediaStill 的图片使用 z-[1]；番号需在图片加载后仍显示于海报上方。 -->
+          <Badge class="absolute top-0 left-0 z-[2] m-[var(--movie-card-padding)] max-w-[calc(100%-1.25rem)] truncate rounded-full border-border/40 bg-background/85 px-1.5 text-[10px] text-foreground shadow-sm backdrop-blur-sm">{{ item.code }}</Badge>
         </div>
       </div>
       <CardContent class="flex w-full min-w-0 min-h-[var(--movie-card-body-min-height)] flex-col justify-between gap-[var(--movie-card-body-gap)] p-[var(--movie-card-padding)]">
