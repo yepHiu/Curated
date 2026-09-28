@@ -10,6 +10,7 @@ const backendLogState = ref({
 } as { logDir?: string; logFilePrefix?: string; logMaxAgeDays?: number; logLevel?: string })
 
 const patchBackendLog = vi.fn()
+const revealLogDirectory = vi.fn()
 
 vi.mock("@/components/ui/badge", () => ({
   Badge: { name: "Badge", template: "<span><slot /></span>" },
@@ -19,17 +20,6 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     t: (key: string) => key,
   }),
-}))
-
-vi.mock("@vueuse/core", () => ({
-  watchDebounced: (
-    source: unknown,
-    cb: unknown,
-  ) => {
-    void source
-    void cb
-    return () => {}
-  },
 }))
 
 vi.mock("lucide-vue-next", () => ({
@@ -62,6 +52,7 @@ vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
     backendLog: computed(() => backendLogState.value),
     patchBackendLog,
+    revealLogDirectory,
   }),
 }))
 
@@ -124,12 +115,14 @@ function backendLogLevelSelectValue(wrapper: ReturnType<typeof mount>) {
 
 describe("SettingsLoggingSection", () => {
   beforeEach(() => {
-    access.value = true;
+    access.value = true
+    delete window.javLibrary
+    revealLogDirectory.mockReset().mockResolvedValue(undefined)
     backendLogState.value = {
       logDir: "",
       logLevel: "info",
     }
-    patchBackendLog.mockReset()
+    patchBackendLog.mockReset().mockResolvedValue(undefined)
   })
 
   it("syncs backend log drafts from service after autoSaveReady becomes true", async () => {
@@ -146,6 +139,7 @@ describe("SettingsLoggingSection", () => {
     await flushPromises()
 
     expect(backendLogLevelSelectValue(wrapper)).toBe("debug")
+    wrapper.unmount()
   })
 })
 
@@ -153,5 +147,60 @@ it("hides backend log configuration remotely", async () => {
   access.value = false
   const wrapper = await mountComponent(true)
   expect(wrapper.text()).not.toContain("settings.backendLogTitle")
+  wrapper.unmount()
+})
+
+it("opens the Server directory only from local Desktop and reports failures", async () => {
+  access.value = true
+  Object.defineProperty(window, "javLibrary", { configurable: true, value: {} })
+  revealLogDirectory.mockReset().mockRejectedValueOnce(new Error("failed")).mockResolvedValue(undefined)
+  const wrapper = await mountComponent(true)
+  expect(wrapper.find("input").exists()).toBe(false)
+  const button = wrapper.findAll("button").find(b => b.text() === "settings.backendLogOpenDirectory")!
+  await button.trigger("click")
+  await flushPromises()
+  expect(revealLogDirectory).toHaveBeenCalledTimes(1)
+  expect(revealLogDirectory).toHaveBeenCalledWith()
+  expect(wrapper.text()).toContain("settings.backendLogOpenFailed")
+  await button.trigger("click")
+  await flushPromises()
+  expect(wrapper.text()).not.toContain("settings.backendLogOpenFailed")
+  wrapper.unmount()
+  delete window.javLibrary
+})
+
+it("keeps local Web log settings but hides directory opening", async () => {
+  access.value = true
+  delete window.javLibrary
+  const wrapper = await mountComponent(true)
+  expect(wrapper.text()).toContain("settings.backendLogMaxAge")
+  expect(wrapper.text()).toContain("settings.backendLogLevel")
+  expect(wrapper.text()).not.toContain("settings.backendLogOpenDirectory")
+  wrapper.unmount()
+})
+
+it("hides Server controls from remote Desktop while keeping client logs", async () => {
+  access.value = false
+  Object.defineProperty(window, "javLibrary", { configurable: true, value: {} })
+  const wrapper = await mountComponent(true)
+  expect(wrapper.text()).not.toContain("settings.backendLogOpenDirectory")
+  expect(wrapper.text()).not.toContain("settings.backendLogLevel")
+  expect(wrapper.text()).toContain("settings.clientLogLevel")
+  wrapper.unmount()
+  delete window.javLibrary
+})
+
+it("saves retention and level without sending a directory override", async () => {
+  access.value = true
+  patchBackendLog.mockReset().mockImplementation(async patch => {
+    backendLogState.value = { ...backendLogState.value, ...patch }
+  })
+  const wrapper = await mountComponent(true)
+  wrapper.findAllComponents({ name: "Select" })[0]!.vm.$emit("update:modelValue", "10")
+  wrapper.findAllComponents({ name: "Select" })[1]!.vm.$emit("update:modelValue", "debug")
+  await nextTick()
+  await new Promise(resolve => setTimeout(resolve, 650))
+  await flushPromises()
+  expect(patchBackendLog).toHaveBeenCalledWith({ logMaxAgeDays: 10, logLevel: "debug" })
   wrapper.unmount()
 })

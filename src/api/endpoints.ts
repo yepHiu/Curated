@@ -738,6 +738,10 @@ export const api = {
     return httpClient.post<void>(`/library/paths/${encodeURIComponent(id)}/reveal`)
   },
 
+  revealLogDirectory(): Promise<void> {
+    return httpClient.post<void>("/settings/logs/reveal")
+  },
+
   startMetadataRefreshByPaths(body: MetadataScrapeByPathsBody): Promise<MetadataRefreshQueuedDTO> {
     return httpClient.post<MetadataRefreshQueuedDTO>("/library/metadata-scrape", body)
   },

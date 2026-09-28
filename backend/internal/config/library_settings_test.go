@@ -319,7 +319,7 @@ func TestMergeLibrarySettingsFile_BackendLog(t *testing.T) {
 	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := cfg.LogDir, `D:\logs`; got != want {
+	if got, want := cfg.LogDir, DefaultLogDir(); got != want {
 		t.Fatalf("LogDir = %q, want %q", got, want)
 	}
 	if got, want := cfg.LogFilePrefix, "app"; got != want {

@@ -19,8 +19,8 @@ type Config struct {
 	// DiscoveryEnabled defaults on only when LAN access is explicitly enabled.
 	DiscoveryEnabled *bool  `json:"discoveryEnabled,omitempty"`
 	LogLevel         string `json:"logLevel"`
-	// LogDir stores the effective backend log directory. Empty config values are normalized
-	// to the build-specific default (dev: project runtime/logs; release: app-data logs).
+	// LogDir stores the effective backend log directory. Legacy custom values are
+	// normalized to the build-specific default (dev: runtime/logs; release: app-data logs).
 	LogDir string `json:"logDir,omitempty"`
 	// LogFilePrefix is the base name for files like {prefix}-20060102.log; default is channel-specific when LogDir is set.
 	LogFilePrefix string `json:"logFilePrefix,omitempty"`

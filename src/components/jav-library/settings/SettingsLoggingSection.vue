@@ -13,7 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -28,7 +27,6 @@ import {
   setClientLogLevel,
   type ClientLogLevelName,
 } from "@/lib/app-logger"
-import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { useLibraryService } from "@/services/library-service"
 
 const props = defineProps<{
@@ -44,13 +42,12 @@ const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
 const BACKEND_LOG_LEVEL_OPTIONS = ["trace", "debug", "info", "warn", "error"] as const
 const BACKEND_LOG_MAX_AGE_PRESET_VALUES = ["0", "1", "5", "10", "30"] as const
 
-const backendLogDirDraft = ref("")
 const backendLogMaxAgeDaysChoice = ref("0")
 const backendLogLevelDraft = ref("info")
 const backendLogSaving = ref(false)
 const backendLogError = ref("")
-const backendLogDirPickHint = ref("")
-const pickBackendLogDirBusy = ref(false)
+const openingLogDirectory = ref(false)
+const canOpenLogDirectory = computed(() => useWebApi && isServerLocal.value && !!window.javLibrary)
 const clientLogLevelUi = ref<ClientLogLevelName>(getClientLogLevelName())
 const backendLogSavedFlash = ref(false)
 let backendLogSavedFlashTimer: ReturnType<typeof setTimeout> | null = null
@@ -94,7 +91,6 @@ const selectedBackendLogMaxAgeLabel = computed(() => (
 
 function syncBackendLogDraftFromService() {
   const b = libraryService.backendLog.value
-  backendLogDirDraft.value = (b.logDir ?? "").trim()
   syncBackendLogMaxAgeDaysChoiceFromDto(b.logMaxAgeDays)
   const lvl = (b.logLevel ?? "info").trim() || "info"
   backendLogLevelDraft.value = (BACKEND_LOG_LEVEL_OPTIONS as readonly string[]).includes(lvl)
@@ -109,25 +105,16 @@ function onClientLogLevelSelect(v: unknown) {
   }
 }
 
-async function pickBackendLogDirectory() {
-  backendLogDirPickHint.value = ""
+async function openLogDirectory() {
+  if (!canOpenLogDirectory.value || !props.autoSaveReady || openingLogDirectory.value) return
   backendLogError.value = ""
-  pickBackendLogDirBusy.value = true
+  openingLogDirectory.value = true
   try {
-    const outcome = await pickLibraryDirectory()
-    if (outcome.status === "ok") {
-      backendLogDirDraft.value = outcome.path
-      return
-    }
-    if (outcome.status === "hint") {
-      backendLogDirPickHint.value = outcome.message
-      return
-    }
-    if (outcome.status === "unsupported") {
-      backendLogDirPickHint.value = t("settings.errPickUnsupported")
-    }
+    await libraryService.revealLogDirectory()
+  } catch {
+    backendLogError.value = t("settings.backendLogOpenFailed")
   } finally {
-    pickBackendLogDirBusy.value = false
+    openingLogDirectory.value = false
   }
 }
 
@@ -141,9 +128,8 @@ function flashBackendLogSaved() {
 }
 
 async function performSaveBackendLogSettings() {
-  if (!isServerLocal.value) return
+  if (!isServerLocal.value || !props.autoSaveReady) return
   backendLogError.value = ""
-  backendLogDirPickHint.value = ""
   const maxAge = Number.parseInt(backendLogMaxAgeDaysChoice.value, 10)
   if (!Number.isFinite(maxAge) || maxAge < 0) {
     backendLogError.value = t("settings.backendLogMaxAgeInvalid")
@@ -154,7 +140,6 @@ async function performSaveBackendLogSettings() {
       backendLogSaving.value = true
       try {
         await libraryService.patchBackendLog({
-          logDir: backendLogDirDraft.value.trim(),
           logMaxAgeDays: maxAge,
           logLevel: backendLogLevelDraft.value.trim() || "info",
         })
@@ -198,9 +183,6 @@ async function saveBackendLogSettings() {
 
 function backendLogDraftMatchesServer(): boolean {
   const b = libraryService.backendLog.value
-  if (backendLogDirDraft.value.trim() !== (b.logDir ?? "").trim()) {
-    return false
-  }
   const lvl = (backendLogLevelDraft.value || "info").trim() || "info"
   const serverLvl = ((b.logLevel ?? "info").trim() || "info") as string
   if (lvl !== serverLvl) {
@@ -217,7 +199,6 @@ function backendLogDraftMatchesServer(): boolean {
 watchDebounced(
   () =>
     [
-      backendLogDirDraft.value,
       backendLogMaxAgeDaysChoice.value,
       backendLogLevelDraft.value,
     ] as const,
@@ -276,47 +257,20 @@ onBeforeUnmount(() => {
             {{ t("settings.backendLogMockHint") }}
           </p>
           <div
-            class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-start sm:justify-between"
+            v-if="canOpenLogDirectory"
+            class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
           >
-            <p class="shrink-0 text-sm font-semibold text-foreground sm:pt-2">
-              {{ t("settings.backendLogDir") }}
-            </p>
-            <div
-              class="flex min-w-0 flex-1 flex-col gap-3 sm:items-end"
+            <p class="text-sm font-semibold text-foreground">{{ t("settings.backendLogDir") }}</p>
+            <Button
+              type="button"
+              variant="secondary"
+              class="w-fit shrink-0 rounded-full"
+              :disabled="!autoSaveReady || openingLogDirectory"
+              @click="openLogDirectory"
             >
-              <div
-                class="flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:items-center sm:gap-3"
-              >
-                <Input
-                  id="backend-log-dir"
-                  v-model="backendLogDirDraft"
-                  type="text"
-                  autocomplete="off"
-                  class="min-w-0 flex-1 rounded-xl border-border/50"
-                  :placeholder="t('settings.backendLogDirPlaceholder')"
-                  :disabled="backendLogSaving || pickBackendLogDirBusy"
-                  @input="backendLogDirPickHint = ''"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  class="shrink-0 rounded-full"
-                  :disabled="backendLogSaving || pickBackendLogDirBusy"
-                  @click="pickBackendLogDirectory"
-                >
-                  <FolderOpen data-icon="inline-start" aria-hidden="true" />
-                  {{
-                    pickBackendLogDirBusy ? t("settings.picking") : t("settings.pickFolder")
-                  }}
-                </Button>
-              </div>
-              <p
-                v-if="backendLogDirPickHint"
-                class="w-full max-w-2xl whitespace-pre-line text-xs leading-relaxed text-muted-foreground sm:text-right sm:text-sm"
-              >
-                {{ backendLogDirPickHint }}
-              </p>
-            </div>
+              <FolderOpen data-icon="inline-start" aria-hidden="true" />
+              {{ t("settings.backendLogOpenDirectory") }}
+            </Button>
           </div>
           <div
             class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
@@ -324,7 +278,7 @@ onBeforeUnmount(() => {
             <p class="text-sm font-semibold text-foreground">{{ t("settings.backendLogMaxAge") }}</p>
             <Select
               v-model="backendLogMaxAgeDaysChoice"
-              :disabled="backendLogSaving"
+              :disabled="!autoSaveReady || backendLogSaving"
             >
               <SelectTrigger
                 size="sm"
@@ -351,7 +305,7 @@ onBeforeUnmount(() => {
             <p class="text-sm font-semibold text-foreground">{{ t("settings.backendLogLevel") }}</p>
             <Select
               v-model="backendLogLevelDraft"
-              :disabled="backendLogSaving"
+              :disabled="!autoSaveReady || backendLogSaving"
             >
               <SelectTrigger
                 size="sm"
@@ -376,7 +330,7 @@ onBeforeUnmount(() => {
             v-if="!useWebApi"
             type="button"
             class="w-fit rounded-full"
-            :disabled="backendLogSaving"
+            :disabled="!autoSaveReady || backendLogSaving"
             @click="saveBackendLogSettings"
           >
             {{ backendLogSaving ? t("common.saving") : t("settings.backendLogSave") }}

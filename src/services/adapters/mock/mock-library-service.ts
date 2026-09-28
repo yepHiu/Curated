@@ -1282,6 +1282,10 @@ export const mockLibraryService: LibraryService = {
     }
   },
 
+  async revealLogDirectory() {
+    throw mockHttpError(501, "MOCK_REVEAL_NOT_SUPPORTED")
+  },
+
   async patchBackendLog(patch: PatchBackendLogBody) {
     const prev = backendLogMock.value
     backendLogMock.value = {

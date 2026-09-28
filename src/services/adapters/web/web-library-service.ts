@@ -958,6 +958,8 @@ function createWebLibraryService(): LibraryService {
       }
     },
 
+    revealLogDirectory: () => api.revealLogDirectory(),
+
     async patchBackendLog(patch: PatchBackendLogBody) {
       const seq = ++backendLogSaveSeq
       const prev = backendLogState.value
@@ -974,7 +976,6 @@ function createWebLibraryService(): LibraryService {
         // 不传 logFilePrefix：由后端/logging 默认前缀（curated），避免设置页覆盖手写 cfg
         const next = await api.patchSettings({
           backendLog: {
-            logDir: merged.logDir ?? "",
             logMaxAgeDays: merged.logMaxAgeDays ?? 0,
             logLevel: (merged.logLevel ?? "info").trim() || "info",
           },

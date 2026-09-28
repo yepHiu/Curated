@@ -1916,19 +1916,15 @@ func (a *App) SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error {
 }
 
 // SetBackendLogPatch merges patch into current values, persists to library-config.cfg, and updates memory.
-// Changing logDir/logLevel takes effect after backend restart.
+// Changing retention/level takes effect after backend restart. The directory is managed by the app.
 func (a *App) SetBackendLogPatch(p contracts.PatchBackendLogSettings) error {
 	path := a.librarySettingsPath
 	if path == "" {
 		return fmt.Errorf("library settings path not configured")
 	}
-	nextDir := a.cfg.LogDir
 	nextPrefix := a.cfg.LogFilePrefix
 	nextMaxAge := a.cfg.LogMaxAgeDays
 	nextLevel := a.cfg.LogLevel
-	if p.LogDir != nil {
-		nextDir = strings.TrimSpace(*p.LogDir)
-	}
 	if p.LogFilePrefix != nil {
 		nextPrefix = strings.TrimSpace(*p.LogFilePrefix)
 	}
@@ -1950,11 +1946,7 @@ func (a *App) SetBackendLogPatch(p contracts.PatchBackendLogSettings) error {
 		nextLevel = lvl
 	}
 	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
-		if strings.TrimSpace(nextDir) == "" {
-			delete(m, "logDir")
-		} else {
-			m["logDir"] = nextDir
-		}
+		delete(m, "logDir")
 		if strings.TrimSpace(nextPrefix) == "" {
 			delete(m, "logFilePrefix")
 		} else {
@@ -1970,7 +1962,7 @@ func (a *App) SetBackendLogPatch(p contracts.PatchBackendLogSettings) error {
 	}); err != nil {
 		return err
 	}
-	a.cfg.LogDir = config.ResolveLogDir(nextDir)
+	a.cfg.LogDir = config.DefaultLogDir()
 	a.cfg.LogFilePrefix = nextPrefix
 	a.cfg.LogMaxAgeDays = nextMaxAge
 	a.cfg.LogLevel = nextLevel

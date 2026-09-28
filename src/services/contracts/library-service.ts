@@ -160,6 +160,7 @@ export interface LibraryService {
   /** 后端日志目录与级别（Web：library-config.cfg；Mock：内存） */
   backendLog: ComputedRef<BackendLogSettingsDTO>
   patchBackendLog(patch: PatchBackendLogBody): Promise<void>
+  revealLogDirectory(): Promise<void>
   listConnectedClients(): Promise<ConnectedClientsDTO>
   health(): Promise<HealthDTO>
   createBackup(destinationPath: string): Promise<BackupManifestDTO>
