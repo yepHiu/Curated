@@ -146,7 +146,9 @@ This builds `backend/runtime/curated-dev.exe` and `electron-dist/`, starts or re
 
 ## 3. Backup, restore, and path migration
 
-In Web API mode, Settings → Maintenance & backup can create and verify a backup package, verify an existing package, and run restore preflight. Enter an absolute directory on the backend machine; Curated generates a UTC-timestamped filename. After a successful create, only the directory is remembered as `backupDirectory`. There is no in-app restore button.
+In Web API mode on the Server machine, open Settings → Maintenance & backup. The page starts with backup, followed by library health checks and manual rescanning. Enter a destination folder and choose **Back up now**: Curated generates a timestamped filename, creates the package, checks it automatically and shows the saved file path. After successful creation, the directory is remembered as `backupDirectory`. Desktop offers its native folder picker; browsers require pasting the full Server-local path.
+
+Expand **Restore from a backup**, enter the backup file path (or reuse the backup just created), and choose **Check backup and continue**. This single action verifies the package and checks restore requirements. Changing the file or retrying clears previous results. A passed check shows the target database and the offline steps; it does **not** mean data has been restored. Open this guide before quitting Server. Creation receipts and restore results are separate. See the [maintenance workflow record](plan/2026-09-06-maintenance-ui-alignment.md).
 
 Run maintenance from `backend/`. Add `-config path/to/config.json` when the database path comes from a custom main config.
 
@@ -156,13 +158,21 @@ go run ./cmd/curated -maintenance backup-verify -backup-path C:\Backups\curated.
 go run ./cmd/curated -maintenance backup-preflight -backup-path C:\Backups\curated.curated-backup
 ```
 
-Restore is offline: fully quit Curated, review a successful preflight, then confirm:
+Restore is offline: keep the backup path, consider backing up the current library, pause playback/tasks, and fully quit **Curated Server from its tray**. Closing the Desktop window alone does not stop Server. Review a successful preflight, then confirm:
 
 ```powershell
 go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated.curated-backup -confirm-restore
 ```
 
-The package contains a consistent SQLite snapshot and, when present, `library-config.cfg`. It does not include media or user asset files. Verification runs SHA-256 checks plus SQLite `quick_check` / `foreign_key_check`. Restore rejects future migrations and insufficient disk space, replaces files atomically, and keeps `.pre-restore-*` rollback copies.
+For an installed Windows Server, run the equivalent command from its installation directory in PowerShell:
+
+```powershell
+.\curated.exe -maintenance backup-restore -backup-path 'C:\Backups\curated.curated-backup' -confirm-restore
+```
+
+Use the same data directory, environment and custom `-config` as the running Server. Confirm that the preflight target matches the database you intend to restore; do not assume a different working directory or configuration uses the same database. Restart Server after the command succeeds.
+
+The package contains a consistent SQLite snapshot, `library-config.cfg` when present, and managed wishlist images. It does not include media or other user asset files. Verification runs SHA-256 checks plus SQLite `quick_check` / `foreign_key_check`. Restore rejects future migrations and insufficient disk space, replaces files atomically, and keeps `.pre-restore-*` rollback copies.
 
 When a drive letter or library root changes, plan first:
 
