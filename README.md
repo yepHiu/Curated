@@ -33,6 +33,8 @@ This README is the short public entry. For setup details, configuration, packagi
 
 ## Download
 
+Windows installer improvements are prepared for Server 1.7.4 / Desktop 0.2.2: a dedicated destination page, explicit upgrade confirmation and conditional application shutdown. See the [installation flow](docs/guide.md#windows-installation-flow); these source versions are not a publication announcement.
+
 Full/Server 1.7.3 and Desktop 0.2.1 add Chinese Windows setup and automatic shutdown before upgrading; Full removes registered old all-in-one installations after a verified backup. The release passed Windows/Mac CD checks; see the [migration guide](docs/guide.md#migrating-an-old-all-in-one-installation) for supported layouts and Windows acceptance.
 
 New releases ship **Desktop and Server as independent packages only**, available on **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**. Release Notes state which modules changed; an unchanged module keeps its version.

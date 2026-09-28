@@ -31,6 +31,8 @@ Curated はローカルファーストのメディアライブラリです。Vue
 
 ## ダウンロード
 
+次期 Windows インストーラー（Server 1.7.4 / Desktop 0.2.2）のソースは、専用のインストール先ページ、バージョンと上書きの確認、実行中のみの終了確認に対応しています。[インストール手順](docs/guide.md#windows-installation-flow)を参照してください。公開リリースは別途行います。
+
 Full/Server 1.7.3、Desktop 0.2.1 では Windows インストーラの簡体字中国語対応と更新前の自動終了を追加しました。Full はバックアップ検証後に旧一体型をアンインストールします。Windows/Mac CD 検証を通過し、公開済みです。対応範囲と Windows 検証は[移行ガイド](docs/guide.md#migrating-an-old-all-in-one-installation)を参照してください。
 
 今後は **Desktop / Server の単体パッケージのみ**を **[GitHub Releases](https://github.com/yepHiu/Curated/releases)** で公開します。Release Notes には両モジュールの更新有無を記載し、変更のないモジュールのバージョンは据え置きます。
