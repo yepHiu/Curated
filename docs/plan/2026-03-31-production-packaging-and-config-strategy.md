@@ -1,5 +1,28 @@
 # Curated 生产打包、配置、版本与发布计划
 
+## 2026-09-29：Release 组合版本展示实施
+
+状态：implemented。本次按用户“按照今晚新规矩出包”的要求落实组合标题；发布与说明同步共用标题生成器，并验证两端 Module updates 快照。正式产品名称沿用 Curated。历史 Release 不批量重命名。
+
+### 建议形式
+
+对外采用 `Curated - Server 1.7.4 + Desktop 0.2.2` 这样的组合展示，产品名称与版本组合之间使用普通横线（用户已确认此分隔符偏好）。两个组件地位平等，Curated 不再借用任一组件版本作为产品总版本。这里的数字仅用于示例；当前源码目标确为 Server 1.7.4 / Desktop 0.2.2，但不代表两个版本均已发布或已验证兼容。
+
+组合是发行快照的显示名称；Server 与 Desktop 继续独立使用 SemVer、标签、安装包版本和更新渠道。更新器按自身组件版本比较，不能把组合字符串作为一个 SemVer。版本组合本身也不构成强制配对或兼容性承诺；兼容范围应在发行说明中根据实际验证单独声明。
+
+保留已经实施的独立发布政策。每条 Release 标题同时标明本次更新对象，例如：
+
+- `Curated - Server 1.7.4 + Desktop 0.2.1 - Server update`
+- `Curated - Server 1.7.4 + Desktop 0.2.2 - Desktop update`
+
+以上例子假设先完成 Server 发布，再完成 Desktop 发布。标题中的另一端应使用发行说明中经校验的已发布版本快照，不能直接读取源码里尚未发布的目标版本；以后另一端发布新版本，也不自动回写旧 Release 标题。两端同时开发、分别发布时，各自 Notes 可以保留其已审核的已发布基线，并交叉链接另一条 Release。
+
+仅 Server 更新只递进 Server；仅 Desktop 更新只递进 Desktop；两端均更新仍分别发布；没有交付变更则不发版。组合展示不恢复 Full 包、不新增总版本号。若以后希望把两端资产合并到一条 GitHub Release，需要另外设计发布批次身份、部分失败恢复和独立渠道推进，不能仅靠改标题实现。
+
+### 实现范围
+
+`scripts/release/component_cd.py` 发布标题和 `scripts/release/release_lib/sync_notes.py` 说明同步标题现已共用 `release_title`，从已校验的 Module updates 表读取两端 After 快照，以标签确定更新对象；标题测试及 `docs/release-notes/README.md` 已同步。标题调整本身不要求递进 Server/Desktop 产品版本；历史 Release 批量重命名另行确定范围。现有 Latest 历史迁移规则与独立更新渠道继续保持。
+
 ## 2026-09-29：Windows 安装流程实施结果
 
 状态：implemented，用户已通过“开始实施”授权。本节是当前实现范围；下文 2026-09-28 调研和多分支建议保留为设计记录，超出本节的项目仍为后续工作。

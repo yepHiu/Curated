@@ -60,4 +60,4 @@ Public descriptions are written in English and follow the structure used by v1.5
 
 Published component descriptions can be updated from the corresponding note files through the Release notes workflow. It updates the display title and body, preserves the original source marker, and checks that assets, tags, publication state and Latest remain unchanged.
 
-GitHub Release titles use `Curated vX.Y.Z`. Component prefixes belong in tags and asset filenames, not the display title.
+New GitHub Release titles use `Curated - Server X.Y.Z + Desktop A.B.C - Server update` (or `Desktop update`), with ordinary hyphens. Publication and note synchronization share the same title generator and read the validated Module updates After snapshots, never unpublished source targets. Historical Full titles remain unchanged. The combination is display-only; tags, artifacts and update comparisons keep independent component versions.
