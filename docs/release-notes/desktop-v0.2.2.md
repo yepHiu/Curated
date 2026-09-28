@@ -11,9 +11,9 @@ Curated Desktop 0.2.2 makes Windows installation and upgrades clearer, with an e
 | Module | Status | Before | After |
 | --- | --- | --- | --- |
 | Desktop | Updated | 0.2.1 | 0.2.2 |
-| Server | Unchanged | 1.7.5 | 1.7.5 |
+| Server | Unchanged | 1.7.6 | 1.7.6 |
 
-This Release updates **Desktop only**. Server is unchanged by this package. The companion Server improvements are available separately in [Server 1.7.5](https://github.com/yepHiu/Curated/releases/tag/server-v1.7.5); each module has its own Release and installation. No new Full package is produced.
+This Release updates **Desktop only**. Server is unchanged by this package. The companion Server improvements are available separately in [Server 1.7.6](https://github.com/yepHiu/Curated/releases/tag/server-v1.7.6); each module has its own Release and installation. No new Full package is produced.
 
 ### What's Changed
 
