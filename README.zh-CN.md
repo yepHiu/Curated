@@ -33,13 +33,13 @@ Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，
 
 Full/Server 1.7.3、Desktop 0.2.1 已补齐 Windows 安装器中文与自动退出，Full 在备份校验后自动卸载旧一体版；新包已通过 Windows/Mac CD 验收并发布，支持范围见[迁移指南](docs/guide.md#migrating-an-old-all-in-one-installation)。
 
-正式 Windows 安装包和便携包发布在 **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**。请使用 [最新 Release](https://github.com/yepHiu/Curated/releases/latest)。
+后续仅发布 **Desktop 和 Server 独立包**，下载见 **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**。每份 Release Note 明确两端是否更新；无更新内容的模块不递进版本。
 
 - 漫画库 / 写真库 **Beta**：在「设置 → 资料库 → 漫画库 / 写真库」分别开启，开启后才显示配置。写真库页支持批量收藏、追加标签和删除索引。见 [试用说明](docs/guide.md#comic-and-photo-library-beta)。
-- **安装器（推荐）：** `Curated-Full-Setup-<version>-windows-x64.exe`
-- **离线安装包合集：** `Curated-Full-<version>-windows-x64.zip`；另提供独立 Server/Desktop ZIP。
+- **Windows 安装器：** `Curated-Server-Setup-<version>-windows-x64.exe` 与 `Curated-Desktop-Setup-<version>-windows-x64.exe`；各有独立 ZIP。
+- **Apple Silicon Desktop：** `Curated-Desktop-<version>-macos-arm64.dmg` / `.zip`。
 
-Latest 指向最新 Full 正式版，独立 Server/Desktop 使用各自更新渠道。旧一体版可能在应用内显示检查更新失败；请从 Latest 下载并手动运行一次 Full，保留原数据完成迁移。
+后续不再出 Full 包。Latest 保留为历史 Full 迁移入口；新版本请看 Releases 列表或各组件更新渠道。旧一体版可先运行已发布的 Full 1.7.3 完成一次迁移，再分别更新 Desktop 和 Server。
 
 ## 亮点
 
@@ -73,7 +73,7 @@ pnpm dev
 - 桌面壳：`pnpm dev:electron`。
 - Windows 开发二进制：`pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`。
 
-备份、恢复、路径迁移、配置项和发布打包见 [docs/guide.md](docs/guide.md)。CD 构建 Windows Full / Server / Desktop 三种包与 Apple Silicon Mac Desktop，支持版本标签发布和手动草稿运行，详见[发布操作](docs/guide.md#8-release-and-packaging)。
+备份、恢复、路径迁移、配置项和发布打包见 [docs/guide.md](docs/guide.md)。CD 构建 Windows Server / Desktop 独立包与 Apple Silicon Mac Desktop，支持版本标签发布和手动草稿运行，详见[发布操作](docs/guide.md#8-release-and-packaging)。
 
 ## 文档
 

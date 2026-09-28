@@ -1,5 +1,9 @@
 # Agent 构建 / 编译 / 测试范式（Curated）
 
+## Standalone-only release policy — 2026-09-28
+
+This supersedes earlier Full release plans below. New production releases use only `server-vX.Y.Z` / `desktop-vX.Y.Z`; no new Full packages or Full version increases. Desktop and Server advance independently only for actual changes to their deliverables; unchanged modules keep versions/packages/channels. Every Release Note states both modules' Updated/Unchanged status and Before/After versions. CD validates those rows against the tag and published channels. Both changed means two releases; no change means no release. Server-hosted Web UI belongs to Server; Electron/connection UI belongs to Desktop. Documentation/test/CI-only changes do not automatically bump either. Current product versions remain Server 1.7.3 and Desktop 0.2.1. Historical Full remains for migration/recovery; Latest retains the historical Full policy, while new downloads use Releases/component channels. See `docs/guide.md` §8 and `docs/release-notes/README.md`.
+
 本文档约束 **Agent 与本机协作者** 在本仓库内执行安装、开发、构建、测试时的**默认做法**，避免不同会话各用一套命令（例如在错误目录跑 `go test`、或随意改锁文件而不提交说明）。
 
 **优先级**：若与对话中的临时指令冲突，以本文档为准；若与 `package.json` / `go.mod` 实际脚本冲突，以仓库脚本为准并应更新本文档。

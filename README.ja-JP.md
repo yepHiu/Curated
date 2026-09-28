@@ -33,13 +33,13 @@ Curated はローカルファーストのメディアライブラリです。Vue
 
 Full/Server 1.7.3、Desktop 0.2.1 では Windows インストーラの簡体字中国語対応と更新前の自動終了を追加しました。Full はバックアップ検証後に旧一体型をアンインストールします。Windows/Mac CD 検証を通過し、公開済みです。対応範囲と Windows 検証は[移行ガイド](docs/guide.md#migrating-an-old-all-in-one-installation)を参照してください。
 
-公式の Windows パッケージは **[GitHub Releases](https://github.com/yepHiu/Curated/releases)** にあります。[最新リリース](https://github.com/yepHiu/Curated/releases/latest) を使ってください。
+今後は **Desktop / Server の単体パッケージのみ**を **[GitHub Releases](https://github.com/yepHiu/Curated/releases)** で公開します。Release Notes には両モジュールの更新有無を記載し、変更のないモジュールのバージョンは据え置きます。
 
 - コミック / 写真ライブラリ **Beta**：設定 → ライブラリ → 漫画ライブラリ / 写真ライブラリで個別に有効化すると設定を表示します。写真ライブラリではお気に入り、タグ追加、索引削除の一括操作ができます。[利用ガイド](docs/guide.md#comic-and-photo-library-beta)。
-- **インストーラ（推奨）：** `Curated-Full-Setup-<version>-windows-x64.exe`
-- **オフラインインストーラ一式：** `Curated-Full-<version>-windows-x64.zip`。Server/Desktop 単体 ZIP もあります。
+- **Windows インストーラ：** `Curated-Server-Setup-<version>-windows-x64.exe` と `Curated-Desktop-Setup-<version>-windows-x64.exe`。各単体 ZIP もあります。
+- **Apple Silicon Desktop：** `Curated-Desktop-<version>-macos-arm64.dmg` / `.zip`。
 
-Latest は最新の安定版 Full を指します。Server/Desktop は独立した更新チャネルを使います。旧一体型では更新確認エラーが出る場合があります。Latest から Full をダウンロードし、一度手動で実行して元のデータを引き継いでください。
+新しい Full は公開しません。Latest は過去の Full による移行用入口として維持します。最新版は Releases 一覧または各更新チャネルで確認してください。旧一体型は公開済みの Full 1.7.3 で一度移行した後、Desktop / Server を個別に更新できます。
 
 ## ハイライト
 
@@ -73,7 +73,7 @@ pnpm dev
 - デスクトップシェル：`pnpm dev:electron`。
 - Windows 開発バイナリ：`pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`。
 
-バックアップ、復元、パス移行、設定キー、リリース手順は [docs/guide.md](docs/guide.md) を参照してください。CD は Windows Full / Server / Desktop パッケージと Apple Silicon Mac Desktop をビルドし、バージョンタグによる公開と手動のドラフト実行に対応しています。[リリース操作](docs/guide.md#8-release-and-packaging)を参照してください。
+バックアップ、復元、パス移行、設定キー、リリース手順は [docs/guide.md](docs/guide.md) を参照してください。CD は Windows Server / Desktop の単体パッケージと Apple Silicon Mac Desktop をビルドし、バージョンタグによる公開と手動のドラフト実行に対応しています。[リリース操作](docs/guide.md#8-release-and-packaging)を参照してください。
 
 ## ドキュメント
 

@@ -1,5 +1,7 @@
 # GitHub Latest 与组件更新渠道解耦
 
+2026-09-28 补充：后续停止发布 Full，仅发布独立 Desktop / Server，详见[生产发布计划](2026-03-31-production-packaging-and-config-strategy.md)。本文件的 Latest 规则继续服务于历史 Full 的迁移入口，不表示后续继续递进 Full；新版本从 Releases 列表和组件渠道获取。
+
 ## 问题与已核实影响
 
 2026-09-27，Full 1.7.3 首次 CD 因 Latest 指向 Full 1.7.2 而在 `legacy_latest()` 失败。临时将 Latest 指回 v1.5.8 后，第 2 次运行完成全部质量、Windows/Mac 构建和升级验收，并公开 Full 1.7.3。发布配置将公共下载入口绑在旧一体版上，是这次阻塞的根因。

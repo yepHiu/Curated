@@ -35,12 +35,12 @@ This README is the short public entry. For setup details, configuration, packagi
 
 Full/Server 1.7.3 and Desktop 0.2.1 add Chinese Windows setup and automatic shutdown before upgrading; Full removes registered old all-in-one installations after a verified backup. The release passed Windows/Mac CD checks; see the [migration guide](docs/guide.md#migrating-an-old-all-in-one-installation) for supported layouts and Windows acceptance.
 
-Official Windows packages are on **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**. Use the [latest release](https://github.com/yepHiu/Curated/releases/latest).
+New releases ship **Desktop and Server as independent packages only**, available on **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**. Release Notes state which modules changed; an unchanged module keeps its version.
 
-- **Installer (recommended):** `Curated-Full-Setup-<version>-windows-x64.exe`
-- **Offline installer kit:** `Curated-Full-<version>-windows-x64.zip`; standalone Server/Desktop ZIPs are also available.
+- **Windows installers:** `Curated-Server-Setup-<version>-windows-x64.exe` and `Curated-Desktop-Setup-<version>-windows-x64.exe`; independent ZIPs are also available.
+- **Apple Silicon Desktop:** `Curated-Desktop-<version>-macos-arm64.dmg` / `.zip`.
 
-Latest points to the newest stable Full. Standalone Server/Desktop use independent update channels. Old all-in-one apps may show an update-check error: download and run Full once to migrate, preserving your original data.
+No new Full packages are planned. Latest remains a historical Full migration entry; use the Releases list or component update channels for current versions. Old all-in-one users can run the published Full 1.7.3 once to migrate, then update Desktop and Server independently.
 
 ## Highlights
 
@@ -75,7 +75,7 @@ pnpm dev
 - Desktop shell: `pnpm dev:electron`.
 - Windows dev binary: `pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`.
 
-Backup, restore, path migration, configuration keys, and release packaging are documented in [docs/guide.md](docs/guide.md). CD builds Windows Full / Server / Desktop packages and Apple Silicon Mac Desktop, with version-tag releases and manual draft runs; see [release operations](docs/guide.md#8-release-and-packaging).
+Backup, restore, path migration, configuration keys, and release packaging are documented in [docs/guide.md](docs/guide.md). CD builds independent Windows Server / Desktop packages and Apple Silicon Mac Desktop, with version-tag releases and manual draft runs; see [release operations](docs/guide.md#8-release-and-packaging).
 
 ## Documentation
 

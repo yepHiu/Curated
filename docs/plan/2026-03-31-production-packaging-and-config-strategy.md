@@ -1,5 +1,22 @@
 # Curated 生产打包、配置、版本与发布计划
 
+## 2026-09-28：后续仅发布 Desktop / Server 独立包
+
+状态：approved（用户已确认发布政策；当前入口与校验已实现，本地验证见下）
+
+本节优先于下文历史 Full / 一体包规划。后续只发布 Desktop 和 Server 独立包，不再生成或递进 Full。已发布 Full 1.7.3、历史安装包和旧版迁移能力保留。
+
+- Desktop 与 Server 独立决定是否发版。没有实际更新内容的模块，版本号、标签、包和更新渠道都保持不变；不为日期、另一模块发版或版本对齐而递进。此次发布流程/文档调整不递进产品版本：Desktop 0.2.1、Server 1.7.3。
+- Server 包含 Go 服务、Server 托管的 Web UI、数据库迁移及随包运行时。Desktop 包含 Electron 主进程/preload、本地连接页、客户端资源及安装器。共享依赖、安装器模板或构建规则只有影响实际交付物时才算对应模块更新；两端均受影响则分别递进。纯文档、测试、CI 管理改动不自动触发产品版本递进。
+- 只更新 Server：仅发布 `server-vX.Y.Z`；只更新 Desktop：仅发布 `desktop-vX.Y.Z`；两端均更新：分别创建两个标签、两个 Release 和对应说明，可引用同一提交。未更新的一端不重新打包。
+- 每个 Release Note 必须列出 Desktop、Server 两行，明确 Updated / Unchanged 及 Before / After 版本，并描述已更新模块的实际变更。表格范围是当前标签；同批另一端更新以独立 Release 链接说明，不冒充当前 Release 的产物。英文模板见 `docs/release-notes/README.md`。
+- `component_cd.py check/publish` 校验两行齐全、更新模块与标签版本一致且递进、未更新模块版本相同，更新模块的 Before 与已发布渠道一致；未更新模块允许保留不高于其已发布版本的快照，避免两端独立发布互相阻塞。新模块首次发布以 0.0.0 表示尚未发布。版本源是否需要变动仍需审阅实际交付物；脚本不能判断变更内容是否有意义。
+- `.github/workflows/cd-release.yml` 和 `package.yml` 仅接受 Server/Desktop。当前组件 CLI 拒绝 Full 的 check/build/stage/publish；`channels` 保留已公开历史 Full 的摘要验证与渠道恢复。底层历史打包工具/旧标签不作为后续发版入口。
+- Latest 暂保留既有历史 Full 选择规则，服务于旧一体版的一次迁移；新版本从 Releases 列表及各组件渠道获取。独立版本不可互相比大小。旧版先使用已发布 Full 1.7.3 迁移，再分别升级组件；迁移范围见 guide。
+- 发布前先审阅实际模块变更、仅修改需发版的版本源、填写说明，再创建对应标签。本次未推送、未创建标签、未构建或发布生产包。若草稿等待期间当前待发模块的渠道已前进，必须重新审阅版本/说明并使用新的不可变标签，不覆盖旧标签或公开资产。
+
+本地验收：`python -m unittest discover -s scripts/release/tests -p "test_*.py"` 的 69 项测试通过，两个修改后的 workflow 通过 actionlint 1.7.7，`git diff --check` 通过。发布脚本单元测试覆盖拒绝新 Full、两类独立 Release、未更新模块版本冻结、说明漏项/重复/错误版本/过期基线拦截，以及历史 Full 渠道恢复。GitHub CD 的真实构建与发布须在后续正式标签运行时验收。
+
 ## 2026-09-27：macOS DMG 安装窗口视觉优化
 
 状态：**已实现并在本机 Finder 挂载验收，尚未发布。** Desktop 源码版本升为 0.2.1，Full 1.7.2 说明同步引用，避免 CD 复用旧 0.2.0 DMG。

@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## Standalone-only release policy — 2026-09-28
+
+This supersedes earlier Full release plans below. New production releases use only `server-vX.Y.Z` / `desktop-vX.Y.Z`; no new Full packages or Full version increases. Desktop and Server advance independently only for actual changes to their deliverables; unchanged modules keep versions/packages/channels. Every Release Note states both modules' Updated/Unchanged status and Before/After versions. CD validates those rows against the tag and published channels. Both changed means two releases; no change means no release. Server-hosted Web UI belongs to Server; Electron/connection UI belongs to Desktop. Documentation/test/CI-only changes do not automatically bump either. Current product versions remain Server 1.7.3 and Desktop 0.2.1. Historical Full remains for migration/recovery; Latest retains the historical Full policy, while new downloads use Releases/component channels. See `docs/guide.md` §8 and `docs/release-notes/README.md`.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview

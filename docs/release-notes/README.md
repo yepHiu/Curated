@@ -2,7 +2,48 @@
 
 This directory stores packaged release notes for Curated builds.
 
-Convention:
+## Standalone release policy (2026-09-28)
+
+Future releases contain **Desktop or Server only**. Full is retired from new releases. Advance a module version only when that module has actual shipped changes; an unchanged module keeps its version, packages and channel. Server owns its hosted Web UI; Desktop owns the Electron shell and bundled connection UI. Shared changes require a version increase only for the affected deliverables. Documentation/test/CI-only changes do not automatically increase product versions.
+
+Use `server-vX.Y.Z.md` or `desktop-vX.Y.Z.md`. Every publish-ready body must include both module rows in this exact four-column format. Example for a Server-only update (illustrative, not a release request):
+
+```markdown
+## GitHub Release Body
+
+This release improves Server library scanning.
+
+### Module updates
+
+| Module | Status | Before | After |
+| --- | --- | --- | --- |
+| Desktop | Unchanged | 0.2.1 | 0.2.1 |
+| Server | Updated | 1.7.3 | 1.7.4 |
+
+Desktop has no changes in this release; keep the existing installation.
+
+### What's Changed
+
+- Server: describe the actual user-visible scanning improvement.
+
+### Upgrade Notes
+
+Only Server needs updating. Desktop remains compatible at 0.2.1.
+
+### Downloads
+
+List the Server installer and ZIP for this tag, with verified asset links.
+
+### Full Changelog
+
+Link the comparison with the previous Server release source.
+```
+
+CD requires exactly one row per module. The tagged module must be `Updated`, its After must equal the tag, and its version must increase. The other must be `Unchanged` with identical Before/After. The updated module’s Before must match its currently published channel (`0.0.0` if never published). The unchanged row is a snapshot: its version must not exceed the published channel, but a later independent update of that other module does not invalidate these notes. Keep the table in the GitHub body, not only internal notes. Include concrete changes for the updated module; review which deliverables actually changed before bumping any version source.
+
+When both modules change, publish two tags and two notes. Each table describes only its own Release; cross-link the companion Release in prose. If the draft's own module channel has since changed, prepare reviewed notes and a new immutable tag. Existing historical descriptions are not rewritten by this policy.
+
+Historical convention:
 
 - Each production packaging run should produce one release note file here.
 - File naming should use the release date and version, for example:
