@@ -3,6 +3,11 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## Release retry — 2026-09-29
+
+Server source now targets **1.7.5**, Desktop remains **0.2.2**. The immutable server-v1.7.4 tag failed the outdated backup browser test before packaging; it is retained and will not be published. The test now follows the actual create/verify/expand/preflight flow. New releases use combined module snapshot titles with ordinary hyphens. Publish Server first, then Desktop; no new Full.
+
+
 ## Windows installer flow — 2026-09-29
 
 Source now targets Server **1.7.4** and Desktop **0.2.2** because both independent Windows installers changed. These are prepared versions, not a publication claim; no new Full. Setup shows existing/target versions, a dedicated destination page, an overwrite/reinstall summary, then a conditional running-application page before file replacement. Fresh installs allow an empty custom local directory; upgrades retain the registered location and reject relocation. Downgrades and unsafe/program-local-data folders are blocked. Read-only probing never stops an app; explicit confirmation requests scoped graceful shutdown with retry/manual exit/recheck. Silent shutdown requires `/CLOSECURATED=1`; interactive in-app updates do not bypass the wizard. The finish page offers launch; stopped upgrades default unchecked. First Server launch opens management, upgrades start quietly. No HTTP API or library configuration changes. Local fixture installer tests and Go checks cover these branches; production CD remains required. See `docs/guide.md` (Windows installation flow) and the production packaging plan.
