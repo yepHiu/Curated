@@ -260,15 +260,6 @@ const storageStatusError = ref("")
 const storageBindingBusy = ref<string | null>(null)
 const movieCsvExportBusy = ref(false)
 const movieCsvExportError = ref("")
-/** 按目录批量元数据刷新：成功摘要 */
-const metadataRefreshSuccess = ref("")
-/** 按目录批量元数据刷新：错误文案 */
-const metadataRefreshError = ref("")
-const metadataRefreshBusy = ref(false)
-/** 选中的库根路径（与后端配置的 path 字符串一致，用于 POST metadata-scrape） */
-const selectedMetadataRefreshPaths = ref<string[]>([])
-/** 资料库路径：与资料库页一致的「批量管理」模式（显示勾选与批量操作条） */
-const libraryPathsBatchMode = ref(false)
 /** 后台保存中：仅作轻提示，不禁用开关以免打断动画、体感卡顿 */
 const organizeLibrarySaving = ref(false)
 const organizeLibraryError = ref("")
@@ -1276,36 +1267,6 @@ async function clearCuratedExportDirectory() {
 }
 
 
-const hasMetadataPathSelection = computed(() => selectedMetadataRefreshPaths.value.length > 0)
-
-function toggleMetadataPathSelection(path: string) {
-  const cur = selectedMetadataRefreshPaths.value
-  if (cur.includes(path)) {
-    selectedMetadataRefreshPaths.value = cur.filter((p) => p !== path)
-  } else {
-    selectedMetadataRefreshPaths.value = [...cur, path]
-  }
-}
-
-function selectAllMetadataPaths() {
-  selectedMetadataRefreshPaths.value = libraryPathsList.value.map((p) => p.path)
-}
-
-function clearMetadataPathSelection() {
-  selectedMetadataRefreshPaths.value = []
-}
-
-function enterLibraryPathsBatchMode() {
-  libraryPathsBatchMode.value = true
-}
-
-function exitLibraryPathsBatchMode() {
-  libraryPathsBatchMode.value = false
-  clearMetadataPathSelection()
-  metadataRefreshSuccess.value = ""
-  metadataRefreshError.value = ""
-}
-
 const canSaveNewPath = computed(() => {
   const t = newPath.value.trim()
   return t.length > 0 && isAbsoluteLibraryPath(t)
@@ -1680,7 +1641,7 @@ async function onOrganizeLibraryChange(next: boolean) {
 }
 
 async function onDefaultImportLibraryPathChange(next: string) {
-  if (!next || next === defaultImportLibraryPathId.value) return
+  if (defaultImportPathSaving.value || !next || next === defaultImportLibraryPathId.value) return
   defaultImportPathError.value = ""
   try {
     await withPreservedScroll(async () => {
@@ -1957,40 +1918,6 @@ async function runFullScan() {
   }
 }
 
-async function runMetadataRefreshForSelected() {
-  metadataRefreshSuccess.value = ""
-  metadataRefreshError.value = ""
-  const paths = selectedMetadataRefreshPaths.value
-  if (paths.length === 0) {
-    metadataRefreshError.value = t("settings.errMetadataSelect")
-    return
-  }
-  try {
-    await withPreservedScroll(async () => {
-      metadataRefreshBusy.value = true
-      try {
-        const dto = await libraryService.refreshMetadataForLibraryPaths(paths)
-        const parts: string[] = [t("settings.metadataQueued", { n: dto.queued })]
-        if (dto.skipped > 0) {
-          parts.push(t("settings.metadataSkipped", { n: dto.skipped }))
-        }
-        if (dto.invalidPaths.length > 0) {
-          parts.push(t("settings.metadataInvalid", { paths: dto.invalidPaths.join("；") }))
-        }
-        metadataRefreshSuccess.value = parts.join(" ")
-      } finally {
-        metadataRefreshBusy.value = false
-      }
-    })
-  } catch (err) {
-    console.error("[settings] metadata refresh by paths failed", err)
-    if (err instanceof HttpClientError && err.apiError?.message) {
-      metadataRefreshError.value = err.apiError.message
-    } else {
-      metadataRefreshError.value = t("settings.errMetadataBatch")
-    }
-  }
-}
 </script>
 
 <template>
@@ -2147,12 +2074,6 @@ async function runMetadataRefreshForSelected() {
         :default-import-library-path-id="defaultImportLibraryPathId"
         :default-import-path-saving="defaultImportPathSaving"
         :default-import-path-error="defaultImportPathError"
-        :batch-mode="libraryPathsBatchMode"
-        :has-metadata-path-selection="hasMetadataPathSelection"
-        :metadata-refresh-busy="metadataRefreshBusy"
-        :metadata-refresh-success="metadataRefreshSuccess"
-        :metadata-refresh-error="metadataRefreshError"
-        :selected-metadata-refresh-paths="selectedMetadataRefreshPaths"
         :remove-path-pending="removePathPending"
         :remove-path-busy="removePathBusy"
         :editing-library-path-id="editingLibraryPathId"
@@ -2166,15 +2087,9 @@ async function runMetadataRefreshForSelected() {
         :add-busy="addBusy"
         :can-save-new-path="canSaveNewPath"
         :dialog-content-class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
-        @enter-batch-mode="enterLibraryPathsBatchMode"
-        @select-all="selectAllMetadataPaths"
-        @clear-selection="clearMetadataPathSelection"
-        @refresh-metadata="runMetadataRefreshForSelected"
-        @exit-batch-mode="exitLibraryPathsBatchMode"
         @confirm-remove="confirmRemoveLibraryPath"
         @save-title="saveLibraryPathTitle"
         @cancel-edit="cancelEditLibraryTitle"
-        @toggle-metadata-path-selection="toggleMetadataPathSelection"
         @reveal="revealLibraryPath"
         @edit="startEditLibraryTitle"
         @rescan="rescanPath($event.path)"

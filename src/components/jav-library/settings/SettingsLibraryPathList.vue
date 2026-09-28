@@ -3,6 +3,8 @@ import SettingsHint from "./SettingsHint.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import type { LibraryPathDTO, LibraryPathStorageStatusDTO } from "@/api/types"
+import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import SettingsLibraryPathActions from "./SettingsLibraryPathActions.vue"
@@ -11,8 +13,8 @@ const props = defineProps<{
   paths: readonly LibraryPathDTO[]
   storageStatuses: readonly LibraryPathStorageStatusDTO[]
   storageBindingBusy: string | null
-  batchMode: boolean
-  selectedMetadataRefreshPaths: readonly string[]
+  defaultImportLibraryPathId: string
+  defaultImportPathSaving: boolean
   editingLibraryPathId: string | null
   editLibraryTitleDraft: string
   editTitleBusy: boolean
@@ -25,7 +27,7 @@ const emit = defineEmits<{
   "update:editLibraryTitleDraft": [title: string]
   saveTitle: [id: string]
   cancelEdit: []
-  toggleMetadataPathSelection: [path: string]
+  changeDefaultImportLibraryPath: [id: string]
   reveal: [path: LibraryPathDTO]
   edit: [path: LibraryPathDTO]
   rescan: [path: LibraryPathDTO]
@@ -44,10 +46,6 @@ const storageStatusByPathId = computed(() => {
   }
   return map
 })
-
-function isMetadataPathChecked(path: string): boolean {
-  return props.selectedMetadataRefreshPaths.includes(path)
-}
 
 function updateTitleDraft(value: unknown) {
   emit("update:editLibraryTitleDraft", typeof value === "string" ? value : String(value ?? ""))
@@ -74,16 +72,6 @@ function storageStatusLabelKey(status: LibraryPathStorageStatusDTO["status"]): s
   }
 }
 
-function storageStatusClass(status: LibraryPathStorageStatusDTO["status"]): string {
-  if (status === "online") {
-    return "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-  }
-  if (status === "unknown") {
-    return "border-border bg-muted text-muted-foreground"
-  }
-  return "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-}
-
 function storageStatusAllowsRescan(path: LibraryPathDTO): boolean {
   const status = storageStatusFor(path)
   return !status || status.canRescan
@@ -95,11 +83,17 @@ function canRebindStorage(status?: LibraryPathStorageStatusDTO): boolean {
 </script>
 
 <template>
-  <div class="flex flex-col gap-3">
+  <div class="flex flex-col gap-2" :aria-busy="defaultImportPathSaving">
     <div
       v-for="path in paths"
       :key="path.id"
-      class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
+      :class="cn(
+        'min-w-0 rounded-lg border bg-muted/5 px-3 py-1.5',
+        path.id === defaultImportLibraryPathId ? 'border-success/70' : 'border-border/50',
+        editingLibraryPathId === path.id && 'py-3',
+      )"
+      :data-library-path="path.id"
+      :data-default-import-path="path.id === defaultImportLibraryPathId || undefined"
     >
       <template v-if="editingLibraryPathId === path.id">
         <div class="flex flex-col gap-3">
@@ -150,60 +144,32 @@ function canRebindStorage(status?: LibraryPathStorageStatusDTO): boolean {
         </div>
       </template>
       <template v-else>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex min-w-0 flex-1 items-start gap-3">
-            <input
-              v-if="batchMode"
-              type="checkbox"
-              class="mt-1 size-4 shrink-0 cursor-pointer rounded border border-input accent-primary"
-              :checked="isMetadataPathChecked(path.path)"
-              :aria-label="t('settings.includeInMetadataRefresh', { title: path.title })"
-              @change="emit('toggleMetadataPathSelection', path.path)"
-            />
-            <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <div class="flex min-w-0 flex-wrap items-center gap-2">
-                <p class="min-w-0 font-medium">{{ path.title }}</p>
-                <span
-                  v-if="storageStatusFor(path)"
-                  class="inline-flex h-5 items-center rounded-full border px-1.5 py-0 text-xs font-medium leading-none"
-                  :class="storageStatusClass(storageStatusFor(path)!.status)"
-                >
-                  {{ t(storageStatusLabelKey(storageStatusFor(path)!.status)) }}
-                </span>
-              </div>
-              <p class="break-all text-sm text-muted-foreground">{{ path.path }}</p>
-              <div
-                v-if="storageStatusFor(path) && storageStatusFor(path)!.status !== 'online'"
-                class="flex flex-col gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
-              >
-                <span class="min-w-0 leading-relaxed">
-                  {{ t(`settings.storageStatusMessages.${storageStatusFor(path)!.status}`) }}
-                </span>
-                <Button
-                  v-if="canRebindStorage(storageStatusFor(path))"
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  class="h-8 shrink-0 rounded-lg"
-                  :disabled="storageBindingBusy === path.id"
-                  :data-rebind-storage="path.id"
-                  @click="emit('rebindStorage', path)"
-                >
-                  {{
-                    storageBindingBusy === path.id
-                      ? t("settings.storageStatusRebinding")
-                      : t("settings.storageStatusRebind")
-                  }}
-                </Button>
-              </div>
-            </div>
+        <div class="flex min-w-0 items-center gap-2">
+          <div class="flex min-w-0 flex-1 items-center gap-3" :title="path.path">
+            <p v-if="path.title && path.title !== path.path" class="max-w-[35%] truncate text-sm font-medium" :title="path.title">{{ path.title }}</p>
+            <p class="min-w-0 flex-1 truncate text-sm text-muted-foreground">{{ path.path }}</p>
           </div>
-          <div class="library-path-toolbar flex flex-wrap items-center gap-2">
+          <span v-if="path.id === defaultImportLibraryPathId" class="sr-only">{{ t('settings.defaultImportPathLabel') }}</span>
+          <Badge
+            v-if="storageStatusFor(path)"
+            :variant="storageStatusFor(path)!.status === 'online' ? 'success' : storageStatusFor(path)!.status === 'unknown' ? 'secondary' : 'warning'"
+            :title="t(`settings.storageStatusMessages.${storageStatusFor(path)!.status}`)"
+            :aria-label="t(`settings.storageStatusMessages.${storageStatusFor(path)!.status}`)"
+          >
+            {{ t(storageStatusLabelKey(storageStatusFor(path)!.status)) }}
+          </Badge>
+          <div class="library-path-toolbar shrink-0">
             <SettingsLibraryPathActions
               :path="path"
+              :is-default="path.id === defaultImportLibraryPathId"
+              :default-import-path-saving="defaultImportPathSaving"
               :reveal-busy="revealPathBusy === path.id"
               :scan-busy="scanPathBusy === path.path"
               :scan-disabled="!storageStatusAllowsRescan(path)"
+              :can-rebind="canRebindStorage(storageStatusFor(path))"
+              :rebind-busy="storageBindingBusy === path.id"
+              @set-default="emit('changeDefaultImportLibraryPath', $event)"
+              @rebind-storage="emit('rebindStorage', $event)"
               @reveal="emit('reveal', $event)"
               @edit="emit('edit', $event)"
               @rescan="emit('rescan', $event)"

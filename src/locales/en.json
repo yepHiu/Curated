@@ -1131,6 +1131,7 @@
     "storageStatusRebindFailed": "Failed to update storage binding.",
     "storageStatusCheckFailed": "Failed to check storage status.",
     "storageStatusActionBlocked": "This storage path is not available. Check the disk before scanning or importing.",
+    "setDefaultImportPath": "Set as default import folder",
     "defaultImportPathLabel": "Default import folder",
     "defaultImportPathPlaceholder": "Choose default import folder",
     "defaultImportPathNone": "Add a library path first",

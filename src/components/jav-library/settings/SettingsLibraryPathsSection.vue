@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
-import { computed } from "vue"
 import { useLibraryPathAccess } from "@/composables/use-library-path-access"
 import SettingsReadOnlyLibraryPaths from "./SettingsReadOnlyLibraryPaths.vue"
 import { useI18n } from "vue-i18n"
@@ -13,19 +12,11 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import SettingsLibraryPathAddDialog from "@/components/jav-library/settings/SettingsLibraryPathAddDialog.vue"
 import SettingsLibraryPathList from "@/components/jav-library/settings/SettingsLibraryPathList.vue"
 import SettingsLibraryPathRemoveDialog from "@/components/jav-library/settings/SettingsLibraryPathRemoveDialog.vue"
-import SettingsLibraryPathToolbar from "@/components/jav-library/settings/SettingsLibraryPathToolbar.vue"
 
-const props = defineProps<{
+defineProps<{
   scanFeedbackError: string
   paths: readonly LibraryPathDTO[]
   storageStatuses: readonly LibraryPathStorageStatusDTO[]
@@ -37,12 +28,6 @@ const props = defineProps<{
   defaultImportLibraryPathId: string
   defaultImportPathSaving: boolean
   defaultImportPathError: string
-  batchMode: boolean
-  hasMetadataPathSelection: boolean
-  metadataRefreshBusy: boolean
-  metadataRefreshSuccess: string
-  metadataRefreshError: string
-  selectedMetadataRefreshPaths: readonly string[]
   removePathDialogOpen: boolean
   removePathPending: LibraryPathDTO | null
   removePathBusy: boolean
@@ -69,15 +54,9 @@ const emit = defineEmits<{
   "update:addPathDialogOpen": [open: boolean]
   "update:newPath": [path: string]
   "update:newPathTitle": [title: string]
-  enterBatchMode: []
-  selectAll: []
-  clearSelection: []
-  refreshMetadata: []
-  exitBatchMode: []
   confirmRemove: []
   saveTitle: [id: string]
   cancelEdit: []
-  toggleMetadataPathSelection: [path: string]
   reveal: [path: LibraryPathDTO]
   edit: [path: LibraryPathDTO]
   rescan: [path: LibraryPathDTO]
@@ -94,32 +73,6 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { canManagePaths } = useLibraryPathAccess()
 
-const defaultImportPathSelectValue = computed(() =>
-  props.paths.some((path) => path.id === props.defaultImportLibraryPathId)
-    ? props.defaultImportLibraryPathId
-    : undefined,
-)
-
-const selectedDefaultImportPath = computed(() => {
-  const id = defaultImportPathSelectValue.value
-  if (!id) return undefined
-  return props.paths.find((p) => p.id === id)
-})
-
-/** Reka SelectItemText flattens nested spans into one string for the trigger; keep separator here. */
-function defaultImportPathTriggerLabel(path: LibraryPathDTO): string {
-  const title = (path.title ?? "").trim()
-  const diskPath = path.path
-  if (!title || title === diskPath) {
-    return diskPath
-  }
-  return `${title} · ${diskPath}`
-}
-
-function onDefaultImportPathChange(value: unknown) {
-  if (typeof value !== "string" || value === props.defaultImportLibraryPathId) return
-  emit("changeDefaultImportLibraryPath", value)
-}
 </script>
 
 <template>
@@ -154,80 +107,9 @@ function onDefaultImportPathChange(value: unknown) {
           </CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
-          <div
-            class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-start sm:justify-between"
-            :aria-busy="defaultImportPathSaving"
-          >
-            <div class="min-w-0 space-y-1">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.defaultImportPathLabel") }}
-              </p>
-              <p
-                v-if="defaultImportPathSaving"
-                class="text-xs text-muted-foreground motion-safe:animate-pulse"
-              >
-                {{ t("common.saving") }}
-              </p>
-            </div>
-            <div class="w-full pt-1 sm:w-auto sm:shrink-0 sm:pt-2">
-              <Select
-                :model-value="defaultImportPathSelectValue"
-                :disabled="defaultImportPathSaving || paths.length === 0"
-                @update:model-value="onDefaultImportPathChange"
-              >
-                <SelectTrigger
-                  size="sm"
-                  class="h-9 w-full min-w-0 rounded-xl border-border/50 sm:w-72 sm:shrink-0"
-                  :aria-label="t('settings.defaultImportPathLabel')"
-                >
-                  <SelectValue
-                    :placeholder="
-                      paths.length > 0
-                        ? t('settings.defaultImportPathPlaceholder')
-                        : t('settings.defaultImportPathNone')
-                    "
-                  >
-                    <span
-                      v-if="selectedDefaultImportPath"
-                      class="block min-w-0 flex-1 truncate text-left"
-                    >
-                      {{ defaultImportPathTriggerLabel(selectedDefaultImportPath) }}
-                    </span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent align="end" class="rounded-xl border-border/50">
-                  <SelectItem
-                    v-for="path in paths"
-                    :key="`default-import-path-${path.id}`"
-                    class="rounded-lg"
-                    :value="path.id"
-                  >
-                    <span class="flex min-w-0 flex-col gap-0.5">
-                      <span class="truncate text-sm">{{ path.title || path.path }}</span>
-                      <span class="truncate font-mono text-xs text-muted-foreground">
-                        {{ path.path }}
-                      </span>
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
           <p v-if="defaultImportPathError" class="text-sm text-destructive" role="alert">
             {{ defaultImportPathError }}
           </p>
-
-          <SettingsLibraryPathToolbar
-            :batch-mode="batchMode"
-            :library-paths-count="paths.length"
-            :has-metadata-path-selection="hasMetadataPathSelection"
-            :metadata-refresh-busy="metadataRefreshBusy"
-            @enter-batch-mode="emit('enterBatchMode')"
-            @select-all="emit('selectAll')"
-            @clear-selection="emit('clearSelection')"
-            @refresh-metadata="emit('refreshMetadata')"
-            @exit-batch-mode="emit('exitBatchMode')"
-          />
 
           <p v-if="storageStatusError" class="text-sm text-destructive" role="alert">
             {{ storageStatusError }}
@@ -245,24 +127,13 @@ function onDefaultImportPathChange(value: unknown) {
             @confirm="emit('confirmRemove')"
           />
 
-          <p v-if="metadataRefreshSuccess" class="text-sm text-primary">
-            {{ metadataRefreshSuccess }}
-          </p>
-          <p
-            v-if="metadataRefreshError"
-            class="text-sm text-destructive"
-            role="alert"
-          >
-            {{ metadataRefreshError }}
-          </p>
-
           <SettingsLibraryPathList
             :edit-library-title-draft="editLibraryTitleDraft"
             :paths="paths"
             :storage-statuses="storageStatuses"
             :storage-binding-busy="storageBindingBusy"
-            :batch-mode="batchMode"
-            :selected-metadata-refresh-paths="selectedMetadataRefreshPaths"
+            :default-import-library-path-id="defaultImportLibraryPathId"
+            :default-import-path-saving="defaultImportPathSaving"
             :editing-library-path-id="editingLibraryPathId"
             :edit-title-busy="editTitleBusy"
             :edit-title-error="editTitleError"
@@ -271,7 +142,7 @@ function onDefaultImportPathChange(value: unknown) {
             @update:edit-library-title-draft="emit('update:editLibraryTitleDraft', $event)"
             @save-title="emit('saveTitle', $event)"
             @cancel-edit="emit('cancelEdit')"
-            @toggle-metadata-path-selection="emit('toggleMetadataPathSelection', $event)"
+            @change-default-import-library-path="emit('changeDefaultImportLibraryPath', $event)"
             @reveal="emit('reveal', $event)"
             @edit="emit('edit', $event)"
             @rescan="emit('rescan', $event)"

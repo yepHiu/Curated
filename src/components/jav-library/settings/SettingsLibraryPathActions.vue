@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import {
+  Check,
+  Download,
   FolderOpen,
   MoreVertical,
   Pencil,
@@ -27,6 +29,10 @@ defineProps<{
   revealBusy?: boolean
   scanBusy?: boolean
   scanDisabled?: boolean
+  isDefault?: boolean
+  defaultImportPathSaving?: boolean
+  canRebind?: boolean
+  rebindBusy?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -34,6 +40,8 @@ const emit = defineEmits<{
   edit: [path: LibraryPathActionTarget]
   rescan: [path: LibraryPathActionTarget]
   remove: [path: LibraryPathActionTarget]
+  setDefault: [id: string]
+  rebindStorage: [path: LibraryPathActionTarget]
 }>()
 
 const { t } = useI18n()
@@ -50,11 +58,20 @@ const { t } = useI18n()
         :aria-label="t('settings.moreActions')"
         class="border-0 bg-transparent text-muted-foreground shadow-none ring-0 transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/45 data-[state=open]:bg-muted/55 data-[state=open]:text-foreground"
       >
-        <MoreVertical class="size-4" aria-hidden="true" />
+        <MoreVertical aria-hidden="true" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" class="min-w-[11rem]">
       <DropdownMenuGroup>
+        <DropdownMenuItem
+          :disabled="isDefault || defaultImportPathSaving"
+          data-set-default-import-path
+          @click="emit('setDefault', path.id)"
+        >
+          <Check v-if="isDefault" aria-hidden="true" />
+          <Download v-else aria-hidden="true" />
+          {{ isDefault ? t('settings.defaultImportPathLabel') : t('settings.setDefaultImportPath') }}
+        </DropdownMenuItem>
         <DropdownMenuItem
           :disabled="revealBusy"
           @click="emit('reveal', path)"
@@ -80,6 +97,15 @@ const { t } = useI18n()
             aria-hidden="true"
           />
           {{ t("settings.rescan") }}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          v-if="canRebind"
+          :disabled="rebindBusy"
+          :data-rebind-storage="path.id"
+          @click="emit('rebindStorage', path)"
+        >
+          <RefreshCw :class="rebindBusy ? 'animate-spin' : ''" aria-hidden="true" />
+          {{ rebindBusy ? t('settings.storageStatusRebinding') : t('settings.storageStatusRebind') }}
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuGroup>

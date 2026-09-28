@@ -30,8 +30,8 @@ vi.mock("@/components/ui/input", () => ({
 vi.mock("./SettingsLibraryPathActions.vue", () => ({
   default: {
     name: "SettingsLibraryPathActions",
-    props: ["path", "revealBusy", "scanBusy"],
-    emits: ["reveal", "edit", "rescan", "remove"],
+    props: ["path", "revealBusy", "scanBusy", "isDefault", "defaultImportPathSaving", "canRebind", "scanDisabled"],
+    emits: ["reveal", "edit", "rescan", "remove", "setDefault", "rebindStorage"],
     template:
       "<div><button data-row-reveal @click=\"$emit('reveal', path)\">reveal</button><button data-row-edit @click=\"$emit('edit', path)\">edit</button><button data-row-rescan @click=\"$emit('rescan', path)\">rescan</button><button data-row-remove @click=\"$emit('remove', path)\">remove</button></div>",
   },
@@ -46,8 +46,8 @@ const baseProps = {
   paths,
   storageStatuses: [],
   storageBindingBusy: "",
-  batchMode: true,
-  selectedMetadataRefreshPaths: ["D:/Media/A"],
+  defaultImportLibraryPathId: "a",
+  defaultImportPathSaving: false,
   editingLibraryPathId: null,
   editLibraryTitleDraft: "",
   editTitleBusy: false,
@@ -57,22 +57,20 @@ const baseProps = {
 }
 
 describe("SettingsLibraryPathList", () => {
-  it("renders path rows with batch checkboxes and row action events", async () => {
+  it("renders path rows without batch selection and forwards row actions", async () => {
     const wrapper = mount(SettingsLibraryPathList, {
       props: baseProps,
     })
 
     expect(wrapper.text()).toContain("Archive A")
     expect(wrapper.text()).toContain("D:/Media/A")
-    expect(wrapper.get("input[type='checkbox']").attributes("checked")).toBeDefined()
+    expect(wrapper.find("input[type='checkbox']").exists()).toBe(false)
 
-    await wrapper.get("input[type='checkbox']").setValue(false)
     await wrapper.get("[data-row-reveal]").trigger("click")
     await wrapper.get("[data-row-edit]").trigger("click")
     await wrapper.get("[data-row-rescan]").trigger("click")
     await wrapper.get("[data-row-remove]").trigger("click")
 
-    expect(wrapper.emitted("toggleMetadataPathSelection")).toEqual([["D:/Media/A"]])
     expect(wrapper.emitted("reveal")).toEqual([[paths[0]]])
     expect(wrapper.emitted("edit")).toEqual([[paths[0]]])
     expect(wrapper.emitted("rescan")).toEqual([[paths[0]]])
@@ -103,15 +101,18 @@ describe("SettingsLibraryPathList", () => {
     expect(wrapper.emitted("cancelEdit")).toHaveLength(1)
   })
 
-  it("hides checkboxes outside batch mode", () => {
-    const wrapper = mount(SettingsLibraryPathList, {
-      props: {
-        ...baseProps,
-        batchMode: false,
-      },
-    })
-
-    expect(wrapper.find("input[type='checkbox']").exists()).toBe(false)
+  it("moves the unique default marker when the saved directory changes", async () => {
+    const wrapper = mount(SettingsLibraryPathList, { props: baseProps })
+    expect(wrapper.findAll("[data-default-import-path]")).toHaveLength(1)
+    expect(wrapper.get("[data-default-import-path]").attributes("data-library-path")).toBe("a")
+    wrapper.getComponent({ name: "SettingsLibraryPathActions" }).vm.$emit("setDefault", "b")
+    expect(wrapper.emitted("changeDefaultImportLibraryPath")).toEqual([["b"]])
+    await wrapper.setProps({ defaultImportLibraryPathId: "b", defaultImportPathSaving: true })
+    expect(wrapper.findAll("[data-default-import-path]")).toHaveLength(1)
+    expect(wrapper.get("[data-default-import-path]").attributes("data-library-path")).toBe("b")
+    for (const menu of wrapper.findAllComponents({ name: "SettingsLibraryPathActions" })) {
+      expect(menu.props("defaultImportPathSaving")).toBe(true)
+    }
   })
 
   it("renders storage status labels and emits rebind actions", async () => {
@@ -147,10 +148,13 @@ describe("SettingsLibraryPathList", () => {
 
     expect(wrapper.text()).toContain("settings.storageStatusOnline")
     expect(wrapper.text()).toContain("settings.storageStatusVolumeMismatch")
-    expect(wrapper.text()).toContain("settings.storageStatusMessages.volume_mismatch")
+    expect(wrapper.find('[title="settings.storageStatusMessages.volume_mismatch"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain("wrong disk")
 
-    await wrapper.get("[data-rebind-storage='b']").trigger("click")
+    const actions = wrapper.findAllComponents({ name: "SettingsLibraryPathActions" })[1]!
+    expect(actions.props("scanDisabled")).toBe(true)
+    expect(actions.props("canRebind")).toBe(true)
+    actions.vm.$emit("rebindStorage", paths[1])
 
     expect(wrapper.emitted("rebindStorage")).toEqual([[paths[1]]])
   })

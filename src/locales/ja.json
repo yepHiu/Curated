@@ -1131,6 +1131,7 @@
     "storageStatusRebindFailed": "ストレージ紐づけの更新に失敗しました。",
     "storageStatusCheckFailed": "ストレージ状態の確認に失敗しました。",
     "storageStatusActionBlocked": "この保存先は現在利用できません。スキャンやインポートの前にディスクを確認してください。",
+    "setDefaultImportPath": "デフォルトのインポート先に設定",
     "defaultImportPathLabel": "既定のインポート先",
     "defaultImportPathPlaceholder": "既定のインポート先を選択",
     "defaultImportPathNone": "先にライブラリパスを追加してください",

@@ -38,39 +38,6 @@ vi.mock("@/components/ui/button", () => ({
   },
 }))
 
-vi.mock("@/components/ui/select", () => ({
-  Select: {
-    name: "Select",
-    props: ["modelValue", "disabled"],
-    emits: ["update:modelValue"],
-    template:
-      "<div class=\"select-stub\" :data-model-value=\"modelValue\" :data-disabled=\"String(!!disabled)\"><slot /></div>",
-  },
-  SelectContent: { name: "SelectContent", template: "<div><slot /></div>" },
-  SelectItem: { name: "SelectItem", props: ["value"], template: "<div><slot /></div>" },
-  SelectTrigger: { name: "SelectTrigger", template: "<div><slot /></div>" },
-  SelectValue: {
-    name: "SelectValue",
-    props: ["placeholder"],
-    template: "<div><slot>{{ placeholder }}</slot></div>",
-  },
-}))
-
-vi.mock("./SettingsLibraryPathToolbar.vue", () => ({
-  default: {
-    name: "SettingsLibraryPathToolbar",
-    props: [
-      "batchMode",
-      "libraryPathsCount",
-      "hasMetadataPathSelection",
-      "metadataRefreshBusy",
-    ],
-    emits: ["enterBatchMode", "selectAll", "clearSelection", "refreshMetadata", "exitBatchMode"],
-    template:
-      "<div data-toolbar><button data-enter @click=\"$emit('enterBatchMode')\">enter</button><button data-select-all @click=\"$emit('selectAll')\">select</button><button data-clear @click=\"$emit('clearSelection')\">clear</button><button data-refresh @click=\"$emit('refreshMetadata')\">refresh</button><button data-exit @click=\"$emit('exitBatchMode')\">exit</button></div>",
-  },
-}))
-
 vi.mock("./SettingsLibraryPathRemoveDialog.vue", () => ({
   default: {
     name: "SettingsLibraryPathRemoveDialog",
@@ -88,8 +55,8 @@ vi.mock("./SettingsLibraryPathList.vue", () => ({
       "paths",
       "storageStatuses",
       "storageBindingBusy",
-      "batchMode",
-      "selectedMetadataRefreshPaths",
+      "defaultImportLibraryPathId",
+      "defaultImportPathSaving",
       "editingLibraryPathId",
       "editLibraryTitleDraft",
       "editTitleBusy",
@@ -100,8 +67,8 @@ vi.mock("./SettingsLibraryPathList.vue", () => ({
     emits: [
       "update:editLibraryTitleDraft",
       "saveTitle",
+      "changeDefaultImportLibraryPath",
       "cancelEdit",
-      "toggleMetadataPathSelection",
       "reveal",
       "edit",
       "rescan",
@@ -109,7 +76,7 @@ vi.mock("./SettingsLibraryPathList.vue", () => ({
       "remove",
     ],
     template:
-      "<div data-list><button data-draft @click=\"$emit('update:editLibraryTitleDraft', 'Renamed')\">draft</button><button data-save @click=\"$emit('saveTitle', paths[0].id)\">save</button><button data-cancel @click=\"$emit('cancelEdit')\">cancel</button><button data-toggle @click=\"$emit('toggleMetadataPathSelection', paths[0].path)\">toggle</button><button data-reveal @click=\"$emit('reveal', paths[0])\">reveal</button><button data-edit @click=\"$emit('edit', paths[0])\">edit</button><button data-rescan @click=\"$emit('rescan', paths[0])\">rescan</button><button data-rebind @click=\"$emit('rebindStorage', paths[0])\">rebind</button><button data-remove @click=\"$emit('remove', paths[0])\">remove</button></div>",
+      "<div data-list><button data-draft @click=\"$emit('update:editLibraryTitleDraft', 'Renamed')\">draft</button><button data-save @click=\"$emit('saveTitle', paths[0].id)\">save</button><button data-cancel @click=\"$emit('cancelEdit')\">cancel</button><button data-reveal @click=\"$emit('reveal', paths[0])\">reveal</button><button data-edit @click=\"$emit('edit', paths[0])\">edit</button><button data-rescan @click=\"$emit('rescan', paths[0])\">rescan</button><button data-rebind @click=\"$emit('rebindStorage', paths[0])\">rebind</button><button data-remove @click=\"$emit('remove', paths[0])\">remove</button></div>",
   },
 }))
 
@@ -162,12 +129,6 @@ const baseProps = {
   defaultImportLibraryPathId: "library-a",
   defaultImportPathSaving: false,
   defaultImportPathError: "",
-  batchMode: true,
-  hasMetadataPathSelection: true,
-  metadataRefreshBusy: false,
-  metadataRefreshSuccess: "",
-  metadataRefreshError: "",
-  selectedMetadataRefreshPaths: ["D:/Media/JAV/Main"],
   removePathDialogOpen: false,
   removePathPending: libraryPath,
   removePathBusy: false,
@@ -196,8 +157,6 @@ describe("SettingsLibraryPathsSection", () => {
       props: {
         ...baseProps,
         scanFeedbackError: "scan failed",
-        metadataRefreshSuccess: "metadata queued",
-        metadataRefreshError: "metadata failed",
         defaultImportPathError: "default path failed",
         storageStatusError: "storage failed",
       },
@@ -205,12 +164,11 @@ describe("SettingsLibraryPathsSection", () => {
 
     expect(wrapper.text()).toContain("settings.storageCardTitle")
     expect(wrapper.text()).not.toContain("settings.storageCardDesc")
-    expect(wrapper.text()).toContain("settings.defaultImportPathLabel")
-    expect(wrapper.text()).toContain("Primary archive · D:/Media/JAV/Main")
+    expect(wrapper.text()).not.toContain("settings.defaultImportPathLabel")
+    expect(wrapper.text()).not.toContain("settings.libraryPaths")
+    expect(wrapper.find("[data-toolbar], [role=combobox]").exists()).toBe(false)
     expect(wrapper.text()).not.toContain("settings.defaultImportPathDesc")
     expect(wrapper.text()).toContain("scan failed")
-    expect(wrapper.text()).toContain("metadata queued")
-    expect(wrapper.text()).toContain("metadata failed")
     expect(wrapper.text()).toContain("default path failed")
     expect(wrapper.text()).toContain("storage failed")
   })
@@ -220,43 +178,24 @@ describe("SettingsLibraryPathsSection", () => {
       props: baseProps,
     })
 
-    wrapper.getComponent({ name: "Select" }).vm.$emit("update:modelValue", "library-b")
+    wrapper.getComponent({ name: "SettingsLibraryPathList" }).vm.$emit("changeDefaultImportLibraryPath", "library-b")
 
-    expect(wrapper.get(".select-stub").attributes("data-model-value")).toBe("library-a")
+    expect(wrapper.getComponent({ name: "SettingsLibraryPathList" }).props("defaultImportLibraryPathId")).toBe("library-a")
     expect(wrapper.emitted("changeDefaultImportLibraryPath")).toEqual([["library-b"]])
   })
 
-  it("disables default import path selection when no library paths exist", () => {
-    const wrapper = mount(SettingsLibraryPathsSection, {
-      props: {
-        ...baseProps,
-        paths: [],
-        defaultImportLibraryPathId: "",
-      },
-    })
-
-    expect(wrapper.get(".select-stub").attributes("data-disabled")).toBe("true")
-    expect(wrapper.text()).toContain("settings.defaultImportPathNone")
-  })
-
-  it("forwards toolbar, list, remove dialog, and add dialog events", async () => {
+  it("forwards list, remove dialog, and add dialog events", async () => {
     const wrapper = mount(SettingsLibraryPathsSection, {
       props: baseProps,
     })
 
-    await wrapper.get("[data-enter]").trigger("click")
-    await wrapper.get("[data-select-all]").trigger("click")
-    await wrapper.get("[data-clear]").trigger("click")
-    await wrapper.get("[data-refresh]").trigger("click")
     await wrapper.get("[data-export-movie-csv]").trigger("click")
     await wrapper.get("[data-check-storage-status]").trigger("click")
-    await wrapper.get("[data-exit]").trigger("click")
     await wrapper.get("[data-remove-open]").trigger("click")
     await wrapper.get("[data-remove-confirm]").trigger("click")
     await wrapper.get("[data-draft]").trigger("click")
     await wrapper.get("[data-save]").trigger("click")
     await wrapper.get("[data-cancel]").trigger("click")
-    await wrapper.get("[data-toggle]").trigger("click")
     await wrapper.get("[data-reveal]").trigger("click")
     await wrapper.get("[data-edit]").trigger("click")
     await wrapper.get("[data-rescan]").trigger("click")
@@ -269,19 +208,13 @@ describe("SettingsLibraryPathsSection", () => {
     await wrapper.get("[data-browse]").trigger("click")
     await wrapper.get("[data-submit]").trigger("click")
 
-    expect(wrapper.emitted("enterBatchMode")).toHaveLength(1)
-    expect(wrapper.emitted("selectAll")).toHaveLength(1)
-    expect(wrapper.emitted("clearSelection")).toHaveLength(1)
-    expect(wrapper.emitted("refreshMetadata")).toHaveLength(1)
     expect(wrapper.emitted("exportMoviesCsv")).toHaveLength(1)
     expect(wrapper.emitted("checkStorage")).toHaveLength(1)
-    expect(wrapper.emitted("exitBatchMode")).toHaveLength(1)
     expect(wrapper.emitted("update:removePathDialogOpen")).toEqual([[false]])
     expect(wrapper.emitted("confirmRemove")).toHaveLength(1)
     expect(wrapper.emitted("update:editLibraryTitleDraft")).toEqual([["Renamed"]])
     expect(wrapper.emitted("saveTitle")).toEqual([["library-a"]])
     expect(wrapper.emitted("cancelEdit")).toHaveLength(1)
-    expect(wrapper.emitted("toggleMetadataPathSelection")).toEqual([["D:/Media/JAV/Main"]])
     expect(wrapper.emitted("reveal")).toEqual([[libraryPath]])
     expect(wrapper.emitted("edit")).toEqual([[libraryPath]])
     expect(wrapper.emitted("rescan")).toEqual([[libraryPath]])

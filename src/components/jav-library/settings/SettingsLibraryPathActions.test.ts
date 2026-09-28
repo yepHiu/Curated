@@ -18,6 +18,8 @@ vi.mock("vue-i18n", () => ({
 }))
 
 vi.mock("lucide-vue-next", () => ({
+  Check: { template: "<span />" },
+  Download: { template: "<span />" },
   FolderOpen: { name: "FolderOpen", template: "<span />" },
   MoreVertical: { name: "MoreVertical", template: "<span />" },
   Pencil: { name: "Pencil", template: "<span />" },
@@ -64,6 +66,27 @@ async function mountComponent(props?: Record<string, unknown>) {
 }
 
 describe("SettingsLibraryPathActions", () => {
+  it("sets a directory as default and blocks repeat changes while saving", async () => {
+    const wrapper = await mountComponent()
+    await wrapper.get("[data-set-default-import-path]").trigger("click")
+    expect(wrapper.emitted("setDefault")).toEqual([["library-a"]])
+    await wrapper.setProps({ defaultImportPathSaving: true })
+    expect(wrapper.get("[data-set-default-import-path]").attributes("disabled")).toBeDefined()
+    await wrapper.setProps({ defaultImportPathSaving: false, isDefault: true })
+    expect(wrapper.get("[data-set-default-import-path]").attributes("disabled")).toBeDefined()
+    expect(wrapper.get("[data-set-default-import-path]").text()).toBe("settings.defaultImportPathLabel")
+  })
+
+  it("offers disk rebind only for mismatched storage", async () => {
+    const wrapper = await mountComponent()
+    expect(wrapper.find("[data-rebind-storage]").exists()).toBe(false)
+    await wrapper.setProps({ canRebind: true })
+    await wrapper.get("[data-rebind-storage]").trigger("click")
+    expect(wrapper.emitted("rebindStorage")).toHaveLength(1)
+    await wrapper.setProps({ rebindBusy: true })
+    expect(wrapper.get("[data-rebind-storage]").attributes("disabled")).toBeDefined()
+  })
+
   it("renders a more-actions trigger and grouped menu items", async () => {
     const wrapper = await mountComponent()
 

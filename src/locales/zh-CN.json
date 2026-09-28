@@ -1131,6 +1131,7 @@
     "storageStatusRebindFailed": "更新存储绑定失败。",
     "storageStatusCheckFailed": "检查存储状态失败。",
     "storageStatusActionBlocked": "这个存储目录当前不可用，请先检查硬盘再扫描或导入。",
+    "setDefaultImportPath": "设置为默认导入目录",
     "defaultImportPathLabel": "默认导入目录",
     "defaultImportPathPlaceholder": "选择默认导入目录",
     "defaultImportPathNone": "请先添加资料库路径",
