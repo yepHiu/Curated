@@ -11,9 +11,9 @@ Curated Desktop 0.2.2 makes Windows installation and upgrades clearer, with an e
 | Module | Status | Before | After |
 | --- | --- | --- | --- |
 | Desktop | Updated | 0.2.1 | 0.2.2 |
-| Server | Unchanged | 1.7.3 | 1.7.3 |
+| Server | Unchanged | 1.7.4 | 1.7.4 |
 
-This Release updates **Desktop only**. Server is unchanged by this package. The companion Windows installer improvement is prepared separately as Server 1.7.4; each module has its own Release and installation. No new Full package is produced.
+This Release updates **Desktop only**. Server is unchanged by this package. The companion Server improvements are available separately in [Server 1.7.4](https://github.com/yepHiu/Curated/releases/tag/server-v1.7.4); each module has its own Release and installation. No new Full package is produced.
 
 ### What's Changed
 
@@ -36,10 +36,10 @@ This Release updates **Desktop only**. Server is unchanged by this package. The 
 
 Select the matching asset attached to this Release:
 
-- `Curated-Desktop-Setup-0.2.2-windows-x64.exe`
-- `Curated-Desktop-0.2.2-windows-x64.zip`
-- `Curated-Desktop-0.2.2-macos-arm64.dmg`
-- `Curated-Desktop-0.2.2-macos-arm64.zip`
+- [Curated-Desktop-Setup-0.2.2-windows-x64.exe](https://github.com/yepHiu/Curated/releases/download/desktop-v0.2.2/Curated-Desktop-Setup-0.2.2-windows-x64.exe)
+- [Curated-Desktop-0.2.2-windows-x64.zip](https://github.com/yepHiu/Curated/releases/download/desktop-v0.2.2/Curated-Desktop-0.2.2-windows-x64.zip)
+- [Curated-Desktop-0.2.2-macos-arm64.dmg](https://github.com/yepHiu/Curated/releases/download/desktop-v0.2.2/Curated-Desktop-0.2.2-macos-arm64.dmg)
+- [Curated-Desktop-0.2.2-macos-arm64.zip](https://github.com/yepHiu/Curated/releases/download/desktop-v0.2.2/Curated-Desktop-0.2.2-macos-arm64.zip)
 
 Use the accompanying `SHA256SUMS` for artifact integrity verification.
 
