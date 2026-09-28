@@ -55,7 +55,7 @@ Photo library current slice:
 | `organizeLibrary` | 默认 **`true`**（若文件不存在或省略该字段，启动时也按 `true` 处理）。`true`/`false` 由前端 **Settings → 整理入库** 通过 `PATCH /api/settings` 更新，成功后**原子写回**本文件。 |
 | `metadataMovieProvider` | 影片 Metatube 源；空字符串表示自动。由设置页或 `PATCH /api/settings` 更新。 |
 | `defaultImportLibraryPathId` | 默认导入目标库路径 id。由设置页「影片存储」或 `PATCH /api/settings` 更新；`POST /api/import/movies` 会把浏览器选择的影片复制到该库根目录下，不移动或删除源文件。 |
-| `backupDirectory` | 最近一次通过设置页成功创建备份时使用的绝对目录。只保存目录，不保存自动生成的包文件名；每次创建仍生成新的 UTC 时间戳文件名。空字符串表示未记住目录。由 `PATCH /api/settings` 原子更新，刷新页面或重启后端后通过 `GET /api/settings` 回填。 |
+| `backupDirectory` | 最近一次通过设置页成功创建备份时使用的绝对目录。只保存目录，不保存自动生成的包文件名；每次创建仍生成新的 UTC 时间戳文件名。空字符串或缺省表示使用默认目录：正式版 `<Curated 用户数据目录>/backups`（Windows 为 `%LOCALAPPDATA%\Curated\backups`，跟随 `CURATED_DATA_DIR`），开发版为绝对 `backend/runtime/backups`。自定义目录优先；`GET /api/settings` 返回实际生效路径，但只读查询不创建目录或写回配置。`PATCH /api/settings` 写空可恢复默认，成功创建备份后仍记住所用目录。 |
 | `autoLibraryWatch` | 默认 **`true`**。为 **`true`** 且主配置允许目录监听时，库根下新文件经 **fsnotify** 防抖后会触发与 **`POST /api/scans`** 同类的扫描链（任务元数据常带 `trigger: fsnotify`），并可能对新增条目排队刮削。为 **`false`** 时**不**因监听排队扫描；**手动扫描、周期 `autoScanIntervalSeconds` 全库扫描**不受影响。由设置页「自动刮削元数据」或 `PATCH /api/settings` 的 `autoLibraryWatch` 更新。 |
 | `autoComicLibraryWatch` | 默认 **`true`**。为 **`true`** 且漫画库已启用、主配置允许目录监听时，漫画存储路径下新增或变更的 `.zip` / `.cbz` 会经独立漫画 watcher 防抖后触发 `scan.comics`（任务元数据常带 `trigger: fsnotify`）。为 **`false`** 时不因监听排队漫画扫描；手动漫画扫描与漫画导入后的扫描不受影响。 |
 | `autoPhotoLibraryWatch` | 默认 **`true`**。为 **`true`** 且写真库已启用、主配置允许目录监听时，独立写真 watcher 会监听写真存储路径下新增或变更的 `.zip` / `.cbz`，并经防抖后触发 `scan.photos`。 |

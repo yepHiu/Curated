@@ -146,7 +146,7 @@ This builds `backend/runtime/curated-dev.exe` and `electron-dist/`, starts or re
 
 ## 3. Backup, restore, and path migration
 
-In Web API mode on the Server machine, open Settings → Maintenance & backup. The page starts with backup, followed by library health checks and manual rescanning. Enter a destination folder and choose **Back up now**: Curated generates a timestamped filename, creates the package, checks it automatically and shows the saved file path. After successful creation, the directory is remembered as `backupDirectory`. Desktop offers its native folder picker; browsers require pasting the full Server-local path.
+In Web API mode on the Server machine, open Settings → Maintenance & backup. The page starts with backup, followed by library health checks and manual rescanning. Enter a destination folder and choose **Back up now**: Curated generates a timestamped filename, creates the package, checks it automatically and shows the saved file path. After successful creation, the directory is remembered as `backupDirectory`. Desktop offers its native folder picker; browsers can paste a different full Server-local path. Without a saved preference, Server supplies a default: Windows release `%LOCALAPPDATA%\Curated\backups`, macOS release `~/Library/Application Support/Curated/backups`, Linux release `$XDG_DATA_HOME/curated/backups` (fallback `~/.local/share/curated/backups`). `CURATED_DATA_DIR` redirects the release default to `<data-root>/backups`; development uses the absolute `backend/runtime/backups` path. Existing custom preferences win. Reading settings does not create a directory or persist the default; creating the first backup creates the directory. Clearing the stored `backupDirectory` restores default resolution.
 
 Expand **Restore from a backup**, enter the backup file path (or reuse the backup just created), and choose **Check backup and continue**. This single action verifies the package and checks restore requirements. Changing the file or retrying clears previous results. A passed check shows the target database and the offline steps; it does **not** mean data has been restored. Open this guide before quitting Server. Creation receipts and restore results are separate. See the [maintenance workflow record](plan/2026-09-06-maintenance-ui-alignment.md).
 
@@ -172,7 +172,20 @@ For an installed Windows Server, run the equivalent command from its installatio
 
 Use the same data directory, environment and custom `-config` as the running Server. Confirm that the preflight target matches the database you intend to restore; do not assume a different working directory or configuration uses the same database. Restart Server after the command succeeds.
 
-The package contains a consistent SQLite snapshot, `library-config.cfg` when present, and managed wishlist images. It does not include media or other user asset files. Verification runs SHA-256 checks plus SQLite `quick_check` / `foreign_key_check`. Restore rejects future migrations and insufficient disk space, replaces files atomically, and keeps `.pre-restore-*` rollback copies.
+A backup is **one `.curated-backup` file**, internally a ZIP archive (current format version 2). It contains `manifest.json`, `database/curated.db`, optional `config/library-config.cfg` and managed `assets/wishlist/` originals/thumbnails. The manifest records the application version, database migrations, file sizes and SHA-256 checksums. It is not just a loose database file.
+
+| Content | Included in the current package? |
+| --- | --- |
+| Movie metadata, favorites, ratings, comments, viewing history and playback progress | Yes, in the database snapshot. External media/asset paths are records, not copies of those files. |
+| Static curated frames | Yes: original image BLOB, thumbnail BLOB, capture time, tags and associated metadata. |
+| Curated-frame GIF / MP4 / WebM motion files and separately exported captures | No. Motion metadata is in the database, but external artifacts/exports are not collected. |
+| Wishlist | Yes: records, metadata and managed originals/thumbnails; an arbitrary external file or remote URL alone is not archived. |
+| Movie posters, previews/screenshots and actor-avatar files | No. Database references are preserved, but files outside the database/wishlist asset set are not copied. |
+| Comic / photo library | Indexes, tags, favorites, ratings, comments and reading/viewing progress are included. Comic ZIP/CBZ archives, photo originals and page/cover caches are not. |
+| Movie / audio / other media originals | No. |
+| Settings | `library-config.cfg` when present. This is not a whole-machine export of custom main config JSON, Desktop connection profiles, browser localStorage or browser IndexedDB. |
+
+This describes real Server / Web API storage. Static captures saved only in Mock-mode browser IndexedDB are not part of a Server backup. External files must still exist at their recorded locations, or be separately restored/rebound; a valid package does not imply every referenced media or image file is inside it. Verification runs SHA-256 checks plus SQLite `quick_check` / `foreign_key_check`. Restore rejects future migrations and insufficient disk space, replaces files atomically, and keeps `.pre-restore-*` rollback copies.
 
 When a drive letter or library root changes, plan first:
 
