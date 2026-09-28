@@ -27,8 +27,11 @@ def installed(component):
 
 
 def run(file, *args, success=True):
-    result = subprocess.run([str(file), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/SP-', '/NORESTART', '/NOLAUNCH=1', *args])
+    log = Path(tempfile.gettempdir()) / f'curated-smoke-{time.time_ns()}.log'
+    result = subprocess.run([str(file), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/SP-', '/NORESTART', '/NOLAUNCH=1', '/LOG=' + str(log), *args])
     if (result.returncode == 0) != success:
+        if log.exists():
+            print(log.read_text(encoding='utf-8-sig', errors='replace')[-12000:], flush=True)
         raise RuntimeError(f'{file.name}: unexpected exit {result.returncode}')
 
 
@@ -44,7 +47,9 @@ def main():
     packages = ROOT / 'release/windows-components'
     setup = lambda c: packages / artifact_name(c, current[c], 'windows', 'x64', 'exe')
     with tempfile.TemporaryDirectory(prefix='curated-installer-smoke-') as temporary:
-        base = Path(temporary)
+        # Hosted Windows TEMP can contain RUNNER~1. Match the canonical directory
+        # used by installer preflight, as the isolated installer fixtures do.
+        base = Path(temporary).resolve()
         # Separate data marker proves program uninstall does not remove user data.
         data = base / 'library'
         data.mkdir()
