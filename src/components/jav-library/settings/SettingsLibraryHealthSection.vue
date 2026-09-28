@@ -293,7 +293,7 @@ function downloadDiagnostics() {
             type="button"
             variant="outline"
             size="sm"
-            class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+            class="h-auto min-h-11 sm:h-8 sm:min-h-8 rounded-full"
             data-settings-comfortable-control
             data-library-health-export
             :disabled="reportBusy"
@@ -305,9 +305,10 @@ function downloadDiagnostics() {
           <Button
             type="button"
             size="sm"
-            class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+            class="h-auto min-h-11 sm:h-8 sm:min-h-8 rounded-full"
             data-settings-comfortable-control
             data-library-health-scan
+            variant="outline"
             :disabled="!supported || reportBusy || maintenanceActive"
             @click="runHealthScan"
           >
@@ -439,7 +440,7 @@ function downloadDiagnostics() {
                 v-if="report.summary.categoryCounts.metadata_missing"
                 type="button"
                 variant="outline"
-                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8 rounded-full"
                 data-settings-comfortable-control
                 data-library-health-repair-missing
                 :disabled="repairActive"
@@ -452,7 +453,7 @@ function downloadDiagnostics() {
                 v-if="report.summary.categoryCounts.metadata_failed"
                 type="button"
                 variant="outline"
-                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8 rounded-full"
                 data-settings-comfortable-control
                 data-library-health-repair-failed
                 :disabled="repairActive"
@@ -475,7 +476,7 @@ function downloadDiagnostics() {
                 v-if="orphanCleanupFindings.length"
                 type="button"
                 variant="outline"
-                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8 rounded-full"
                 data-settings-comfortable-control
                 data-library-health-cleanup-orphans
                 :disabled="maintenanceActive"
@@ -488,7 +489,7 @@ function downloadDiagnostics() {
                 v-if="stagingCleanupFindings.length"
                 type="button"
                 variant="outline"
-                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8 rounded-full"
                 data-settings-comfortable-control
                 data-library-health-cleanup-staging
                 :disabled="maintenanceActive"
@@ -546,12 +547,12 @@ function downloadDiagnostics() {
           <p class="text-xs leading-relaxed sm:text-sm">{{ t("settings.libraryHealthRepairConfirmWarning") }}</p>
         </div>
         <DialogFooter class="gap-3">
-          <Button type="button" variant="outline" class="min-h-11 rounded-2xl" :disabled="repairSubmitting" @click="repairDialogOpen = false">
+          <Button type="button" variant="outline" class="min-h-11 rounded-full" :disabled="repairSubmitting" @click="repairDialogOpen = false">
             {{ t("common.cancel") }}
           </Button>
           <Button
             type="button"
-            class="min-h-11 rounded-2xl"
+            class="min-h-11 rounded-full"
             data-library-health-repair-confirm
             :disabled="repairSubmitting"
             @click="confirmRepair"
@@ -582,13 +583,13 @@ function downloadDiagnostics() {
           <p class="text-xs leading-relaxed sm:text-sm">{{ t("settings.libraryHealthCleanupConfirmWarning") }}</p>
         </div>
         <DialogFooter class="gap-3">
-          <Button type="button" variant="outline" class="min-h-11 rounded-2xl" :disabled="cleanupSubmitting" @click="cleanupDialogOpen = false">
+          <Button type="button" variant="outline" class="min-h-11 rounded-full" :disabled="cleanupSubmitting" @click="cleanupDialogOpen = false">
             {{ t("common.cancel") }}
           </Button>
           <Button
             type="button"
             variant="destructive"
-            class="min-h-11 rounded-2xl"
+            class="min-h-11 rounded-full"
             data-library-health-cleanup-confirm
             :disabled="cleanupSubmitting"
             @click="confirmCleanup"

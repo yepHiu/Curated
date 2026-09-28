@@ -47,9 +47,9 @@ const { t } = useI18n()
       </CardHeader>
 
       <CardContent class="flex flex-col gap-3 pt-0">
-        <SettingsLibraryHealthSection :supported="healthSupported" />
-
         <SettingsBackupSection :supported="backupSupported" />
+
+        <SettingsLibraryHealthSection :supported="healthSupported" />
 
         <section
           aria-labelledby="settings-manual-maintenance-title"
@@ -71,7 +71,7 @@ const { t } = useI18n()
             type="button"
             variant="outline"
             size="sm"
-            class="h-auto min-h-11 w-full shrink-0 sm:h-8 sm:min-h-8 sm:w-auto"
+            class="h-auto min-h-11 self-end shrink-0 sm:h-8 sm:min-h-8 rounded-full"
             :disabled="fullScanBusy"
             data-settings-comfortable-control
             data-settings-full-scan
@@ -81,7 +81,7 @@ const { t } = useI18n()
               data-icon="inline-start"
               :class="{ 'motion-safe:animate-pulse': fullScanBusy }"
             />
-            {{ t("common.run") }}
+            {{ t(fullScanBusy ? "settings.maintenanceScanning" : "settings.maintenanceScanAction") }}
           </Button>
         </section>
       </CardContent>

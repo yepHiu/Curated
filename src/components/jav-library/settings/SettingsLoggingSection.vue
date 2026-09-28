@@ -300,7 +300,7 @@ onBeforeUnmount(() => {
                 <Button
                   type="button"
                   variant="secondary"
-                  class="shrink-0 rounded-2xl"
+                  class="shrink-0 rounded-full"
                   :disabled="backendLogSaving || pickBackendLogDirBusy"
                   @click="pickBackendLogDirectory"
                 >
@@ -375,7 +375,7 @@ onBeforeUnmount(() => {
           <Button
             v-if="!useWebApi"
             type="button"
-            class="w-fit rounded-lg"
+            class="w-fit rounded-full"
             :disabled="backendLogSaving"
             @click="saveBackendLogSettings"
           >

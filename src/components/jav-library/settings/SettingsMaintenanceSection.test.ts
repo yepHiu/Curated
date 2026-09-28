@@ -59,8 +59,8 @@ describe("SettingsMaintenanceSection", () => {
     const fullScan = wrapper.get("[data-settings-full-scan]")
     expect(fullScan.attributes("data-settings-comfortable-control")).toBeDefined()
     expect(fullScan.classes()).toContain("min-h-11")
-    expect(fullScan.classes()).toContain("w-full")
-    expect(fullScan.classes()).toContain("sm:w-auto")
+    expect(fullScan.classes()).toContain("rounded-full")
+    expect(fullScan.classes()).not.toContain("w-full")
   })
 
   it("disables full scan while a scan is busy", () => {
