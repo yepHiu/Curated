@@ -715,14 +715,15 @@ func normalizeInstallMode(mode string) string {
 	}
 }
 
+// installerArgs keeps interactive confirmation in the wizard; explicit silent requests permit scoped shutdown.
 func installerArgs(mode string) ([]string, error) {
 	switch mode {
 	case "interactive":
-		return []string{"/NORESTART", "/SP-", "/CLOSEAPPLICATIONS"}, nil
+		return []string{"/NORESTART", "/SP-"}, nil
 	case "silent":
-		return []string{"/SILENT", "/NORESTART", "/SP-", "/CLOSEAPPLICATIONS"}, nil
+		return []string{"/SILENT", "/NORESTART", "/SP-", "/CLOSECURATED=1"}, nil
 	case "verysilent":
-		return []string{"/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CLOSEAPPLICATIONS"}, nil
+		return []string{"/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CLOSECURATED=1"}, nil
 	default:
 		return nil, fmt.Errorf("unsupported install mode: %s", mode)
 	}

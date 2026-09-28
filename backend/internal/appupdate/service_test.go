@@ -259,7 +259,7 @@ func TestInstallLaunchesVerifiedInstallerWithRequestedMode(t *testing.T) {
 	if gotPath != installerPath {
 		t.Fatalf("launched path = %q, want %q", gotPath, installerPath)
 	}
-	wantArgs := []string{"/SILENT", "/NORESTART", "/SP-", "/CLOSEAPPLICATIONS"}
+	wantArgs := []string{"/SILENT", "/NORESTART", "/SP-", "/CLOSECURATED=1"}
 	if strings.Join(gotArgs, " ") != strings.Join(wantArgs, " ") {
 		t.Fatalf("launched args = %v, want %v", gotArgs, wantArgs)
 	}
@@ -268,6 +268,19 @@ func TestInstallLaunchesVerifiedInstallerWithRequestedMode(t *testing.T) {
 	}
 	if dto.LastInstallAttemptAt != "2026-05-12T12:05:00Z" {
 		t.Fatalf("LastInstallAttemptAt = %q", dto.LastInstallAttemptAt)
+	}
+}
+
+// TestInteractiveInstallerLeavesShutdownConsentToWizard protects the default interactive confirmation path.
+func TestInteractiveInstallerLeavesShutdownConsentToWizard(t *testing.T) {
+	args, err := installerArgs(normalizeInstallMode(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "/CLOSE") || strings.Contains(arg, "SILENT") {
+			t.Fatalf("interactive update bypasses wizard consent: %v", args)
+		}
 	}
 }
 
