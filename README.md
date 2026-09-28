@@ -77,7 +77,7 @@ pnpm dev
 - Desktop shell: `pnpm dev:electron`.
 - Windows dev binary: `pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`.
 
-Backup, restore, path migration, configuration keys, and release packaging are documented in [docs/guide.md](docs/guide.md). CD builds independent Windows Server / Desktop packages and Apple Silicon Mac Desktop, with version-tag releases and manual draft runs; see [release operations](docs/guide.md#8-release-and-packaging).
+Backups support file-picker selection and guided offline recovery; backup scope, path migration, configuration keys, and release packaging are documented in [docs/guide.md](docs/guide.md). CD builds independent Windows Server / Desktop packages and Apple Silicon Mac Desktop, with version-tag releases and manual draft runs; see [release operations](docs/guide.md#8-release-and-packaging).
 
 ## Documentation
 

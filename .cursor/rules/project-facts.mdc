@@ -107,6 +107,10 @@ Desktop/Full 版本源位于 `scripts/release/versions/`，Server 位于 `backen
 - Web API clips use `POST /api/library/movies/{movieId}/clips` with bounded `startSec/endSec` (0.4–6 seconds), `format: "gif" | "mp4" | "webm"`, optional `fps` (1–20), `width` (160–960) and `curatedFrameId`. Associated artifacts persist under `curated-frame-motions` and use `GET /api/curated-frames/{id}/motion`; unassociated tasks use `GET /api/tasks/{taskId}/artifact`.
 - Source paths are validated against configured library roots before FFmpeg reads them. Persisted motion metadata lives in migration `0037_curated_frame_motion.sql`; temporary unassociated clip artifacts are removed after 24 hours, while a persisted artifact is deleted with its curated frame. Mock mode does not fake clip generation.
 
+## 2026-09-29 备份文件选择
+
+恢复区通过标准文件选择器选 `.curated-backup`，只读地址栏默认显示客户端按 Server origin 记忆的最近包，或 `GET /api/maintenance/backups/latest` 发现的备份目录/imports 最新文件。点击检查才调用 `POST /api/maintenance/backups/inspect-file`（单个 multipart file，8 GiB）；有效包保留在备份目录/imports 并返回 Server 路径与 preflight，失败/无效上传删除。两端点沿用 PIN/session + direct local 管理限制，无在线恢复。创建后自动回填；目录/文件选择与执行动作同行，窄屏换行。旧 JSON 路径接口保留。详见 guide §3。
+
 ## 2026-09-29 备份默认位置与范围
 
 `GET/PATCH /api/settings` 的 `backupDirectory` 返回有效路径：显式偏好优先，缺省/空值使用正式版 `<curatedDataRoot>/backups`（Windows `%LOCALAPPDATA%\Curated\backups`，跟随 `CURATED_DATA_DIR`），开发版绝对 `backend/runtime/backups`。读取不创建目录或持久化默认；写空恢复默认选择。包仍为单个 ZIP 格式 v2 `.curated-backup`：DB 一致快照、可选 library-config、manifest、愿望单托管图片。静态萃取帧原图和缩略图是 DB BLOB，包含；动态萃取文件、影片海报/预览图等外部资产、漫画 ZIP/CBZ 与写真原图不包含，相关 DB 记录仍保留。详见 guide §3 的逐项范围表。无新端点、配置字段或包格式。
