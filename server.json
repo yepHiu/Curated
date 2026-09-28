@@ -1,34 +1,34 @@
 {
   "schema": 1,
   "component": "server",
-  "version": "1.7.3",
-  "sourceCommit": "b067e59d087ea00481829604a2711db84582504b",
+  "version": "1.7.6",
+  "sourceCommit": "c692d98ba3e2b6a3c5b5539591e600476ac56108",
   "artifacts": [
     {
       "component": "server",
       "variant": "standalone",
-      "version": "1.7.3",
+      "version": "1.7.6",
       "channel": "stable",
       "platform": "windows",
       "arch": "x64",
       "format": "exe",
-      "fileName": "Curated-Server-Setup-1.7.3-windows-x64.exe",
-      "sha256": "198ebde0893ace6e70e4b10ca7f3e10d346242bd8af72a8d73521906dcbce442",
-      "sourceCommit": "b067e59d087ea00481829604a2711db84582504b",
-      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.7.3/Curated-Server-Setup-1.7.3-windows-x64.exe"
+      "fileName": "Curated-Server-Setup-1.7.6-windows-x64.exe",
+      "sha256": "a81482cc23b4550dbdfbc75293f1c69d9c37974be03b5c133a6de2c7b8569a24",
+      "sourceCommit": "c692d98ba3e2b6a3c5b5539591e600476ac56108",
+      "url": "https://github.com/yepHiu/Curated/releases/download/server-v1.7.6/Curated-Server-Setup-1.7.6-windows-x64.exe"
     },
     {
       "component": "server",
       "variant": "standalone",
-      "version": "1.7.3",
+      "version": "1.7.6",
       "channel": "stable",
       "platform": "windows",
       "arch": "x64",
       "format": "zip",
-      "fileName": "Curated-Server-1.7.3-windows-x64.zip",
-      "sha256": "28a34d81a6838c6c386e5742e0471769ca42d2b4b0e9f6816c2c89804789b912",
-      "sourceCommit": "b067e59d087ea00481829604a2711db84582504b",
-      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.7.3/Curated-Server-1.7.3-windows-x64.zip"
+      "fileName": "Curated-Server-1.7.6-windows-x64.zip",
+      "sha256": "80611b63fe2f806167984a530449cb8432d0970f9618969b133856283d36da67",
+      "sourceCommit": "c692d98ba3e2b6a3c5b5539591e600476ac56108",
+      "url": "https://github.com/yepHiu/Curated/releases/download/server-v1.7.6/Curated-Server-1.7.6-windows-x64.zip"
     }
   ]
 }
