@@ -271,6 +271,8 @@ test("maintenance backup flow creates verifies and preflights without online res
   const pageErrors: string[] = []
   const unknownApiRequests: string[] = []
   const backupPaths: string[] = []
+  const verifiedPaths: string[] = []
+  const preflightPaths: string[] = []
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text())
   })
@@ -453,11 +455,17 @@ test("maintenance backup flow creates verifies and preflights without online res
       await route.fulfill({ status: 201, json: manifest })
       return
     }
+    if (path === "/api/maintenance/backups/latest") {
+      await route.fulfill({ json: { backupPath: "" } })
+      return
+    }
     if (path === "/api/maintenance/backups/verify") {
+      verifiedPaths.push((request.postDataJSON() as { backupPath: string }).backupPath)
       await route.fulfill({ json: verification })
       return
     }
     if (path === "/api/maintenance/backups/preflight") {
+      preflightPaths.push((request.postDataJSON() as { backupPath: string }).backupPath)
       await route.fulfill({
         json: {
           canRestore: true,
@@ -489,19 +497,27 @@ test("maintenance backup flow creates verifies and preflights without online res
     waitUntil: "domcontentloaded",
   })
   const pathInput = page.locator("[data-settings-backup-path]")
-  await expect(pathInput).toBeVisible()
+  await expect(pathInput).not.toBeVisible()
   const directoryInput = page.locator("[data-settings-backup-directory]")
   await expect(directoryInput).toBeVisible()
   await directoryInput.fill("D:\\Backups")
-  await pathInput.fill("D:\\Backups\\curated-e2e")
   await page.locator("[data-settings-backup-create]").click()
-  await expect(page.getByText(/验证通过|Verified|検証済み/)).toBeVisible()
+  await expect(page.locator("[data-settings-backup-created-path]")).toBeVisible()
+  await expect(page.locator("[data-settings-backup-create]")).toBeEnabled()
   expect(backupPaths).toHaveLength(1)
   expect(backupPaths[0]).toMatch(/^D:\\Backups\\curated-\d{8}-\d{6}Z\.curated-backup$/)
 
+  await page.locator("[data-settings-backup-existing]").click()
+  await expect(pathInput).toHaveValue(backupPaths[0]!)
+  await expect(pathInput).toHaveAttribute("readonly", "")
   await page.locator("[data-settings-backup-preflight]").click()
-  await expect(page.getByText(/可以离线恢复|Ready for offline restore|オフライン復元可能/)).toBeVisible()
+  await expect(page.locator("[data-settings-backup-check-result]")).toBeVisible()
+  await expect(page.locator("[data-settings-backup-check-result]")).toContainText("D:\\Curated\\curated.db")
+  expect(verifiedPaths).toEqual(backupPaths)
+  expect(preflightPaths).toEqual(backupPaths)
   await expect(page.locator("[data-settings-backup-restore]")).toHaveCount(0)
+  await expect(page.locator("[data-settings-backup-pick]")).toHaveCount(0)
+  await expect(page.locator("[data-settings-backup-verify]")).toHaveCount(0)
 
   const desktopHasHorizontalOverflow = await page.evaluate(() => {
     const root = document.documentElement
@@ -517,9 +533,9 @@ test("maintenance backup flow creates verifies and preflights without online res
   })
   expect(mobileHasHorizontalOverflow).toBe(false)
   for (const selector of [
-    "[data-settings-backup-pick]",
+    "[data-settings-backup-pick-file]",
     "[data-settings-backup-create]",
-    "[data-settings-backup-verify]",
+    "[data-settings-backup-existing]",
     "[data-settings-backup-preflight]",
   ]) {
     await expect.poll(async () => {
