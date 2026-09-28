@@ -1,4 +1,4 @@
-"""Publish independent component feeds and promote the newest Full to GitHub Latest."""
+"""Publish standalone Desktop/Server releases; preserve historical Full recovery."""
 from __future__ import annotations
 import argparse
 import json
@@ -43,6 +43,44 @@ def body(root: Path, meta: dict) -> str:
     if not text:
         raise ValueError('Component release notes must not be empty')
     return text + '\n\n' + legacy.source_marker(meta) + '\n'
+
+
+def require_standalone(component: str) -> None:
+    if component not in ('server', 'desktop'):
+        raise ValueError('New releases must use server-v or desktop-v; Full is retired')
+
+
+def release_body(root: Path, meta: dict) -> str:
+    """Require explicit module changes against the currently published channels.
+
+    The table describes this tag only. A batch updating both modules uses two
+    tags/notes, allowing the other module to be published independently.
+    """
+    require_standalone(meta['component'])
+    text = body(root, meta)
+    semver = r'(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)'
+    rows = re.findall(
+        rf'^\|\s*(Desktop|Server)\s*\|\s*(Updated|Unchanged)\s*\|\s*({semver})\s*\|\s*({semver})\s*\|\s*$',
+        text, re.MULTILINE)
+    if len(rows) != 2 or {row[0] for row in rows} != {'Desktop', 'Server'}:
+        raise ValueError('Release notes require Desktop and Server rows: Module | Status | Before | After')
+    for name, status, before, after in rows:
+        component = name.lower()
+        updated = component == meta['component']
+        if updated:
+            if status != 'Updated' or after != meta['version'] or tuple(map(int, after.split('.'))) <= tuple(map(int, before.split('.'))):
+                raise ValueError('The released module must be Updated with an increased tag version')
+        elif status != 'Unchanged' or before != after:
+            raise ValueError('The other module must be Unchanged with the same version')
+        published = read_channel(component)
+        baseline = published['version'] if published else '0.0.0'
+        if updated and before != baseline:
+            raise ValueError(f'{name} Before must match the published channel ({baseline})')
+        # An independent release of the other module must not invalidate a draft.
+        # Its unchanged row is a version snapshot, never a future/unpublished bump.
+        if not updated and tuple(map(int, before.split('.'))) > tuple(map(int, baseline.split('.'))):
+            raise ValueError(f'Unchanged {name} cannot claim an unpublished version')
+    return text
 
 
 def expected_assets(meta: dict) -> dict[str, dict]:
@@ -176,6 +214,7 @@ def advance_channels(changes: dict[str, str], meta: dict) -> None:
 
 
 def publish(root: Path, meta: dict, output: Path, mode: str) -> None:
+    notes = release_body(root, meta)
     assets = output / 'assets'
     verify_distribution(meta, assets)
     changes = validate_channel_advance(assets)
@@ -183,7 +222,7 @@ def publish(root: Path, meta: dict, output: Path, mode: str) -> None:
     # The tag is already verified by check_release. Omitting target_commitish
     # avoids asking GITHUB_TOKEN to create a tag at a workflow-changing commit.
     payload = {'tag_name': meta['tag'], 'name': f"Curated v{meta['version']}",
-               'body': body(root, meta), 'draft': True, 'prerelease': False, 'make_latest': 'false'}
+               'body': notes, 'draft': True, 'prerelease': False, 'make_latest': 'false'}
     release = legacy.api(f"releases/{release['id']}", payload, 'PATCH') if release else legacy.api('releases', payload)
     subprocess.run(['gh', 'release', 'upload', meta['tag'], '--repo', os.environ['GITHUB_REPOSITORY'],
                     '--clobber', *map(str, sorted(assets.iterdir()))], check=True)
@@ -208,12 +247,15 @@ def main() -> None:
     parser.add_argument('--windows', type=Path, default=Path('release/windows-components'))
     parser.add_argument('--macos', type=Path, default=Path('release/macos-desktop'))
     args = parser.parse_args()
+    # Historical Full manifests can still be recovered, but never built or published anew.
+    if args.command != 'channels':
+        require_standalone(args.tag.split('-v', 1)[0])
     root = args.source_root.resolve() if args.source_root else Path(__file__).resolve().parents[2]
     if args.source_root and args.command not in ('stage', 'publish', 'channels'):
         raise ValueError('Separate source checkout is only supported for artifact recovery')
     meta = metadata(root, args.tag)
     if args.command == 'check':
-        body(root, meta)
+        release_body(root, meta)
         legacy.check_release(meta)
         if target := os.environ.get('GITHUB_OUTPUT'):
             with open(target, 'a') as stream:

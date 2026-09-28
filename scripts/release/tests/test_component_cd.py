@@ -28,6 +28,67 @@ class ComponentReleaseTests(unittest.TestCase):
             entries.append(entry)
         return entries
 
+    def test_new_full_commands_fail_before_git_or_build(self):
+        for command in ('check', 'windows', 'macos', 'stage', 'publish'):
+            with self.subTest(command=command), \
+                 patch('sys.argv', ['component_cd', command, '--tag', 'full-v1.7.4']), \
+                 patch.object(cd, 'metadata') as metadata, \
+                 self.assertRaisesRegex(ValueError, 'Full is retired'):
+                cd.main()
+            metadata.assert_not_called()
+
+    def notes_fixture(self, component='server'):
+        meta = {'component': component, 'tag': f'{component}-v1.1.0',
+                'version': '1.1.0', 'commit': 'abc'}
+        directory = self.root / 'docs/release-notes'
+        directory.mkdir(parents=True, exist_ok=True)
+        file = directory / f"{meta['tag']}.md"
+        rows = [f'| {c.title()} | {"Updated" if c == component else "Unchanged"} | 1.0.0 | {"1.1.0" if c == component else "1.0.0"} |'
+                for c in ('desktop', 'server')]
+        text = '## GitHub Release Body\n\n### Module updates\n\n| Module | Status | Before | After |\n| --- | --- | --- | --- |\n' + '\n'.join(rows) + '\n\n### What\'s Changed\n\nFix component startup.\n'
+        file.write_text(text, encoding='utf-8')
+        return meta, file, text
+
+    def test_notes_identify_both_modules_for_either_standalone_release(self):
+        for component in ('server', 'desktop'):
+            meta, _, text = self.notes_fixture(component)
+            with self.subTest(component=component), patch.object(cd, 'read_channel', return_value={'version': '1.0.0'}):
+                self.assertEqual(cd.release_body(self.root, meta), text.split('## GitHub Release Body', 1)[1].strip() + '\n\n' + cd.legacy.source_marker(meta) + '\n')
+
+    def test_notes_reject_missing_status_rows_version_bumps_and_stale_baseline(self):
+        meta, file, text = self.notes_fixture()
+        invalid = [
+            text.replace('| Desktop | Unchanged | 1.0.0 | 1.0.0 |', ''),
+            text + '\n| Desktop | Unchanged | 1.0.0 | 1.0.0 |\n',
+            text.replace('| Desktop | Unchanged | 1.0.0 | 1.0.0 |', '| Desktop | Unchanged | 1.0.0 | 1.1.0 |'),
+            text.replace('| Desktop | Unchanged', '| Desktop | Updated'),
+            text.replace('| Server | Updated', '| Server | Unchanged'),
+            text.replace('| Server | Updated | 1.0.0 | 1.1.0 |', '| Server | Updated | 1.1.0 | 1.1.0 |'),
+            text.replace('| Server | Updated | 1.0.0 | 1.1.0 |', '| Server | Updated | 1.0.0 | 1.2.0 |'),
+            text.replace('1.0.0', '0.9.0'),
+        ]
+        for notes in invalid:
+            file.write_text(notes, encoding='utf-8')
+            with self.subTest(notes=notes), patch.object(cd, 'read_channel', return_value={'version': '1.0.0'}), self.assertRaises(ValueError):
+                cd.release_body(self.root, meta)
+
+    def test_invalid_notes_stop_publication_before_upload(self):
+        meta, file, _ = self.notes_fixture()
+        file.write_text('## GitHub Release Body\nUndeclared update', encoding='utf-8')
+        with patch.object(cd.legacy, 'api') as api, patch.object(cd.subprocess, 'run') as run, self.assertRaises(ValueError):
+            cd.publish(self.root, meta, self.root, 'publish')
+        api.assert_not_called()
+        run.assert_not_called()
+
+    def test_other_module_release_does_not_invalidate_unchanged_snapshot(self):
+        meta, file, text = self.notes_fixture()
+        with patch.object(cd, 'read_channel', side_effect=lambda c: {'version': '1.1.0' if c == 'desktop' else '1.0.0'}):
+            cd.release_body(self.root, meta)
+        file.write_text(text.replace('| Desktop | Unchanged | 1.0.0 | 1.0.0 |',
+                                     '| Desktop | Unchanged | 1.2.0 | 1.2.0 |'), encoding='utf-8')
+        with patch.object(cd, 'read_channel', return_value={'version': '1.0.0'}), self.assertRaisesRegex(ValueError, 'unpublished'):
+            cd.release_body(self.root, meta)
+
     def test_full_requires_all_eight_packages_and_actual_component_versions(self):
         entries = self.fixture()
         self.assertEqual(len(entries), 8)
@@ -96,7 +157,7 @@ class ComponentReleaseTests(unittest.TestCase):
             (self.root / entry['fileName']).rename(assets / entry['fileName'])
         (assets / 'release.json').write_text(json.dumps({**self.meta, 'artifacts': entries}))
         release = {'id': 20, 'html_url': 'https://example.test/release'}
-        with patch.object(cd.legacy, 'check_release', return_value=None), patch.object(cd, 'body', return_value='Notes'), \
+        with patch.object(cd.legacy, 'check_release', return_value=None), patch.object(cd, 'release_body', return_value='Notes'), \
              patch.object(cd, 'reconcile_latest') as reconcile, patch.object(cd.legacy, 'api', return_value=release) as api, \
              patch.object(cd.legacy, 'verify_uploaded'), patch.object(cd.subprocess, 'run'), \
              patch.object(cd, 'verify_distribution'), patch.object(cd, 'validate_channel_advance', return_value={}), patch.object(cd, 'advance_channels'), \
@@ -109,9 +170,10 @@ class ComponentReleaseTests(unittest.TestCase):
             self.assertFalse(any(args[0] == 'releases/20' and args[1].get('make_latest') == 'true' for args in payloads))
 
     def test_preflight_never_requires_or_mutates_latest(self):
+        self.meta.update(component='server', tag='server-v1.5.8', version='1.5.8')
         with patch('sys.argv', ['component_cd', 'check', '--tag', self.meta['tag']]), \
              patch.object(cd, 'metadata', return_value=self.meta), \
-             patch.object(cd, 'body', return_value='Notes'), \
+             patch.object(cd, 'release_body', return_value='Notes'), \
              patch.object(cd.legacy, 'check_release') as check, \
              patch.object(cd.legacy, 'api') as api, \
              patch.object(cd, 'reconcile_latest') as reconcile:
@@ -136,7 +198,7 @@ class ComponentReleaseTests(unittest.TestCase):
     def test_draft_does_not_change_channels_or_latest(self):
         assets = self.root / 'assets'
         assets.mkdir()
-        with patch.object(cd.legacy, 'check_release', return_value=None), patch.object(cd, 'body', return_value='Notes'), \
+        with patch.object(cd.legacy, 'check_release', return_value=None), patch.object(cd, 'release_body', return_value='Notes'), \
              patch.object(cd.legacy, 'api', return_value={'id': 20, 'html_url': 'fixture'}) as api, \
              patch.object(cd.legacy, 'verify_uploaded'), patch.object(cd.subprocess, 'run'), \
              patch.object(cd, 'verify_distribution'), patch.object(cd, 'validate_channel_advance', return_value={}), \

@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing full-v / server-v / desktop-v tag; builds verified packages as a draft
+        description: Existing server-v / desktop-v tag; builds verified standalone packages as a draft
         required: true
         type: string
 permissions:

@@ -1,4 +1,4 @@
-name: CD - Full, Server and Desktop
+name: CD - Server and Desktop
 
 on:
   workflow_call:
@@ -11,13 +11,12 @@ on:
         default: draft
   push:
     tags:
-      - 'full-v*'
       - 'server-v*'
       - 'desktop-v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing component tag (full-v, server-v or desktop-vMAJOR.MINOR.PATCH)
+        description: Existing component tag (server-v or desktop-vMAJOR.MINOR.PATCH)
         required: true
         type: string
       mode:
@@ -61,8 +60,8 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_SHA: ${{ github.sha }}
         run: |
-          if [[ ! "$RELEASE_TAG" =~ ^(full|server|desktop)-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo '::error::Expected a component tag: full-v, server-v or desktop-vMAJOR.MINOR.PATCH'
+          if [[ ! "$RELEASE_TAG" =~ ^(server|desktop)-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo '::error::Expected a standalone tag: server-v or desktop-vMAJOR.MINOR.PATCH'
             exit 1
           fi
           commit="$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")"
@@ -149,26 +148,13 @@ jobs:
             Get-Content "$env:RUNNER_TEMP/component-build.log" -Tail 18 | ForEach-Object { Write-Output "::error::$_" }
             exit 1
           }
-      - name: Exercise independent installers and Full composition
+      - name: Exercise independent installers
         run: |
           python scripts/release/windows_smoke.py --component "${{ needs.prepare.outputs.component }}" 2>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/component-smoke.log"
           if ($LASTEXITCODE -ne 0) {
             python scripts/build/report-test-failure.py "$env:RUNNER_TEMP/component-smoke.log"
             exit 1
           }
-      - name: Upgrade the real old all-in-one installation with Full
-        if: needs.prepare.outputs.component == 'full'
-        run: |
-          python scripts/release/windows_legacy_smoke.py 2>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/legacy-smoke.log"
-          if ($LASTEXITCODE -ne 0) {
-            python scripts/build/report-test-failure.py "$env:RUNNER_TEMP/legacy-smoke.log"
-            exit 1
-          }
-      - name: Upgrade the earlier all-in-one baseline with Full
-        if: needs.prepare.outputs.component == 'full'
-        run: |
-          python scripts/release/windows_legacy_smoke.py --baseline 1.4.13
-          if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Preserve verified distribution
         uses: actions/upload-artifact@v4
         with:
