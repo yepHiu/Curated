@@ -38,8 +38,9 @@ def main():
         marker = cd_release.source_marker({'commit': commit})
         if marker not in release['body']:
             raise ValueError(f'Original source marker does not match tag: {tag}')
-        title = f"Curated v{component_cd.PATTERN.fullmatch(tag).group(2)}"
         body = component_cd.body(ROOT, {'tag': tag, 'commit': commit})
+        component, version = component_cd.PATTERN.fullmatch(tag).groups()
+        title = component_cd.release_title(body, {'component': component, 'version': version})
         urls = re.findall(r'https://github.com/[^\s)]+/releases/download/[^\s)]+', body)
         available = {a['browser_download_url'] for a in release['assets']}
         if not urls or not set(urls) <= available:

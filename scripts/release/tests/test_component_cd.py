@@ -72,6 +72,22 @@ class ComponentReleaseTests(unittest.TestCase):
             with self.subTest(notes=notes), patch.object(cd, 'read_channel', return_value={'version': '1.0.0'}), self.assertRaises(ValueError):
                 cd.release_body(self.root, meta)
 
+    def test_title_uses_note_snapshot_without_live_channels_or_source_versions(self):
+        for component in ('server', 'desktop'):
+            meta, _, text = self.notes_fixture(component)
+            meta['versions'] = {'server': '99.0.0', 'desktop': '99.0.0'}
+            expected = ('Server 1.1.0 + Desktop 1.0.0' if component == 'server'
+                        else 'Server 1.0.0 + Desktop 1.1.0')
+            with self.subTest(component=component), patch.object(cd, 'read_channel') as channel:
+                self.assertEqual(cd.release_title(text, meta),
+                                 f'Curated - {expected} - {component.title()} update')
+                channel.assert_not_called()
+            with self.assertRaises(ValueError):
+                cd.release_title(text.replace('| Unchanged |', '| Updated |'), meta)
+
+    def test_historical_full_title_is_preserved(self):
+        self.assertEqual(cd.release_title('Historical notes', self.meta), 'Curated v1.6.0')
+
     def test_invalid_notes_stop_publication_before_upload(self):
         meta, file, _ = self.notes_fixture()
         file.write_text('## GitHub Release Body\nUndeclared update', encoding='utf-8')

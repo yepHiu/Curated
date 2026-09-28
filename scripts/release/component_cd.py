@@ -50,14 +50,9 @@ def require_standalone(component: str) -> None:
         raise ValueError('New releases must use server-v or desktop-v; Full is retired')
 
 
-def release_body(root: Path, meta: dict) -> str:
-    """Require explicit module changes against the currently published channels.
-
-    The table describes this tag only. A batch updating both modules uses two
-    tags/notes, allowing the other module to be published independently.
-    """
+def module_updates(text: str, meta: dict) -> list[tuple[str, str, str, str]]:
+    """Validate the immutable module snapshot shared by notes and display titles."""
     require_standalone(meta['component'])
-    text = body(root, meta)
     semver = r'(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)'
     rows = re.findall(
         rf'^\|\s*(Desktop|Server)\s*\|\s*(Updated|Unchanged)\s*\|\s*({semver})\s*\|\s*({semver})\s*\|\s*$',
@@ -72,6 +67,24 @@ def release_body(root: Path, meta: dict) -> str:
                 raise ValueError('The released module must be Updated with an increased tag version')
         elif status != 'Unchanged' or before != after:
             raise ValueError('The other module must be Unchanged with the same version')
+    return rows
+
+
+def release_title(text: str, meta: dict) -> str:
+    """Use reviewed note snapshots, never unpublished source targets or live channels."""
+    if meta['component'] == 'full':
+        return f"Curated v{meta['version']}"
+    after = {name: version for name, _, _, version in module_updates(text, meta)}
+    return (f"Curated - Server {after['Server']} + Desktop {after['Desktop']}"
+            f" - {meta['component'].title()} update")
+
+
+def release_body(root: Path, meta: dict) -> str:
+    """Require explicit module changes against the currently published channels."""
+    text = body(root, meta)
+    for name, _, before, _ in module_updates(text, meta):
+        component = name.lower()
+        updated = component == meta['component']
         published = read_channel(component)
         baseline = published['version'] if published else '0.0.0'
         if updated and before != baseline:
@@ -221,7 +234,7 @@ def publish(root: Path, meta: dict, output: Path, mode: str) -> None:
     release = legacy.check_release(meta)
     # The tag is already verified by check_release. Omitting target_commitish
     # avoids asking GITHUB_TOKEN to create a tag at a workflow-changing commit.
-    payload = {'tag_name': meta['tag'], 'name': f"Curated v{meta['version']}",
+    payload = {'tag_name': meta['tag'], 'name': release_title(notes, meta),
                'body': notes, 'draft': True, 'prerelease': False, 'make_latest': 'false'}
     release = legacy.api(f"releases/{release['id']}", payload, 'PATCH') if release else legacy.api('releases', payload)
     subprocess.run(['gh', 'release', 'upload', meta['tag'], '--repo', os.environ['GITHUB_REPOSITORY'],
