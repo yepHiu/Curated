@@ -19,10 +19,27 @@ type restartProcess struct {
 	Created windows.Filetime
 }
 
+var errInstallationRunning = errors.New("installation is running")
+
+// InstallationRunning performs the same identity/ownership checks as shutdown,
+// without sending any window messages or changing a running application.
+func InstallationRunning(directory string) (bool, error) {
+	err := inspectOrStopInstallation(context.Background(), directory, false)
+	if errors.Is(err, errInstallationRunning) {
+		return true, nil
+	}
+	return false, err
+}
+
 // StopInstallation uses Restart Manager only for exact executables belonging to
 // the selected installation. Other accounts and sessions are never shut down.
 // It does not force termination: a busy/unresponsive application blocks upgrade.
 func StopInstallation(ctx context.Context, directory string) error {
+	return inspectOrStopInstallation(ctx, directory, true)
+}
+
+// inspectOrStopInstallation shares exact process identity checks between probing and graceful shutdown.
+func inspectOrStopInstallation(ctx context.Context, directory string, stop bool) error {
 	if !filepath.IsAbs(directory) {
 		return fmt.Errorf("installation directory must be absolute")
 	}
@@ -104,6 +121,9 @@ func StopInstallation(ctx context.Context, directory string) error {
 	}
 	if len(processes) == 0 {
 		return nil
+	}
+	if !stop {
+		return errInstallationRunning
 	}
 	rm := windows.NewLazySystemDLL("rstrtmgr.dll")
 	var rmSession uint32

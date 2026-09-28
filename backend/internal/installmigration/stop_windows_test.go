@@ -113,14 +113,24 @@ func startStopFixture(t *testing.T) (string, *exec.Cmd) {
 	return dir, cmd
 }
 
+// TestStopInstallationClosesOnlySelectedDirectory checks probing and shutdown isolation with two live app instances.
 func TestStopInstallationClosesOnlySelectedDirectory(t *testing.T) {
 	dir, selected := startStopFixture(t)
 	_, other := startStopFixture(t)
+	if running, err := InstallationRunning(dir); err != nil || !running {
+		t.Fatalf("probe failed: running=%v err=%v", running, err)
+	}
+	if running, err := InstallationRunning(t.TempDir()); err != nil || running {
+		t.Fatalf("unrelated directory reported running: %v %v", running, err)
+	}
 	if err := StopInstallation(context.Background(), dir); err != nil {
 		t.Fatal(err)
 	}
 	if err := selected.Wait(); err != nil {
 		t.Fatalf("graceful exit: %v", err)
+	}
+	if running, err := InstallationRunning(dir); err != nil || running {
+		t.Fatalf("stopped probe: %v %v", running, err)
 	}
 	handle, err := windows.OpenProcess(windows.SYNCHRONIZE, false, uint32(other.Process.Pid))
 	if err != nil {
@@ -135,7 +145,11 @@ func TestStopInstallationClosesOnlySelectedDirectory(t *testing.T) {
 	}
 }
 
+// TestStopInstallationRejectsRelativeDirectory prevents ambiguous probe and shutdown targets.
 func TestStopInstallationRejectsRelativeDirectory(t *testing.T) {
+	if _, err := InstallationRunning("."); err == nil {
+		t.Fatal("probe accepted relative directory")
+	}
 	if err := StopInstallation(context.Background(), "."); err == nil {
 		t.Fatal("accepted relative directory")
 	}
