@@ -32,6 +32,27 @@ func TestCreateVerifyPreflightAndRestore(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = sourceStore.Close() })
 
+	// Static captures are BLOBs in the database: a portable package must retain
+	// both their actual pixels and metadata, not merely their record IDs.
+	seedDB, err := sql.Open("sqlite", sourceDatabase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := seedDB.ExecContext(ctx, `INSERT INTO movies
+		(id, title, code, studio, summary, added_at, location, resolution, year, is_favorite)
+		VALUES ('backup-movie', 'Saved title', 'TEST-001', '', 'Saved summary', '2026-09-29', '/media/test.mp4', '', 2026, 1)`); err != nil {
+		t.Fatal(err)
+	}
+	imageBytes, thumbBytes := []byte("original capture pixels"), []byte("thumbnail pixels")
+	if _, err := seedDB.ExecContext(ctx, `INSERT INTO curated_frames
+		(id, movie_id, title, code, position_sec, captured_at, image_blob, thumb_blob)
+		VALUES ('backup-frame', 'backup-movie', 'Saved capture', 'TEST-001', 12.5, '2026-09-29', ?, ?)`, imageBytes, thumbBytes); err != nil {
+		t.Fatal(err)
+	}
+	if err := seedDB.Close(); err != nil {
+		t.Fatal(err)
+	}
+
 	sourceConfig := filepath.Join(root, "source-library-config.cfg")
 	if err := os.WriteFile(sourceConfig, []byte("{\n  \"organizeLibrary\": true\n}\n"), 0o600); err != nil {
 		t.Fatalf("write source config: %v", err)
@@ -120,6 +141,27 @@ func TestCreateVerifyPreflightAndRestore(t *testing.T) {
 		t.Fatalf("restore did not retain rollback paths: %+v", restored)
 	}
 	assertLibraryPaths(t, targetDatabase, []string{sourceLibrary})
+	restoredDB, err := sql.Open("sqlite", targetDatabase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restoredDB.Close()
+	var restoredImage, restoredThumbnail []byte
+	var position float64
+	if err := restoredDB.QueryRowContext(ctx, `SELECT image_blob, thumb_blob, position_sec FROM curated_frames WHERE id = 'backup-frame'`).Scan(&restoredImage, &restoredThumbnail, &position); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(restoredImage, imageBytes) || !bytes.Equal(restoredThumbnail, thumbBytes) || position != 12.5 {
+		t.Fatal("static capture content or position was lost during restore")
+	}
+	var title, summary string
+	var favorite int
+	if err := restoredDB.QueryRowContext(ctx, `SELECT title, summary, is_favorite FROM movies WHERE id = 'backup-movie'`).Scan(&title, &summary, &favorite); err != nil {
+		t.Fatal(err)
+	}
+	if title != "Saved title" || summary != "Saved summary" || favorite != 1 {
+		t.Fatal("movie metadata or favorite was lost during restore")
+	}
 	assertLibraryPaths(t, restored.DatabaseRollbackPath, []string{targetLibrary})
 	configContents, err := os.ReadFile(targetConfig)
 	if err != nil {
