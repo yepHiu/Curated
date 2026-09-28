@@ -130,10 +130,10 @@ def package_windows(root: Path, output: Path, component: str = 'full') -> Path:
             compile_installer(root, work, output, c, current[c], {
                 'APP_ID': IDENTITIES[c], 'SOURCE': str(payload),
                 'EXE': 'curated.exe' if c == 'server' else 'Curated Desktop.exe',
-                'PARAMS': '-mode tray -autostart' if c == 'server' else '',
+                'PARAMS': '-mode tray' if c == 'server' else '',
                 'MANAGED_DELETE': 'frontend-dist' if c == 'server' else 'resources\\app',
                 'LEGACY_CHECK': 'True' if c == 'server' else 'False',
-                'RUN_FLAGS': 'nowait' if c == 'server' else 'nowait postinstall skipifsilent',
+                'RUN_FLAGS': 'nowait postinstall skipifsilent',
                 'MIGRATION_HELPER': str(helper),
             })
             with ZipFile(output / artifact_name(c, current[c], 'windows', 'x64', 'zip'), 'w', ZIP_DEFLATED) as archive:

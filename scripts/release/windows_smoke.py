@@ -95,7 +95,7 @@ def main():
                         except Exception:
                             if running[0].poll() is not None or attempt == 59: raise
                             time.sleep(0.5)
-                run(setup(args.component), '/LANG=chinesesimp')
+                run(setup(args.component), '/LANG=chinesesimp', '/CLOSECURATED=1')
                 for process in running:
                     assert process.wait(timeout=30) == 0, 'Old component did not exit gracefully'
             finally:

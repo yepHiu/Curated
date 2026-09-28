@@ -141,6 +141,8 @@ jobs:
           if (!(Test-Path 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe') -and !(Test-Path 'C:/Program Files/Inno Setup 6/ISCC.exe') -and !(Get-Command ISCC.exe -ErrorAction SilentlyContinue)) {
             throw 'Inno Setup compiler not found'
           }
+      - name: Test Windows installer confirmation and directory flow
+        run: python -m unittest scripts.release.tests.test_installer_flow scripts.release.tests.test_windows_migration
       - name: Build release with the tag version
         run: |
           python scripts/release/component_cd.py windows --tag "$env:RELEASE_TAG" 2>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/component-build.log"
