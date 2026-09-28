@@ -64,9 +64,10 @@ health 的 `version` 为数字 SemVer（当前 1.5.8），`buildStamp` 单独保
   - `aiProvider` / `aiGovernance`（正式 Settings → AI；缺省禁用，治理经 `/api/ai/settings` 保存）
   - `logDir` / `logFilePrefix` / `logMaxAgeDays` / `logLevel`
 - `PATCH /api/settings` 会部分更新这些资料库级设置。
-- 空 `logDir` 表示使用默认日志目录，而不是关闭文件日志：
+- `logDir` 已固定为应用默认日志目录；旧自定义值被忽略，设置页不再提供编辑：
   - release 默认 `LOCALAPPDATA\\Curated\\logs`
   - dev 默认 `backend/runtime/logs`
+- 本机 Desktop 可打开日志目录；本机 Desktop/Web 可改保留天数与等级（重启生效）。远端禁止打开或修改。详见 `docs/guide.md` 的 Server logging。
 
 ## Agent 作品回答（2026-09-09）
 

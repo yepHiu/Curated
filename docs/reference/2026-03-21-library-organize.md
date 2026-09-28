@@ -63,7 +63,7 @@ Photo library current slice:
 | `launchAtLogin` | 默认 **`false`**。由设置页「通用」或 `PATCH /api/settings` 更新；在支持的 Windows 运行时中会同步当前用户 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 项，命令行为 `curated(.exe) -mode tray -autostart`。Windows 登录触发的这次启动会**静默进入托盘**，只拉起本地服务与托盘图标，**不会自动打开浏览器页面**。 |
 | `lanEnabled` | 默认 **`false`**。由设置页「网络」或 `PATCH /api/settings` 更新。为 **`true`** 时启动会把 loopback/`0.0.0.0` 监听改成 `0.0.0.0:<port>`；关闭时强制绑回 `127.0.0.1:<port>`。不要求应用 PIN。改绑需**完全退出** Curated 后重新打开，只关窗口不够。 |
 | `autoDownloadUpdates` | 默认 **`false`**。由设置页「通用」或 `PATCH /api/settings` 更新；开启后，启动阶段的后台更新检查若发现较新的 installer，会自动下载并完成 SHA256 校验；安装仍须用户在 Settings -> About 显式确认，不会自动静默安装。 |
-| `logDir` | 后端启动后按日向该目录轮转写日志文件（与主配置 `logDir` 同源字段，由本文件合并覆盖）。空或省略表示使用默认目录，而不是关闭文件日志：**release** 默认 `LOCALAPPDATA\Curated\logs`，**dev** 默认 `backend/runtime/logs`。由设置页 **通用** 或 `PATCH /api/settings` 的 `backendLog` 更新；**重启后端**后 Zap 才按新目录/级别落盘。 |
+| `logDir` | 兼容旧配置的字段，现已忽略自定义值，日志固定使用应用默认目录：release 为 `LOCALAPPDATA\Curated\logs`，dev 为 `backend/runtime/logs`。保存日志策略时移除此键；旧目录文件保留原处。设置页仅在本机 Desktop 提供「打开日志目录」，不再提供路径编辑。 |
 | `logFilePrefix` | 日志文件名前缀，默认行为见 `internal/logging`（省略或空则使用 `curated`）。设置页不写入该键，需手写本文件或主配置。 |
 | `logMaxAgeDays` | 日志文件保留天数；`0` 或省略时由日志模块使用默认（7 天）。 |
 | `logLevel` | Zap 级别（如 `debug`/`info`/`warn`/`error`）；非法值会导致启动合并失败。 |

@@ -571,5 +571,12 @@
 <section><h2>2026-09-29：独立 Windows 安装流程</h2><p>Server 1.7.4 / Desktop 0.2.2 源码：欢迎页展示旧版与新版，独立目录页提供默认位置与首次安装自定义，升级沿用原位置；准备页明确覆盖或同版本重装，较旧包阻止降级。仅运行中的目标实例出现关闭确认页，可有序退出、手动退出后重查或取消。完成页可选启动，静默退出需要 /CLOSECURATED=1。两端独立发布，无新 Full；本地夹具实装通过，正式包仍需 CD 验收。未新增 API 或资料库配置。详见 <a href="../guide.md#windows-installation-flow">操作手册</a>。</p></section>
 <section><h2>Windows 安装器中文与自动退出（1.7.3 / 0.2.1 源码）</h2><p>Full、Server、Desktop 安装器支持简体中文和英文。安装前按可执行文件完整路径、用户与会话确认目标进程，通过 Restart Manager 请求退出并等待；拒绝退出则停止升级。Full 复用先验证备份再卸载旧一体版的流程，独立组件保持原 AppId 覆盖升级，保留资料库。Desktop 连接页支持系统退出；Server 忽略已取消的退出请求。未新增 HTTP API 或资料库配置。四类 Inno 模板编译、Windows 进程夹具、Go 与 Electron 检查通过；历史包与 UAC 实装仍由 CD 验收。现有已发布包不变。</p></section>
 <section><h2>GitHub Latest 与更新渠道解耦</h2><p>Latest 指向最高版本的公开 Full；Server/Desktop 使用独立清单。发布前不再要求 Latest 为旧一体版，发布及恢复后统一协调标记，失败不隐藏公开产物。旧一体版内置更新器无法远端修补，需从 Latest 手动下载 Full 完成一次迁移。Full 1.7.3 已通过 Windows/Mac CD 并发布。未变更 API、运行时或资料库配置。</p></section>
+  <h2 id="server-logging">Server 日志（2026-09-29）</h2>
+  <p>日志目录固定使用 config.DefaultLogDir()；旧 logDir 覆盖值不再生效，旧文件保留。SettingsLoggingSection 仅在本机 Desktop 展示打开按钮，经服务合约调用 POST /api/settings/logs/reveal，由 Go 在 Server 本机打开默认目录，无客户端路径输入。前端结合 health 与 Desktop 主进程连接目标判断权限，接口使用直接 loopback 校验拒绝远端和转发请求。</p>
+  <table><thead><tr><th>能力</th><th>本机 Desktop</th><th>本机 Web</th><th>远端客户端</th></tr></thead><tbody>
+    <tr><td>打开默认日志目录按钮</td><td>已实现</td><td>不展示</td><td>禁止</td></tr>
+    <tr><td>保留时间 / 日志等级</td><td>可修改，重启生效</td><td>可修改，重启生效</td><td>禁止</td></tr>
+    <tr><td>前端日志设置</td><td colspan="3">保留；默认开发 debug / 正式 warn</td></tr>
+  </tbody></table>
 </body>
 </html>

@@ -420,3 +420,7 @@ Source targets Full/Server **1.7.3**, Desktop **0.2.1**. Windows setup has Simpl
 ## Latest policy — 2026-09-27 (supersedes legacy pinning)
 
 GitHub Latest now selects the highest public stable Full SemVer; standalone Server/Desktop keep independent component manifests. Component preflight no longer depends on a legacy Latest. Component, legacy and recovery publication share `release_lib/latest_release.py`: list all pages, ignore drafts/prereleases and single-component tags, validate the matching nonempty installer, then set/verify Latest without changing public assets or visibility. No Full means highest legacy fallback. Manual `Release - Reconcile Latest` shares the publication lock. Old installed all-in-one binaries cannot be remotely patched: verified v1.5.8 rejects Full tags and requires a one-time manual Full migration. Full 1.7.3 has passed Windows/Mac CD and is published. No new runtime/API/config changes. See guide §8 and docs/plan/2026-09-27-latest-release-channel-separation.md.
+
+## Server 日志默认目录（2026-09-29）
+
+日志固定使用 `config.DefaultLogDir()`；旧主配置/库配置 `logDir` 被忽略，保存日志策略时从库配置移除，旧日志不搬移/删除。本机 Desktop 显示「打开日志目录」，经服务层调用 `POST /api/settings/logs/reveal`（无路径参数，Server 打开自己的文件管理器，204）；接口复用直接 loopback 权限拒绝远端/代理。本机 Desktop/Web 可改保留时间与等级，重启后生效；远端只保留前端日志设置。前端默认仍为开发 debug / 正式 warn。详见 guide 的 Server logging。

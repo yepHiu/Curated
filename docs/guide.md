@@ -227,7 +227,7 @@ Common keys:
 - `proxy`
 - backend log directory, retention, and level
 
-Empty `logDir` means “use the default log directory”, not “disable file logging”: release uses `LOCALAPPDATA\Curated\logs`, development uses `backend/runtime/logs`.
+Server logs always use the application default directory: release uses `LOCALAPPDATA\Curated\logs`, development uses `backend/runtime/logs`. Legacy `logDir` overrides are ignored; existing files stay in their old locations. See [Server logging](#server-logging).
 
 Development and release builds default to loopback `127.0.0.1:8080` and `127.0.0.1:8081`. Settings → Network & devices can persist `"lanEnabled": true` in `library-config.cfg`; the next full restart binds `0.0.0.0` on the same port. A non-loopback `httpAddr` in the main runtime JSON still requires `"lanEnabled": true`. PIN lock is independent of LAN access. CORS allows same-origin, loopback development origins, and exact `corsAllowedOrigins`.
 
@@ -598,6 +598,17 @@ The three root CRUD APIs and movie reveal/rebind reject remote requests with `40
 Remote uploads continue to use the configured Server destination. Directory reads, storage checks and other business actions retain their existing API behavior; this change does not make every scan or metadata operation local-only.
 
 
+### Server logging
+
+「设置 → 维护与备份」不再显示日志绝对路径或目录选择器。Server 日志固定写入默认目录：Windows release 为 `%LOCALAPPDATA%\Curated\logs`，开发版为仓库的 `backend/runtime/logs`。旧主配置和 `library-config.cfg` 中的 `logDir` 不再生效；保存日志策略时会移除库配置中的该键。旧目录的日志不搬移、不删除，新版 Server 启动后写入默认目录。
+
+- **Server 本机 Desktop**：通过 loopback 连接且确认本机权限后，可点击「打开日志目录」。Server 在自己的系统文件管理器中打开目录，不接受前端指定路径。
+- **Server 本机 Desktop / Web**：可修改日志保留时间和等级；自动保存，重启 Server 后应用。默认保留 7 天，等级 `info`。
+- **远端 Desktop / Web**：隐藏服务端日志控制项；服务端接口也拒绝远端和转发请求，不因 Desktop 标记而放行。
+- **前端日志**：保留现有设置与默认值，开发 `debug`、正式 `warn`；已有设备偏好仍生效。
+
+`POST /api/settings/logs/reveal` 无请求参数，成功返回 `204`，远端返回 `403 SERVER_SETTINGS_READ_ONLY`，系统目录打开失败返回 `500`；本机判定复用 `isDirectLocalRequest`，依赖实际连接地址而非客户端声称的来源。本机 Web 仅提供策略设置，不显示打开目录按钮。
+
 ### Remote settings access
 
 Server administration must be performed through `localhost` / loopback on the Server computer. Remote clients hide metadata, AI administration, maintenance/backup, server networking/proxy/plugin controls, startup and automatic updates, PIN administration and trusted devices, server logs, library automation, Beta toggles/cache controls, and server-wide playback/reader/capture-export defaults. Existing directory and installer protections still apply. The network page remains available in Desktop for local connection management; a remote browser has no network tab. Unavailable settings deep links return to Overview after connection verification.
@@ -622,7 +633,7 @@ Language/theme, current-session lock/unlock, local capture saving/directory/shor
 
 开发环境右下角 `DEBUG` 打开调试弹窗，包含配置重新读取、使用服务器已保存代理的连通检测、首页每日推荐刷新，以及确认同机后可用的强制 HLS 测试开关。强制 HLS 需先启用推流，保存立即生效；普通播放设置不会覆盖该调试值，关闭推流仍同步关闭强制 HLS。
 
-`性能监控` 分区复用当前采样器，支持暂停/恢复、清空、复制摘要和隐藏底部条；点击底部 Perf 条直接进入这个分区。`日志` 分区提供服务端日志配置与当前客户端日志级别，读取配置失败时可重试。打开弹窗只读取配置，不会自动执行检测或刷新推荐。正式构建没有 DEBUG。普通日志配置在开发与正式构建中都保留在「设置 → 维护与备份」；Server 本机的 Desktop 通过 loopback 连接并确认本机管理权限后，可以修改服务端日志目录、保留天数与日志级别，配置自动保存，重启 Server 后完全应用到文件日志。开发环境同时保留 Debug 的日志快捷入口。
+`性能监控` 分区复用当前采样器，支持暂停/恢复、清空、复制摘要和隐藏底部条；点击底部 Perf 条直接进入这个分区。`日志` 分区提供服务端日志配置与当前客户端日志级别，读取配置失败时可重试。打开弹窗只读取配置，不会自动执行检测或刷新推荐。正式构建没有 DEBUG。普通日志配置在开发与正式构建中都保留在「设置 → 维护与备份」；Server 本机的 Desktop 通过 loopback 连接并确认本机管理权限后，可以打开服务端默认日志目录、修改保留天数与日志级别，配置自动保存，重启 Server 后完全应用到文件日志。开发环境同时保留 Debug 的日志快捷入口。
 
 实现决定与验证记录：[Debug 工具弹窗](plan/2026-09-26-debug-tools-dialog.md)。
 

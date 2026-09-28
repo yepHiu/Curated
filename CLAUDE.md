@@ -141,7 +141,7 @@ Library-specific settings are persisted to `config/library-config.cfg` (JSON) an
 - **`metadataMovieStrategy`** - Higher-level provider scheduling strategy (`auto-global` | `auto-cn-friendly` | `custom-chain` | `specified`)
 - **`defaultImportLibraryPathId`** - Library path id used as the target for top-bar movie imports; persisted by Settings -> Video library and consumed by `POST /api/import/movies` and resumable upload endpoints under `/api/import/movies/uploads`
 - **`backupDirectory`** - Last directory used by a successful Settings -> Maintenance backup creation. Only the directory is stored; each backup still receives a new UTC-timestamped filename. Empty means no remembered destination
-- **`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`** - Backend Zap log file output (merged into the same fields as the main `-config` JSON); empty **`logDir`** means "use the default log directory" instead of disabling file logging: dev builds default to **`backend/runtime/logs`**, while release builds default to **`LOCALAPPDATA\\Curated\\logs`**. **`PATCH /api/settings`** field **`backendLog`** updates **`logDir`** / **`logMaxAgeDays`** / **`logLevel`** from the settings UI (omits **`logFilePrefix`** so manual `library-config.cfg` or the default `curated-dev` in dev / `curated` in release applies); **restart the backend** for new log directory/level to apply to file sinks
+- **Backend logs** — Always use the application default directory (dev: `backend/runtime/logs`; Windows release: `%LOCALAPPDATA%\Curated\logs`). Legacy `logDir` overrides in either config are ignored; old files are preserved. Saving `backendLog` removes the library-config override. `logMaxAgeDays` / `logLevel` remain editable only on Server-local Desktop/Web and apply after Server restart; `logFilePrefix` remains an advanced file setting. Local Desktop shows Open log directory; remote clients cannot open it or change policies.
 - **`proxy`** - Outbound HTTP proxy for the Curated backend (Metatube scraping, asset downloads); persisted here and applied as process `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` via `backend/internal/proxyenv` so `http.ProxyFromEnvironment` picks it up
 
 Update via `PATCH /api/settings`; changes are written atomically to the config file.
@@ -298,6 +298,7 @@ POST   /api/import/movies/uploads/{id}/commit # Commit staged chunks into the li
 DELETE /api/import/movies/uploads/{id}      # Abort resumable upload and remove staging files
 GET    /api/settings                        # Get settings (includes backupDirectory / autoDownloadUpdates / launchAtLogin / launchAtLoginSupported / lanEnabled / lanListening / lanAccessUrls)
 PATCH  /api/settings                        # Partial update (persisted to config/library-config.cfg)
+POST   /api/settings/logs/reveal             # Open default Server log directory; direct loopback only, no path input
 POST   /api/proxy/ping-javbus               # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
 POST   /api/proxy/ping-google               # Test proxy: GET https://www.google.com/ (same body as ping-javbus)
 GET    /api/ai/settings                    # Global enable/read-only/privacy; stepLimit=0 unlimited (default), optional 1–30; existing positive limits preserved
