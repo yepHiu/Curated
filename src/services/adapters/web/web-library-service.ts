@@ -9,6 +9,7 @@ import type {
   ActorMergePreviewRequest,
   ApplyActorMergeRequest,
   BackupManifestDTO,
+  BackupFileInspectionDTO,
   BackupRestorePreflightDTO,
   BackupVerificationDTO,
   CuratedFrameExportFormat,
@@ -607,6 +608,14 @@ function createWebLibraryService(): LibraryService {
         refreshLibraryPathStorageStatusesFromApi(),
         refreshCuratedFramesCountFromApi(),
       ])
+    },
+
+    async latestBackup(): Promise<string> {
+      return (await api.latestBackup()).backupPath
+    },
+
+    async inspectBackupFile(file: File): Promise<BackupFileInspectionDTO> {
+      return api.inspectBackupFile(file)
     },
 
     async createBackup(destinationPath: string): Promise<BackupManifestDTO> {

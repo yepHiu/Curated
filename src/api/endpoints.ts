@@ -3,6 +3,8 @@ import {
   assertApiResponse,
   isConnectedClientsDTO,
   isBackupManifestDTO,
+  isBackupFileSelectionDTO,
+  isBackupFileInspectionDTO,
   isBackupRestorePreflightDTO,
   isBackupVerificationDTO,
   isHealthDTO,
@@ -57,6 +59,8 @@ import type {
   AppUpdateInstallBody,
   BackupCreateBody,
   BackupManifestDTO,
+  BackupFileSelectionDTO,
+  BackupFileInspectionDTO,
   BackupPathBody,
   BackupRestorePreflightDTO,
   BackupVerificationDTO,
@@ -391,6 +395,18 @@ export const api = {
 
   clearDownloadedAppUpdateInstaller(): Promise<AppUpdateStatusDTO> {
     return httpClient.delete<AppUpdateStatusDTO>("/app-update/downloaded-installer")
+  },
+
+  latestBackup(): Promise<BackupFileSelectionDTO> {
+    return httpClient.get<unknown>("/maintenance/backups/latest")
+      .then(value => assertApiResponse("GET /maintenance/backups/latest", value, isBackupFileSelectionDTO))
+  },
+
+  inspectBackupFile(file: File): Promise<BackupFileInspectionDTO> {
+    const body = new FormData()
+    body.append("file", file)
+    return httpClient.postFormWithProgress<unknown>("/maintenance/backups/inspect-file", body)
+      .then(value => assertApiResponse("POST /maintenance/backups/inspect-file", value, isBackupFileInspectionDTO))
   },
 
   createBackup(body: BackupCreateBody): Promise<BackupManifestDTO> {

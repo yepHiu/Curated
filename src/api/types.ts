@@ -1802,3 +1802,8 @@ export interface RefreshHomepageDailyRecommendationsBody {
   preserveHeroMovieIds?: string[]
   excludeRecommendationMovieIds?: string[]
 }
+
+export interface BackupFileSelectionDTO { backupPath: string }
+export interface BackupFileInspectionDTO extends BackupFileSelectionDTO {
+  preflight: BackupRestorePreflightDTO
+}

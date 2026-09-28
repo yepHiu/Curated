@@ -1308,6 +1308,10 @@ export const mockLibraryService: LibraryService = {
     }
   },
 
+  async latestBackup(): Promise<string> { return "" },
+  async inspectBackupFile(): Promise<never> {
+    throw new Error("Backup maintenance requires Web API mode")
+  },
   async createBackup(): Promise<never> {
     throw new Error("Backup maintenance requires Web API mode")
   },

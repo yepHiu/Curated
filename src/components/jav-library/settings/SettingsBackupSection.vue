@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import SettingsHint from "./SettingsHint.vue"
-import { computed, ref, watch } from "vue"
+import { computed, onMounted, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { ChevronDown, DatabaseBackup, ExternalLink, FolderOpen, RotateCw, ShieldCheck } from "lucide-vue-next"
-import { HttpClientError } from "@/api/http-client"
+import { HttpClientError, resolveApiBaseUrl } from "@/api/http-client"
 import type { BackupRestorePreflightDTO, BackupVerificationDTO } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Separator } from "@/components/ui/separator"
 import { pushAppToast } from "@/composables/use-app-toast"
-import { buildBackupFilename, ensureBackupExtension, joinBackupDestination } from "@/lib/backup-path"
+import { buildBackupFilename, joinBackupDestination } from "@/lib/backup-path"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { useLibraryService } from "@/services/library-service"
@@ -22,6 +22,58 @@ const { t, locale } = useI18n()
 const libraryService = useLibraryService()
 const backupDirectoryDraft = ref("")
 const backupPathDraft = ref("")
+const selectedFile = shallowRef<File | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+const selectionLoading = ref(false)
+const selectionError = ref("")
+const selectionStorageKey = `curated-backup-selection:${new URL(resolveApiBaseUrl(import.meta.env), window.location.origin).origin}`
+let selectionChanged = false
+
+function rememberBackup(path: string) {
+  try { localStorage.setItem(selectionStorageKey, path) } catch { /* Storage can be unavailable. */ }
+}
+
+onMounted(async () => {
+  if (!props.supported) return
+  try {
+    const saved = localStorage.getItem(selectionStorageKey)?.trim()
+    if (saved && isAbsoluteLibraryPath(saved)) {
+      backupPathDraft.value = saved
+      return
+    }
+  } catch { /* Server discovery remains available. */ }
+  selectionLoading.value = true
+  try {
+    const path = await libraryService.latestBackup()
+    if (!selectionChanged) backupPathDraft.value = path
+  } catch (error) {
+    selectionError.value = formatError(error)
+  } finally {
+    selectionLoading.value = false
+  }
+})
+
+function selectBackupFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ""
+  if (!file || busy.value) return
+  if (!file.name.toLowerCase().endsWith(".curated-backup")) {
+    pathError.value = t("settings.backupFileRequired")
+    return
+  }
+  if (file.size > 8 * 1024 ** 3) {
+    pathError.value = t("settings.backupFileTooLarge")
+    return
+  }
+  selectionChanged = true
+  selectedFile.value = file
+  backupPathDraft.value = file.name
+  preflight.value = null
+  pathError.value = ""
+  restoreError.value = ""
+  selectionError.value = ""
+}
 const directoryError = ref("")
 const directoryPersistenceError = ref("")
 const pathError = ref("")
@@ -91,6 +143,10 @@ async function createAndVerifyBackup() {
   try {
     await libraryService.createBackup(path)
     createdPath.value = path
+    selectionChanged = true
+    selectedFile.value = null
+    backupPathDraft.value = path
+    rememberBackup(path)
     try {
       await libraryService.setBackupDirectory(directory)
     } catch (error) {
@@ -111,28 +167,31 @@ async function createAndVerifyBackup() {
   }
 }
 
-function useCreatedBackup() {
-  if (busy.value || !createdPath.value) return
-  backupPathDraft.value = createdPath.value
-  restoreOpen.value = true
-}
-
 async function preflightExistingBackup() {
   if (!props.supported || busy.value) return
   preflight.value = null
   restoreError.value = ""
   pathError.value = ""
-  const path = ensureBackupExtension(backupPathDraft.value)
-  if (!path || !isAbsoluteLibraryPath(path)) {
-    pathError.value = t("settings.backupPathAbsolute")
+  const file = selectedFile.value
+  const path = backupPathDraft.value.trim()
+  if (!file && (!path || !isAbsoluteLibraryPath(path))) {
+    pathError.value = t("settings.backupFileRequired")
     return
   }
-  backupPathDraft.value = path
   busyAction.value = "preflight"
   try {
-    // Preflight already verifies the package; users need only one check action.
-    const result = await libraryService.preflightBackupRestore(path)
-    if (backupPathDraft.value === path) preflight.value = result
+    if (file) {
+      const result = await libraryService.inspectBackupFile(file)
+      if (result.backupPath) {
+        selectedFile.value = null
+        backupPathDraft.value = result.backupPath
+        rememberBackup(result.backupPath)
+      }
+      preflight.value = result.preflight
+    } else {
+      preflight.value = await libraryService.preflightBackupRestore(path)
+      if (preflight.value.verification.valid) rememberBackup(path)
+    }
   } catch (error) {
     restoreError.value = formatError(error)
   } finally {
@@ -189,7 +248,7 @@ function formatBytes(value: number): string {
               aria-describedby="settings-backup-directory-help"
               :placeholder="t('settings.backupDirectoryPlaceholder')"
               autocomplete="off"
-              class="min-w-0 flex-1"
+              class="min-w-0 basis-full sm:basis-0 sm:flex-1"
               data-settings-backup-directory
             />
             <Button
@@ -202,22 +261,21 @@ function formatBytes(value: number): string {
             >
               <FolderOpen data-icon="inline-start" />{{ t("settings.backupPickDirectory") }}
             </Button>
+            <Button
+              type="submit" size="sm" class="h-auto min-h-11 rounded-full sm:h-8 sm:min-h-8"
+              :disabled="!supported || busy" data-settings-comfortable-control data-settings-backup-create
+            >
+              <RotateCw v-if="busyAction === 'create'" data-icon="inline-start" class="motion-safe:animate-spin" />
+              <DatabaseBackup v-else data-icon="inline-start" />
+              {{ t(busyAction === 'create' ? 'settings.backupCreating' : 'settings.backupCreate') }}
+            </Button>
           </div>
           <p v-if="directoryError" id="settings-backup-directory-help" class="text-xs text-destructive" role="alert">{{ directoryError }}</p>
           <p v-else-if="!canPickDirectory" id="settings-backup-directory-help" class="text-xs text-muted-foreground">{{ t("settings.backupBrowserPathHint") }}</p>
           <span v-else id="settings-backup-directory-help" class="sr-only">{{ t("settings.backupDirectoryHint") }}</span>
         </Field>
       </FieldGroup>
-      <div class="flex justify-end">
-        <Button
-          type="submit" size="sm" class="h-auto min-h-11 rounded-full sm:h-8 sm:min-h-8"
-          :disabled="!supported || busy" data-settings-comfortable-control data-settings-backup-create
-        >
-          <RotateCw v-if="busyAction === 'create'" data-icon="inline-start" class="motion-safe:animate-spin" />
-          <DatabaseBackup v-else data-icon="inline-start" />
-          {{ t(busyAction === 'create' ? 'settings.backupCreating' : 'settings.backupCreate') }}
-        </Button>
-      </div>
+
     </form>
 
     <div v-if="createdPath || createError || directoryPersistenceError" class="flex min-w-0 flex-col gap-2" aria-live="polite" data-settings-backup-receipt>
@@ -256,25 +314,30 @@ function formatBytes(value: number): string {
               <SettingsHint :text="t('settings.backupPathHint')">
                 <FieldLabel for="settings-backup-path">{{ t("settings.backupPathLabel") }}</FieldLabel>
               </SettingsHint>
-              <Input
-                id="settings-backup-path" v-model="backupPathDraft" :disabled="!supported || busy"
-                :aria-invalid="Boolean(pathError)" aria-describedby="settings-backup-path-help"
-                :placeholder="t('settings.backupPathPlaceholder')" autocomplete="off" data-settings-backup-path
-              />
+              <input ref="fileInput" type="file" accept=".curated-backup" class="hidden" tabindex="-1" aria-hidden="true" :disabled="!supported || busy" data-settings-backup-file-input @change="selectBackupFile" />
+              <div class="flex min-w-0 flex-wrap items-center gap-2" data-settings-backup-restore-row>
+                <Input
+                  id="settings-backup-path" :model-value="backupPathDraft" readonly :disabled="!supported || busy"
+                  :title="backupPathDraft" class="min-w-0 basis-full sm:basis-0 sm:flex-1"
+                  :aria-invalid="Boolean(pathError)" aria-describedby="settings-backup-path-help"
+                  :placeholder="t(selectionLoading ? 'settings.backupFindingRecent' : 'settings.backupPathPlaceholder')"
+                  autocomplete="off" data-settings-backup-path
+                />
+                <Button type="button" variant="outline" size="sm" class="h-auto min-h-11 rounded-full sm:h-8 sm:min-h-8" :disabled="!supported || busy" data-settings-comfortable-control data-settings-backup-pick-file @click="fileInput?.click()">
+                  <FolderOpen data-icon="inline-start" />{{ t("settings.backupPickFile") }}
+                </Button>
+                <Button type="submit" size="sm" class="h-auto min-h-11 rounded-full sm:h-8 sm:min-h-8" :disabled="!supported || busy || !backupPathDraft" data-settings-comfortable-control data-settings-backup-preflight>
+                  <RotateCw v-if="busyAction === 'preflight'" data-icon="inline-start" class="motion-safe:animate-spin" />
+                  <ShieldCheck v-else data-icon="inline-start" />
+                  {{ t(busyAction === 'preflight' ? 'settings.backupChecking' : 'settings.backupPreflight') }}
+                </Button>
+              </div>
               <p v-if="pathError" id="settings-backup-path-help" class="text-xs text-destructive" role="alert">{{ pathError }}</p>
+              <p v-else-if="selectedFile" id="settings-backup-path-help" class="text-xs text-muted-foreground">{{ t("settings.backupSelectedFileHint") }}</p>
               <span v-else id="settings-backup-path-help" class="sr-only">{{ t("settings.backupPathHint") }}</span>
+              <p v-if="selectionError" class="text-xs text-muted-foreground" role="status">{{ t("settings.backupRecentUnavailable") }}</p>
             </Field>
           </FieldGroup>
-          <div class="flex flex-wrap justify-end gap-2">
-            <Button v-if="createdPath" type="button" variant="outline" size="sm" class="h-auto min-h-11 rounded-full sm:h-8 sm:min-h-8" :disabled="!supported || busy" data-settings-comfortable-control data-settings-backup-use-created @click="useCreatedBackup">
-              {{ t("settings.backupUseCreated") }}
-            </Button>
-            <Button type="submit" size="sm" class="h-auto min-h-11 rounded-full sm:h-8 sm:min-h-8" :disabled="!supported || busy" data-settings-comfortable-control data-settings-backup-preflight>
-              <RotateCw v-if="busyAction === 'preflight'" data-icon="inline-start" class="motion-safe:animate-spin" />
-              <ShieldCheck v-else data-icon="inline-start" />
-              {{ t(busyAction === 'preflight' ? 'settings.backupChecking' : 'settings.backupPreflight') }}
-            </Button>
-          </div>
         </form>
         <p v-if="restoreError" class="break-words text-sm text-destructive" role="alert">{{ restoreError }}</p>
         <div v-if="preflight" class="flex min-w-0 flex-col gap-3" aria-live="polite" data-settings-backup-check-result>

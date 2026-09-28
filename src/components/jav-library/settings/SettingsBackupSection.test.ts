@@ -5,6 +5,8 @@ import SettingsBackupSection from "./SettingsBackupSection.vue"
 const serviceMock = vi.hoisted(() => ({
   backupDirectory: { value: "" },
   createBackup: vi.fn(),
+  latestBackup: vi.fn(),
+  inspectBackupFile: vi.fn(),
   setBackupDirectory: vi.fn(),
   verifyBackup: vi.fn(),
   preflightBackupRestore: vi.fn(),
@@ -60,6 +62,8 @@ const verification = {
 describe("SettingsBackupSection", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
+    serviceMock.latestBackup.mockResolvedValue("D:/Backups/first.curated-backup")
     delete window.javLibrary
     serviceMock.backupDirectory.value = ""
     serviceMock.createBackup.mockResolvedValue(manifest)
@@ -154,9 +158,7 @@ describe("SettingsBackupSection", () => {
   it("runs restore preflight without exposing an online restore action", async () => {
     const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
     await wrapper.get("[data-settings-backup-existing]").trigger("click")
-    await wrapper.get("[data-settings-backup-path]").setValue(
-      "D:\\Backups\\curated.curated-backup",
-    )
+    await flushPromises()
     await wrapper.findAll("form")[1]!.trigger("submit")
     await flushPromises()
 
@@ -182,20 +184,22 @@ describe("SettingsBackupSection", () => {
   it("checks restore requirements in one action and clears the result when the file changes", async () => {
     const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
     await wrapper.get("[data-settings-backup-existing]").trigger("click")
-    await wrapper.get("[data-settings-backup-path]").setValue("D:/Backups/first.curated-backup")
+    await flushPromises()
     await wrapper.findAll("form")[1]!.trigger("submit")
     await flushPromises()
     expect(serviceMock.verifyBackup).not.toHaveBeenCalled()
     expect(serviceMock.preflightBackupRestore).toHaveBeenCalledWith("D:/Backups/first.curated-backup")
     expect(wrapper.text()).toContain("settings.backupRestoreStepQuit")
-    await wrapper.get("[data-settings-backup-path]").setValue("D:/Backups/second.curated-backup")
+    const input = wrapper.get("[data-settings-backup-file-input]")
+    Object.defineProperty(input.element, "files", { value: [new File(["data"], "second.curated-backup")], configurable: true })
+    await input.trigger("change")
     expect(wrapper.find("[data-settings-backup-check-result]").exists()).toBe(false)
   })
 
   it("clears successful results before retrying a failed restore check", async () => {
     const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
     await wrapper.get("[data-settings-backup-existing]").trigger("click")
-    await wrapper.get("[data-settings-backup-path]").setValue("D:/Backups/first.curated-backup")
+    await flushPromises()
     await wrapper.findAll("form")[1]!.trigger("submit")
     await flushPromises()
     serviceMock.preflightBackupRestore.mockRejectedValueOnce(new Error("file no longer exists"))
@@ -217,14 +221,14 @@ describe("SettingsBackupSection", () => {
     expect(toastMock).not.toHaveBeenCalled()
   })
 
-  it("reuses the new backup only when requested and preserves its receipt during restore checks", async () => {
+  it("automatically selects the newly created backup and preserves its receipt during restore checks", async () => {
     const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
     await wrapper.get("[data-settings-backup-directory]").setValue("D:/Backups")
     await wrapper.get("form").trigger("submit")
     await flushPromises()
     const path = serviceMock.createBackup.mock.calls[0]?.[0]
     await wrapper.get("[data-settings-backup-existing]").trigger("click")
-    await wrapper.get("[data-settings-backup-use-created]").trigger("click")
+
     expect((wrapper.get("[data-settings-backup-path]").element as HTMLInputElement).value).toBe(path)
     await wrapper.findAll("form")[1]!.trigger("submit")
     await flushPromises()
@@ -254,13 +258,81 @@ describe("SettingsBackupSection", () => {
     })
     const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
     await wrapper.get("[data-settings-backup-existing]").trigger("click")
-    await wrapper.get("[data-settings-backup-path]").setValue("D:/Backups/broken.curated-backup")
+    await flushPromises()
     await wrapper.findAll("form")[1]!.trigger("submit")
     await flushPromises()
     expect(wrapper.text()).toContain("settings.backupPreflightBlocked")
     expect(wrapper.text()).toContain("insufficient space")
     expect(wrapper.text().match(/damaged package/g)).toHaveLength(1)
     expect(wrapper.text()).not.toContain("settings.backupRestoreNextTitle")
+  })
+
+  it("selects a file without uploading, then checks and remembers the retained Server path", async () => {
+    const result = await serviceMock.preflightBackupRestore()
+    serviceMock.preflightBackupRestore.mockClear()
+    serviceMock.inspectBackupFile.mockResolvedValue({ backupPath: "D:/Backups/imports/selected.curated-backup", preflight: result })
+    const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
+    await wrapper.get("[data-settings-backup-existing]").trigger("click")
+    await flushPromises()
+    const file = new File(["archive"], "selected.curated-backup")
+    const input = wrapper.get("[data-settings-backup-file-input]")
+    Object.defineProperty(input.element, "files", { value: [file], configurable: true })
+    await input.trigger("change")
+    expect(wrapper.get("[data-settings-backup-path]").attributes("readonly")).toBeDefined()
+    expect((wrapper.get("[data-settings-backup-path]").element as HTMLInputElement).value).toBe(file.name)
+    expect(serviceMock.inspectBackupFile).not.toHaveBeenCalled()
+    await wrapper.findAll("form")[1]!.trigger("submit")
+    await flushPromises()
+    expect(serviceMock.inspectBackupFile).toHaveBeenCalledWith(file)
+    expect(serviceMock.preflightBackupRestore).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain("settings.backupPreflightReady")
+    wrapper.unmount()
+    serviceMock.latestBackup.mockClear()
+    const reopened = mount(SettingsBackupSection, { props: { supported: true } })
+    await reopened.get("[data-settings-backup-existing]").trigger("click")
+    expect((reopened.get("[data-settings-backup-path]").element as HTMLInputElement).value).toBe("D:/Backups/imports/selected.curated-backup")
+    expect(serviceMock.latestBackup).not.toHaveBeenCalled()
+  })
+
+  it("does not replace a chosen file with a late default lookup, and cancellation preserves it", async () => {
+    let finish!: (path: string) => void
+    serviceMock.latestBackup.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+    const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
+    await wrapper.get("[data-settings-backup-existing]").trigger("click")
+    const input = wrapper.get("[data-settings-backup-file-input]")
+    Object.defineProperty(input.element, "files", { value: [new File(["archive"], "chosen.curated-backup")], configurable: true })
+    await input.trigger("change")
+    finish("D:/Backups/late.curated-backup")
+    await flushPromises()
+    Object.defineProperty(input.element, "files", { value: [], configurable: true })
+    await input.trigger("change")
+    expect((wrapper.get("[data-settings-backup-path]").element as HTMLInputElement).value).toBe("chosen.curated-backup")
+  })
+
+  it("keeps a failed upload selected for retry without showing old successful results", async () => {
+    const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
+    await wrapper.get("[data-settings-backup-existing]").trigger("click")
+    await flushPromises()
+    await wrapper.findAll("form")[1]!.trigger("submit")
+    await flushPromises()
+    const input = wrapper.get("[data-settings-backup-file-input]")
+    Object.defineProperty(input.element, "files", { value: [new File(["data"], "retry.curated-backup")], configurable: true })
+    await input.trigger("change")
+    serviceMock.inspectBackupFile.mockRejectedValueOnce(new Error("upload interrupted"))
+    await wrapper.findAll("form")[1]!.trigger("submit")
+    await flushPromises()
+    expect(wrapper.find("[data-settings-backup-check-result]").exists()).toBe(false)
+    expect(wrapper.text()).toContain("upload interrupted")
+    expect((wrapper.get("[data-settings-backup-path]").element as HTMLInputElement).value).toBe("retry.curated-backup")
+  })
+
+  it("starts empty when no previous backup exists and disables checking", async () => {
+    serviceMock.latestBackup.mockResolvedValueOnce("")
+    const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
+    await wrapper.get("[data-settings-backup-existing]").trigger("click")
+    await flushPromises()
+    expect((wrapper.get("[data-settings-backup-path]").element as HTMLInputElement).value).toBe("")
+    expect(wrapper.get("[data-settings-backup-preflight]").attributes("disabled")).toBeDefined()
   })
 
 })

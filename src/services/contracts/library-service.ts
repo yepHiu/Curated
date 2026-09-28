@@ -14,6 +14,7 @@ import type {
   PatchAIProviderBody,
   BackendLogSettingsDTO,
   BackupManifestDTO,
+  BackupFileInspectionDTO,
   BackupRestorePreflightDTO,
   BackupVerificationDTO,
   ConnectedClientsDTO,
@@ -163,6 +164,8 @@ export interface LibraryService {
   revealLogDirectory(): Promise<void>
   listConnectedClients(): Promise<ConnectedClientsDTO>
   health(): Promise<HealthDTO>
+  latestBackup(): Promise<string>
+  inspectBackupFile(file: File): Promise<BackupFileInspectionDTO>
   createBackup(destinationPath: string): Promise<BackupManifestDTO>
   setBackupDirectory(directory: string): Promise<void>
   verifyBackup(backupPath: string): Promise<BackupVerificationDTO>

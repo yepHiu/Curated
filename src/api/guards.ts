@@ -8,6 +8,8 @@ import type {
   ConnectedClientDTO,
   ConnectedClientsDTO,
   BackupManifestDTO,
+  BackupFileSelectionDTO,
+  BackupFileInspectionDTO,
   BackupRestorePreflightDTO,
   BackupVerificationDTO,
   HealthDTO,
@@ -692,4 +694,12 @@ export function isPersonalInsightsBreakdownDTO(value: unknown): value is Persona
     value.items.length <= value.limit &&
     value.items.every(isPersonalInsightsBreakdownItemDTO)
   )
+}
+
+export function isBackupFileSelectionDTO(value: unknown): value is BackupFileSelectionDTO {
+  return isRecord(value) && isString(value.backupPath)
+}
+
+export function isBackupFileInspectionDTO(value: unknown): value is BackupFileInspectionDTO {
+  return isRecord(value) && isString(value.backupPath) && isBackupRestorePreflightDTO(value.preflight)
 }
