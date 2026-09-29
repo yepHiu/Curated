@@ -162,6 +162,8 @@ end;
 { Build the dedicated pages using the wizard's standard button dimensions. }
 procedure InitializeWizard;
 begin
+  { Leave room for the themed checkbox glyph at scaled display sizes. }
+  WizardForm.RunList.Offset := ScaleX(8);
   WizardForm.WelcomeLabel2.Caption := FmtMessage(CustomMessage('InstallIntroduction'), ['Curated __COMPONENT__', '__VERSION__']);
   if InstalledVersion <> '' then
     WizardForm.WelcomeLabel2.Caption := WizardForm.WelcomeLabel2.Caption + #13#10#13#10 +
