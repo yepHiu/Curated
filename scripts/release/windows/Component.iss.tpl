@@ -159,13 +159,9 @@ begin
   RefreshRunning;
 end;
 
-{ Build the dedicated pages and preserve room for explicit action labels. }
+{ Build the dedicated pages using the wizard's standard button dimensions. }
 procedure InitializeWizard;
 begin
-  { Both languages use explicit action labels longer than Inno's default Next. }
-  WizardForm.NextButton.Width := ScaleX(170);
-  WizardForm.NextButton.Left := WizardForm.CancelButton.Left - ScaleX(10) - WizardForm.NextButton.Width;
-  WizardForm.BackButton.Left := WizardForm.NextButton.Left - WizardForm.BackButton.Width;
   WizardForm.WelcomeLabel2.Caption := FmtMessage(CustomMessage('InstallIntroduction'), ['Curated __COMPONENT__', '__VERSION__']);
   if InstalledVersion <> '' then
     WizardForm.WelcomeLabel2.Caption := WizardForm.WelcomeLabel2.Caption + #13#10#13#10 +
@@ -180,7 +176,7 @@ begin
   RunningLabel.WordWrap := True;
   RecheckButton := TNewButton.Create(RunningPage);
   RecheckButton.Parent := RunningPage.Surface;
-  RecheckButton.SetBounds(0, ScaleY(185), ScaleX(140), ScaleY(25));
+  RecheckButton.SetBounds(0, ScaleY(185), WizardForm.NextButton.Width, WizardForm.NextButton.Height);
   RecheckButton.Caption := CustomMessage('Recheck');
   RecheckButton.OnClick := @RecheckClick;
   StopProgress := CreateOutputProgressPage(CustomMessage('ClosingTitle'), CustomMessage('ClosingDetails'));

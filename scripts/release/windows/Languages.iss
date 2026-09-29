@@ -70,7 +70,7 @@ english.FreshInstall=&Install
 chinesesimp.FreshInstall=安装(&I)
 
 english.UpgradeInstall=&Upgrade
-chinesesimp.UpgradeInstall=覆盖安装并升级(&I)
+chinesesimp.UpgradeInstall=升级(&I)
 
 english.Reinstall=&Reinstall
 chinesesimp.Reinstall=重新安装(&I)
@@ -93,8 +93,8 @@ chinesesimp.RunningTitle=关闭正在运行的程序
 english.RunningSubtitle=Program files will not be replaced until the application exits.
 chinesesimp.RunningSubtitle=确认程序退出后才会替换文件。
 
-english.RunningDetails=%1 is running, possibly in the tray. Close it to continue, or exit it yourself and select Check again.
-chinesesimp.RunningDetails=%1 正在运行，可能已隐藏到托盘。请关闭后继续，或自行从托盘退出再点击“重新检查”。
+english.RunningDetails=%1 is running, possibly in the tray. Select Close app to close it and continue installation, or exit it yourself and select Check again.
+chinesesimp.RunningDetails=%1 正在运行，可能已隐藏到托盘。点击“关闭程序”退出并继续安装，或自行从托盘退出再点击“重新检查”。
 
 english.ServerImpact=Clients will temporarily disconnect. Playback, uploads and background work may be interrupted. Finish current work before continuing.
 chinesesimp.ServerImpact=客户端将暂时断开连接，播放、上传和后台任务可能中断。请完成当前操作后继续。
@@ -102,10 +102,10 @@ chinesesimp.ServerImpact=客户端将暂时断开连接，播放、上传和后�
 english.DesktopImpact=Save unfinished edits before continuing. Desktop windows and playback will close. Server will keep running.
 chinesesimp.DesktopImpact=请先保存未完成的编辑。Desktop 窗口和播放将关闭，Server 会继续运行。
 
-english.CloseContinue=&Close and continue
-chinesesimp.CloseContinue=关闭并继续安装(&I)
+english.CloseContinue=&Close app
+chinesesimp.CloseContinue=关闭程序(&I)
 
-english.ContinueInstall=&Continue install
+english.ContinueInstall=&Install
 chinesesimp.ContinueInstall=继续安装(&I)
 
 english.Recheck=Check again
