@@ -50,7 +50,6 @@ let overscrollDistance = 0
 let touchStartY = 0
 let touchStartedAtBottom = false
 
-const hasTopics = ref(false)
 const recommendationsRefreshLabel = computed(() =>
   props.recommendationsRefreshing
     ? t("home.refreshingRecommendations")
@@ -131,7 +130,7 @@ function onHomeTouchMove(event: TouchEvent) {
     <div
       class="mx-auto flex w-full max-w-[1680px] flex-col gap-8 px-4 py-6 sm:px-5 lg:gap-10 lg:px-6 lg:py-8 xl:px-8"
     >
-      <HomeTopicSection @loaded="hasTopics = $event > 0" @open-details="emit('openDetails', $event)" @open-player="emit('openPlayer', $event)" />
+      <HomeTopicSection @open-details="emit('openDetails', $event)" @open-player="emit('openPlayer', $event)" />
       <HomeSectionRow
         :title="t('home.sectionRecentTitle')"
         :movies="model.recentMovies"
@@ -139,8 +138,6 @@ function onHomeTouchMove(event: TouchEvent) {
         @open-player="emit('openPlayer', $event)"
       />
 
-      <details :open="!hasTopics" class="group">
-        <summary v-if="hasTopics" class="cursor-pointer text-sm text-muted-foreground">{{ t('home.sectionRecommendTitle') }}</summary>
       <HomeSectionRow
         :title="t('home.sectionRecommendTitle')"
         :movies="recommendationMovies"
@@ -212,7 +209,6 @@ function onHomeTouchMove(event: TouchEvent) {
           </div>
         </template>
       </HomeSectionRow>
-      </details>
 
       <HomeContinueRow
         v-if="model.continueWatching.length > 0"
