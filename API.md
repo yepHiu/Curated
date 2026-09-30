@@ -1385,6 +1385,7 @@ Body：
   "confirm": true,
   "profileDecisions": {
     "summary": "target",
+    "provider": "source",
     "providerActorId": "source"
   }
 }
@@ -1394,7 +1395,8 @@ Body：
 
 - `confirm` 必须为 `true`，并且必须携带最近 preview 返回的 token。
 - apply 在同一个 SQLite 事务内重新生成完整 preview；任一相关内容变化都会以 stale preview 拒绝。
-- `profileDecisions` 只接受 preview 中列出的字段，值只能是 `source` 或 `target`；两个不同非空值的字段必须显式选择。
+- `profileDecisions` 只接受 preview 中列出的字段，值只能是 `source` 或 `target`；以 preview 的 `requiredDecisions` 为准，所有冲突必须显式选择。
+- `avatarRemoteUrl` / `avatarLocalPath` 与 `provider` / `providerActorId` 分别为不可拆分的组合。同组必须选择同一侧，否则返回 `ACTOR_MERGE_CONFLICT`、事务零写入。默认整组保留 target；target 整组为空才补 source。双方组内都有资料且组合不同，则整组标记冲突（包括其中一个字段为空的情况），客户端需同时提交两项选择。头像抓取状态随所选头像组保留。
 - `movie_actors`、演员用户标签、外链、profile、头像本地状态、aliases、演员推荐反馈与萃取帧演员列表按 preview 规则迁移并去重，然后才删除 source actor。
 - 任何步骤失败都会回滚，零部分写入；成功后写入持久化 merge audit。
 - 已经作为 target 的 canonical actor 后续仍可继续归并到另一个 canonical actor；历史 audit 保存当时的数字 ID、名称和摘要快照，不钉死活跃演员行。

@@ -52,6 +52,7 @@ Full/Server 1.7.3、Desktop 0.2.1 已补齐 Windows 安装器中文与自动退�
 - 双模式开发：真实 Web API 与 Mock UI 共用同一服务层。
 - 内容区右侧 Agent 面板，支持自动整理上下文与持久会话摘要；作品引用经后端填入事实并在展示前校验；工具调用默认不限，可选上限；写入明确区分待确认与已保存，AI 设置支持模型上下文容量配置与预设，并提供权限、实际 token 用量、耗时与审计；详见[操作手册](docs/guide.md#ai-settings-and-governance)。
 - 资料库浏览、刮削、导入、播放、萃取帧、演员身份、每日推荐与个人洞察。
+- 演员合并支持搜索选人、选择保留身份与预览最终资料；见[演员合并说明](docs/guide.md#merging-duplicate-actors)。
 - 独立 HLS 会话、指定位置续播与有界错误恢复，详见[播放说明](docs/guide.md#playback-recovery)。
 - 可选 PIN 锁、可验证备份、路径迁移、资料库健康与有界修复。
 - 基于 GitHub Releases 的更新检查与安装器下载；正式包内置 FFmpeg 与本地 `hls.js`。

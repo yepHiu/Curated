@@ -51,6 +51,7 @@ No new Full packages are planned. Latest remains a historical Full migration ent
 - macOS desktop uses an integrated titlebar with native window controls.
 - Dual-mode development: real Web API or Mock UI behind the same service layer.
 - Library browsing, scraping, import, playback, curated frames, actor identities, recommendations, and personal insights.
+- Search duplicate actors, choose the retained identity and preview the merged profile; see [actor merging](docs/guide.md#merging-duplicate-actors).
 - A wishlist with named source-page links, on-demand watch-site availability checks, background metadata enrichment, persistent posters, library matching and browser-plugin intake controlled by a switch in Settings → Network & devices, with no token required; see [wishlist setup](docs/guide.md#wishlist).
 - Capture previews with retry/undo, source-file frames and GIF/MP4/WebM clips; see [capture guidance](docs/guide.md#curated-capture-and-inspection).
 - Independent HLS sessions, explicit resume targets, and bounded playback recovery; see [playback guidance](docs/guide.md#playback-recovery).

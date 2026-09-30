@@ -261,6 +261,12 @@ On the homepage, scroll to the end of the recent, recommendation, and continue-w
 
 In the web player, **D** steps backward and **F** steps forward while pausing playback. Use the fullscreen button to toggle fullscreen. Frame duration comes from stream metadata or media-timestamp measurements; when neither is available, the player uses a 30fps estimate.
 
+### Merging duplicate actors
+
+Open an actor’s detail page and choose **Merge actors**. Search an existing actor by name or alias, select which actor to keep, then preview the result. The preview shows the final display name, aliases, movie union, tags and profile values. Choose a photo and profile source as complete groups when they conflict; other differing profile values are selected individually. Changing the actor or retained identity clears the previous preview and choices.
+
+Confirming preserves movie files and migrates associations to the retained actor. Old names continue to resolve to that actor. If data changes, preview again before confirming. More than 16 merged links requires removing unnecessary links in the actor profiles first. A successful merge with a failed movie-list refresh shows a warning: reload the page instead of repeating the merge. Web API mode persists to SQLite; Mock mode uses localStorage. Individual undo, standalone name/alias editing, and a merge-history screen are not yet provided.
+
 ### Curated capture and inspection
 
 Use the capture shortcut or the visible Capture button to save the current displayed frame. A small preview shows the captured media time, saving state and final receipt; successive captures share a bounded queue (four retained jobs, 128 MiB admission budget, one upload at a time). A failed item remains available for retry or original download for up to three minutes; successful receipts expire after twelve seconds. Undo removes the library entry, not an already downloaded external file. Directory export failure is reported separately and can be retried.
