@@ -41,6 +41,16 @@ Longer product and architecture writing:
 - [Project memory](reference/2026-03-20-project-memory.md)
 - [Actor library design](product/2026-03-24-actor-libary.md)
 
+### AI user tags and homepage topics
+
+On the home page, open **AI 整理标签 / Organize tags**, then explicitly start the library task. Configure and enable AI first, with read-only mode off. The task reads titles, summaries and source tags through the configured provider; it only changes **user tags**. It never writes NFO tags or NFO files. Simply browsing, playing or favoriting movies does not start a task. There is no automatic incremental trigger in this first version.
+
+The server stores task progress independently of the browser. You can stop, retry failures, review per-movie evidence or undo a batch. Stop preserves committed results. Undo skips movies edited afterwards; manual exclusions take precedence on subsequent organization. Reconnecting restores status without replaying completion toasts; playback/fullscreen suppresses popups. A completed organization can be undone even if it created no visible homepage group.
+
+Home shows up to three topics with six representative posters each; a movie can belong to several topics. **View all** filters the movie library using user tags only. Existing recommendation feedback also applies to representative selection. Hidden topics can be restored in the organization panel. Completed changes offer an explicit refresh so existing rows do not jump while browsing. Mock uses deterministic source-tag examples and localStorage, with no model request; real persistence requires Web API mode.
+
+Natural-language chat initiation, automatic incremental organization, detail-page recommendations, global topic rename/merge and real-provider classification quality acceptance remain pending. See [implementation and limitations](plan/2026-08-19-agent-user-prd.md#11-2026-10-01-实施记录代码已落地真实模型质量待验收).
+
 ### AI settings and governance
 
 Enable AI in Settings → AI and configure an OpenAI-compatible provider. The backend global enable switch defaults off, including after upgrading from the browser-only experimental switch. Persistent chats and edits require Web API mode and the Go backend. The current reliability implementation and remaining acceptance work are tracked in [the Agent milestone plan, section 14](plan/2026-08-19-agent-milestone-plan.md). The connectivity probe permits up to 1024 output tokens within 30 seconds, so reasoning providers have room to produce a final answer.

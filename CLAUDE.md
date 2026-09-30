@@ -688,3 +688,24 @@ Source targets Full/Server **1.7.3**, Desktop **0.2.1**. Windows setup has Simpl
 ## Latest policy — 2026-09-27 (supersedes legacy pinning)
 
 GitHub Latest now selects the highest public stable Full SemVer; standalone Server/Desktop keep independent component manifests. Component preflight no longer depends on a legacy Latest. Component, legacy and recovery publication share `release_lib/latest_release.py`: list all pages, ignore drafts/prereleases and single-component tags, validate the matching nonempty installer, then set/verify Latest without changing public assets or visibility. No Full means highest legacy fallback. Manual `Release - Reconcile Latest` shares the publication lock. Old installed all-in-one binaries cannot be remotely patched: verified v1.5.8 rejects Full tags and requires a one-time manual Full migration. Full 1.7.3 has passed Windows/Mac CD and is published. No new runtime/API/config changes. See guide §8 and docs/plan/2026-09-27-latest-release-channel-separation.md.
+
+## AI user-tag organization and topics (2026-10-01)
+
+All endpoints use the existing authenticated/unlocked API boundary. No endpoint below permits NFO writes.
+
+| Method | Endpoint | Behavior |
+|---|---|---|
+| GET | `/api/library/topics?limit=100&offset=0` | Paged topic array `{items}` |
+| GET | `/api/library/topics/{topicId}` | Topic and active member count |
+| PATCH | `/api/library/topics/{topicId}` | Only `{hidden: boolean}` |
+| GET | `/api/library/movies?topicId=...` | User-topic membership plus existing filters |
+| GET | `/api/homepage/topics` | At most three groups of six posters `{items}` |
+| GET | `/api/ai/tag-organizations` | Latest 50 persistent jobs `{items}` |
+| POST | `/api/ai/tag-organizations` | `{scope:"all"|"selected",movieIds?:string[],requestId:string}`; 202 job; selected 1–600 |
+| GET | `/api/ai/tag-organizations/{jobId}` | Persistent progress and counters |
+| GET | `/api/ai/tag-organizations/{jobId}/items?limit=25&offset=0` | Paged result/evidence records `{items}` |
+| POST | `/api/ai/tag-organizations/{jobId}/cancel` | Stop and retain committed results |
+| POST | `/api/ai/tag-organizations/{jobId}/retry` | Resume pending/failed/conflicting items |
+| POST | `/api/ai/tag-organizations/{jobId}/undo` | `{restored,conflicts}`; later manual edits are preserved |
+
+Unknown input fields/trailing JSON return 400; disabled/read-only AI returns 403; missing job/topic 404; unavailable operation/state returns 409; GET never mutates tasks. No automatic schedule/config fields are added. AI task writes use an internal job-bound gateway, shared write budget and audit; ordinary chat/MCP cannot invoke this apply capability. Invalid or unsupported evidence does not clear user tags.

@@ -3637,3 +3637,24 @@ These use the ordinary application session rather than the intake token:
 | DELETE | `/api/integrations/wishlist/tokens/{tokenId}` | Loopback-only revocation |
 
 Token creation returns plaintext once; listing excludes both plaintext and hash. An optional origin binds the credential to a browser extension origin. Only the intake route permits extension origins; the token grants no general library or settings access.
+
+## AI user-tag organization and topics (2026-10-01)
+
+All endpoints use the existing authenticated/unlocked API boundary. No endpoint below permits NFO writes.
+
+| Method | Endpoint | Behavior |
+|---|---|---|
+| GET | `/api/library/topics?limit=100&offset=0` | Paged topic array `{items}` |
+| GET | `/api/library/topics/{topicId}` | Topic and active member count |
+| PATCH | `/api/library/topics/{topicId}` | Only `{hidden: boolean}` |
+| GET | `/api/library/movies?topicId=...` | User-topic membership plus existing filters |
+| GET | `/api/homepage/topics` | At most three groups of six posters `{items}` |
+| GET | `/api/ai/tag-organizations` | Latest 50 persistent jobs `{items}` |
+| POST | `/api/ai/tag-organizations` | `{scope:"all"|"selected",movieIds?:string[],requestId:string}`; 202 job; selected 1–600 |
+| GET | `/api/ai/tag-organizations/{jobId}` | Persistent progress and counters |
+| GET | `/api/ai/tag-organizations/{jobId}/items?limit=25&offset=0` | Paged result/evidence records `{items}` |
+| POST | `/api/ai/tag-organizations/{jobId}/cancel` | Stop and retain committed results |
+| POST | `/api/ai/tag-organizations/{jobId}/retry` | Resume pending/failed/conflicting items |
+| POST | `/api/ai/tag-organizations/{jobId}/undo` | `{restored,conflicts}`; later manual edits are preserved |
+
+Unknown input fields/trailing JSON return 400; disabled/read-only AI returns 403; missing job/topic 404; unavailable operation/state returns 409; GET never mutates tasks. No automatic schedule/config fields are added. AI task writes use an internal job-bound gateway, shared write budget and audit; ordinary chat/MCP cannot invoke this apply capability. Invalid or unsupported evidence does not clear user tags.

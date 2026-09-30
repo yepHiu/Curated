@@ -434,3 +434,7 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 ## Server 日志默认目录（2026-09-29）
 
 日志固定使用 `config.DefaultLogDir()`；旧主配置/库配置 `logDir` 被忽略，保存日志策略时从库配置移除，旧日志不搬移/删除。本机 Desktop 显示「打开日志目录」，经服务层调用 `POST /api/settings/logs/reveal`（无路径参数，Server 打开自己的文件管理器，204）；接口复用直接 loopback 权限拒绝远端/代理。本机 Desktop/Web 可改保留时间与等级，重启后生效；远端只保留前端日志设置。前端默认仍为开发 debug / 正式 warn。详见 guide 的 Server logging。
+
+## 2026-10-01 AI 用户标签整理与首页题材
+
+首页显式发起全库整理；selected 1–600 另有 API。词汇分页20片、分类5片、逐片事务/检查点、恢复/取消/重试/撤销、依据分页，迁移0057/0058。NFO只读；user题材同名隔离、人工排除/保留及修订冲突保护，独立内部网关共用写频控/审计。`GET /api/homepage/topics` 最多3×6，`library/topics`目录与隐藏，`movies?topicId`只匹配user，`ai/tag-organizations`持久任务。播放静默、重连不重放；Web/Mock均已接入。聊天发起、自动增量、详情推荐及真实Provider质量验收待做。无新增cfg键；详见guide与用户PRD§11。
