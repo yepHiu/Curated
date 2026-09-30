@@ -228,8 +228,10 @@ type BackupRestorePreflightDTO struct {
 // ListMoviesRequest filters the library movie listing using the same canonical
 // semantics that Saved Views expose to the renderer.
 type ListMoviesRequest struct {
-	Mode  string `json:"mode,omitempty"`
-	Query string `json:"query,omitempty"`
+	// TopicID matches a canonical user tag only; source/NFO tags cannot satisfy it.
+	TopicID string `json:"topicId,omitempty"`
+	Mode    string `json:"mode,omitempty"`
+	Query   string `json:"query,omitempty"`
 	// Tag / Tags are exact matches against metadata (nfo) or user tags; multiple values are AND.
 	Tag  string   `json:"tag,omitempty"`
 	Tags []string `json:"tags,omitempty"`

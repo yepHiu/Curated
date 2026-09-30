@@ -317,6 +317,10 @@ func ParseMovieTagFilters(values ...string) []string {
 func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 	clauses := make([]string, 0, 10)
 	args := make([]any, 0, 16)
+	if request.TopicID != "" {
+		clauses = append(clauses, `EXISTS (SELECT 1 FROM library_topics tp JOIN tags tt ON tt.id=tp.tag_id AND tt.type='user' JOIN movie_tags tm ON tm.tag_id=tt.id WHERE tp.id=? AND tm.movie_id=m.id)`)
+		args = append(args, request.TopicID)
+	}
 
 	mode := strings.TrimSpace(strings.ToLower(request.Mode))
 	if mode == "trash" {
