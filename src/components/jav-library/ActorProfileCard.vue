@@ -204,9 +204,6 @@ function manualRefreshProfile() {
 }
 
 async function load(): Promise<void> {
-  if (!useWeb) {
-    return
-  }
   const name = props.actorName.trim()
   if (!name) {
     return
@@ -238,7 +235,7 @@ async function load(): Promise<void> {
   if (seq !== loadSeq) {
     return
   }
-  await runScrapePipeline(seq, name, false)
+  if (useWeb) await runScrapePipeline(seq, name, false)
 }
 
 watch(

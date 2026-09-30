@@ -283,7 +283,7 @@ export interface LibraryService {
   /** Read-only merge preview with stale-preview token and every affected association. */
   previewActorMerge(body: ActorMergePreviewRequest): Promise<ActorMergePreviewDTO>
   /** Confirm and transactionally apply a previously previewed canonical merge. */
-  applyActorMerge(body: ApplyActorMergeRequest): Promise<ActorMergeAuditDTO>
+  applyActorMerge(body: ApplyActorMergeRequest): Promise<ActorMergeAuditDTO & { refreshFailed?: boolean }>
   /** Query persisted canonical merge audit history. */
   listActorMergeAudits(params?: { limit?: number; offset?: number }): Promise<ActorMergeAuditListDTO>
   /** Return bounded, server-side personal viewing metrics for one local calendar range. */

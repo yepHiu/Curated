@@ -937,6 +937,14 @@ function applyMockActorMerge(body: ApplyActorMergeRequest): ActorMergeAuditDTO {
     }
   }
 
+  for (const [first, second] of [["avatarRemoteUrl", "avatarLocalPath"], ["provider", "providerActorId"]] as const) {
+    const firstSelection = body.profileDecisions?.[first] ?? "target"
+    const secondSelection = body.profileDecisions?.[second] ?? "target"
+    if (firstSelection !== secondSelection) {
+      throw mockActorMergeError("ACTOR_MERGE_CONFLICT", "Related profile fields must use the same actor")
+    }
+  }
+
   const sourceNames = new Set(
     [preview.source.name, ...preview.source.aliases].map(normalizeMockActorIdentity),
   )

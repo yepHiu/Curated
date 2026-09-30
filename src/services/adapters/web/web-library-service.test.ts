@@ -1219,6 +1219,21 @@ describe("webLibraryService loading", () => {
     expect(webLibraryService.movies.value[0]?.actors).toEqual(["Target"])
   })
 
+  it("returns the committed merge with a warning when refreshing movies fails", async () => {
+    apiMocks.listMovies.mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 })
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+    apiMocks.applyActorMerge.mockResolvedValue({ id: "amrg_committed", sourceName: "Source", targetName: "Target" })
+    apiMocks.listMovies.mockRejectedValue(new Error("refresh offline"))
+    const log = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      await expect(webLibraryService.applyActorMerge({ sourceName: "Source", targetName: "Target", previewToken: "token", confirm: true })).resolves.toMatchObject({ id: "amrg_committed", refreshFailed: true })
+      expect(apiMocks.applyActorMerge).toHaveBeenCalledTimes(1)
+    } finally {
+      log.mockRestore()
+    }
+  })
+
   it("delegates bounded personal insights queries to the Web API", async () => {
     apiMocks.listMovies.mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 })
     apiMocks.getPersonalInsightsOverview.mockResolvedValue({

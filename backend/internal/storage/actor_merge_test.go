@@ -27,6 +27,62 @@ func newActorMergeTestStore(t *testing.T) *SQLiteStore {
 	return store
 }
 
+func TestActorMergeKeepsProfileGroupsTogether(t *testing.T) {
+	store := newActorMergeTestStore(t)
+	ctx := context.Background()
+	sourceID := seedActorMergeActor(t, store, "Grouped Source", actorMergeFields(map[string]any{
+		"avatar": "https://source.example/avatar.jpg", "avatar_local_path": "/source/avatar.jpg",
+		"provider": "source-provider", "provider_actor_id": "source-id",
+	}))
+	targetID := seedActorMergeActor(t, store, "Grouped Target", actorMergeFields(map[string]any{
+		"avatar": "https://target.example/avatar.jpg", "provider": "target-provider",
+	}))
+	if _, err := store.db.Exec(`UPDATE actors SET avatar_last_http_status = 200, avatar_last_error = '', avatar_last_fetched_at = 'source-fetch' WHERE id = ?`, sourceID); err != nil {
+		t.Fatal(err)
+	}
+	preview, err := store.PreviewActorMerge(ctx, contracts.ActorMergePreviewRequest{SourceName: "Grouped Source", TargetName: "Grouped Target"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// An empty target cache/ID still belongs to its populated group, rather
+	// than silently taking the source's cache or provider-specific identity.
+	for _, field := range preview.ProfileFields {
+		if field.Field == "avatarLocalPath" || field.Field == "providerActorId" {
+			if !field.Conflict || field.DefaultSelection != "target" {
+				t.Fatalf("group was split: %+v", field)
+			}
+		}
+	}
+	req := contracts.ApplyActorMergeRequest{
+		SourceName: preview.Source.Name, TargetName: preview.Target.Name, PreviewToken: preview.PreviewToken, Confirm: true,
+		ProfileDecisions: map[string]string{"avatarRemoteUrl": "source", "avatarLocalPath": "target", "provider": "target", "providerActorId": "source"},
+	}
+	if _, err := store.ApplyActorMerge(ctx, req, time.Now()); !errors.Is(err, contracts.ErrActorMergeConflict) {
+		t.Fatalf("mixed groups accepted: %v", err)
+	}
+	req.ProfileDecisions["avatarLocalPath"] = "source"
+	if _, err := store.ApplyActorMerge(ctx, req, time.Now()); !errors.Is(err, contracts.ErrActorMergeConflict) {
+		t.Fatalf("mixed provider accepted: %v", err)
+	}
+	var count int
+	if err := store.db.QueryRow(`SELECT COUNT(*) FROM actors WHERE id IN (?, ?)`, sourceID, targetID).Scan(&count); err != nil || count != 2 {
+		t.Fatalf("rejection changed actors: %d %v", count, err)
+	}
+	req.ProfileDecisions["providerActorId"] = "target"
+	if _, err := store.ApplyActorMerge(ctx, req, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	var remote, local, provider, providerID, fetched string
+	var status int
+	err = store.db.QueryRow(`SELECT avatar, avatar_local_path, provider, provider_actor_id, avatar_last_http_status, avatar_last_fetched_at FROM actors WHERE id = ?`, targetID).Scan(&remote, &local, &provider, &providerID, &status, &fetched)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if remote != "https://source.example/avatar.jpg" || local != "/source/avatar.jpg" || provider != "target-provider" || providerID != "" || status != 200 || fetched != "source-fetch" {
+		t.Fatalf("group data corrupted: %s %s %s %s %d %s", remote, local, provider, providerID, status, fetched)
+	}
+}
+
 func seedActorMergeActor(t *testing.T, store *SQLiteStore, name string, fields map[string]any) int64 {
 	t.Helper()
 	ctx := context.Background()

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import type { ActorMergeProfileSelection } from "@/api/types"
 import { ACTOR_MERGE_STORAGE_KEY } from "@/lib/actor-merge-local-storage"
 
 async function loadMockService() {
@@ -63,5 +64,20 @@ describe("mock actor canonical merges", () => {
         confirm: true,
       }),
     ).rejects.toMatchObject({ apiError: { code: "ACTOR_MERGE_STALE_PREVIEW" } })
+  })
+
+  it("rejects mixed profile groups before mutating associations or audit history", async () => {
+    const service = await loadMockService()
+    const preview = await service.previewActorMerge({ sourceName: "Mina Kaze", targetName: "Rin Asuka" })
+    const before = JSON.stringify(service.movies.value)
+    const choices: Record<string, ActorMergeProfileSelection>[] = [
+      { provider: "source" as const, providerActorId: "target" as const },
+      { avatarRemoteUrl: "source" as const, avatarLocalPath: "target" as const },
+    ]
+    for (const profileDecisions of choices) {
+      await expect(service.applyActorMerge({ sourceName: preview.source.name, targetName: preview.target.name, previewToken: preview.previewToken, confirm: true, profileDecisions })).rejects.toMatchObject({ apiError: { code: "ACTOR_MERGE_CONFLICT" } })
+      expect(JSON.stringify(service.movies.value)).toBe(before)
+      await expect(service.listActorMergeAudits()).resolves.toMatchObject({ total: 0 })
+    }
   })
 })

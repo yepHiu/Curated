@@ -164,6 +164,20 @@ describe("ActorProfileCard", () => {
     pushAppToastMock.mockReset()
   })
 
+  it("resolves old actor names in Mock mode without auto scraping", async () => {
+    vi.resetModules()
+    vi.stubEnv("VITE_USE_WEB_API", "false")
+    getActorProfile.mockResolvedValue({ name: "Canonical Actor" })
+    const mod = await import("./ActorProfileCard.vue")
+    const wrapper = mount(mod.default, { props: { actorName: "Old Alias" } })
+    await flushPromises()
+    expect(getActorProfile).toHaveBeenCalledWith("Old Alias")
+    expect(wrapper.emitted("resolvedName")).toEqual([["Canonical Actor"]])
+    expect(scrapeActorProfile).not.toHaveBeenCalled()
+    wrapper.unmount()
+    vi.unstubAllEnvs()
+  })
+
   it("opens the actor edit dialog and replaces the saved external link", async () => {
     getActorProfile.mockResolvedValue({
       name: "Alpha Star",

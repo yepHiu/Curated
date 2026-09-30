@@ -26,6 +26,7 @@ const libraryService = useLibraryService()
 
 const resolvedActorName = ref(props.actorName.trim())
 const mergeDialogOpen = ref(false)
+const profileRevision = ref(0)
 const actorDisplayName = computed(() => resolvedActorName.value || props.actorName.trim())
 
 watch(
@@ -51,6 +52,7 @@ async function onActorNameResolved(name: string) {
 async function onActorMerged(targetName: string) {
   mergeDialogOpen.value = false
   resolvedActorName.value = targetName.trim()
+  profileRevision.value += 1
   await router.replace({
     name: "actor-detail",
     params: { actorName: targetName.trim() },
@@ -131,6 +133,7 @@ async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) 
 
     <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <ActorProfileCard
+        :key="profileRevision"
         :actor-name="actorDisplayName"
         :show-clear-filter="false"
         @resolved-name="onActorNameResolved"

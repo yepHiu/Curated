@@ -351,7 +351,35 @@ func buildActorMergeProfileFields(source, target actorMergeRow) []contracts.Acto
 			Conflict:         sourceValue != "" && targetValue != "" && sourceValue != targetValue,
 		})
 	}
+	// An avatar and a provider identity are indivisible: never assemble values
+	// from different actors, even when one member of a pair is empty.
+	for _, group := range actorMergeProfileGroups {
+		var members []int
+		sourcePresent, targetPresent, different := false, false, false
+		for i, field := range out {
+			if field.Field != group[0] && field.Field != group[1] {
+				continue
+			}
+			members = append(members, i)
+			sourcePresent = sourcePresent || field.SourceValue != ""
+			targetPresent = targetPresent || field.TargetValue != ""
+			different = different || field.SourceValue != field.TargetValue
+		}
+		selection := "target"
+		if !targetPresent && sourcePresent {
+			selection = "source"
+		}
+		for _, i := range members {
+			out[i].DefaultSelection = selection
+			out[i].Conflict = sourcePresent && targetPresent && different
+		}
+	}
 	return out
+}
+
+var actorMergeProfileGroups = [][2]string{
+	{"avatarRemoteUrl", "avatarLocalPath"},
+	{"provider", "providerActorId"},
 }
 
 func actorMergeIntValue(value int) string {
@@ -850,6 +878,11 @@ func validateActorMergeProfileDecisions(
 			selection = field.DefaultSelection
 		}
 		out[field.Field] = selection
+	}
+	for _, group := range actorMergeProfileGroups {
+		if out[group[0]] != out[group[1]] {
+			return nil, fmt.Errorf("%w: %s and %s must use the same actor", contracts.ErrActorMergeConflict, group[0], group[1])
+		}
 	}
 	return out, nil
 }

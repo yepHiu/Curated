@@ -204,4 +204,13 @@ describe("ActorDetailPage", () => {
       query: {},
     })
   })
+
+  it("reloads the profile when a merge retains the currently displayed actor", async () => {
+    const wrapper = await mountPage()
+    const before = wrapper.getComponent({ name: "ActorProfileCard" }).vm
+    wrapper.getComponent({ name: "ActorMergeDialog" }).vm.$emit("merged", "Mina Kaze")
+    await flushPromises()
+    expect(wrapper.getComponent({ name: "ActorProfileCard" }).vm).not.toBe(before)
+    expect(wrapper.get("[data-actor-profile]").attributes("data-actor-name")).toBe("Mina Kaze")
+  })
 })

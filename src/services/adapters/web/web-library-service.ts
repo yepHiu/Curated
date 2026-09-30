@@ -268,9 +268,11 @@ async function reloadMoviesFromApiImmediate(options?: { includeTrash?: boolean }
     }
     moviesLoadedState.value = true
     loadErrorState.value = null
+    return true
   } catch (err) {
     setLoadError(err, "library.loadFailed")
     console.error("[web-library-service] failed to reload movies", err)
+    return false
   }
 }
 
@@ -1414,10 +1416,11 @@ function createWebLibraryService(): LibraryService {
       return await api.previewActorMerge(body)
     },
 
-    async applyActorMerge(body: ApplyActorMergeRequest): Promise<ActorMergeAuditDTO> {
+    async applyActorMerge(body: ApplyActorMergeRequest): Promise<ActorMergeAuditDTO & { refreshFailed?: boolean }> {
       const audit = await api.applyActorMerge(body)
-      await reloadMoviesFromApiImmediate()
-      return audit
+      const refreshed = await reloadMoviesFromApiImmediate()
+      // The transaction has committed even when the subsequent refresh fails.
+      return refreshed ? audit : { ...audit, refreshFailed: true }
     },
 
     async listActorMergeAudits(params?: { limit?: number; offset?: number }): Promise<ActorMergeAuditListDTO> {
