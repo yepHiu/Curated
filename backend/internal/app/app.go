@@ -137,6 +137,7 @@ type App struct {
 	// aiProviderMu protects cfg.AIProvider (library-config.cfg) for the experimental agent.
 	aiProviderMu sync.RWMutex
 	agentRT      agentRuntime
+	tagRT        tagOrganizationRuntime
 	// metadataMovieMu protects cfg.MetadataMovieProvider/ProviderChain (library-config.cfg) during concurrent scrapes.
 	metadataMovieMu            sync.RWMutex
 	metadataMovieProviderChain []string // ordered list of providers to try in sequence
@@ -278,6 +279,10 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 	}
 
 	app.startWishlistWorker()
+	// 无待恢复任务时不创建常驻整理 goroutine；首次显式请求再启动。
+	if jobs, err := store.ListTagOrganizations(ctx, true); err == nil && len(jobs) > 0 {
+		app.startTagOrganizationWorker()
+	}
 	return app, nil
 }
 
@@ -285,6 +290,10 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 func (a *App) Close() {
 	if a == nil {
 		return
+	}
+	if a.tagRT.cancel != nil {
+		a.tagRT.cancel()
+		<-a.tagRT.done
 	}
 	if a.wishlistCancel != nil {
 		a.wishlistCancel()
@@ -3805,6 +3814,7 @@ func (a *App) HTTPHandler() http.Handler {
 			DevPerformanceProvider:           a,
 			PlaybackResolver:                 a,
 			NativePlaybackLauncher:           a,
+			TopicOrganization:                a,
 			HomepageRecommendations:          a,
 			HomepageRecommendationFeedback:   a,
 			ActorMergeProvider:               a,

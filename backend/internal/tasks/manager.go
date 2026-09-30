@@ -175,6 +175,17 @@ func (m *Manager) Fail(taskID, code, message string) contracts.TaskDTO {
 	})
 }
 
+// Cancel closes a cancelled background task without presenting it as a failure.
+func (m *Manager) Cancel(taskID, message string) contracts.TaskDTO {
+	return m.update(taskID, func(task contracts.TaskDTO) contracts.TaskDTO {
+		// Cancellation keeps progress already committed by the worker.
+		task.Status = contracts.TaskCancelled
+		task.FinishedAt = nowUTC()
+		task.Message = message
+		return task
+	})
+}
+
 // Get returns the task snapshot for taskID, or false if not found.
 func (m *Manager) Get(taskID string) (contracts.TaskDTO, bool) {
 	m.mu.RLock()

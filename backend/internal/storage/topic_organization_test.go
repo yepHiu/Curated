@@ -157,3 +157,27 @@ func TestTopicOrganizationHonorsManualExclusionAndUndoConflict(t *testing.T) {
 		t.Fatalf("manual exclusion lost: %+v", after)
 	}
 }
+
+// TestTopicManualNoopPreservesUndo verifies an unchanged tag form does not create a false conflict.
+func TestTopicManualNoopPreservesUndo(t *testing.T) {
+	s := newTopicTestStore(t)
+	ctx := context.Background()
+	startTopicTestJob(t, s, "noop")
+	input, _ := s.TopicMovieInput(ctx, "a")
+	if err := s.ApplyMovieTopics(ctx, "noop", input, []string{"Theme"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTagOrganization(ctx, "noop", "completed", "finished", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PatchMovieUserPrefs(ctx, "a", contracts.PatchMovieInput{UserTagsSet: true, UserTags: []string{"Theme"}}); err != nil {
+		t.Fatal(err)
+	}
+	undo, err := s.UndoTopicOrganization(ctx, "noop")
+	if err != nil || undo.Restored != 1 || undo.Conflicts != 0 {
+		t.Fatalf("undo=%+v %v", undo, err)
+	}
+	if err := s.RetryTagOrganization(ctx, "noop"); err == nil {
+		t.Fatal("undone task was replayed")
+	}
+}

@@ -347,6 +347,7 @@ type Handler struct {
 	devPerformanceProvider         DevPerformanceProvider
 	playbackResolver               PlaybackResolver
 	nativePlaybackLauncher         NativePlaybackLauncher
+	topicOrganization              TopicOrganizationProvider
 	homepageRecommendations        HomepageRecommendationsProvider
 	homepageRecommendationFeedback HomepageRecommendationFeedbackProvider
 	actorMergeProvider             ActorMergeProvider
@@ -409,6 +410,7 @@ type Deps struct {
 	DevPerformanceProvider           DevPerformanceProvider
 	PlaybackResolver                 PlaybackResolver
 	NativePlaybackLauncher           NativePlaybackLauncher
+	TopicOrganization                TopicOrganizationProvider
 	HomepageRecommendations          HomepageRecommendationsProvider
 	HomepageRecommendationFeedback   HomepageRecommendationFeedbackProvider
 	ActorMergeProvider               ActorMergeProvider
@@ -484,6 +486,7 @@ func NewHandler(deps Deps) *Handler {
 		devPerformanceProvider:         deps.DevPerformanceProvider,
 		playbackResolver:               deps.PlaybackResolver,
 		nativePlaybackLauncher:         deps.NativePlaybackLauncher,
+		topicOrganization:              deps.TopicOrganization,
 		homepageRecommendations:        deps.HomepageRecommendations,
 		homepageRecommendationFeedback: deps.HomepageRecommendationFeedback,
 		actorMergeProvider:             deps.ActorMergeProvider,
@@ -535,6 +538,15 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/health/repairs", localServerManagement(h.handleStartLibraryHealthRepair))
 	mux.HandleFunc("GET /api/library/health/repairs/{repairId}", localServerManagement(h.handleGetLibraryHealthRepair))
 	mux.HandleFunc("POST /api/library/health/actions", localServerManagement(h.handleStartLibraryHealthAction))
+	mux.HandleFunc("GET /api/library/topics", h.handleListTopics)
+	mux.HandleFunc("GET /api/library/topics/{topicId}", h.handleGetTopic)
+	mux.HandleFunc("PATCH /api/library/topics/{topicId}", h.handleGetTopic)
+	mux.HandleFunc("GET /api/homepage/topics", h.handleHomepageTopics)
+	mux.HandleFunc("GET /api/ai/tag-organizations", h.handleTagOrganizations)
+	mux.HandleFunc("POST /api/ai/tag-organizations", h.handleTagOrganizations)
+	mux.HandleFunc("GET /api/ai/tag-organizations/{jobId}", h.handleTagOrganization)
+	mux.HandleFunc("GET /api/ai/tag-organizations/{jobId}/{operation}", h.handleTagOrganization)
+	mux.HandleFunc("POST /api/ai/tag-organizations/{jobId}/{operation}", h.handleTagOrganization)
 	mux.HandleFunc("GET /api/homepage/recommendations", h.handleGetHomepageRecommendations)
 	mux.HandleFunc("POST /api/homepage/recommendations/refresh", h.handleRefreshHomepageRecommendations)
 	mux.HandleFunc("GET /api/homepage/recommendations/feedback", h.handleListHomepageRecommendationFeedback)
@@ -785,6 +797,7 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 		rawStudios = append(rawStudios, value)
 	}
 	request := contracts.ListMoviesRequest{
+		TopicID:    query.Get("topicId"),
 		Mode:       mode,
 		Query:      query.Get("q"),
 		Tags:       storage.ParseMovieTagFilters(rawTags...),

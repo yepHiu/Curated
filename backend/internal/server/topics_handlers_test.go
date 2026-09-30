@@ -1,0 +1,56 @@
+package server
+
+import (
+	"context"
+	"curated-backend/internal/contracts"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+// topicHandlerFixture counts mutations to detect method and schema bypasses.
+type topicHandlerFixture struct {
+	TopicOrganizationProvider
+	starts, cancels int
+}
+
+func (f *topicHandlerFixture) StartTagOrganization(_ context.Context, _ contracts.TagOrganizationRequest) (contracts.TagOrganizationJobDTO, error) {
+	f.starts++
+	return contracts.TagOrganizationJobDTO{ID: "fixture", Status: "queued"}, nil
+}
+func (f *topicHandlerFixture) GetTagOrganization(_ context.Context, id string) (contracts.TagOrganizationJobDTO, error) {
+	return contracts.TagOrganizationJobDTO{ID: id, Status: "running"}, nil
+}
+func (f *topicHandlerFixture) CancelTagOrganization(_ context.Context, _ string) error {
+	f.cancels++
+	return nil
+}
+
+// TestTopicHandlersRejectMetadataWrites verifies HTTP callers cannot smuggle NFO fields or use GET mutations.
+func TestTopicHandlersRejectMetadataWrites(t *testing.T) {
+	f := &topicHandlerFixture{}
+	h := &Handler{topicOrganization: f}
+	for _, body := range []string{`{"scope":"all","requestId":"x","metadataTags":["bad"]}`, `{"scope":"all","requestId":"x","tagType":"nfo"}`, `{"scope":"all","requestId":"x"}{}`} {
+		req := httptest.NewRequest(http.MethodPost, "/api/ai/tag-organizations", strings.NewReader(body))
+		response := httptest.NewRecorder()
+		h.handleTagOrganizations(response, req)
+		if response.Code != 400 || f.starts != 0 {
+			t.Fatalf("schema bypass: %d %s", response.Code, response.Body)
+		}
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/ai/tag-organizations/fixture/cancel", nil)
+	req.SetPathValue("jobId", "fixture")
+	req.SetPathValue("operation", "cancel")
+	response := httptest.NewRecorder()
+	h.handleTagOrganization(response, req)
+	if response.Code != 405 || f.cancels != 0 {
+		t.Fatal("GET mutated task")
+	}
+	req = httptest.NewRequest(http.MethodPost, "/api/ai/tag-organizations", strings.NewReader(`{"scope":"all","requestId":"x"}`))
+	response = httptest.NewRecorder()
+	h.handleTagOrganizations(response, req)
+	if response.Code != 202 || f.starts != 1 {
+		t.Fatalf("explicit start failed: %s", response.Body)
+	}
+}

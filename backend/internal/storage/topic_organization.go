@@ -85,11 +85,30 @@ func topicMovieInputTx(ctx context.Context, tx *sql.Tx, id string) (TopicMovieIn
 
 // SaveTopicVocabulary 将受验证的规范词汇映射到用户标签，永不修改 NFO 行。
 func (s *SQLiteStore) SaveTopicVocabulary(ctx context.Context, defs []TopicDefinition) error {
+	return s.saveTopicVocabulary(ctx, "", defs)
+}
+
+// SaveTopicVocabularyForJob checks cancellation in the same transaction as vocabulary writes.
+func (s *SQLiteStore) SaveTopicVocabularyForJob(ctx context.Context, jobID string, defs []TopicDefinition) error {
+	return s.saveTopicVocabulary(ctx, jobID, defs)
+}
+
+// saveTopicVocabulary is the only writer of user-only topic mappings.
+func (s *SQLiteStore) saveTopicVocabulary(ctx context.Context, jobID string, defs []TopicDefinition) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if jobID != "" {
+		var status string
+		if err = tx.QueryRowContext(ctx, `SELECT status FROM ai_tag_organization_jobs WHERE id=?`, jobID).Scan(&status); err != nil {
+			return err
+		}
+		if status != "running" {
+			return fmt.Errorf("organization is not running")
+		}
+	}
 	for _, d := range defs {
 		names, err := NormalizeUserTagsForPatch([]string{d.Name})
 		if err != nil || len(names) != 1 {
@@ -142,6 +161,9 @@ func (s *SQLiteStore) TopicVocabulary(ctx context.Context) ([]TopicDefinition, e
 
 // recordManualTopicDecisionsTx 记录真实人工增删，保留对 AI 后续整理的约束。
 func recordManualTopicDecisionsTx(ctx context.Context, tx *sql.Tx, movieID string, names []string) error {
+	if err := recordManualUserTagDecisionsTx(ctx, tx, movieID, names); err != nil {
+		return err
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT p.id,t.name,EXISTS(SELECT 1 FROM movie_tags mt WHERE mt.movie_id=? AND mt.tag_id=t.id)
 	FROM library_topics p JOIN tags t ON t.id=p.tag_id AND t.type='user'`, movieID)
 	if err != nil {
@@ -227,7 +249,11 @@ func (s *SQLiteStore) ApplyMovieTopics(ctx context.Context, jobID string, input 
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		if decision == "exclude" {
+		var manualExclude int
+		if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM movie_user_tag_decisions WHERE movie_id=? AND name=? AND decision='exclude'`, input.MovieID, canonical).Scan(&manualExclude); err != nil {
+			return err
+		}
+		if decision == "exclude" || manualExclude > 0 {
 			continue
 		}
 		set[canonical] = true
@@ -242,7 +268,11 @@ func (s *SQLiteStore) ApplyMovieTopics(ctx context.Context, jobID string, input 
 				if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM movie_topic_decisions d JOIN library_topics p ON p.id=d.topic_id JOIN tags t ON t.id=p.tag_id WHERE d.movie_id=? AND d.decision='keep' AND t.name=?`, input.MovieID, alias).Scan(&keep); err != nil {
 					return err
 				}
-				if keep == 0 {
+				var manualKeep int
+				if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM movie_user_tag_decisions WHERE movie_id=? AND name=? AND decision='keep'`, input.MovieID, alias).Scan(&manualKeep); err != nil {
+					return err
+				}
+				if keep == 0 && manualKeep == 0 {
 					delete(set, alias)
 				}
 			}
@@ -338,4 +368,61 @@ func (s *SQLiteStore) UndoTopicOrganization(ctx context.Context, jobID string) (
 		out.Restored++
 	}
 	return out, tx.Commit()
+}
+
+// sameUserTagSet 避免仅顺序变化或无变化的人工提交破坏撤销版本。
+func sameUserTagSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	set := map[string]bool{}
+	for _, n := range a {
+		set[n] = true
+	}
+	for _, n := range b {
+		if !set[n] {
+			return false
+		}
+	}
+	return true
+}
+
+// recordManualUserTagDecisionsTx preserves later corrections, including aliases without their own topic.
+// Existing tags before the first vocabulary remain eligible for initial normalization.
+func recordManualUserTagDecisionsTx(ctx context.Context, tx *sql.Tx, movieID string, names []string) error {
+	var topics int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM library_topics`).Scan(&topics); err != nil {
+		return err
+	}
+	if topics == 0 {
+		return nil
+	}
+	current, err := topicMovieInputTx(ctx, tx, movieID)
+	if err != nil {
+		return err
+	}
+	before, after := map[string]bool{}, map[string]bool{}
+	for _, name := range current.UserTags {
+		before[name] = true
+	}
+	for _, name := range names {
+		after[name] = true
+	}
+	decisions := map[string]string{}
+	for name := range before {
+		if !after[name] {
+			decisions[name] = "exclude"
+		}
+	}
+	for name := range after {
+		if !before[name] {
+			decisions[name] = "keep"
+		}
+	}
+	for name, decision := range decisions {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO movie_user_tag_decisions(movie_id,name,decision) VALUES(?,?,?) ON CONFLICT(movie_id,name) DO UPDATE SET decision=excluded.decision`, movieID, name, decision); err != nil {
+			return err
+		}
+	}
+	return nil
 }

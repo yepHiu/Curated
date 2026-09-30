@@ -119,14 +119,20 @@ func (s *SQLiteStore) PatchMovieUserPrefs(ctx context.Context, movieID string, p
 		if err != nil {
 			return err
 		}
+		currentTags, err := topicMovieInputTx(ctx, tx, movieID)
+		if err != nil {
+			return err
+		}
 		if err := recordManualTopicDecisionsTx(ctx, tx, movieID, normalized); err != nil {
 			return err
 		}
 		if err := replaceMovieUserTagsTx(ctx, tx, movieID, normalized); err != nil {
 			return err
 		}
-		if err := bumpUserTagRevisionTx(ctx, tx, movieID); err != nil {
-			return err
+		if !sameUserTagSet(currentTags.UserTags, normalized) {
+			if err := bumpUserTagRevisionTx(ctx, tx, movieID); err != nil {
+				return err
+			}
 		}
 	}
 

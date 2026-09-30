@@ -41,10 +41,19 @@ type TagOrganizationJobDTO struct {
 }
 
 // TagOrganizationItemDTO 提供逐片结果，不暴露路径或模型原始输入。
+type TopicEvidenceDTO struct {
+	Topic string `json:"topic"`
+	Field string `json:"field"`
+	Quote string `json:"quote"`
+}
+
+// TagOrganizationItemDTO exposes only validated excerpts and the movie display identity.
 type TagOrganizationItemDTO struct {
-	MovieID string `json:"movieId"`
-	Status  string `json:"status"`
-	Reason  string `json:"reason"`
+	Title    string             `json:"title"`
+	Evidence []TopicEvidenceDTO `json:"evidence"`
+	MovieID  string             `json:"movieId"`
+	Status   string             `json:"status"`
+	Reason   string             `json:"reason"`
 }
 
 // TagOrganizationUndoDTO 明确区分成功恢复和因新修改而跳过的影片。

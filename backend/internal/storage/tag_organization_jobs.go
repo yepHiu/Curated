@@ -31,6 +31,13 @@ func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, 
 			return "", err
 		}
 	}
+	var count int
+	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM ai_tag_organization_items WHERE job_id=?`, id).Scan(&count); err != nil {
+		return "", err
+	}
+	if count == 0 {
+		return "", fmt.Errorf("no eligible movies")
+	}
 	return id, tx.Commit()
 }
 
@@ -83,7 +90,7 @@ func (s *SQLiteStore) ListTagOrganizations(ctx context.Context, active bool) ([]
 
 // UpdateTagOrganization 推进状态，取消状态不能被迟到的运行结果复活。
 func (s *SQLiteStore) UpdateTagOrganization(ctx context.Context, id, status, stage, message string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE ai_tag_organization_jobs SET status=?,stage=?,error=?,revision=revision+1,updated_at=? WHERE id=? AND status!='cancelled'`, status, stage, message, nowUTC(), id)
+	_, err := s.db.ExecContext(ctx, `UPDATE ai_tag_organization_jobs SET status=?,stage=?,error=?,revision=revision+1,updated_at=? WHERE id=? AND status IN ('queued','running')`, status, stage, message, nowUTC(), id)
 	return err
 }
 
@@ -118,9 +125,9 @@ func (s *SQLiteStore) TagOrganizationItems(ctx context.Context, id string, pendi
 	}
 	where := ""
 	if pending {
-		where = " AND status='pending'"
+		where = " AND i.status='pending'"
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT movie_id,status,reason FROM ai_tag_organization_items WHERE job_id=?`+where+` ORDER BY movie_id LIMIT ? OFFSET ?`, id, limit, offset)
+	rows, err := s.db.QueryContext(ctx, `SELECT i.movie_id,i.status,i.reason,COALESCE(m.title,i.movie_id),i.evidence_json FROM ai_tag_organization_items i LEFT JOIN movies m ON m.id=i.movie_id WHERE i.job_id=?`+where+` ORDER BY i.movie_id LIMIT ? OFFSET ?`, id, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +135,11 @@ func (s *SQLiteStore) TagOrganizationItems(ctx context.Context, id string, pendi
 	out := []contracts.TagOrganizationItemDTO{}
 	for rows.Next() {
 		var v contracts.TagOrganizationItemDTO
-		if err = rows.Scan(&v.MovieID, &v.Status, &v.Reason); err != nil {
+		var evidence string
+		if err = rows.Scan(&v.MovieID, &v.Status, &v.Reason, &v.Title, &evidence); err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal([]byte(evidence), &v.Evidence); err != nil {
 			return nil, err
 		}
 		out = append(out, v)
@@ -138,7 +149,7 @@ func (s *SQLiteStore) TagOrganizationItems(ctx context.Context, id string, pendi
 
 // SetTagOrganizationItem 仅记录尚未提交项的失败／待归类，不覆盖成功检查点。
 func (s *SQLiteStore) SetTagOrganizationItem(ctx context.Context, id, movieID, status, reason string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE ai_tag_organization_items SET status=?,reason=? WHERE job_id=? AND movie_id=? AND status='pending'`, status, reason, id, movieID)
+	_, err := s.db.ExecContext(ctx, `UPDATE ai_tag_organization_items SET status=?,reason=? WHERE job_id=? AND movie_id=? AND status='pending' AND EXISTS(SELECT 1 FROM ai_tag_organization_jobs j WHERE j.id=job_id AND j.status='running')`, status, reason, id, movieID)
 	return err
 }
 
@@ -153,7 +164,11 @@ func (s *SQLiteStore) RetryTagOrganization(ctx context.Context, id string) error
 	if err = tx.QueryRowContext(ctx, `SELECT status FROM ai_tag_organization_jobs WHERE id=?`, id).Scan(&status); err != nil {
 		return err
 	}
-	if status == "running" || status == "queued" || status == "completed" {
+	var undone int
+	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM ai_tag_organization_changes WHERE job_id=? AND undone=1`, id).Scan(&undone); err != nil {
+		return err
+	}
+	if undone > 0 || status == "running" || status == "queued" || status == "completed" {
 		return fmt.Errorf("job cannot be retried")
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE ai_tag_organization_items SET status='pending',reason='' WHERE job_id=? AND status IN ('failed','conflict')`, id); err != nil {
@@ -163,4 +178,14 @@ func (s *SQLiteStore) RetryTagOrganization(ctx context.Context, id string) error
 		return err
 	}
 	return tx.Commit()
+}
+
+// SetTopicEvidence checkpoints validated evidence before applying tags, without editing source metadata.
+func (s *SQLiteStore) SetTopicEvidence(ctx context.Context, jobID, movieID, fingerprint string, evidence []contracts.TopicEvidenceDTO) error {
+	data, err := json.Marshal(evidence)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE ai_tag_organization_items SET evidence_json=?,input_fingerprint=? WHERE job_id=? AND movie_id=? AND status='pending' AND EXISTS(SELECT 1 FROM ai_tag_organization_jobs j WHERE j.id=job_id AND j.status='running')`, string(data), fingerprint, jobID, movieID)
+	return err
 }

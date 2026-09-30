@@ -28,7 +28,7 @@ func (r *Registry) Register(def ToolDefinition) error {
 		return fmt.Errorf("tool %q is missing a handler", name)
 	}
 	switch def.Permission {
-	case PermissionRead, PermissionWritePreview, PermissionWriteApply:
+	case PermissionRead, PermissionWritePreview, PermissionWriteApply, PermissionUserTagTask:
 	default:
 		return fmt.Errorf("tool %q has invalid permission %q", name, def.Permission)
 	}

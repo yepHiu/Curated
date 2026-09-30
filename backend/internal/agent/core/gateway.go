@@ -53,6 +53,13 @@ func NewGateway(registry *Registry, confirm *ConfirmStore, audit AuditSink, sett
 	}
 }
 
+// WithRegistry keeps task-only tools private while sharing the process write budget and audit sink.
+func (g *Gateway) WithRegistry(registry *Registry) *Gateway {
+	child := NewGateway(registry, nil, g.audit, g.settings)
+	child.budget = g.budget
+	return child
+}
+
 func (g *Gateway) Invoke(ctx context.Context, call Call) Result {
 	started := g.now()
 	if call.Channel == "" {
@@ -101,9 +108,13 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 		return fail(ErrInvalidArgs, "AI_TOOL_INVALID_ARGS", err.Error()), def.Permission, ResultRejected, "AI_TOOL_INVALID_ARGS"
 	}
 
-	apply := strings.TrimSpace(call.ConfirmTok) != "" && (def.Permission == PermissionWriteApply || def.Apply != nil)
+	taskApply := def.Permission == PermissionUserTagTask && hasUserTagTaskGrant(ctx, call)
+	if def.Permission == PermissionUserTagTask && (!taskApply || settings.Disabled || settings.ReadOnly) {
+		return fail(ErrPermissionDenied, "AI_TOOL_PERMISSION_DENIED", "user tag task grant required"), def.Permission, ResultRejected, "AI_TOOL_PERMISSION_DENIED"
+	}
+	apply := taskApply || strings.TrimSpace(call.ConfirmTok) != "" && (def.Permission == PermissionWriteApply || def.Apply != nil)
 
-	if err := allowCall(def, call, settings); err != nil {
+	if err := allowCall(def, call, settings); err != nil && !taskApply {
 		code := "AI_TOOL_PERMISSION_DENIED"
 		if errors.Is(err, ErrConfirmRequired) || (call.ConfirmTok == "" && def.Permission == PermissionWriteApply) {
 			code = "AI_CONFIRM_REQUIRED"
@@ -128,7 +139,7 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 		}
 	}
 
-	if apply {
+	if apply && !taskApply {
 		preconditions, err := g.confirm.ConsumePreview(call.ConfirmTok, call.SessionID, call.Name, call.Args)
 		if err != nil {
 			return fail(ErrConfirmExpired, "AI_CONFIRM_EXPIRED", err.Error()), def.Permission, ResultRejected, "AI_CONFIRM_EXPIRED"
