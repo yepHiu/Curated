@@ -1,3 +1,4 @@
+import type { TopicLibraryService } from "./topic-service"
 import type { WishlistServiceContract } from "./wishlist-service"
 import type { ComputedRef } from "vue"
 import type {
@@ -74,7 +75,7 @@ export interface ResumableMovieImportSession {
   expiresAt?: string
 }
 
-export interface LibraryService {
+export interface LibraryService extends TopicLibraryService {
   wishlist: WishlistServiceContract
   supportsSourceFrame: boolean
   movies: ComputedRef<readonly Movie[]>

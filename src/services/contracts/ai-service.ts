@@ -1,3 +1,4 @@
+import type { TagOrganizationService } from "./topic-service"
 import type {
   AIActionPreviewDTO,
   AIActionRequestBody,
@@ -68,7 +69,7 @@ export interface AIChatStreamHandlers {
  * 实验性 Agent 服务契约（E3：只读工具 + 会话 + 笔记 Action 确认写）。
  * Web 走 POST /api/ai/chat 的 SSE；Mock 返回假流式与假工具结果。
  */
-export interface AIService {
+export interface AIService extends TagOrganizationService {
   streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHandlers): Promise<void>
   listSessions(): Promise<AIChatSessionDTO[]>
   createSession(title?: string): Promise<AIChatSessionDTO>

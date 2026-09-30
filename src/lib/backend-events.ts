@@ -48,6 +48,7 @@ export function subscribeBackendEvents(
   source.addEventListener("task.updated", (event) => {
     const task = parseTaskUpdatedEvent((event as MessageEvent<string>).data)
     if (task) {
+      if (task.type === "ai.organize-tags") window.dispatchEvent(new Event("curated:tag-organization-updated"))
       options.onTaskUpdated?.(task)
     }
   })

@@ -2352,5 +2352,59 @@
     "webOnly": "This action requires Web API mode.",
     "streamDisabled": "Enable streaming in playback settings first.",
     "retry": "Retry"
+  },
+  "topics": {
+    "heading": "Start with a theme",
+    "organize": "Organize tags with AI",
+    "start": "Organize the library",
+    "explanation": "Organize user tags from movie information. Original NFO tags stay unchanged. Runs in the background; you can stop or undo it.",
+    "completed": "Organized {count} movies",
+    "needsAttention": "Tag organization needs attention. Review the task results.",
+    "disconnected": "Organization status unavailable",
+    "progress": "Organizing · {done}/{total}",
+    "vocabulary": "Building topic vocabulary",
+    "updated": "Topics updated · View",
+    "loading": "Loading topics…",
+    "loadFailed": "Could not load topics. Please retry.",
+    "empty": "Organize user tags to discover movies grouped by theme.",
+    "viewAll": "View all {count}",
+    "cancel": "Stop",
+    "retry": "Retry",
+    "undo": "Undo this organization",
+    "undoResult": "Restored {restored}; skipped {conflicts} with later changes",
+    "trigger": "Started by",
+    "result": "Organized {success} · Unclassified {unresolved} · Failed {failed}",
+    "back": "Back to home",
+    "status": {
+      "queued": "Queued",
+      "running": "Organizing",
+      "blocked": "Needs attention",
+      "completed": "Completed",
+      "partial_failed": "Partially completed",
+      "failed": "Failed",
+      "cancelled": "Stopped"
+    },
+    "reason": {
+      "manual": "Manual request",
+      "import": "New movies",
+      "metadata": "Updated information",
+      "resume": "Resumed organization"
+    },
+    "details": "View evidence",
+    "more": "Load more",
+    "hide": "Hide topic",
+    "itemStatus": {
+      "pending": "Waiting",
+      "succeeded": "Classified; manual exclusions take precedence",
+      "unresolved": "Insufficient evidence; tags preserved",
+      "failed": "Processing failed",
+      "conflict": "Skipped because data or tags changed"
+    },
+    "evidenceField": {
+      "title": "Title",
+      "summary": "Summary",
+      "metadataTags": "Source tag (read only)"
+    },
+    "restore": "Restore topic: {name}"
   }
 }

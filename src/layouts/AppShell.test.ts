@@ -27,6 +27,16 @@ vi.mock("@vueuse/core", async () => {
   }
 })
 
+// Task tracking has its own lifecycle tests; shell tests avoid provider/service initialization.
+vi.mock("@/composables/use-tag-organization", async () => {
+  const { ref } = await vi.importActual<typeof import("vue")>("vue")
+  return {
+    useTagOrganization: () => ({ active: ref(undefined), quiet: ref(false), dialogOpen: ref(false) }),
+    startTagOrganizationTracking: vi.fn(), stopTagOrganizationTracking: vi.fn(),
+  }
+})
+vi.mock("@/components/jav-library/TagOrganizationDialog.vue", () => ({ default: { template: "<div />" } }))
+
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     locale: { value: "zh-CN" },

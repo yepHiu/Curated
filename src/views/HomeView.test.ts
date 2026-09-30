@@ -79,6 +79,11 @@ const listSortedByUpdatedDescMock = vi.hoisted(() =>
   ]),
 )
 
+// Topic tasks are tested separately; homepage model tests must not start service observers.
+vi.mock("@/composables/use-tag-organization", () => ({
+  useTagOrganization: () => ({ revision: ref(0), active: ref(undefined), connected: ref(true), dialogOpen: ref(false) }),
+}))
+
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     locale: ref("en"),

@@ -192,6 +192,10 @@ test("locked startup defers protected hydration until a successful unlock", asyn
       await route.fulfill({ json: { items: [], total: 0, pendingCount: 0 } })
       return
     }
+    if (path === "/api/ai/tag-organizations") {
+      await route.fulfill({ json: { items: [] } })
+      return
+    }
     if (path === "/api/ai/settings") {
       await route.fulfill({ json: { enabled: false } })
       return
@@ -332,6 +336,10 @@ test("maintenance backup flow creates verifies and preflights without online res
     // 侧栏愿望计数与现有 AI 治理启动读取均使用受保护接口。
     if (path === "/api/wishlist/items") {
       await route.fulfill({ json: { items: [], total: 0, pendingCount: 0 } })
+      return
+    }
+    if (path === "/api/ai/tag-organizations") {
+      await route.fulfill({ json: { items: [] } })
       return
     }
     if (path === "/api/ai/settings") {

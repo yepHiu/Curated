@@ -2352,5 +2352,59 @@
     "webOnly": "此操作需要 Web API 模式。",
     "streamDisabled": "请先在播放设置中开启推流。",
     "retry": "重试"
+  },
+  "topics": {
+    "heading": "从一个题材开始逛",
+    "organize": "AI 整理标签",
+    "start": "整理整个片库",
+    "explanation": "根据影片资料整理用户标签，NFO 原始标签保持不变。开始后在后台运行，可取消或撤销。",
+    "completed": "整理完成：已归类 {count} 部",
+    "needsAttention": "标签整理需要处理，请查看任务结果",
+    "disconnected": "整理状态暂不可用",
+    "progress": "正在整理 · {done}/{total} 部",
+    "vocabulary": "正在归纳题材",
+    "updated": "主题已更新 · 查看",
+    "loading": "正在加载题材…",
+    "loadFailed": "无法加载题材，请重试",
+    "empty": "整理用户标签后，相近题材的影片会在这里成组呈现。",
+    "viewAll": "查看全部 {count} 部",
+    "cancel": "停止整理",
+    "retry": "重试",
+    "undo": "撤销本次整理",
+    "undoResult": "已恢复 {restored} 部，因后续修改跳过 {conflicts} 部",
+    "trigger": "触发原因",
+    "result": "已归类 {success} · 待归类 {unresolved} · 失败 {failed}",
+    "back": "返回首页",
+    "status": {
+      "queued": "排队中",
+      "running": "整理中",
+      "blocked": "需要处理",
+      "completed": "已完成",
+      "partial_failed": "部分完成",
+      "failed": "失败",
+      "cancelled": "已停止"
+    },
+    "reason": {
+      "manual": "手动发起",
+      "import": "新增影片",
+      "metadata": "资料更新",
+      "resume": "继续上次整理"
+    },
+    "details": "查看归类依据",
+    "more": "加载更多",
+    "hide": "隐藏题材",
+    "itemStatus": {
+      "pending": "等待整理",
+      "succeeded": "已归类；人工排除会优先保留",
+      "unresolved": "资料不足，未更改标签",
+      "failed": "本次处理失败",
+      "conflict": "资料或标签已变更，已跳过"
+    },
+    "evidenceField": {
+      "title": "标题",
+      "summary": "简介",
+      "metadataTags": "原始标签（只读）"
+    },
+    "restore": "恢复题材：{name}"
   }
 }

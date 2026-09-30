@@ -248,6 +248,18 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
 }
 
 export const mockAIService: AIService = {
+  /** 按需加载模拟资料库，普通聊天不初始化影片偏好状态。 */
+  async listTagOrganizations() { return (await import("./mock-library-service")).mockTopicServices.listTagOrganizations() },
+  /** 整理只由显式动作触发。 */
+  async startTagOrganization(scope, movieIds) { return (await import("./mock-library-service")).mockTopicServices.startTagOrganization(scope, movieIds) },
+  /** 读取模拟结果证据。 */
+  async getTagOrganizationItems(id, offset) { return (await import("./mock-library-service")).mockTopicServices.getTagOrganizationItems(id, offset) },
+  /** 停止模拟任务。 */
+  async cancelTagOrganization(id) { return (await import("./mock-library-service")).mockTopicServices.cancelTagOrganization(id) },
+  /** 重试模拟任务。 */
+  async retryTagOrganization(id) { return (await import("./mock-library-service")).mockTopicServices.retryTagOrganization(id) },
+  /** 撤销模拟用户标签。 */
+  async undoTagOrganization(id) { return (await import("./mock-library-service")).mockTopicServices.undoTagOrganization(id) },
   streamChat,
   async listSessions() {
     return sessions.map((session) => ({

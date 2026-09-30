@@ -2352,5 +2352,59 @@
     "webOnly": "この操作には Web API モードが必要です。",
     "streamDisabled": "再生設定でストリーミングを有効にしてください。",
     "retry": "再試行"
+  },
+  "topics": {
+    "heading": "テーマから探す",
+    "organize": "AI でタグを整理",
+    "start": "ライブラリを整理",
+    "explanation": "作品情報からユーザータグを整理します。元の NFO タグは変更しません。バックグラウンドで実行し、中止・取り消しができます。",
+    "completed": "{count} 本を分類しました",
+    "needsAttention": "タグ整理の結果を確認してください",
+    "disconnected": "整理状況を取得できません",
+    "progress": "整理中 · {done}/{total} 本",
+    "vocabulary": "テーマを整理中",
+    "updated": "テーマ更新 · 表示",
+    "loading": "テーマを読み込み中…",
+    "loadFailed": "テーマを読み込めません。再試行してください。",
+    "empty": "ユーザータグを整理すると、同じテーマの作品がここに表示されます。",
+    "viewAll": "全 {count} 本を見る",
+    "cancel": "中止",
+    "retry": "再試行",
+    "undo": "今回の整理を取り消す",
+    "undoResult": "{restored} 本を復元、後の変更がある {conflicts} 本をスキップ",
+    "trigger": "実行理由",
+    "result": "分類済み {success} · 未分類 {unresolved} · 失敗 {failed}",
+    "back": "ホームへ戻る",
+    "status": {
+      "queued": "待機中",
+      "running": "整理中",
+      "blocked": "確認が必要",
+      "completed": "完了",
+      "partial_failed": "一部完了",
+      "failed": "失敗",
+      "cancelled": "中止済み"
+    },
+    "reason": {
+      "manual": "手動実行",
+      "import": "新しい作品",
+      "metadata": "情報更新",
+      "resume": "前回の整理を再開"
+    },
+    "details": "分類の根拠",
+    "more": "もっと見る",
+    "hide": "題材を非表示",
+    "itemStatus": {
+      "pending": "待機中",
+      "succeeded": "分類済み・手動の除外を優先",
+      "unresolved": "情報不足・タグは保持",
+      "failed": "処理失敗",
+      "conflict": "情報の変更によりスキップ"
+    },
+    "evidenceField": {
+      "title": "タイトル",
+      "summary": "あらすじ",
+      "metadataTags": "元タグ（読み取り専用）"
+    },
+    "restore": "題材を再表示：{name}"
   }
 }

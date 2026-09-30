@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, provide, ref, watch } from "vue"
+import { computed, onMounted, defineAsyncComponent, nextTick, onBeforeUnmount, provide, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vueuse/core"
+import { onClickOutside, onKeyStroke, useFullscreen, useMediaQuery, watchDebounced } from "@vueuse/core"
 import { MessagesSquare, LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
@@ -9,6 +9,8 @@ import ImportMenu from "@/components/jav-library/ImportMenu.vue"
 import DevEnvironmentBadge from "@/components/dev/DevEnvironmentBadge.vue"
 import DevPerformanceBar from "@/components/dev/DevPerformanceBar.vue"
 import { Toaster } from "@/components/ui/sonner"
+import TagOrganizationDialog from "@/components/jav-library/TagOrganizationDialog.vue"
+import { useTagOrganization, startTagOrganizationTracking, stopTagOrganizationTracking } from "@/composables/use-tag-organization"
 import ScanProgressDock from "@/components/jav-library/ScanProgressDock.vue"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -768,6 +770,11 @@ function clearActorsSearch() {
     }),
   })
 }
+const tagOrganization = useTagOrganization()
+const { isFullscreen: topicFullscreen } = useFullscreen()
+watch([() => route.name, topicFullscreen], ([name, fullscreen]) => { /* 播放和全屏只留结果记录。 */ tagOrganization.quiet.value = name === "player" || fullscreen }, { immediate: true })
+onMounted(() => { /* 全局观察任务，不因进入首页触发整理。 */ startTagOrganizationTracking() })
+onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 */ stopTagOrganizationTracking() })
 </script>
 
 <template>
@@ -1039,6 +1046,10 @@ function clearActorsSearch() {
       </div>
     </div>
 
+    <TagOrganizationDialog />
+    <Button v-if="tagOrganization.active.value && !tagOrganization.quiet.value" class="fixed bottom-4 left-4 z-40" variant="secondary" size="sm" @click="tagOrganization.dialogOpen.value = true">
+      {{ t('topics.progress', { done: tagOrganization.active.value.processed, total: tagOrganization.active.value.total }) }}
+    </Button>
     <ScanProgressDock />
     <DevPerformanceBar v-if="isDev" v-model:debug-open="debugOpen" />
     <Toaster :theme="resolvedMode" />

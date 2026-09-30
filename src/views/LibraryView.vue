@@ -3,6 +3,7 @@ import { computed, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { HttpClientError } from "@/api/http-client"
+import type { LibraryTopic } from "@/services/contracts/topic-service"
 import type { PatchMovieBody } from "@/api/types"
 import LibraryBatchActionBar from "@/components/jav-library/LibraryBatchActionBar.vue"
 import LibraryPage from "@/components/jav-library/LibraryPage.vue"
@@ -48,6 +49,15 @@ const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
 const scanTaskTracker = useScanTaskTracker()
+const selectedTopic = ref<LibraryTopic | null>(null)
+const topicLoadError = ref("")
+watch(() => route.query.topicId, async (value) => {
+  // 主题按 user 标签筛选；请求迟到不得回填另一个主题。
+  selectedTopic.value = null; topicLoadError.value = ""
+  if (typeof value !== "string" || !value) return
+  try { const topic = await libraryService.getTopic(value); if (route.query.topicId === value) selectedTopic.value = topic }
+  catch { if (route.query.topicId === value) topicLoadError.value = "Topic unavailable" }
+}, { immediate: true })
 
 const metadataRefreshBusy = ref(false)
 
@@ -666,6 +676,10 @@ const queryFilteredMovies = computed(() => {
     list = list.filter((movie) => movie.actors.includes(actorViaQ))
   }
 
+  if (route.query.topicId) list = selectedTopic.value
+    ? list.filter((movie) => { /* 不能使用 movie.tags 的 NFO 关联。 */ return movie.userTags.includes(selectedTopic.value!.name) })
+    : []
+
   // These revisions make the Saved View result reactive after playback writes or hydrate.
   void playbackProgressRevision.value
   void playedMovieCount.value
@@ -678,7 +692,7 @@ const queryFilteredMovies = computed(() => {
 /** Only filters that affect membership count; sorting and navigation metadata do not. */
 const hasContentConstraints = computed(() => {
   const f = savedViewFilters.value
-  return Boolean(f.q || f.tag || f.actor || f.studio ||
+  return Boolean(route.query.topicId || f.q || f.tag || f.actor || f.studio ||
     (f.playState && f.playState !== "all") || f.userRating !== undefined || f.unrated ||
     f.resolution || f.addedWithinDays !== undefined || f.year || f.runtime || f.catalog)
 })
@@ -752,6 +766,11 @@ const activeStudioForPage = computed(() =>
       >
         {{ libraryLoadError }}
       </p>
+      <div v-if="route.query.topicId" class="mb-4 flex items-center justify-between gap-3">
+        <h2 class="text-lg font-semibold">{{ selectedTopic?.name ?? t('topics.loading') }}</h2>
+        <RouterLink :to="{ name: 'home' }" class="text-sm text-muted-foreground">{{ t('topics.back') }}</RouterLink>
+      </div>
+      <p v-if="topicLoadError" role="alert" class="mb-3 text-sm text-destructive">{{ t('topics.loadFailed') }}</p>
       <LibraryPage
         :mode="libraryMode"
         :visible-movies="visibleMovies"

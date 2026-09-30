@@ -1,3 +1,4 @@
+import { webTagOrganization } from "./web-topic-service"
 import { api } from "@/api/endpoints"
 import { resolveApiBaseUrl } from "@/api/http-client"
 import type {
@@ -256,6 +257,7 @@ async function fetchJSON<T>(path: string, body: unknown, signal: AbortSignal): P
 }
 
 export const webAIService: AIService = {
+  ...webTagOrganization,
   streamChat,
   listSessions: async () => (await api.listAIChatSessions()).items ?? [],
   createSession: (title) => api.createAIChatSession(title),

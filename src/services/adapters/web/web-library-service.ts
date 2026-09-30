@@ -1,3 +1,4 @@
+import { webTopicLibrary } from "./web-topic-service"
 import { webWishlistService } from "./web-wishlist-service"
 import { computed, ref, shallowRef, watch, type Ref } from "vue"
 import { applyAIGovernance } from "@/lib/experimental-agent"
@@ -431,6 +432,7 @@ async function refreshLibraryPathStorageStatusesFromApi() {
 
 function createWebLibraryService(): LibraryService {
   const impl: LibraryService = {
+    ...webTopicLibrary,
     wishlist: webWishlistService,
     supportsSourceFrame: true,
     movies: computed(() => moviesState.value),
