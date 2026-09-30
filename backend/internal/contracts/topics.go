@@ -40,7 +40,7 @@ type TagOrganizationJobDTO struct {
 	Error         string `json:"error,omitempty"`
 }
 
-// TagOrganizationItemDTO 提供逐片结果，不暴露路径或模型原始输入。
+// TopicEvidenceDTO 只提供已核对的原文片段，不暴露路径或完整模型输入。
 type TopicEvidenceDTO struct {
 	Topic string `json:"topic"`
 	Field string `json:"field"`

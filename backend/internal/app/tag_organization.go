@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"curated-backend/internal/agent/core"
+	"curated-backend/internal/agent/run"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/llm"
 	"curated-backend/internal/storage"
@@ -201,7 +202,13 @@ func (a *App) topicComplete(ctx context.Context, prompt string, data any) (raw s
 	if err != nil {
 		return "", err
 	}
-	raw, retErr = c.Complete(ctx, []llm.ChatMessage{{Role: "system", Content: prompt}, {Role: "user", Content: "<source>" + string(encoded) + "</source>"}}, 0)
+	budget := run.BudgetForContext(cfg.ContextWindow)
+	messages := []llm.ChatMessage{{Role: "system", Content: prompt}, {Role: "user", Content: "<source>" + string(encoded) + "</source>"}}
+	serialized, _ := json.Marshal(messages)
+	if len(serialized) > budget.Input {
+		return "", &core.ToolError{Code: "AI_CONTEXT_TOO_LARGE", Message: "Organization input exceeds model context budget"}
+	}
+	raw, retErr = c.Complete(ctx, messages, budget.Output)
 	if retErr == nil && (a.currentAIProviderConfig() != requestedConfig || a.AIGovernanceSettings() != requestedPolicy) {
 		return "", &core.ToolError{Code: "AI_SETTINGS_CHANGED", Message: "AI settings changed during organization"}
 	}
