@@ -31,7 +31,6 @@ const movie: Movie = {
   coverClass: "",
 }
 
-const SlotStub = { template: "<div><slot /></div>" }
 const ButtonStub = {
   inheritAttrs: false,
   props: ["disabled"],
@@ -62,24 +61,8 @@ function mountCard(withFeedback = false) {
     global: {
       stubs: {
         MovieCard: { props: ["movie"], template: "<div>{{ movie.title }}</div>" },
-        Badge: SlotStub,
         Button: ButtonStub,
-        DropdownMenu: SlotStub,
-        DropdownMenuContent: SlotStub,
-        DropdownMenuGroup: SlotStub,
-        DropdownMenuItem: ButtonStub,
-        DropdownMenuLabel: SlotStub,
-        DropdownMenuSeparator: SlotStub,
-        DropdownMenuSub: SlotStub,
-        DropdownMenuSubContent: SlotStub,
-        DropdownMenuSubTrigger: SlotStub,
-        DropdownMenuTrigger: SlotStub,
-        Clock3: true,
-        MoreHorizontal: true,
         RotateCcw: true,
-        Tags: true,
-        ThumbsDown: true,
-        UserRound: true,
       },
     },
   })
@@ -92,18 +75,6 @@ function buttonContaining(wrapper: ReturnType<typeof mountCard>, text: string) {
 }
 
 describe("HomeRecommendationCard", () => {
-  it("emits explicit feedback targets", async () => {
-    const wrapper = mountCard()
-
-    await buttonContaining(wrapper, "home.recommendationNotInterested").trigger("click")
-    expect(wrapper.emitted("submitFeedback")?.[0]).toEqual([{
-      action: "not_interested",
-      targetType: "movie",
-      targetValue: "m01",
-      sourceMovieId: "m01",
-    }])
-  })
-
   it("offers an immediate undo for active feedback", async () => {
     const wrapper = mountCard(true)
     await buttonContaining(wrapper, "home.recommendationUndo").trigger("click")

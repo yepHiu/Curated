@@ -152,7 +152,6 @@ function onHomeTouchMove(event: TouchEvent) {
             :busy="recommendationFeedbackBusy"
             @open-details="emit('openDetails', $event)"
             @open-player="emit('openPlayer', $event)"
-            @submit-feedback="emit('submitRecommendationFeedback', $event)"
             @delete-feedback="emit('deleteRecommendationFeedback', $event)"
           />
         </template>
