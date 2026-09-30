@@ -16,6 +16,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    // Only scan the app entry, not HTML fixtures or generated reports in the workspace.
+    entries: ['index.html'],
+  },
   build: {
     // 单块仅作宽松提醒；分级上限和增长规则统一在 bundle-policy.json。
     chunkSizeWarningLimit: loadPolicy(__dirname).chunkWarningBytes / 1000,
@@ -45,6 +49,9 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
+    watch: {
+      ignored: ['**/.workspace/**', '**/.playwright-cli/**', '**/backend/runtime/**', '**/release/**'],
+    },
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8080',
