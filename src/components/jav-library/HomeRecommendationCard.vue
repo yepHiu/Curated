@@ -8,7 +8,6 @@ import type {
 } from "@/api/types"
 import type { HomepageRecommendationEntry } from "@/lib/homepage-portal"
 import MovieCard from "@/components/jav-library/MovieCard.vue"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -57,13 +56,6 @@ function submit(
     ...(durationDays === undefined ? {} : { durationDays }),
   })
 }
-
-function reasonLabel(index: number) {
-  const reason = props.entry.reasons[index]
-  return reason
-    ? t(`home.recommendationReason.${reason.code}`, { value: reason.entityValue ?? "" })
-    : ""
-}
 </script>
 
 <template>
@@ -79,22 +71,8 @@ function reasonLabel(index: number) {
 
     <div
       data-home-recommendation-meta
-      class="flex min-w-0 items-center gap-1.5 px-0.5"
+      class="flex min-w-0 items-center justify-end gap-1.5 px-0.5"
     >
-      <div
-        data-home-recommendation-tags
-        class="flex min-h-6 min-w-0 flex-1 flex-wrap gap-1.5"
-      >
-        <Badge
-          v-for="(_, index) in entry.reasons.slice(0, 2)"
-          :key="`${movie.id}-${index}`"
-          variant="secondary"
-          class="max-w-full truncate"
-        >
-          {{ reasonLabel(index) }}
-        </Badge>
-      </div>
-
       <div data-home-recommendation-actions class="flex shrink-0 items-center gap-1">
         <Button
           v-if="activeFeedback"
