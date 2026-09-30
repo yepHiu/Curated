@@ -129,6 +129,7 @@ func TestIntegration_RunScan_LegacyExtendedLibraryImportIgnoredAndClearsPending(
 	}
 
 	a := newTestApp(t, store, cfg)
+	defer a.Close() // Drain background tasks before closing SQLite and deleting the fixture.
 	taskID := startScanTask(a, store, ctx, []string{libRoot})
 
 	var buf bytes.Buffer
@@ -194,6 +195,7 @@ func TestIntegration_RunScan_LegacyExtendedLibraryImportIgnoredForExternalLayout
 	}
 
 	a := newTestApp(t, store, cfg)
+	defer a.Close() // Drain background tasks before closing SQLite and deleting the fixture.
 	taskID := startScanTask(a, store, ctx, []string{libRoot})
 	var buf bytes.Buffer
 	a.runScan(ctx, &buf, taskID, []string{libRoot})
@@ -243,6 +245,7 @@ func TestIntegration_RunScan_NoImportLayoutWithoutLegacySetting(t *testing.T) {
 	cfg.OrganizeLibrary = false
 
 	a := newTestApp(t, store, cfg)
+	defer a.Close() // Drain background tasks before closing SQLite and deleting the fixture.
 	taskID := startScanTask(a, store, ctx, []string{libRoot})
 	var buf bytes.Buffer
 	a.runScan(ctx, &buf, taskID, []string{libRoot})
@@ -291,6 +294,7 @@ func TestIntegration_RunScan_DuplicateMovieRootSecondSkipped(t *testing.T) {
 	cfg.OrganizeLibrary = false
 
 	a := newTestApp(t, store, cfg)
+	defer a.Close() // Drain background tasks before closing SQLite and deleting the fixture.
 	taskID := startScanTask(a, store, ctx, []string{libRoot})
 	var buf bytes.Buffer
 	a.runScan(ctx, &buf, taskID, []string{libRoot})
@@ -343,6 +347,7 @@ func TestIntegration_RunScan_MoreThan255MovieDirectories(t *testing.T) {
 	cfg.OrganizeLibrary = false
 
 	a := newTestApp(t, store, cfg)
+	defer a.Close() // Drain background tasks before closing SQLite and deleting the fixture.
 	taskID := startScanTask(a, store, ctx, []string{libRoot})
 	var buf bytes.Buffer
 	a.runScan(ctx, &buf, taskID, []string{libRoot})
@@ -417,6 +422,7 @@ func TestIntegration_RunScan_TrashedLocationDoesNotAbortLaterImports(t *testing.
 	cfg.OrganizeLibrary = false
 
 	a := newTestApp(t, store, cfg)
+	defer a.Close() // Drain background tasks before closing SQLite and deleting the fixture.
 	taskID := startScanTask(a, store, ctx, []string{libRoot})
 	var buf bytes.Buffer
 	a.runScan(ctx, &buf, taskID, []string{libRoot})
