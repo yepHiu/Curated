@@ -115,16 +115,6 @@ async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) 
             {{ actorDisplayName }}
           </h1>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          class="min-h-11 sm:min-h-8"
-          @click="mergeDialogOpen = true"
-        >
-          <GitMerge data-icon="inline-start" aria-hidden="true" />
-          {{ t("actors.merge.openAction") }}
-        </Button>
       </div>
       <p class="text-sm text-muted-foreground">
         {{ t("actors.detailSubtitle") }}
@@ -137,7 +127,20 @@ async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) 
         :actor-name="actorDisplayName"
         :show-clear-filter="false"
         @resolved-name="onActorNameResolved"
-      />
+      >
+        <template #actions>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="min-h-11 rounded-full sm:min-h-8"
+            @click="mergeDialogOpen = true"
+          >
+            <GitMerge data-icon="inline-start" aria-hidden="true" />
+            {{ t("actors.merge.openAction") }}
+          </Button>
+        </template>
+      </ActorProfileCard>
 
       <section class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
         <div class="flex shrink-0 flex-wrap items-end justify-between gap-2">

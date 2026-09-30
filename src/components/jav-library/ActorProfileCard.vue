@@ -329,7 +329,7 @@ onUnmounted(() => {
 
 <template>
   <Card
-    v-if="useWeb"
+    v-if="useWeb || $slots.actions"
     class="gap-3 py-4 sm:py-5 rounded-3xl border-border/70 bg-card/85 shadow-lg shadow-black/5"
   >
     <CardHeader class="gap-2">
@@ -338,8 +338,9 @@ onUnmounted(() => {
           <CardTitle>{{ t("library.actorCardTitle") }}</CardTitle>
         </div>
         <div class="flex shrink-0 flex-wrap items-center gap-2">
+          <slot name="actions" />
           <Button
-            v-if="profile && !initialLoading && !notFound && !loadError"
+            v-if="useWeb && profile && !initialLoading && !notFound && !loadError"
             type="button"
             variant="outline"
             size="sm"
@@ -350,7 +351,7 @@ onUnmounted(() => {
             {{ t("library.editActorInfo") }}
           </Button>
           <Button
-            v-if="profile && !initialLoading && !notFound && !loadError"
+            v-if="useWeb && profile && !initialLoading && !notFound && !loadError"
             type="button"
             variant="secondary"
             size="sm"
