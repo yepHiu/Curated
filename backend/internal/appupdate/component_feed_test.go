@@ -49,3 +49,35 @@ func TestStandaloneServerRejectsLegacyCachedInstaller(t *testing.T) {
 		t.Fatal("rejected matching Server cache")
 	}
 }
+
+func TestServerBatchTagsKeepComponentSemverAndExactDownload(t *testing.T) {
+	for _, tag := range []string{"server-v1.7.7", "release-20261001", "release-20261001-2", "release-20261001-10"} {
+		t.Run(tag, func(t *testing.T) {
+			name := "Curated-Server-Setup-1.7.8-windows-x64.exe"
+			url := "https://github.com/yepHiu/Curated/releases/download/" + tag + "/" + name
+			data, _ := json.Marshal(map[string]any{"schema": 1, "artifacts": []map[string]string{{
+				"component": "server", "variant": "standalone", "channel": "stable", "version": "1.7.8",
+				"platform": "windows", "arch": "x64", "format": "exe", "fileName": name, "url": url, "sha256": strings.Repeat("a", 64),
+			}}})
+			release, err := selectServerRelease(data, "windows", "x64")
+			if err != nil || release.TagName != "1.7.8" || release.Assets[0].BrowserDownloadURL != url {
+				t.Fatalf("batch changed version or download selection: %+v %v", release, err)
+			}
+			if !strings.HasSuffix(release.HTMLURL, "/"+tag) {
+				t.Fatalf("wrong release link: %s", release.HTMLURL)
+			}
+		})
+	}
+}
+
+func TestServerRejectsMalformedAndForeignBatchTags(t *testing.T) {
+	for _, tag := range []string{"release-20260230", "release-20261001-1", "release-20261001-02", "release-20261001-0",
+		"release-20261001183000", "release-20261001/other", "desktop-v1.7.8", "server-vanything", "v1.7.8"} {
+		if validServerReleaseTag(tag) {
+			t.Fatalf("accepted invalid release tag: %s", tag)
+		}
+	}
+	if !strings.HasSuffix(serverFeedURL, "/server-v2.json") {
+		t.Fatal("bridge Server must read the new feed, leaving old clients on the bridge feed")
+	}
+}

@@ -38,7 +38,7 @@ func TestNormalizeReleaseNotesForCache(t *testing.T) {
 	}
 }
 
-func TestPackageVersionUsesDevFallbackVersion(t *testing.T) {
+func TestPackageVersionFallbackMatchesBuildChannel(t *testing.T) {
 	original := version.InstallerVersion
 	version.InstallerVersion = ""
 	t.Cleanup(func() {
@@ -46,8 +46,12 @@ func TestPackageVersionUsesDevFallbackVersion(t *testing.T) {
 	})
 
 	got := version.PackageVersion()
-	if got != "0.0.0" {
-		t.Fatalf("PackageVersion() = %q, want %q", got, "0.0.0")
+	want := "0.0.0"
+	if version.Channel == "release" {
+		want = "" // Unstamped release binaries must not masquerade as installed packages.
+	}
+	if got != want {
+		t.Fatalf("PackageVersion() = %q, want %q", got, want)
 	}
 }
 

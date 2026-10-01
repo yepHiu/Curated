@@ -9,16 +9,31 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"curated-backend/internal/storage"
 	"curated-backend/internal/version"
 )
 
-const serverFeedURL = "https://raw.githubusercontent.com/yepHiu/Curated/release-channels/server.json"
+const serverFeedURL = "https://raw.githubusercontent.com/yepHiu/Curated/release-channels/server-v2.json"
 const serverUpdateSource = "curated-server-stable"
 
 var componentVersionPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 var componentDigestPattern = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
+var batchTagPattern = regexp.MustCompile(`^release-([0-9]{8})(?:-([2-9]|[1-9][0-9]+))?$`)
+var legacyComponentTagPattern = regexp.MustCompile(`^(full|server)-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
+
+func validServerReleaseTag(tag string) bool {
+	if legacyComponentTagPattern.MatchString(tag) {
+		return true
+	}
+	match := batchTagPattern.FindStringSubmatch(tag)
+	if match == nil {
+		return false
+	}
+	_, err := time.Parse("20060102", match[1])
+	return err == nil
+}
 
 type componentManifest struct {
 	Schema    int `json:"schema"`
@@ -71,7 +86,7 @@ func selectServerRelease(data []byte, platform, arch string) (latestReleaseRespo
 		parts := strings.Split(tail, "/")
 		if !componentVersionPattern.MatchString(entry.Version) || !componentDigestPattern.MatchString(entry.SHA256) || entry.FileName != name ||
 			!strings.HasPrefix(entry.URL, prefix) || len(parts) != 2 || parts[1] != name ||
-			!(strings.HasPrefix(parts[0], "full-v") || strings.HasPrefix(parts[0], "server-v")) {
+			!validServerReleaseTag(parts[0]) {
 			return latestReleaseResponse{}, fmt.Errorf("invalid Server update asset")
 		}
 		if result.TagName != "" {

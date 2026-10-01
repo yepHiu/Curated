@@ -7,6 +7,18 @@ const asset = { component: "desktop", variant: "standalone", channel: "stable", 
 const feed = "https://updates.example.com/desktop.json"
 
 describe("Desktop updates", () => {
+  it("finds its component in an earlier batch independently of later Server releases", async () => {
+    const url = "https://github.com/yepHiu/Curated/releases/download/release-20261001/Curated-Desktop-0.2.3-macos-arm64.dmg"
+    const manifest = { schema: 1, artifacts: [{ ...asset, version: "0.2.3", url }] }
+    const desktopFeed = "https://raw.githubusercontent.com/yepHiu/Curated/release-channels/desktop.json"
+    const fetcher = vi.fn().mockImplementation(async () => new Response(JSON.stringify(manifest)))
+    expect(await checkDesktopUpdate({ ...info, version: "0.2.2" }, desktopFeed, fetcher)).toEqual({
+      status: "update-available", latestVersion: "0.2.3", downloadUrl: url,
+    })
+    expect(await checkDesktopUpdate({ ...info, version: "0.2.3" }, desktopFeed, fetcher)).toEqual({ status: "up-to-date" })
+    expect(fetcher.mock.calls.every(([requested]) => requested === desktopFeed)).toBe(true)
+  })
+
   it("selects by component, variant, channel, platform and architecture before comparing numeric versions", () => {
     const artifacts = [asset, { ...asset, version: "0.10.0" }, ...[
       { component: "full" }, { component: "server" }, { variant: "bundle" }, { channel: "dev" },
