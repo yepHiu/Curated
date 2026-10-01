@@ -118,7 +118,7 @@ func (s *SQLiteStore) saveTopicVocabulary(ctx context.Context, jobID string, def
 		id := topicIdentifier(name)
 		// 名称大小写规范化后，优先复用既有题材和对应用户标签。
 		var existing string
-		err = tx.QueryRowContext(ctx, `SELECT id FROM library_topics WHERE id=?`, id).Scan(&existing)
+		err = tx.QueryRowContext(ctx, `SELECT p.id FROM library_topics p JOIN tags t ON t.id=p.tag_id AND t.type='user' WHERE lower(t.name)=lower(?)`, name).Scan(&existing)
 		if err == nil {
 			continue
 		}
@@ -239,9 +239,8 @@ func (s *SQLiteStore) ApplyMovieTopics(ctx context.Context, jobID string, input 
 		set[n] = true
 	}
 	for _, name := range names {
-		id := topicIdentifier(name)
-		var canonical, aliasesRaw string
-		if err = tx.QueryRowContext(ctx, `SELECT t.name,p.aliases_json FROM library_topics p JOIN tags t ON t.id=p.tag_id AND t.type='user' WHERE p.id=?`, id).Scan(&canonical, &aliasesRaw); err != nil {
+		var id, canonical, aliasesRaw string
+		if err = tx.QueryRowContext(ctx, `SELECT p.id,t.name,p.aliases_json FROM library_topics p JOIN tags t ON t.id=p.tag_id AND t.type='user' WHERE lower(t.name)=lower(?)`, name).Scan(&id, &canonical, &aliasesRaw); err != nil {
 			return fmt.Errorf("unknown user topic: %w", err)
 		}
 		var decision string

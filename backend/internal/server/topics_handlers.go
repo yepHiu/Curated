@@ -72,21 +72,29 @@ func (h *Handler) handleListTopics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"items": v})
 }
 
-// handleGetTopic 返回单题材或仅更新隐藏状态。
+// handleGetTopic 返回单题材或显式调整隐藏状态/用户标签名称。
 func (h *Handler) handleGetTopic(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("topicId")
 	if r.Method == http.MethodPatch {
 		var body struct {
-			Hidden *bool `json:"hidden"`
+			Hidden       *bool   `json:"hidden"`
+			Name         *string `json:"name"`
+			ExpectedName *string `json:"expectedName"`
 		}
 		if !decodeTopicRequest(w, r, &body) {
 			return
 		}
-		if body.Hidden == nil {
-			writeAppError(w, 400, contracts.ErrorCodeBadRequest, "hidden required")
+		if (body.Hidden == nil) == (body.Name == nil) || (body.Name != nil && body.ExpectedName == nil) || (body.Hidden != nil && body.ExpectedName != nil) {
+			writeAppError(w, 400, contracts.ErrorCodeBadRequest, "provide hidden or name with expectedName")
 			return
 		}
-		if err := h.store.SetLibraryTopicHidden(r.Context(), id, *body.Hidden); err != nil {
+		var err error
+		if body.Name != nil {
+			err = h.store.RenameLibraryTopic(r.Context(), id, *body.ExpectedName, *body.Name)
+		} else {
+			err = h.store.SetLibraryTopicHidden(r.Context(), id, *body.Hidden)
+		}
+		if err != nil {
 			topicHTTPError(w, err)
 			return
 		}

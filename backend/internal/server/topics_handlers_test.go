@@ -54,3 +54,17 @@ func TestTopicHandlersRejectMetadataWrites(t *testing.T) {
 		t.Fatalf("explicit start failed: %s", response.Body)
 	}
 }
+
+// TestTopicRenameSchema rejects metadata fields and ambiguous edits before touching storage.
+func TestTopicRenameSchema(t *testing.T) {
+	h := &Handler{}
+	for _, body := range []string{`{"name":"Travel"}`, `{"name":"Travel","expectedName":"Trips","hidden":false}`, `{"hidden":true,"expectedName":"Trips"}`, `{"name":"Travel","expectedName":"Trips","metadataTags":[]}`} {
+		req := httptest.NewRequest(http.MethodPatch, "/api/library/topics/topic", strings.NewReader(body))
+		req.SetPathValue("topicId", "topic")
+		response := httptest.NewRecorder()
+		h.handleGetTopic(response, req)
+		if response.Code != 400 {
+			t.Fatalf("invalid rename schema: %d", response.Code)
+		}
+	}
+}
