@@ -1983,7 +1983,6 @@
     "curatedFramesEmpty": "No captured frames for this movie yet.",
     "curatedFramesLoadError": "Could not load captured frames. Please try again.",
     "curatedFrameOpen": "View captured frame at {time}",
-    "previewHelp": "Sample images from metadata scrape; click a thumb to open the viewer (arrow keys). Hotlink blocking may hide images until a proxy exists.",
     "previewAlt": "{code} preview {n}",
     "previewSrOpen": "Open preview {n} in viewer",
     "previewEmpty": "No preview image URLs (text-only scrape or provider omitted art).",

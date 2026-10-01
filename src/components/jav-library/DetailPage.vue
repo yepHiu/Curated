@@ -6,7 +6,6 @@ import type { Movie } from "@/domain/movie/types"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -207,9 +206,6 @@ function openPosterInViewer() {
     <Card class="rounded-3xl border-border/70 bg-card/85">
       <CardHeader>
         <CardTitle>{{ t("detailPage.previewGalleryTitle") }}</CardTitle>
-        <CardDescription>
-          {{ t("detailPage.previewHelp") }}
-        </CardDescription>
       </CardHeader>
 
       <CardContent

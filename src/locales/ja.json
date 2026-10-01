@@ -1983,7 +1983,6 @@
     "curatedFramesEmpty": "この作品のキャプチャフレームはまだありません。",
     "curatedFramesLoadError": "キャプチャフレームを読み込めませんでした。もう一度お試しください。",
     "curatedFrameOpen": "{time} のキャプチャフレームを表示",
-    "previewHelp": "メタデータ由来のサンプル画像。サムネをクリックでビューア（矢印キー）。ホットリンク制限で表示されない場合があります。",
     "previewAlt": "{code} プレビュー {n}",
     "previewSrOpen": "ビューアでプレビュー {n} を開く",
     "previewEmpty": "プレビュー画像 URL がありません。",
