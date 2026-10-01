@@ -451,3 +451,7 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 ### 2026-10-01 用户标签命名
 
 整理请求附界面 `locale`（zh-CN/en/ja，省略默认中文），迁移0060固定任务语言，重试/恢复不变；词汇提示词v3要求自然短名（中文通常2–6字）和独立说明，已有词汇不自动翻译出重复项。`PATCH /api/library/topics/{topicId}` 支持互斥的 `{hidden}` 或 `{name,expectedName}`；改名保留题材/标签ID、关联、人工决定，同步历史标签快照和依据的题材名（不改引用原文），迁移0061保留改名审计，原名作为别名。活动整理、重名/别名冲突、旧名不符拒绝；不开放普通Agent自动全局改名工具。NFO只读，无新增cfg键。
+
+## 2026-10-02 application-owned Picture-in-Picture
+
+`AppShell` provides a scoped `use-playback-host` and lazily loads `ActivePlaybackHost`: one `PlayerPage` owns video/HLS across business routes while native PiP is active. `PlayerView` registers cached/hydrated movies; returning skips prefetch/descriptor recreation. Player and playlist use a source-route snapshot; explicit same-movie `t=` seeks the existing instance. Background controls return/pause/stop; background hotkeys and automatic next-movie navigation are disabled. System PiP close while browsing, Stop, auth lock, new movie, shell/renderer teardown release playback. Non-PiP navigation still stops. `use-picture-in-picture` gates metadata/video readiness, serializes requests, classifies localized errors, ignores repeated P, and cleans late entry after source change/unmount. No HTTP/API/config/IPC changes. See guide “Picture-in-picture across pages” and docs/plan/2026-10-01-picture-in-picture-audit-and-optimization.md.

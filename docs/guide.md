@@ -297,6 +297,14 @@ Movie details also show a **Curated Frames** section below the preview gallery, 
 
 Web frames remain in SQLite; migration 0045 adds stable ordering indexes. Mock IndexedDB upgrades to version 2 and moves full image blobs into a separate store transactionally; frame metadata and directory handles remain available. Measurements and implementation decisions are in [the curated-frame review](plan/2026-04-11-curated-frames-review.md#12-2026-09-06-实施记录与验证).
 
+### Picture-in-picture across pages
+
+Open picture-in-picture after the video has loaded, using the player button or **P**. Unsupported browsers hide the entry; native failures give a short reason and retry guidance. Requests are serialized and holding P does not repeatedly toggle the window.
+
+While the native window is open, browsing other Curated pages retains the same video and HLS session. The page shows a compact return, play/pause and stop control. Returning reuses the active player at its current position; an explicit frame-time link can seek within that same instance. Playback hotkeys are disabled on other pages, and the playlist keeps its original browsing context.
+
+Closing PiP while browsing, pressing Stop, locking the app, switching to another movie, or replacing the server renderer stops and releases the old player. Without PiP, leaving the player stops playback as before. A background movie ending does not navigate away from your current page or automatically open the next movie. Browser/desktop native-window capabilities still vary by platform. See [implementation and verification](plan/2026-10-01-picture-in-picture-audit-and-optimization.md).
+
 ### Playback recovery
 
 Settings → Playback shows hardware acceleration, encoder selection, HLS enablement, test-only forced HLS, and the FFmpeg command only for a verified Server-local Web or Desktop connection (and Mock). Remote or unverified connections keep the everyday native-player and seek-step preferences. Saving from that reduced view omits the hidden infrastructure fields and backend native-player command. Existing preference storage remains unchanged; this is a UI/save-payload boundary, not a new HTTP authorization rule. Locality requires both the request-local health signal and the actual API/Desktop target; older or unreachable servers default to the reduced view.
