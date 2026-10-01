@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import CuratedFrameCard from "@/components/jav-library/CuratedFrameCard.vue"
+import CuratedFrameGrid from "@/components/jav-library/CuratedFrameGrid.vue"
 import CuratedFrameDetailDialog from "@/components/jav-library/CuratedFrameDetailDialog.vue"
 import { listCuratedFramesPage } from "@/lib/curated-frames/db"
 import { curatedFramesRevision } from "@/lib/curated-frames/revision"
@@ -12,7 +13,7 @@ import type { CuratedFrameDialogItem } from "@/lib/curated-frames/dialog-navigat
 import { buildCuratedFrameNearDuplicateIndex, findCuratedFrameNearDuplicateGroups } from "@/lib/curated-frames/near-duplicates"
 import { formatTimecodeLabel } from "@/lib/player-playback-stats-format"
 
-const props = defineProps<{ movieId?: string; actorName?: string }>()
+const props = defineProps<{ movieId?: string; actorName?: string; unframed?: boolean }>()
 const { t } = useI18n()
 const actor = computed(() => props.actorName?.trim() || undefined)
 const scope = computed(() => props.movieId?.trim()
@@ -111,15 +112,29 @@ function applyFrameTags({ id, tags }: { id: string; tags: string[] }) {
 </script>
 
 <template>
-  <Card :data-movie-curated-frames="movieId ? '' : undefined" :data-actor-curated-frames="actor ? '' : undefined" class="min-w-0 rounded-3xl border-border/70 bg-card/85">
-    <CardHeader class="flex flex-wrap items-center justify-between gap-2">
-      <CardTitle>{{ t("curated.title") }}</CardTitle>
+  <component
+    :is="unframed ? 'div' : Card"
+    :data-movie-curated-frames="movieId ? '' : undefined"
+    :data-actor-curated-frames="actor ? '' : undefined"
+    :class="unframed ? 'min-w-0 space-y-3' : 'min-w-0 rounded-3xl border-border/70 bg-card/85'"
+  >
+    <component :is="unframed ? 'div' : CardHeader" class="flex flex-wrap items-center justify-between gap-2">
+      <component :is="unframed ? 'h2' : CardTitle" :class="unframed ? 'text-lg font-semibold tracking-tight' : undefined">{{ t("curated.title") }}</component>
       <span v-if="total > 0" class="text-xs text-muted-foreground">
         {{ t("curated.pageSummary", { shown: entries.length, total }) }}
       </span>
-    </CardHeader>
-    <CardContent class="space-y-4" :aria-busy="loading">
-      <div v-if="entries.length" class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
+    </component>
+    <component :is="unframed ? 'div' : CardContent" class="space-y-4" :aria-busy="loading">
+      <CuratedFrameGrid
+        v-if="unframed && entries.length"
+        :items="entries"
+        :batch-mode="false"
+        :selected-ids="[]"
+        :near-duplicate-ids="nearDuplicateIds"
+        :section-actor="actor"
+        @open="(entry) => frameDialogRef?.open(entry, actor ?? null)"
+      />
+      <div v-else-if="entries.length" class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
         <CuratedFrameCard
           v-for="entry in entries"
           :key="entry.row.id"
@@ -140,8 +155,8 @@ function applyFrameTags({ id, tags }: { id: string; tags: string[] }) {
         <Button variant="outline" @click="loadMore">{{ t("curated.retryLoad") }}</Button>
       </div>
       <Button v-else-if="hasMore" variant="outline" :disabled="loading" @click="loadMore">{{ t("curated.loadMore") }}</Button>
-    </CardContent>
-  </Card>
+    </component>
+  </component>
 
   <CuratedFrameDetailDialog
     :key="scopeKey"

@@ -182,9 +182,9 @@ async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) 
             data-actor-frames-region
             tabindex="-1"
             :aria-label="t('curated.title')"
-            class="scroll-mt-3 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            class="scroll-mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <CuratedFramesSection :key="profileRevision" :actor-name="actorDisplayName" />
+            <CuratedFramesSection :key="profileRevision" :actor-name="actorDisplayName" unframed />
           </section>
         </template>
       </VirtualMovieMasonry>
