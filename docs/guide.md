@@ -43,13 +43,15 @@ Longer product and architecture writing:
 
 ### AI user tags and homepage topics
 
-On the home page, open **AI 整理标签 / Organize tags**, then explicitly start the library task. Configure and enable AI first, with read-only mode off. The task reads titles, summaries and source tags through the configured provider; it only changes **user tags**. It never writes NFO tags or NFO files. Simply browsing, playing or favoriting movies does not start a task. There is no automatic incremental trigger in this first version.
+On the home page, open **AI 整理标签 / Organize tags**, then explicitly start the library task. Configure and enable AI first, with read-only mode off. The task reads titles, summaries and source tags through the configured provider; it only changes **user tags**. It never writes NFO tags or NFO files. New AI topic names follow the interface language captured when the task starts (Chinese, English or Japanese), and prefer concise subject terms; changing the interface later does not rename saved tags or change a running task’s language. Simply browsing, playing or favoriting movies does not start a task. There is no automatic incremental trigger in this first version.
 
 The server stores task progress independently of the browser. Preparation now shows how many movies have been analyzed, saves each vocabulary batch and resumes it after retry/restart; classification progress and waits for the shared write quota are shown separately. Failed tasks/items show a specific reason without exposing raw provider errors. You can stop, retry failures, review per-movie evidence or undo a batch. Stop preserves committed results. Undo skips movies edited afterwards; manual exclusions take precedence on subsequent organization. Reconnecting restores status without replaying completion toasts; playback/fullscreen suppresses popups. A completed organization can be undone even if it created no visible homepage group.
 
 Home shows up to three topics with six representative posters each; a movie can belong to several topics. **View all** filters the movie library using user tags only. Existing recommendation feedback also applies to representative selection. Hidden topics can be restored in the organization panel. Completed changes offer an explicit refresh so existing rows do not jump while browsing. Mock uses deterministic source-tag examples and localStorage, with no model request; real persistence requires Web API mode.
 
-Natural-language chat initiation, automatic incremental organization, detail-page recommendations, global topic rename/merge and real-provider classification quality acceptance remain pending. See [implementation and limitations](plan/2026-08-19-agent-user-prd.md#11-2026-10-01-实施记录代码已落地真实模型质量待验收).
+Explicit topic renaming is available through `PATCH /api/library/topics/{topicId}` with `{name, expectedName}`. It preserves IDs, membership, manual decisions and undo meaning, stores a naming audit and retains the old name as an alias. Live organization tasks, stale names and label/alias conflicts reject the edit; it never merges unrelated tags. The current UI does not expose this API as an automatic rename action.
+
+Natural-language chat initiation, automatic incremental organization, detail-page recommendations, automatic bulk topic localization/merge and real-provider classification quality acceptance remain pending. See [implementation and limitations](plan/2026-08-19-agent-user-prd.md#11-2026-10-01-实施记录代码已落地真实模型质量待验收).
 
 ### AI settings and governance
 

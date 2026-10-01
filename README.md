@@ -19,7 +19,7 @@
 
 # Curated
 
-Browse by subject with [AI user-tag organization](docs/guide.md#ai-user-tags-and-homepage-topics): explicit background tasks with resumable preparation progress and NFO tags kept read-only.
+Browse by subject with [AI user-tag organization](docs/guide.md#ai-user-tags-and-homepage-topics): explicit background tasks with resumable preparation progress, concise labels in your interface language, and NFO tags kept read-only.
 
 Server uses a dark icon background; Desktop uses soft off-white (`#F5F6F8`), with the same central artwork. See [brand guidelines](docs/reference/curated-brand-guidelines.md) and [asset preview](icon/brand/index.html).
 

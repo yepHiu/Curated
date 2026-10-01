@@ -3646,12 +3646,12 @@ All endpoints use the existing authenticated/unlocked API boundary. No endpoint 
 |---|---|---|
 | GET | `/api/library/topics?limit=100&offset=0` | Paged topic array `{items}` |
 | GET | `/api/library/topics/{topicId}` | Topic and active member count |
-| PATCH | `/api/library/topics/{topicId}` | Only `{hidden: boolean}` |
+| PATCH | `/api/library/topics/{topicId}` | Either `{hidden: boolean}` or `{name: string, expectedName: string}`; user-only rename preserves IDs, rejects active jobs/conflicts, retains old name as alias and records audit |
 | GET | `/api/library/movies?topicId=...` | User-topic membership plus existing filters |
 | GET | `/api/homepage/topics` | At most three groups of six posters `{items}` |
 | GET | `/api/ai/tag-organizations` | Latest 50 persistent jobs `{items}` |
-| POST | `/api/ai/tag-organizations` | `{scope:"all"|"selected",movieIds?:string[],requestId:string}`; 202 job; selected 1–600 |
-| GET | `/api/ai/tag-organizations/{jobId}` | Persistent progress/counters; `vocabularyProcessed`, `vocabularyReady`; stage includes `vocabulary`, `classifying`, `applying`, `waiting_quota` |
+| POST | `/api/ai/tag-organizations` | `{scope:"all"|"selected",movieIds?:string[],requestId:string,locale?:"zh-CN"|"en"|"ja"}`; 202 job; selected 1–600 |
+| GET | `/api/ai/tag-organizations/{jobId}` | Persistent progress/counters; frozen `locale` (default zh-CN), `vocabularyProcessed`, `vocabularyReady`; stage includes `vocabulary`, `classifying`, `applying`, `waiting_quota` |
 | GET | `/api/ai/tag-organizations/{jobId}/items?limit=25&offset=0` | Paged result/evidence records `{items}` |
 | POST | `/api/ai/tag-organizations/{jobId}/cancel` | Stop and retain committed results |
 | POST | `/api/ai/tag-organizations/{jobId}/retry` | Resume pending/failed/conflicting items |
