@@ -112,6 +112,8 @@
     "actors": "Actors",
     "trash": "Trash",
     "continuePlayback": "Continue playing",
+    "currentPlaybackAria": "Return to the player for {title}, picture-in-picture at {time}",
+    "currentPlaybackAt": "Playing at {time}",
     "continuePlaybackAt": "Last watched at {time}",
     "continuePlaybackAria": "Return to the player and continue {title} at {time}",
     "dismissContinuePlayback": "Hide continue playing",
@@ -1937,7 +1939,7 @@
     "pip": "Picture-in-picture",
     "ariaPlay": "Play",
     "ariaPause": "Pause",
-    "backgroundPlayback": "Picture-in-picture · Return to player",
+    "backgroundPlayback": "Picture-in-picture",
     "stopBackgroundPlayback": "Stop picture-in-picture playback",
     "pipError": {
       "notReady": "Video is not ready. Wait for it to load and try again.",

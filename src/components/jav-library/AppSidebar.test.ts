@@ -94,6 +94,7 @@ vi.mock("@/lib/playback-progress-storage", () => ({
 vi.mock("@/composables/use-active-playback-session", () => ({
   useActivePlaybackSession: () => ({
     activePlaybackSession: activePlaybackSessionState,
+    playbackSessionSnapshot: activePlaybackSessionState,
     dismissActivePlaybackSession: vi.fn(),
   }),
 }))

@@ -112,6 +112,8 @@
     "actors": "出演者",
     "trash": "ゴミ箱",
     "continuePlayback": "再生を続ける",
+    "currentPlaybackAria": "「{title}」のプレーヤーに戻る、画中画の再生位置 {time}",
+    "currentPlaybackAt": "再生位置 {time}",
     "continuePlaybackAt": "{time} まで再生",
     "continuePlaybackAria": "プレイヤーに戻って「{title}」を {time} から再生します",
     "dismissContinuePlayback": "再生再開の表示を隠す",
@@ -1937,7 +1939,7 @@
     "pip": "ピクチャーインピクチャー",
     "ariaPlay": "再生",
     "ariaPause": "一時停止",
-    "backgroundPlayback": "画中画再生 · プレーヤーに戻る",
+    "backgroundPlayback": "画中画再生",
     "stopBackgroundPlayback": "画中画再生を停止",
     "pipError": {
       "notReady": "動画の準備ができていません。読み込み後にもう一度お試しください。",

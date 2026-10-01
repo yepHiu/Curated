@@ -1,10 +1,11 @@
 import { flushPromises, mount } from "@vue/test-utils"
-import { defineComponent, h, nextTick } from "vue"
+import { defineComponent, h, nextTick, ref } from "vue"
 import { createMemoryHistory, createRouter, RouterView, useRoute } from "vue-router"
 import { providePlaybackHost, type PlaybackHost } from "@/composables/use-playback-host"
 import { removeProgress } from "@/lib/playback-progress-storage"
 import { clearActivePlaybackSession } from "@/composables/use-active-playback-session"
 import ActivePlaybackHost from "./ActivePlaybackHost.vue"
+import SidebarPlaybackEntry from "./SidebarPlaybackEntry.vue"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { Movie } from "@/domain/movie/types"
 
@@ -190,12 +191,13 @@ async function mountHost(mode: "direct" | "hls" = "direct") {
   ] })
   await router.push("/player/movie-1?back=browse&tag=original")
   await router.isReady()
+  const compact = ref(false)
   let host!: PlaybackHost
   const wrapper = mount(defineComponent({
     /** 复制壳层拓扑：路由视图和持续播放宿主互为兄弟，导航只替换前者。 */
     setup() {
       host = providePlaybackHost(useRoute())
-      return () => { /* 独立渲染宿主，视频节点不因路由导航重新创建。 */ return h("main", [h(RouterView), host.target.value ? h(ActivePlaybackHost, { host }) : null]) }
+      return () => { /* 独立渲染宿主，视频节点不因路由导航重新创建。 */ return h("main", [h(SidebarPlaybackEntry, { compact: compact.value }), h(RouterView), host.target.value ? h(ActivePlaybackHost, { host }) : null]) }
     },
   }), { global: { plugins: [router], stubs: { Teleport: true, Transition: true } } })
   await flushPromises()
@@ -213,7 +215,7 @@ async function mountHost(mode: "direct" | "hls" = "direct") {
   Object.defineProperty(video, "buffered", { configurable: true, value: { length: 1, start: () => { /* 已缓存时间起点。 */ return 0 }, end: () => { /* 足够的起播缓冲。 */ return 7200 } } })
   video.play = vi.fn(async () => { /* 原生播放成功后派发媒体事件。 */ paused = false; video.dispatchEvent(new Event("play")) })
   video.pause = vi.fn(() => { /* 暂停同步事件供宿主和观看时长跟踪使用。 */ paused = true; video.dispatchEvent(new Event("pause")) })
-  return { wrapper, video, host, router, destroy }
+  return { wrapper, video, host, router, destroy, compact }
 }
 
 /** 模拟系统已进入小窗，保留原生标准所属元素与事件。 */
@@ -256,17 +258,18 @@ describe("application-owned playback", () => {
     expect(test.wrapper.get("video").element).toBe(test.video)
     expect(test.video.currentTime).toBe(42)
     expect(test.wrapper.get("[data-active-player-host]").attributes("inert")).toBeDefined()
-    expect(test.wrapper.find("[data-background-playback]").exists()).toBe(true)
+    expect(test.wrapper.find("[data-active-playback-controls]").exists()).toBe(true)
+    expect(test.wrapper.find("[data-background-playback]").exists()).toBe(false)
     expect(test.host.playerRoute.query.tag).toBe("original")
     expect(test.host.pipActive.value).toBe(true)
     expect(test.destroy).not.toHaveBeenCalled()
     expect(serviceMocks.deletePlaybackSession).not.toHaveBeenCalled()
-    await test.router.push("/player/movie-1?back=browse&tag=original")
+    await test.wrapper.get("[data-active-playback-card]").trigger("click")
     await flushPromises()
     expect(test.wrapper.get("video").element).toBe(test.video)
     expect(serviceMocks.getMoviePlayback).toHaveBeenCalledTimes(1)
     expect(serviceMocks.prefetchMoviePlayback).toHaveBeenCalledTimes(1)
-    expect(test.wrapper.find("[data-background-playback]").exists()).toBe(false)
+    expect(test.wrapper.find("[data-active-playback-controls]").exists()).toBe(false)
     expect(test.wrapper.get("[data-active-player-host]").attributes("inert")).toBeUndefined()
     test.wrapper.unmount()
     await flushPromises()
@@ -333,7 +336,7 @@ describe("application-owned playback", () => {
     test.wrapper.unmount()
   })
   // 后台控制采用同一个 video，暂停及恢复不创建新会话。
-  it("pauses and resumes from the background dock", async () => {
+  it("pauses and resumes from the unified sidebar entry", async () => {
     const test = await mountHost("hls")
     await enterPip(test.video)
     await test.router.push("/library")
@@ -346,6 +349,32 @@ describe("application-owned playback", () => {
     expect(test.video.pause).toHaveBeenCalled()
     expect(test.host.playing.value).toBe(false)
     expect(serviceMocks.createPlaybackSession).not.toHaveBeenCalled()
+    test.wrapper.unmount()
+  })
+
+  // 收起侧栏仍能控制同一实例；起播与近结尾不能沿用续播隐藏规则丢失控制。
+  it("keeps compact sidebar controls before resume eligibility and near the end", async () => {
+    const test = await mountHost("hls")
+    test.video.currentTime = 1
+    await test.wrapper.get("video").trigger("timeupdate")
+    await enterPip(test.video)
+    await test.router.push("/library")
+    test.compact.value = true
+    await flushPromises()
+    expect(test.wrapper.find("[data-active-playback-compact]").exists()).toBe(true)
+    expect(test.wrapper.find("[data-active-playback-dismiss]").exists()).toBe(false)
+    await test.wrapper.get('button[aria-label="player.ariaPlay"]').trigger("click")
+    await flushPromises()
+    expect(test.video.play).toHaveBeenCalledTimes(1)
+    expect(test.router.currentRoute.value.name).toBe("library")
+    test.video.currentTime = 7100
+    await test.wrapper.get("video").trigger("timeupdate")
+    expect(test.wrapper.find("[data-active-playback-controls]").exists()).toBe(true)
+    expect(test.wrapper.get("[data-active-playback-compact]").attributes("title")).toContain("1:58:20")
+    await test.wrapper.get('button[aria-label="player.stopBackgroundPlayback"]').trigger("click")
+    await flushPromises()
+    expect(test.wrapper.find("video").exists()).toBe(false)
+    expect(test.wrapper.find("[data-active-playback-controls]").exists()).toBe(false)
     test.wrapper.unmount()
   })
 

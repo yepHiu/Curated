@@ -181,6 +181,8 @@ export function dismissActivePlaybackSession(movieId?: string) {
 export function useActivePlaybackSession() {
   return {
     activePlaybackSession,
+    // 活动小窗使用完整快照，起播和近结尾的续播隐藏规则不能移除其控制入口。
+    playbackSessionSnapshot: computed<ActivePlaybackSession | null>(() => storedActivePlaybackSession.value),
     dismissActivePlaybackSession,
   }
 }

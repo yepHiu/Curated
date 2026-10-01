@@ -112,6 +112,8 @@
     "actors": "演员",
     "trash": "回收站",
     "continuePlayback": "继续播放",
+    "currentPlaybackAria": "返回播放器《{title}》，小窗播放至 {time}",
+    "currentPlaybackAt": "播放至 {time}",
     "continuePlaybackAt": "刚才播放至 {time}",
     "continuePlaybackAria": "回到播放页继续播放《{title}》，刚才播放至 {time}",
     "dismissContinuePlayback": "隐藏继续播放入口",
@@ -1937,7 +1939,7 @@
     "pip": "画中画",
     "ariaPlay": "播放",
     "ariaPause": "暂停",
-    "backgroundPlayback": "小窗播放 · 返回播放器",
+    "backgroundPlayback": "小窗播放",
     "stopBackgroundPlayback": "停止小窗播放",
     "pipError": {
       "notReady": "视频尚未就绪，请等待画面加载后重试。",

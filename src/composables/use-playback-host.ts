@@ -15,6 +15,7 @@ export const playbackHostKey: InjectionKey<PlaybackHost> = Symbol("curated-playb
 /** 由应用壳层拥有一个活动播放器；只在原生 PiP 存在时跨业务路由保留。 */
 export function createPlaybackHost(route: RouteLocationNormalizedLoaded) {
   let stopMedia: (() => void) | null = null
+  let toggleMedia: (() => Promise<void>) | null = null
   const target = shallowRef<HostedPlaybackTarget | null>(null)
   const pipActive = ref(false)
   const playing = ref(false)
@@ -46,10 +47,20 @@ export function createPlaybackHost(route: RouteLocationNormalizedLoaded) {
     if (clearSnapshot && movieId) clearActivePlaybackSession(movieId)
   }
 
-  /** 宿主绑定立即停止操作，作用域销毁时撤销注册。 */
-  function registerMediaStop(callback: () => void) {
-    stopMedia = callback
-    return () => { /* 只移除自己注册的操作，避免旧宿主影响后继宿主。 */ if (stopMedia === callback) stopMedia = null }
+  /** 宿主绑定媒体停止及播放切换操作，作用域销毁时撤销注册。 */
+  function registerMediaControls(controls: { stop: () => void; toggle: () => Promise<void> }) {
+    stopMedia = controls.stop
+    toggleMedia = controls.toggle
+    return () => {
+      // 只移除自己注册的操作，避免旧宿主影响后继宿主。
+      if (stopMedia === controls.stop) stopMedia = null
+      if (toggleMedia === controls.toggle) toggleMedia = null
+    }
+  }
+
+  /** 侧栏与播放器通过同一宿主操作媒体，不需要跨组件持有 video 引用。 */
+  async function togglePlayback() {
+    await toggleMedia?.()
   }
 
   /** 只接收当前实例事件，迟到的旧播放器退出事件不能关闭新影片。 */
@@ -85,7 +96,7 @@ export function createPlaybackHost(route: RouteLocationNormalizedLoaded) {
     stop()
   })
 
-  return { target, pipActive, playing, visible, playerRoute, hasMovie, start, stop, registerMediaStop, setPipActive, setPlaying }
+  return { target, pipActive, playing, visible, playerRoute, hasMovie, start, stop, registerMediaControls, togglePlayback, setPipActive, setPlaying }
 }
 
 /** 在壳层提供作用域内的播放所有权，不跨服务器或重新挂载的应用共享实例。 */
