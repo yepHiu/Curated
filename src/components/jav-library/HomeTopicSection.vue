@@ -25,11 +25,6 @@ async function refresh() {
   catch { failed.value = true }
   finally { loading.value = false }
 }
-/** 隐藏只改变首页呈现，影片标签保持原样。 */
-async function hide(id: string) {
-  try { await library.setTopicHidden(id, true); groups.value = groups.value.filter((g) => { /* 即时移除当前组。 */ return g.topic.id !== id }); emit("loaded", groups.value.length) }
-  catch { failed.value = true }
-}
 /** 打开稳定主题路由，影片属性筛选与源标签隔离。 */
 function browse(id: string) { void router.push({ name: "library", query: { topicId: id } }) }
 onMounted(() => { /* 浏览只读已有结果。 */ void refresh() })
@@ -54,7 +49,11 @@ watch(state.revision, () => { /* 通知可用更新，不抢滚动位置。 */ i
     <p v-else-if="groups.length === 0" class="text-sm text-muted-foreground">{{ t("topics.empty") }}</p>
     <div v-if="groups.length > 0" class="flex flex-col gap-8 lg:gap-10">
       <HomeSectionRow v-for="group in groups" :key="group.topic.id" :title="group.topic.name" :movies="group.movies" @open-details="emit('openDetails', $event)" @open-player="emit('openPlayer', $event)">
-        <template #action><Button variant="ghost" size="sm" class="min-h-11 sm:min-h-8" @click="hide(group.topic.id)">{{ t("topics.hide") }}</Button><Button variant="ghost" size="sm" class="min-h-11 sm:min-h-8" @click="browse(group.topic.id)">{{ t("topics.viewAll", { count: group.topic.movieCount }) }} →</Button></template>
+        <template #action>
+          <Button variant="ghost" size="sm" class="min-h-11 sm:min-h-8" @click="browse(group.topic.id)">
+            {{ t("topics.viewAll", { count: group.topic.movieCount }) }} →
+          </Button>
+        </template>
       </HomeSectionRow>
     </div>
   </section>
