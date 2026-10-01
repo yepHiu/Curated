@@ -181,3 +181,8 @@ The main implementation decision before Phase 2 is route shape:
 - 新增中英日演员空状态，无新增 API、配置或数据库迁移。
 - 验证：演员页、通用帧区块、虚拟网格、影片详情和词典共 33 项测试通过；类型检查与相关 ESLint 通过。浏览器使用拦截请求的合成帧验证按钮滚动/焦点、演员筛选、12→13 分页、共享弹窗；真实空帧库状态已检查，未写入真实资料库。
 - 浏览器截图保存在 `.workspace/actor-frames-desktop.png` 和 `.workspace/actor-frames-mobile.png`，未运行完整 display scaling 套件。
+
+### 后续调整：资料卡随内容滚动
+
+- 将演员资料卡与影片标题放入 `VirtualMovieMasonry` 现有 header slot，与影片、萃取帧共用滚动区域，释放窄屏浏览空间；空影片状态也沿用此结构。
+- 保留滚动位置恢复和萃取帧跳转。相关 11 项测试、类型检查、局部 ESLint 通过；浏览器在 375px / 1440px 宽度确认资料卡随滚动移动，跳转焦点正常。未运行完整 display scaling 套件。
