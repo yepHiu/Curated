@@ -21,6 +21,8 @@
 
 Browse by subject with [AI user-tag organization](docs/guide.md#ai-user-tags-and-homepage-topics): explicit background tasks with resumable preparation progress, concise labels in your interface language, and NFO tags kept read-only.
 
+AI prompt text is maintained as [independent TXT resources](docs/guide.md#ai-prompt-txt-resources) embedded in the Server.
+
 Server uses a dark icon background; Desktop uses soft off-white (`#F5F6F8`), with the same central artwork. See [brand guidelines](docs/reference/curated-brand-guidelines.md) and [asset preview](icon/brand/index.html).
 
 Desktop can add servers through an in-page Settings dialog, and manage or switch saved connections from Settings or the tray. See [Desktop server connections](docs/guide.md#desktop-server-connections).

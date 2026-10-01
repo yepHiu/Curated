@@ -591,5 +591,13 @@
 <tr><td>首页题材</td><td>已实现；3×6、稳定路由、user-only 成员、隐藏恢复、低打扰状态</td></tr>
 <tr><td>自动增量 / 聊天发起 / 详情推荐</td><td>待实施</td></tr>
 <tr><td>真实分类质量</td><td>待受控资料和真实 Provider 验收</td></tr></tbody></table></section>
+<section><h2>AI 独立 TXT 提示词 · 2026-10-02</h2>
+<p>提示词正文集中在 <code>backend/internal/agent/prompts/*.txt</code>，参考 OpenCode 将文本与加载代码分离。<code>templates.go</code> 通过 Go embed 一次解析，严格检查缺失变量，源资料不二次求值；Go 继续投影动态数据并执行输出校验与写权限。独立 TXT 编辑后须重新编译、重启 Server。</p>
+<table><thead><tr><th>能力</th><th>当前实现</th></tr></thead><tbody>
+<tr><td>TXT 正文与统一加载</td><td>已实现；14 个资源覆盖聊天/上下文、题材整理、独立动作、摘要/纠正与探针；system.md 迁至 system.txt</td></tr>
+<tr><td>迁移行为一致性</td><td>保留原规则、消息角色及版本；题材正文与审计版本一起传递；逐字节基线和缺变量检查</td></tr>
+<tr><td>交付方式</td><td>编译进 Server，不依赖运行目录，无新 API/配置/数据库迁移</td></tr>
+<tr><td>任务固定模板版本 / 在线编辑 / 模型变体</td><td>待实施；本次不提供热更新</td></tr>
+</tbody></table></section>
 </body>
 </html>

@@ -358,7 +358,7 @@ MCP 是独立发布单元，不能因尚未完成批量能力而阻塞，也不�
 
 #### System Prompt v2 guardrail design
 
-`agent-system-v2` 已以可评审的 [system.md](../../backend/internal/agent/prompts/system.md) 外置，并由 Go `embed` 加载；动态页面上下文继续保留在 Go 层投影，避免浏览器数据直接混入静态提示词。它保留工具调用、未信任 `<source>`、本轮实体锚定、库内外边界和 preview → confirm 写入边界，**不以增加大量逐工具指令的方式重写**。
+`agent-system-v2` 已以可评审的 [system.txt](../../backend/internal/agent/prompts/system.txt)（2026-10-02 从 system.md 迁移）外置，并由 Go `embed` 加载；动态页面上下文继续保留在 Go 层投影，避免浏览器数据直接混入静态提示词。它保留工具调用、未信任 `<source>`、本轮实体锚定、库内外边界和 preview → confirm 写入边界，**不以增加大量逐工具指令的方式重写**。
 
 建议将提示词明确分为以下短小、互不重复的段落：
 
@@ -741,7 +741,7 @@ Remove-Item Env:CURATED_AI_EVAL_SETTINGS
 
 用户反馈 Agent 有时编造番号。本节为代码审查后的改进建议，尚未复现用户具体会话，也未实施运行时代码修改。
 
-- `backend/internal/agent/prompts/system.md` 已要求不编造事实、仅使用本轮工具或验证后的页面实体。这是模型行为指引，不能构成强制保证。
+- `backend/internal/agent/prompts/system.txt`（原 system.md）已要求不编造事实、仅使用本轮工具或验证后的页面实体。这是模型行为指引，不能构成强制保证。
 - `backend/internal/agent/tools/present.go` 在 `present_movies` 中通过 MovieRefStore 检查 ID，并从记录填入 code/title；但模型提供的 reason 仍是自由文本。
 - `backend/internal/agent/run/loop.go` 将模型正文直接通过 text_delta 发送，也直接发送 thinking_delta；尚无正文番号与本轮证据核对关卡。
 - `backend/internal/app/agent_runtime.go` 累积 text_delta 保存为 assistant 正文，历史正文以后会重新进入模型窗口。未验证的旧回答存在被继续引用的风险。

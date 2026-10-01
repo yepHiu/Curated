@@ -716,3 +716,8 @@ All endpoints use the existing authenticated/unlocked API boundary. No endpoint 
 | POST | `/api/ai/tag-organizations/{jobId}/undo` | `{restored,conflicts}`; later manual edits are preserved |
 
 Unknown input fields/trailing JSON return 400; disabled/read-only AI returns 403; missing job/topic 404; unavailable operation/state returns 409; GET never mutates tasks. No automatic schedule/config fields are added. AI task writes use an internal job-bound gateway, shared write budget and audit; ordinary chat/MCP cannot invoke this apply capability. Invalid or unsupported evidence does not clear user tags.
+
+
+## AI prompt TXT resources (2026-10-02)
+
+Built-in model instructions now use 14 independent `backend/internal/agent/prompts/*.txt` files. `templates.go` embeds/parses them once with strict missing-variable checks; Go retains bounded context projection and output/write validation. Source values are rendered once and never interpreted as templates. `system.md` moved to `system.txt`; topic calls carry text and their existing audit version together. Existing prompt text, roles and versions are preserved. TXT edits require rebuilding/restarting Server, with no hot reload, new API, configuration key or migration. Task-level immutable prompt snapshots remain pending. See `docs/guide.md` → AI prompt TXT resources for the file map and editing/testing procedure.

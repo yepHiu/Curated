@@ -53,6 +53,22 @@ Explicit topic renaming is available through `PATCH /api/library/topics/{topicId
 
 Natural-language chat initiation, automatic incremental organization, detail-page recommendations, automatic bulk topic localization/merge and real-provider classification quality acceptance remain pending. See [implementation and limitations](plan/2026-08-19-agent-user-prd.md#11-2026-10-01-实施记录代码已落地真实模型质量待验收).
 
+### AI prompt TXT resources
+
+Built-in AI prompt text lives in `backend/internal/agent/prompts/*.txt`, following OpenCode's separation of text assets and loading code. `templates.go` embeds and parses those files once; Go call sites supply bounded context and source data. Installed Server binaries need no external prompt directory. Editing a TXT in the source tree requires rebuilding and restarting the Server; prompts are not hot-reloaded.
+
+| Purpose | TXT files |
+|---|---|
+| Chat and bounded page context | `system.txt`, `response-language.txt`, `page-context.txt`, `active-filters.txt`, `mentions.txt` |
+| Topic organization | `topic-vocabulary.txt`, `topic-classification.txt` |
+| Polish, display translation, insights | `polish-comment.txt`, `translate-display.txt`, `insights-narrative.txt` |
+| Memory and recovery | `memory-checkpoint.txt`, `answer-correction.txt`, `history-omitted.txt` |
+| Provider connectivity probe | `provider-probe.txt` |
+
+Templates use Go `text/template` fields such as `{{.Source}}`, `{{.Locale}}`, `{{.Kind}}` and `{{.Context}}`. Keep the required fields for each call site. Missing fields fail explicitly; inserted source text is never parsed as another template. The loader removes one final file newline and preserves other whitespace. The migration retains existing model-facing text, message roles and prompt versions; topic calls now receive their text and audit version together. Output validation, write permissions and NFO isolation remain enforced by Go.
+
+When changing rules, update the applicable version in `system.go`, `templates.go` or `app/ai_governance.go` and review the regression expectations. From `backend/`, run `go test ./internal/agent/... ./internal/app/...`; before delivery, run `go test ./...` and `go vet ./...`. TXT assets do not add settings or HTTP endpoints. Task-level immutable prompt snapshots, independent Action versions, model-specific variants and online editing remain future work. See [source research and implementation record](plan/2026-10-02-agent-prompt-management-research.md).
+
 ### AI settings and governance
 
 Enable AI in Settings → AI and configure an OpenAI-compatible provider. The backend global enable switch defaults off, including after upgrading from the browser-only experimental switch. Persistent chats and edits require Web API mode and the Go backend. The current reliability implementation and remaining acceptance work are tracked in [the Agent milestone plan, section 14](plan/2026-08-19-agent-milestone-plan.md). The connectivity probe permits up to 1024 output tokens within 30 seconds, so reasoning providers have room to produce a final answer.
