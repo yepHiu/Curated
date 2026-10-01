@@ -289,6 +289,8 @@ Hold the shortcut to record a clip, or use the visible GIF/MP4/WebM action and p
 
 The frame library loads originals only for the current and adjacent detail slides. Use 100% to inspect pixels and Fit image to return. Time-nearby badges can still help locate captures from the same movie for manual review. Offscreen card rows unload while retaining layout placeholders and keyboard entry points.
 
+Movie details also show a **Curated Frames** section below the preview gallery, scoped to that movie and ordered by capture time (newest first). It loads 12 thumbnails at a time; **Load more** appends the next page. Click a thumbnail to inspect the original, use 100% for pixel inspection, and switch among loaded frames with the arrow buttons or left/right keys. Empty and failed states appear in the section, with retry preserving already loaded frames. This works with both Server storage and Mock IndexedDB; metadata-only wishlist details omit the section. See [implementation and checks](plan/2026-10-01-movie-detail-curated-frames.md).
+
 Web frames remain in SQLite; migration 0045 adds stable ordering indexes. Mock IndexedDB upgrades to version 2 and moves full image blobs into a separate store transactionally; frame metadata and directory handles remain available. Measurements and implementation decisions are in [the curated-frame review](plan/2026-04-11-curated-frames-review.md#12-2026-09-06-实施记录与验证).
 
 ### Playback recovery
