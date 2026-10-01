@@ -34,6 +34,8 @@ This supersedes earlier Full release plans below. New production releases use on
 
 ## 2026-09-27 远程设置管理边界
 
+**2026-10-02 远程页面加载恢复**：愿望单／萃取帧业务仍允许远程访问。Server 升级后旧 renderer 可能引用被移除的懒加载脚本；新源码在 router.onError 显示持久刷新提示，显式刷新保留目标路由／查询参数，成功导航清除提示。缺失 `/assets/` 返回 no-store 404，不返回 SPA HTML。无新增 API／配置；已加载旧页面先用 ⌘R／Ctrl+R 或重连恢复。证据与限制见 `docs/plan/2026-10-02-remote-page-navigation-recovery.md`。
+
 远程设置仅保留客户端偏好和只读信息；全局配置、安全、AI 管理及备份维护须在 Server 本机操作，接口同步限制，远程不返回 AI/代理凭据。详见 `docs/guide.md` 的 Remote settings access。
 
 `PATCH /api/settings` 全部写入及管理路由统一要求 `isDirectLocalRequest`，否则 `403 SERVER_SETTINGS_READ_ONLY`（含默认目录字段）；路径 CRUD 保留原错误码。复用已有 health 本机信号，UI 未确认时隐藏管理项、确认远程后回退不可用深链；Desktop 网络页保留本机服务器列表，当前会话锁定及常规业务 API 保留。无新增配置/迁移。
