@@ -168,9 +168,9 @@ if (!singleInstanceLock) {
 }
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    showMainWindow()
-  }
+  // macOS Dock 激活也要恢复仍存在的隐藏窗口；启动未就绪或退出中不创建窗口。
+  if (!app.isReady() || isQuitting) return
+  showMainWindow()
 })
 
 app.on("window-all-closed", () => {
@@ -355,6 +355,7 @@ function handleTrayMenuAction(actionId: TrayMenuActionId, url?: string): void {
   }
 }
 
+/** 恢复现有主窗口及其页面；尚未连接时显示本地服务器管理窗口。 */
 function showMainWindow(initialUrl?: string): void {
   if (!mainWindow || mainWindow.isDestroyed() || !rendererBaseUrl) {
     showConnections()
@@ -616,9 +617,11 @@ function handleWindowsSessionShutdown(window: BrowserWindow): void {
   })
 }
 
+/** 打开服务器管理窗口，已有窗口最小化时先恢复，再显示并聚焦。 */
 function showConnections(): void {
   if (connectionWindow && !connectionWindow.isDestroyed()) {
     if (connectionError) connectionWindow.webContents.send("curated:connection-error", connectionError)
+    if (connectionWindow.isMinimized()) connectionWindow.restore()
     connectionWindow.show(); connectionWindow.focus()
     return
   }
