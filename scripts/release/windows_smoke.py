@@ -37,10 +37,10 @@ def run(file, *args, success=True):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--component', required=True, choices=('server', 'desktop', 'full'))
+    parser.add_argument('--component', required=True, choices=('server', 'desktop', 'both', 'full'))
     args = parser.parse_args()
     current = versions(ROOT)
-    selected = ('server', 'desktop') if args.component == 'full' else (args.component,)
+    selected = ('server', 'desktop') if args.component in ('full', 'both') else (args.component,)
     for component in selected:
         if installed(component):
             raise RuntimeError('Smoke checks require a clean runner, refusing to alter an existing installation')
@@ -100,7 +100,8 @@ def main():
                         except Exception:
                             if running[0].poll() is not None or attempt == 59: raise
                             time.sleep(0.5)
-                run(setup(args.component), '/LANG=chinesesimp', '/CLOSECURATED=1')
+                for target in (selected if args.component == 'both' else (args.component,)):
+                    run(setup(target), '/LANG=chinesesimp', '/CLOSECURATED=1')
                 for process in running:
                     assert process.wait(timeout=30) == 0, 'Old component did not exit gracefully'
             finally:
@@ -128,7 +129,8 @@ def main():
                     winreg.DeleteKey(winreg.HKEY_CURRENT_USER, desktop_key)
                 run(setup('full'))  # retry composes the same Server identity
             else:
-                run(setup(args.component), '/DIR=' + str(base / args.component))
+                for target in selected:
+                    run(setup(target), '/DIR=' + str(base / target))
             before = {c: installed(c) for c in selected}
             for c, info in before.items():
                 assert info and info[0] == current[c], (c, info)

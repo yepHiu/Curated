@@ -1,4 +1,4 @@
-"""Publish standalone Desktop/Server releases; preserve historical Full recovery."""
+"""Publish one immutable batch of selected standalone Desktop/Server packages."""
 from __future__ import annotations
 import argparse
 import json
@@ -15,16 +15,26 @@ from scripts.release.release_lib.windows_components import versions, package_win
 from scripts.release.release_lib.macos_desktop import package_macos_desktop
 from scripts.release.release_lib.component_channels import reuse_assets, read_channel
 from scripts.release.release_lib.latest_release import reconcile_latest
+from scripts.release.release_lib.batches import load_batch, selected_components, verify_changes
+from scripts.release.release_lib.component_channels import read_channel_file
 
 PATTERN = re.compile(r'(full|server|desktop)-v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))')
 
 
 def metadata(root: Path, tag: str) -> dict:
+    current = versions(root)
+    batch = load_batch(root, tag, current)
+    if batch:
+        commit = legacy.git(root, 'rev-parse', '--verify', f'refs/tags/{tag}^{{commit}}')
+        if commit != legacy.git(root, 'rev-parse', 'HEAD'):
+            raise ValueError('Checkout is not the immutable tag commit')
+        selected = [c for c, m in batch['modules'].items() if m['changed']]
+        return {'tag': tag, 'component': 'both' if len(selected) == 2 else selected[0],
+                'version': batch['id'], 'commit': commit, 'versions': current, 'batch': batch}
     match = PATTERN.fullmatch(tag)
     if not match:
         raise ValueError('Expected full-v, server-v or desktop-v followed by numeric SemVer')
     component, version = match.groups()
-    current = versions(root)
     if current[component] != version:
         raise ValueError('Tag disagrees with component version source')
     commit = legacy.git(root, 'rev-parse', '--verify', f'refs/tags/{tag}^{{commit}}')
@@ -42,7 +52,8 @@ def body(root: Path, meta: dict) -> str:
         text = text.split('## GitHub Release Body', 1)[1].strip()
     if not text:
         raise ValueError('Component release notes must not be empty')
-    return text + '\n\n' + legacy.source_marker(meta) + '\n'
+    marker = f"\n<!-- curated-release-batch:{meta['batch']['id']} -->" if 'batch' in meta else ''
+    return text + '\n\n' + legacy.source_marker(meta) + marker + '\n'
 
 
 def require_standalone(component: str) -> None:
@@ -52,7 +63,8 @@ def require_standalone(component: str) -> None:
 
 def module_updates(text: str, meta: dict) -> list[tuple[str, str, str, str]]:
     """Validate the immutable module snapshot shared by notes and display titles."""
-    require_standalone(meta['component'])
+    if 'batch' not in meta:
+        require_standalone(meta['component'])
     semver = r'(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)'
     rows = re.findall(
         rf'^\|\s*(Desktop|Server)\s*\|\s*(Updated|Unchanged)\s*\|\s*({semver})\s*\|\s*({semver})\s*\|\s*$',
@@ -61,9 +73,12 @@ def module_updates(text: str, meta: dict) -> list[tuple[str, str, str, str]]:
         raise ValueError('Release notes require Desktop and Server rows: Module | Status | Before | After')
     for name, status, before, after in rows:
         component = name.lower()
-        updated = component == meta['component']
+        updated = component in selected_components(meta)
+        target = meta['batch']['modules'][component]['after'] if 'batch' in meta else meta['version']
+        if 'batch' in meta and (before, after) != (meta['batch']['modules'][component]['before'], target):
+            raise ValueError('Notes disagree with the prepared batch')
         if updated:
-            if status != 'Updated' or after != meta['version'] or tuple(map(int, after.split('.'))) <= tuple(map(int, before.split('.'))):
+            if status != 'Updated' or after != target or tuple(map(int, after.split('.'))) <= tuple(map(int, before.split('.'))):
                 raise ValueError('The released module must be Updated with an increased tag version')
         elif status != 'Unchanged' or before != after:
             raise ValueError('The other module must be Unchanged with the same version')
@@ -72,6 +87,9 @@ def module_updates(text: str, meta: dict) -> list[tuple[str, str, str, str]]:
 
 def release_title(text: str, meta: dict) -> str:
     """Use reviewed note snapshots, never unpublished source targets or live channels."""
+    if 'batch' in meta:
+        module_updates(text, meta)
+        return f"Curated {meta['batch']['id']}"
     if meta['component'] == 'full':
         return f"Curated v{meta['version']}"
     after = {name: version for name, _, _, version in module_updates(text, meta)}
@@ -84,20 +102,22 @@ def release_body(root: Path, meta: dict) -> str:
     text = body(root, meta)
     for name, _, before, _ in module_updates(text, meta):
         component = name.lower()
-        updated = component == meta['component']
+        updated = component in selected_components(meta)
         published = read_channel(component)
         baseline = published['version'] if published else '0.0.0'
         if updated and before != baseline:
             raise ValueError(f'{name} Before must match the published channel ({baseline})')
-        # An independent release of the other module must not invalidate a draft.
-        # Its unchanged row is a version snapshot, never a future/unpublished bump.
+        if 'batch' in meta and published and published['sourceCommit'] != meta['batch']['modules'][component]['baselineCommit']:
+            raise ValueError(f'{name} source baseline changed; prepare a new batch')
+        # Historical component notes allowed older unchanged snapshots. Batches
+        # pin both source baselines above to keep scope decisions reproducible.
         if not updated and tuple(map(int, before.split('.'))) > tuple(map(int, baseline.split('.'))):
             raise ValueError(f'Unchanged {name} cannot claim an unpublished version')
     return text
 
 
 def expected_assets(meta: dict) -> dict[str, dict]:
-    components = ('server', 'desktop', 'full') if meta['component'] == 'full' else (meta['component'],)
+    components = selected_components(meta)
     result = {}
     for component in components:
         targets = [('windows', 'x64', 'exe'), ('windows', 'x64', 'zip')]
@@ -125,6 +145,10 @@ def validate_entries(meta: dict, entries: list[dict], directories: list[Path]) -
             raise ValueError('Component artifact missing or checksum mismatch')
         if entry['component'] == 'full' and entry.get('components') != {c: meta['versions'][c] for c in ('server', 'desktop')}:
             raise ValueError('Full must pin the exact component versions')
+        if 'batch' in meta and entry.get('sourceCommit') != meta['commit']:
+            raise ValueError('Batch artifact was built from another commit')
+        if 'batch' in meta and 'url' in entry and entry['url'] != f"https://github.com/yepHiu/Curated/releases/download/{meta['tag']}/{name}":
+            raise ValueError('Batch artifact URL belongs to another release')
 
 
 def stage(root: Path, meta: dict, windows: Path, macos: Path, output: Path) -> None:
@@ -140,7 +164,8 @@ def stage(root: Path, meta: dict, windows: Path, macos: Path, output: Path) -> N
         for entry in mac['artifacts']:
             entries.append({**entry, 'component': 'desktop', 'variant': 'standalone', 'channel': 'stable',
                 'version': mac['version'], 'platform': 'macos', 'arch': 'arm64',
-                'format': entry['fileName'].rsplit('.', 1)[1], 'signing': 'ad-hoc', 'notarized': False})
+                'format': entry['fileName'].rsplit('.', 1)[1], 'signing': 'ad-hoc', 'notarized': False,
+                'sourceCommit': entry.get('sourceCommit', mac['sourceCommit'])})
     validate_entries(meta, entries, [windows, macos])
     assets = output / 'assets'
     assets.mkdir(parents=True, exist_ok=False)
@@ -226,11 +251,49 @@ def advance_channels(changes: dict[str, str], meta: dict) -> None:
         legacy.api('git/refs', {'ref': 'refs/heads/release-channels', 'sha': next_commit['sha']})
 
 
+def batch_channels(meta: dict, changes: dict[str, str], assets: Path) -> dict[str, str]:
+    """Advance the new feed; keep the legacy Server feed on its reachable bridge."""
+    changes = dict(changes)
+    if 'server' not in selected_components(meta):
+        return changes
+    modern = read_channel_file('server', 'server-v2.json')
+    document = json.loads((assets / 'server.json').read_text())
+    bridge = meta['batch']['serverBridge']
+    if bridge and modern is not None and modern != document:
+        raise ValueError('Server bridge already exists; never replace the legacy upgrade route')
+    if not bridge and modern is None:
+        raise ValueError('Publish the Server bridge before date-tagged Server updates')
+    content = changes.pop('server.json', None)
+    if content is not None:
+        changes['server-v2.json'] = content
+        if bridge:
+            changes['server.json'] = content
+    return changes
+
+
+def check_batch_identity(meta: dict) -> None:
+    if 'batch' not in meta:
+        return
+    marker = f"<!-- curated-release-batch:{meta['batch']['id']} -->"
+    page = 1
+    while True:
+        releases = legacy.api(f'releases?per_page=100&page={page}')
+        for release in releases:
+            if marker in release.get('body', '') and release['tag_name'] != meta['tag']:
+                raise ValueError('Batch date/sequence is already reserved by another release')
+        if len(releases) < 100:
+            return
+        page += 1
+
+
 def publish(root: Path, meta: dict, output: Path, mode: str) -> None:
     notes = release_body(root, meta)
     assets = output / 'assets'
     verify_distribution(meta, assets)
     changes = validate_channel_advance(assets)
+    if 'batch' in meta:
+        changes = batch_channels(meta, changes, assets)
+        check_batch_identity(meta)
     release = legacy.check_release(meta)
     # The tag is already verified by check_release. Omitting target_commitish
     # avoids asking GITHUB_TOKEN to create a tag at a workflow-changing commit.
@@ -261,14 +324,19 @@ def main() -> None:
     parser.add_argument('--macos', type=Path, default=Path('release/macos-desktop'))
     args = parser.parse_args()
     # Historical Full manifests can still be recovered, but never built or published anew.
-    if args.command != 'channels':
+    if args.command != 'channels' and args.tag.startswith('full-v'):
         require_standalone(args.tag.split('-v', 1)[0])
     root = args.source_root.resolve() if args.source_root else Path(__file__).resolve().parents[2]
     if args.source_root and args.command not in ('stage', 'publish', 'channels'):
         raise ValueError('Separate source checkout is only supported for artifact recovery')
     meta = metadata(root, args.tag)
+    if args.command != 'channels':
+        if 'batch' not in meta:
+            raise ValueError('New releases require a prepared batch; run release:prepare')
+        verify_changes(root, meta['batch'])
     if args.command == 'check':
         release_body(root, meta)
+        check_batch_identity(meta)
         legacy.check_release(meta)
         if target := os.environ.get('GITHUB_OUTPUT'):
             with open(target, 'a') as stream:
@@ -276,6 +344,8 @@ def main() -> None:
     elif args.command == 'windows':
         package_windows(root, args.windows, meta['component'])
     elif args.command == 'macos':
+        if 'desktop' not in selected_components(meta):
+            raise ValueError('This batch has no Desktop update')
         args.macos.mkdir(parents=True, exist_ok=True)
         entries = reuse_assets('desktop', meta['versions']['desktop'], 'macos', 'arm64', args.macos)
         if not entries:
@@ -293,7 +363,10 @@ def main() -> None:
             raise ValueError('Channel recovery requires a published release from this commit')
         verify_distribution(meta, args.output / 'assets')
         legacy.verify_uploaded(release, args.output / 'assets')
-        advance_channels(validate_channel_advance(args.output / 'assets'), meta)
+        changes = validate_channel_advance(args.output / 'assets')
+        if 'batch' in meta:
+            changes = batch_channels(meta, changes, args.output / 'assets')
+        advance_channels(changes, meta)
         reconcile_latest(legacy.api)
     else:
         publish(root, meta, args.output, args.mode)

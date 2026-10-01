@@ -89,8 +89,8 @@ def compile_installer(root: Path, work: Path, output: Path, component: str, vers
 def package_windows(root: Path, output: Path, component: str = 'full') -> Path:
     if platform.system() != 'Windows' or platform.machine().lower() not in ('amd64', 'x86_64'):
         raise RuntimeError('Windows components require a Windows x64 host')
-    selected = ['server', 'desktop'] if component == 'full' else [component]
-    if component not in ('server', 'desktop', 'full'):
+    selected = ['server', 'desktop'] if component in ('full', 'both') else [component]
+    if component not in ('server', 'desktop', 'full', 'both'):
         raise ValueError('Unknown component')
     current = versions(root)
     output = output.resolve()

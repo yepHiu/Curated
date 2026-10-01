@@ -268,6 +268,8 @@ def main() -> None:
     parser.add_argument("--mode", choices=("draft", "publish"), default="draft")
     parser.add_argument("--macos-dir", type=Path, help="Required Mac Desktop artifacts for combined CD publication")
     args = parser.parse_args()
+    if args.command == 'publish':
+        parser.error('Legacy publication is retired. Use the prepared batch CD workflow.')
     root = Path(__file__).resolve().parents[2]
     if args.command == "stage":
         stage(root, args.tag, args.output)

@@ -95,6 +95,9 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    if args.command in ('publish', 'package-portable', 'package-installer', 'set-version-base'):
+        parser.error('Legacy all-in-one packaging is retired. Use pnpm release:prepare and the batch CD workflow.')
+
     if args.command == "package-macos-desktop":
         print(package_macos_desktop(REPO_ROOT, args.output_dir))
         return

@@ -2,7 +2,7 @@ name: Release notes
 on:
   push:
     branches: [master]
-    paths: ['docs/release-notes/full-v*.md', 'docs/release-notes/server-v*.md', 'docs/release-notes/desktop-v*.md']
+    paths: ['docs/release-notes/release-*.md', 'docs/release-notes/full-v*.md', 'docs/release-notes/server-v*.md', 'docs/release-notes/desktop-v*.md']
   workflow_dispatch:
     inputs:
       tag:

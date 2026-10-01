@@ -187,8 +187,11 @@ class ComponentReleaseTests(unittest.TestCase):
 
     def test_preflight_never_requires_or_mutates_latest(self):
         self.meta.update(component='server', tag='server-v1.5.8', version='1.5.8')
+        self.meta['batch'] = {'id': '20261001'}
         with patch('sys.argv', ['component_cd', 'check', '--tag', self.meta['tag']]), \
              patch.object(cd, 'metadata', return_value=self.meta), \
+             patch.object(cd, 'verify_changes'), \
+             patch.object(cd, 'check_batch_identity'), \
              patch.object(cd, 'release_body', return_value='Notes'), \
              patch.object(cd.legacy, 'check_release') as check, \
              patch.object(cd.legacy, 'api') as api, \

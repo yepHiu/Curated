@@ -39,6 +39,9 @@ scripts/prd/*
 !scripts/release/release_cli.py
 !scripts/release/cd_release.py
 !scripts/release/component_cd.py
+!scripts/release/prepare_batch.py
+!scripts/release/batches/
+!scripts/release/batches/*.json
 !scripts/release/recover_release.py
 !scripts/release/recovery-request.json
 !scripts/release/windows_smoke.py

@@ -5,6 +5,7 @@ import re
 import subprocess
 
 from scripts.release import cd_release, component_cd
+from .batches import load_batch
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -25,10 +26,10 @@ def main():
         if not re.fullmatch(r'[a-f0-9]{40}', before) or not re.fullmatch(r'[a-f0-9]{40}', after):
             raise ValueError('Invalid source range')
         files = subprocess.check_output(['git', 'diff', '--name-only', '--diff-filter=AM', before, after, '--', 'docs/release-notes/'], cwd=ROOT, text=True).splitlines()
-        tags = [Path(file).stem for file in files if component_cd.PATTERN.fullmatch(Path(file).stem)]
+        tags = [Path(file).stem for file in files if component_cd.PATTERN.fullmatch(Path(file).stem) or re.fullmatch(r'release-[0-9-]+', Path(file).stem)]
     latest_id = cd_release.api('releases/latest')['id']
     for tag in tags:
-        if not component_cd.PATTERN.fullmatch(tag):
+        if not component_cd.PATTERN.fullmatch(tag) and not re.fullmatch(r'release-[0-9-]+', tag):
             raise ValueError('Expected a component release tag')
         release = cd_release.api(f'releases/tags/{tag}')
         if release is None or release['draft']:
@@ -38,11 +39,25 @@ def main():
         marker = cd_release.source_marker({'commit': commit})
         if marker not in release['body']:
             raise ValueError(f'Original source marker does not match tag: {tag}')
-        body = component_cd.body(ROOT, {'tag': tag, 'commit': commit})
-        component, version = component_cd.PATTERN.fullmatch(tag).groups()
-        title = component_cd.release_title(body, {'component': component, 'version': version})
+        batch = load_batch(ROOT, tag)
+        meta = {'tag': tag, 'commit': commit}
+        if batch:
+            import json
+            original_batch = json.loads(cd_release.git(ROOT, 'show', f'{commit}:scripts/release/batches/{tag}.json'))
+            if batch != original_batch:
+                raise ValueError('Published batch metadata is immutable')
+            meta['batch'] = batch
+        else:
+            match = component_cd.PATTERN.fullmatch(tag)
+            if match is None:
+                raise ValueError('Missing immutable release batch')
+            meta['component'], meta['version'] = match.groups()
+        body = component_cd.body(ROOT, meta)
+        title = component_cd.release_title(body, meta)
         urls = re.findall(r'https://github.com/[^\s)]+/releases/download/[^\s)]+', body)
         available = {a['browser_download_url'] for a in release['assets']}
+        if batch:
+            available.update(a['url'] for m in batch['modules'].values() if not m['changed'] for a in m['previousArtifacts'])
         if not urls or not set(urls) <= available:
             raise ValueError(f'Notes link to unavailable release assets: {tag}')
         original = snapshot(release)

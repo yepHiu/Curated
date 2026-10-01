@@ -27,8 +27,9 @@
     "release:electron-main": "python scripts/release/release_cli.py build-electron-main",
     "release:portable": "python scripts/release/release_cli.py package-portable",
     "release:installer": "python scripts/release/release_cli.py package-installer",
-    "release:publish": "python scripts/release/release_cli.py publish",
-    "release:version:show": "python scripts/release/release_cli.py show-version",
+    "release:prepare": "python3 scripts/release/prepare_batch.py",
+    "release:publish": "python3 scripts/release/component_cd.py publish",
+    "release:version:show": "python3 scripts/release/prepare_batch.py --versions",
     "release:version:set-base": "python scripts/release/release_cli.py set-version-base",
     "release:history:migrate": "python scripts/release/release_cli.py migrate-history",
     "build:desktop-ui": "vite build --config vite.desktop.config.ts --configLoader native"

@@ -9,9 +9,9 @@ FEED_ROOT = 'https://raw.githubusercontent.com/yepHiu/Curated/release-channels'
 ASSET_ROOT = 'https://github.com/yepHiu/Curated/releases/download/'
 
 
-def read_channel(component: str) -> dict | None:
+def read_channel_file(component: str, filename: str) -> dict | None:
     try:
-        with urllib.request.urlopen(f'{FEED_ROOT}/{component}.json', timeout=30) as response:
+        with urllib.request.urlopen(f'{FEED_ROOT}/{filename}', timeout=30) as response:
             data = response.read(1024 * 1024 + 1)
     except urllib.error.HTTPError as error:
         if error.code == 404:
@@ -23,6 +23,15 @@ def read_channel(component: str) -> dict | None:
     if manifest.get('schema') != 1 or manifest.get('component') != component:
         raise ValueError('Invalid component channel')
     return manifest
+
+
+def read_channel(component: str) -> dict | None:
+    # Old installed Servers stay on server.json, pinned to the one-time bridge.
+    if component == 'server':
+        current = read_channel_file(component, 'server-v2.json')
+        if current is not None:
+            return current
+    return read_channel_file(component, f'{component}.json')
 
 
 def reuse_assets(component: str, version: str, platform: str, arch: str, output: Path) -> list[dict]:

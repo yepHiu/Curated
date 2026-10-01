@@ -1,4 +1,4 @@
-name: CD - Server and Desktop
+name: CD - Curated release batch
 
 on:
   workflow_call:
@@ -12,11 +12,11 @@ on:
   push:
     tags:
       - 'server-v*'
-      - 'desktop-v*'
+      - 'release-*'
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing component tag (server-v or desktop-vMAJOR.MINOR.PATCH)
+        description: Prepared batch tag (release-YYYYMMDD[-N], or initial Server bridge tag)
         required: true
         type: string
       mode:
@@ -60,8 +60,8 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_SHA: ${{ github.sha }}
         run: |
-          if [[ ! "$RELEASE_TAG" =~ ^(server|desktop)-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo '::error::Expected a standalone tag: server-v or desktop-vMAJOR.MINOR.PATCH'
+          if [[ ! "$RELEASE_TAG" =~ ^(release-[0-9]{8}(-([2-9]|[1-9][0-9]+))?|server-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$ ]]; then
+            echo '::error::Expected a prepared batch tag or Server bridge tag'
             exit 1
           fi
           commit="$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")"
@@ -95,7 +95,6 @@ jobs:
       RELEASE_ARTIFACT: windows-release-${{ needs.prepare.outputs.tag }}-${{ github.run_attempt }}
       VITE_USE_WEB_API: 'true'
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -235,7 +234,7 @@ jobs:
 
   publish:
     name: Upload and verify GitHub Release
-    if: always() && needs.prepare.result == 'success' && needs.build.result == 'success' && (needs.build-macos.result == 'success' || needs.build-macos.result == 'skipped')
+    if: always() && needs.prepare.result == 'success' && needs.build.result == 'success' && (needs.build-macos.result == 'success' || (needs.prepare.outputs.component == 'server' && needs.build-macos.result == 'skipped'))
     needs: [prepare, build, build-macos]
     runs-on: ubuntu-latest
     timeout-minutes: 20

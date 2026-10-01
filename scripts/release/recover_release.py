@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import base64
 
 
 def gh(path: str, raw=False):
@@ -22,13 +23,32 @@ def main():
     if run['path'] != '.github/workflows/cd-release.yml' or run['conclusion'] != 'failure' or run['event'] != 'push':
         raise ValueError('Recovery only accepts a failed component tag CD run')
     tag = run['head_branch']
-    if not re.fullmatch(r'(full|server|desktop)-v\d+\.\d+\.\d+', tag):
+    if not re.fullmatch(r'(?:(full|server|desktop)-v\d+\.\d+\.\d+|release-\d{8}(?:-(?:[2-9]|[1-9]\d+))?)', tag):
         raise ValueError('Invalid component release tag')
+    # A Server-prefixed bridge tag can contain both components. Recover the exact
+    # selection from the immutable source, never infer it from that tag prefix.
+    component = tag.split('-v')[0]
+    tree = gh(f"repos/{repo}/git/trees/{run['head_sha']}?recursive=1")
+    if tree.get('truncated'):
+        raise ValueError('Cannot resolve recovery batch from a truncated source tree')
+    path = f'scripts/release/batches/{tag}.json'
+    entry = next((e for e in tree['tree'] if e['path'] == path), None)
+    if entry:
+        blob = gh(f"repos/{repo}/git/blobs/{entry['sha']}")
+        batch = json.loads(base64.b64decode(blob['content']))
+        if batch['tag'] != tag or batch['schema'] != 1:
+            raise ValueError('Invalid recovery batch')
+        selected = [c for c in ('server', 'desktop') if batch['modules'][c]['changed']]
+        if not selected:
+            raise ValueError('Empty recovery batch')
+        component = 'both' if len(selected) == 2 else selected[0]
+    elif tag.startswith('release-'):
+        raise ValueError('Missing recovery batch')
     jobs = gh(f'repos/{repo}/actions/runs/{run_id}/jobs?per_page=100')['jobs']
     required = ['Build Windows x64 packages', 'Validate release source and notes',
                 'Check the exact release commit / Frontend, Electron, and release scripts',
                 'Check the exact release commit / Go test and vet', 'Check the exact release commit / Runtime browser e2e']
-    if not tag.startswith('server-'):
+    if component != 'server':
         required.append('Build Mac Desktop (Apple Silicon)')
     for name in required:
         if not any(j['name'] == name and j['conclusion'] == 'success' for j in jobs):
@@ -47,12 +67,19 @@ def main():
             for i in selected[-35:]:
                 line = lines[i].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
                 print('::warning::Previous CD: ' + line)
-    releases = gh(f'repos/{repo}/releases?per_page=100')
+    releases = []
+    page = 1
+    while True:
+        items = gh(f'repos/{repo}/releases?per_page=100&page={page}')
+        releases.extend(items)
+        if len(items) < 100:
+            break
+        page += 1
     published = next((release for release in releases if release['tag_name'] == tag and not release['draft']), None)
     command = 'channels' if published else 'publish'
     attempt = run['run_attempt']
     fields = {'command': command, 'run_id': run_id, 'tag': tag, 'commit': run['head_sha'], 'mode': mode,
-              'component': tag.split('-v')[0], 'windows_artifact': f'windows-release-{tag}-{attempt}',
+              'component': component, 'windows_artifact': f'windows-release-{tag}-{attempt}',
               'macos_artifact': f'macos-desktop-{tag}-{attempt}'}
     with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
         stream.writelines(f'{key}={value}\n' for key, value in fields.items())
