@@ -21,6 +21,7 @@
 
 ## 2. 主题与设计令牌
 
+- 首页下方主题组、最近导入、今日推荐与继续观看的栏目间距统一为 `gap-8 lg:gap-10`（32px / 大屏 40px）。`HomeSectionRow` 标题与操作居中对齐，标题行最小高度为 `min-h-11 sm:min-h-8`，标题行至海报网格为 `gap-4`（16px）；窄屏长标题和操作可换行。首页骨架标题行复用相同高度，不预留不存在的副标题。
 - 全局主题令牌定义在 [`src/style.css`](../src/style.css)。
 - 业务界面应优先使用语义化颜色与表面类名，例如 `bg-background`、`text-foreground`、`bg-card`、`border-border`、`text-muted-foreground`。
 - 避免在业务组件中直接硬编码主背景色、正文色和交互色，除非是非常局部的装饰性图形。
