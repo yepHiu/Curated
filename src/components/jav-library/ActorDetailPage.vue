@@ -9,6 +9,7 @@ import VirtualMovieMasonry from "@/components/jav-library/VirtualMovieMasonry.vu
 import { Button } from "@/components/ui/button"
 import { pushAppToast } from "@/composables/use-app-toast"
 import type { Movie } from "@/domain/movie/types"
+import { compareByReleaseDateDesc } from "@/lib/movie-sort"
 import {
   buildDetailRouteFromActor,
   buildPlayerRouteFromActorIntent,
@@ -65,7 +66,9 @@ const actorMovies = computed(() => {
   if (!actor) {
     return [] as Movie[]
   }
-  return libraryService.movies.value.filter((movie) => movie.actors.includes(actor))
+  return libraryService.movies.value
+    .filter((movie) => movie.actors.includes(actor))
+    .sort(compareByReleaseDateDesc)
 })
 
 const scrollPreserveKey = computed(() =>
