@@ -74,6 +74,10 @@ vi.mock("@/components/jav-library/MovieCommentSection.vue", () => ({
   default: { name: "MovieCommentSection", template: "<div data-movie-comment-section />" },
 }))
 
+vi.mock("@/components/jav-library/MovieCuratedFramesSection.vue", () => ({
+  default: { name: "MovieCuratedFramesSection", props: ["movieId"], template: "<div data-movie-curated-frames />" },
+}))
+
 vi.mock("@/components/jav-library/MediaStill.vue", () => ({
   default: {
     name: "MediaStill",
@@ -89,6 +93,7 @@ describe("DetailPage", () => {
       props: { movie: makeMovie(), relatedMovies: [], readOnly: true },
     })
     expect(wrapper.find('[data-movie-comment-section]').exists()).toBe(false)
+    expect(wrapper.find('[data-movie-curated-frames]').exists()).toBe(false)
     expect(wrapper.get('[data-detail-panel]').attributes('read-only')).toBe('true')
     expect(wrapper.get('[data-detail-panel]').attributes('show-actions')).toBe('false')
     expect(wrapper.text()).toContain('detailPage.previewGalleryTitle')
@@ -105,6 +110,8 @@ describe("DetailPage", () => {
     })
 
     const previewCard = wrapper.get('[data-preview-gallery-item="0"]')
+
+    expect(wrapper.getComponent({ name: "MovieCuratedFramesSection" }).props("movieId")).toBe("movie-1")
 
     expect(previewCard.attributes("data-aspect-ratio")).toBe("1.7778")
     expect(previewCard.classes()).toContain("h-40")

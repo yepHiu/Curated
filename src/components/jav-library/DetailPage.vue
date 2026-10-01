@@ -15,6 +15,7 @@ import MovieGrid from "@/components/jav-library/MovieGrid.vue"
 import MediaStill from "@/components/jav-library/MediaStill.vue"
 import PreviewImageViewer from "@/components/jav-library/PreviewImageViewer.vue"
 import MovieCommentSection from "@/components/jav-library/MovieCommentSection.vue"
+import MovieCuratedFramesSection from "@/components/jav-library/MovieCuratedFramesSection.vue"
 import { useRelatedVisibleCount } from "@/composables/use-related-visible-count"
 
 type PreviewImageLoadPayload = {
@@ -258,6 +259,8 @@ function openPosterInViewer() {
       :initial-index="previewViewerStartIndex"
       :movie-code="movie.code"
     />
+
+    <MovieCuratedFramesSection v-if="!props.readOnly" :movie-id="movie.id" />
 
     <MovieCommentSection v-if="!props.readOnly" :movie-id="movie.id" :readonly="commentReadonly" />
 

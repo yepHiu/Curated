@@ -1980,6 +1980,9 @@
     "prewarmingStream": "正在预热 HLS 播放流…"
   },
   "detailPage": {
+    "curatedFramesEmpty": "这部影片还没有萃取帧。",
+    "curatedFramesLoadError": "萃取帧加载失败，请重试。",
+    "curatedFrameOpen": "查看 {time} 的萃取帧",
     "previewHelp": "点击缩略图以浏览大图，支持左右方向键浏览",
     "previewAlt": "{code} 样本图 {n}",
     "previewSrOpen": "在查看器中打开第 {n} 张预览图",
