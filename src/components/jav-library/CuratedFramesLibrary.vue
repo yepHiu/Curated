@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from "vue"
+import { useTimeoutFn } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import type { CuratedFrameFacetItemDTO } from "@/api/types"
@@ -314,6 +315,16 @@ const rowsLoadingMore = ref(false)
 const rowsLoadError = ref(false)
 let rowsQueryVersion = 0
 const rowsScrollRoot = ref<HTMLElement | null>(null)
+const scrollbarVisible = ref(false)
+const { start: scheduleScrollbarHide } = useTimeoutFn(() => {
+  scrollbarVisible.value = false
+}, 900, { immediate: false })
+
+function onRowsScroll() {
+  scrollbarVisible.value = true
+  scheduleScrollbarHide()
+  maybeAutoLoadMoreRows()
+}
 const rowsLoadMoreSentinel = ref<HTMLElement | null>(null)
 const curatedTagFacets = ref<CuratedFrameFacetItemDTO[]>([])
 let rowsLoadMoreObserver: IntersectionObserver | null = null
@@ -789,11 +800,12 @@ defineExpose({
 
 <template>
   <div
-    class="relative isolate mx-auto flex h-full min-h-0 w-full max-w-[min(100%,120rem)] flex-col gap-6 px-3 sm:px-6"
+    class="relative isolate flex h-full min-h-0 w-full flex-col gap-6"
   >
     <Button v-if="rowsLoadError && isLibraryEmpty" variant="outline" class="mx-auto" @click="reloadFromDb">{{ t('curated.retryLoad') }}</Button>
     <CuratedFrameEmptyState
       v-if="isLibraryEmpty && !rowsLoadError"
+      class="mx-auto w-full max-w-[120rem] px-3 sm:px-6"
       variant="library"
       :show-clear-filter="false"
     />
@@ -804,6 +816,7 @@ defineExpose({
       class="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-4 overflow-hidden"
     >
       <CuratedFrameLibraryToolbar
+        class="mx-auto w-full max-w-[120rem] px-3 sm:px-6"
         :shown-count="rawRows.length"
         :total-rows="totalRows"
         :batch-mode="batchMode"
@@ -825,9 +838,11 @@ defineExpose({
 
       <div
         ref="rowsScrollRoot"
-        class="min-h-0 flex-1 overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable] sm:pr-4"
-        @scroll.passive="maybeAutoLoadMoreRows"
+        class="curated-frames-scroll min-h-0 flex-1 overflow-y-auto"
+        :data-scrolling="scrollbarVisible"
+        @scroll.passive="onRowsScroll"
       >
+      <div class="mx-auto w-full max-w-[120rem] px-3 pb-2 sm:px-6">
       <CuratedFrameEmptyState
         v-if="isFilteredEmpty && !rowsLoadError"
         variant="filtered"
@@ -887,6 +902,7 @@ defineExpose({
         <span v-if="rowsLoadingMore">{{ t("common.loading") }}</span>
       </div>
       </div>
+      </div>
     </Tabs>
 
     <CuratedFrameDetailDialog
@@ -918,3 +934,39 @@ defineExpose({
     />
   </div>
 </template>
+
+<style scoped>
+.curated-frames-scroll {
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 200ms ease;
+}
+
+.curated-frames-scroll[data-scrolling="true"] {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.curated-frames-scroll::-webkit-scrollbar-track,
+.curated-frames-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.curated-frames-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  transition: background-color 200ms ease;
+}
+
+.curated-frames-scroll[data-scrolling="true"]::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+}
+
+.curated-frames-scroll::-webkit-scrollbar-thumb:active {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .curated-frames-scroll,
+  .curated-frames-scroll::-webkit-scrollbar-thumb {
+    transition: none;
+  }
+}
+</style>
