@@ -15,6 +15,14 @@ alwaysApply: false
 - Treat parser logic, dedupe logic, DTO mapping, and task state transitions as testable units with direct coverage.
 - `docs/film-scanner` is a reference for reusable scanning/scraping ideas only, not a package layout to mirror.
 
+## AI 提示词管理（强制）
+
+- 用户已明确要求：后续所有 AI Agent 提示词正文统一放在 `backend/internal/agent/prompts/*.txt`，复用 `templates.go` 的 embed 与模板渲染机制。聊天、独立动作、整理分类、摘要、纠正、恢复说明和探针均遵循此约定。
+- 修改已有用途优先编辑对应 TXT；新增独立用途增加语义清楚的 TXT，并在 prompts 包提供加载/渲染入口。不得在业务代码内新增提示词常量、字符串拼接规则，或绕过统一模块直接读取提示词文件。
+- Go 保留受控变量、动态数据投影、消息角色与装配、输出类型、权限和验证逻辑；用户输入、工具结果与协议字段不是静态提示词模板。源资料只渲染一次，不作为模板二次执行。
+- 规则变化须同步适用的提示词版本和回归预期；纯存储迁移保留原版本。TXT 随 Server 编译交付，编辑后重新编译/重启，不默认引入热更新或另一套模板格式。
+- 文件清单和验证命令见 `docs/guide.md` 的 AI prompt TXT resources。
+
 Example:
 
 ```text

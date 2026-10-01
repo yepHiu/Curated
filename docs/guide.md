@@ -55,6 +55,8 @@ Natural-language chat initiation, automatic incremental organization, detail-pag
 
 ### AI prompt TXT resources
 
+**Project convention:** all future AI Agent prompt additions and edits must use the independent TXT resources in `backend/internal/agent/prompts/` and the existing loading module. Edit the relevant TXT for an existing purpose; add a clearly named TXT and a prompts-package accessor for a new purpose. Do not introduce inline instruction text in Go/TypeScript business code or a separate Markdown/YAML prompt system. Dynamic request data, message assembly, protocol fields and hard validation remain in code.
+
 Built-in AI prompt text lives in `backend/internal/agent/prompts/*.txt`, following OpenCode's separation of text assets and loading code. `templates.go` embeds and parses those files once; Go call sites supply bounded context and source data. Installed Server binaries need no external prompt directory. Editing a TXT in the source tree requires rebuilding and restarting the Server; prompts are not hot-reloaded.
 
 | Purpose | TXT files |

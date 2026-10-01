@@ -11,6 +11,7 @@ alwaysApply: true
 - **Planning docs**: 后续任务规划、实施计划、路线图等 Markdown **plan** 文档统一放在 **`docs/plan/`**；若目录不存在则创建后再写入（勿把 plan 散落在 `docs/` 根目录；**`docs/README.md`** 说明 `reference/`、`product/`、`ops/`、`review/` 等用途，长文与规范各归其位）。操作细节与跨目录文章索引写在 **`docs/guide.md`**，根 README 保持短入口。
 - **Plan persistence**: 当代理输出“方案 / 计划 / 路线图 / 实施建议”等可复用内容时，除对话回复外，还应同步落盘到 **`docs/plan/*.md`**；同主题优先更新已有文档，避免重复创建近似 plan。
 - **Encoding rule**: 写入项目规则、项目记忆及相关 Markdown 台账/计划文档时，一律显式使用 **UTF-8** 编码；不要依赖 PowerShell / 编辑器 / 系统默认代码页，避免中文内容写入后出现乱码。
+- **AI 提示词管理（用户明确约定）**：后续新增或修改的 AI Agent 提示词正文，统一使用 `backend/internal/agent/prompts/*.txt` 独立文件，经现有 `templates.go` 加载；不得再把提示词正文内联到 Go/TypeScript 业务代码，或另建 Markdown/YAML 提示词体系。动态数据投影、消息装配和硬校验继续由代码负责。维护细则见 `backend-go-standards.mdc` 与 `docs/guide.md` 的 AI prompt TXT resources。
 
 ## 代码注释（强制）
 

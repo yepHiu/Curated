@@ -150,6 +150,8 @@ prompts/
 
 用户明确选择 OpenCode 风格的独立 TXT，覆盖上文第四节的 Markdown 资源建议。当前统一使用 `backend/internal/agent/prompts/` 下的 14 个平铺 TXT，未增加 assets 子目录或 YAML。
 
+用户进一步明确：后续所有 AI Agent 提示词都沿用本次 TXT 管理方式。此约定已写入 always-on 项目规则、后端规则、CLAUDE.md 与 guide；后续新增用途复用统一 prompts 模块，现有用途修改对应 TXT，不重新引入业务代码内联正文或另一套提示词格式。
+
 - 主聊天 `system.md` 改为 `system.txt`；语言、页面、筛选、提及片段分别独立。
 - 原 app 包中的归纳/分类、run 包中的摘要/纠正/截断说明，以及连接探针迁入 TXT。
 - 原 actions.go 内的润色/翻译/洞察规则迁入带受控变量的 TXT，保留原消息角色与源资料位置。
