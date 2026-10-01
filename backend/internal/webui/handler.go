@@ -51,6 +51,14 @@ func wrapHandlerWithDist(apiHandler http.Handler, distDir string) http.Handler {
 			return
 		}
 
+		// Old pages can request chunks removed by a Server upgrade. Never serve
+		// the SPA document as JavaScript, CSS or other missing build assets.
+		if r.URL.Path == "/assets" || strings.HasPrefix(r.URL.Path, "/assets/") {
+			w.Header().Set("Cache-Control", entryCacheControl)
+			http.NotFound(w, r)
+			return
+		}
+
 		setFrontendCacheHeaders(w, r.URL.Path, true)
 		http.ServeFile(w, r, indexPath)
 	})

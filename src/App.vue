@@ -2,11 +2,12 @@
 import { onErrorCaptured, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { RouterView } from "vue-router"
+import { Toaster } from "@/components/ui/sonner"
 import { useTheme } from "@/composables/use-theme"
 import { syncHtmlLang } from "@/i18n"
 import { persistLocale, type SupportedLocale } from "@/lib/locale-storage"
 
-useTheme()
+const { resolvedMode } = useTheme()
 
 const { locale, t } = useI18n()
 const appFault = ref(false)
@@ -59,4 +60,5 @@ function reloadApp() {
     </section>
   </main>
   <RouterView v-else />
+  <Toaster :theme="resolvedMode" />
 </template>

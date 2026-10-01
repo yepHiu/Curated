@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import App from "./App.vue"
 
 vi.mock("@/composables/use-theme", () => ({
-  useTheme: vi.fn(),
+  useTheme: () => ({ resolvedMode: ref("dark") }),
 }))
 
 vi.mock("@/i18n", () => ({
@@ -45,5 +45,6 @@ describe("App", () => {
 
     expect(wrapper.get("[data-app-fault]").text()).toContain("app.faultTitle")
     expect(wrapper.text()).toContain("app.faultDescription")
+    expect(wrapper.findComponent({ name: "Toaster" }).exists()).toBe(true)
   })
 })

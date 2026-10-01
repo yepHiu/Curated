@@ -8,7 +8,6 @@ import AppSidebar from "@/components/jav-library/AppSidebar.vue"
 import ImportMenu from "@/components/jav-library/ImportMenu.vue"
 import DevEnvironmentBadge from "@/components/dev/DevEnvironmentBadge.vue"
 import DevPerformanceBar from "@/components/dev/DevPerformanceBar.vue"
-import { Toaster } from "@/components/ui/sonner"
 import TagOrganizationDialog from "@/components/jav-library/TagOrganizationDialog.vue"
 import { useTagOrganization, organizationProgressText, startTagOrganizationTracking, stopTagOrganizationTracking } from "@/composables/use-tag-organization"
 import ScanProgressDock from "@/components/jav-library/ScanProgressDock.vue"
@@ -1052,7 +1051,6 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
     </Button>
     <ScanProgressDock />
     <DevPerformanceBar v-if="isDev" v-model:debug-open="debugOpen" />
-    <Toaster :theme="resolvedMode" />
 
     <Teleport to="body">
       <div

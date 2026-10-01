@@ -32,6 +32,7 @@ export interface PushAppToastOptions {
   durationMs?: number
   /** Replaces an existing toast, such as a loading indicator for the same action. */
   id?: AppToastId
+  action?: { label: string; onClick: () => void }
   /** 如果传入，则按消息政策台账决定是否写入消息中心 */
   notification?: {
     messageId: MessagePolicyId
@@ -62,6 +63,7 @@ export function pushAppToast(message: string, options?: PushAppToastOptions): vo
     closeButton: true,
     dismissible: true,
     ...(options?.id === undefined ? {} : { id: options.id }),
+    ...(options?.action === undefined ? {} : { action: options.action }),
   } as const
 
   switch (variant) {

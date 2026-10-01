@@ -10,6 +10,7 @@ import { initClientLogger } from "@/lib/app-logger"
 import { startAuthIdleLockMonitor } from "@/services/auth-idle-lock-service"
 import { startProtectedWebStateBootstrap } from "@/services/protected-web-state-bootstrap"
 import router from "./router"
+import { installRouteLoadRecovery } from "@/router/route-load-recovery"
 import "./style.css"
 
 initClientLogger()
@@ -24,6 +25,7 @@ async function boot() {
   app.config.errorHandler = (err, _instance, info) => {
     console.error("[global error handler]", err, info)
   }
+  installRouteLoadRecovery(router)
   app.use(i18n).use(router).mount("#app")
   startAuthIdleLockMonitor(router)
   startProtectedWebStateBootstrap()

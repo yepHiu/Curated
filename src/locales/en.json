@@ -85,6 +85,7 @@
     }
   },
   "app": {
+    "routeLoadFailed": "Could not load this page. Reload the app to try again.",
     "faultTitle": "Curated could not render this page",
     "faultDescription": "An unexpected page error occurred. Refresh the app or go back and try again.",
     "reload": "Reload app"
