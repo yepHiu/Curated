@@ -273,6 +273,10 @@ On the homepage, scroll to the end of the recent, recommendation, and continue-w
 
 In the web player, **D** steps backward and **F** steps forward while pausing playback. Use the fullscreen button to toggle fullscreen. Frame duration comes from stream metadata or media-timestamp measurements; when neither is available, the player uses a 30fps estimate.
 
+### Actor details and captured frames
+
+Actor details show **Curated Frames** after the filmography in the same scroll area. Choose **Curated Frames** on the actor profile card to jump to that section. It filters by the resolved actor name, loads 12 frames per page, and uses the same cards and full detail dialog as the frame library, including actor-specific export context. The section remains available when the filmography is empty. See [actor-page implementation](plan/2026-07-04-actor-page-and-tag-visibility-plan.md).
+
 ### Merging duplicate actors
 
 Open an actor’s detail page and choose **Merge actors**. Search an existing actor by name or alias, select which actor to keep, then preview the result. The preview shows the final display name, aliases, movie union, tags and profile values. Choose a photo and profile source as complete groups when they conflict; other differing profile values are selected individually. Changing the actor or retained identity clears the previous preview and choices.

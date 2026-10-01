@@ -171,3 +171,13 @@ The main implementation decision before Phase 2 is route shape:
 - Run `pnpm typecheck`.
 - Run `pnpm lint`.
 - Run focused Vitest tests first, then broader `pnpm test` if route/navigation behavior changes.
+
+## 2026-10-01：演员详情页萃取帧
+
+- 影片列表之后增加演员的萃取帧区块；演员资料卡的「萃取帧」按钮滚动到该区域并移入焦点，支持减少动态效果偏好。
+- `VirtualMovieMasonry` 增加 footer slot，直接使用虚拟滚动器的 after slot，保持影片与帧区块在同一滚动容器内。无影片时，空状态之后仍显示帧区块。
+- 将影片专用区块重命名为通用 `CuratedFramesSection`，复用现有 `actor` / `movieId` 筛选与每页 12 张的分页。无有效范围时不请求全库。
+- 演员范围使用解析后的规范名称；别名跳转及合并后更新范围。复用 `CuratedFrameCard` / `CuratedFrameDetailDialog`，演员范围传入演员上下文，保留导出归属；影片详情页行为保持原样。
+- 新增中英日演员空状态，无新增 API、配置或数据库迁移。
+- 验证：演员页、通用帧区块、虚拟网格、影片详情和词典共 33 项测试通过；类型检查与相关 ESLint 通过。浏览器使用拦截请求的合成帧验证按钮滚动/焦点、演员筛选、12→13 分页、共享弹窗；真实空帧库状态已检查，未写入真实资料库。
+- 浏览器截图保存在 `.workspace/actor-frames-desktop.png` 和 `.workspace/actor-frames-mobile.png`，未运行完整 display scaling 套件。
