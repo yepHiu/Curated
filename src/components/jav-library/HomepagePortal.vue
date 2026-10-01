@@ -132,7 +132,6 @@ function onHomeTouchMove(event: TouchEvent) {
     <div
       class="mx-auto flex w-full max-w-[1680px] flex-col gap-8 px-4 py-6 sm:px-5 lg:gap-10 lg:px-6 lg:py-8 xl:px-8"
     >
-      <HomeTopicSection @open-details="emit('openDetails', $event)" @open-player="emit('openPlayer', $event)" />
       <HomeSectionRow
         :title="t('home.sectionRecentTitle')"
         :movies="model.recentMovies"
@@ -215,6 +214,11 @@ function onHomeTouchMove(event: TouchEvent) {
       <HomeContinueRow
         v-if="model.continueWatching.length > 0"
         :entries="model.continueWatching"
+        @open-details="emit('openDetails', $event)"
+        @open-player="emit('openPlayer', $event)"
+      />
+
+      <HomeTopicSection
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"
       />
