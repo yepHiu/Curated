@@ -3651,7 +3651,7 @@ All endpoints use the existing authenticated/unlocked API boundary. No endpoint 
 | GET | `/api/homepage/topics` | At most three groups of six posters `{items}` |
 | GET | `/api/ai/tag-organizations` | Latest 50 persistent jobs `{items}` |
 | POST | `/api/ai/tag-organizations` | `{scope:"all"|"selected",movieIds?:string[],requestId:string}`; 202 job; selected 1–600 |
-| GET | `/api/ai/tag-organizations/{jobId}` | Persistent progress and counters |
+| GET | `/api/ai/tag-organizations/{jobId}` | Persistent progress/counters; `vocabularyProcessed`, `vocabularyReady`; stage includes `vocabulary`, `classifying`, `applying`, `waiting_quota` |
 | GET | `/api/ai/tag-organizations/{jobId}/items?limit=25&offset=0` | Paged result/evidence records `{items}` |
 | POST | `/api/ai/tag-organizations/{jobId}/cancel` | Stop and retain committed results |
 | POST | `/api/ai/tag-organizations/{jobId}/retry` | Resume pending/failed/conflicting items |

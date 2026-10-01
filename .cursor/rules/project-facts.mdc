@@ -437,4 +437,4 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 
 ## 2026-10-01 AI 用户标签整理与首页题材
 
-首页显式发起全库整理；selected 1–600 另有 API。词汇分页20片、分类5片、逐片事务/检查点、恢复/取消/重试/撤销、依据分页，迁移0057/0058。NFO只读；user题材同名隔离、人工排除/保留及修订冲突保护，独立内部网关共用写频控/审计。`GET /api/homepage/topics` 最多3×6，`library/topics`目录与隐藏，`movies?topicId`只匹配user，`ai/tag-organizations`持久任务。播放静默、重连不重放；Web/Mock均已接入。聊天发起、自动增量、详情推荐及真实Provider质量验收待做。无新增cfg键；详见guide与用户PRD§11。
+首页显式发起全库整理；selected 1–600 另有 API。词汇每批至多50片、超预算自动减半、只返回新增词汇；归纳摘要至多600字并标记摘录，分类仍用完整证据；分类5片、逐片事务/检查点、恢复/取消/重试/撤销、依据分页，迁移0057/0058/0059；归纳批次持久检查点与独立进度、具体失败码、等待写额度状态。NFO只读；user题材同名隔离、人工排除/保留及修订冲突保护，独立内部网关共用写频控/审计。`GET /api/homepage/topics` 最多3×6，`library/topics`目录与隐藏，`movies?topicId`只匹配user，`ai/tag-organizations`持久任务。播放静默、重连不重放；Web/Mock均已接入。聊天发起、自动增量、详情推荐及真实Provider质量验收待做。无新增cfg键；详见guide与用户PRD§11。
