@@ -234,11 +234,12 @@ onBeforeUnmount(() => {
         >
           <div
             data-home-hero-stage
-            class="relative h-[clamp(22rem,44vw,40rem)] w-full overflow-hidden bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.24),_transparent_68%),linear-gradient(180deg,rgba(8,10,14,0.92),rgba(8,10,14,0.98))] sm:h-[clamp(25rem,46vw,44rem)]"
+            class="relative w-full overflow-hidden bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.24),_transparent_68%),linear-gradient(180deg,rgba(8,10,14,0.92),rgba(8,10,14,0.98))] [--hero-card-fraction:0.82] [--hero-card-gap:0.75rem] [--hero-card-width:calc(var(--hero-card-fraction)*100%)] sm:[--hero-card-fraction:0.76] sm:[--hero-card-gap:0.9rem] lg:[--hero-card-fraction:0.68] lg:[--hero-card-gap:1rem] xl:[--hero-card-fraction:0.64]"
+            :class="activeMovie ? 'aspect-[calc(1.5/var(--hero-card-fraction))]' : 'h-[clamp(22rem,44vw,40rem)] sm:h-[clamp(25rem,46vw,44rem)]'"
           >
             <template v-if="activeMovie">
               <div
-                class="relative h-full overflow-hidden [--hero-card-gap:0.75rem] [--hero-card-width:82%] sm:[--hero-card-gap:0.9rem] sm:[--hero-card-width:76%] lg:[--hero-card-gap:1rem] lg:[--hero-card-width:68%] xl:[--hero-card-width:64%]"
+                class="absolute inset-0 overflow-hidden"
               >
                 <div
                   data-home-hero-track
