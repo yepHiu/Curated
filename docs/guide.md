@@ -684,6 +684,8 @@ Language/theme, current-session lock/unlock, local capture saving/directory/shor
 
 ## Desktop server connections
 
+- macOS 关闭主窗口会隐藏窗口，应用仍保留在 Dock；点击 Dock 图标恢复已有主窗口及当前页面，最小化时先恢复再聚焦。尚未连接服务器时打开本地服务器管理窗口；已最小化的管理窗口也会恢复。此行为修复需要更新 Desktop，更新 Server 不会改变旧 Desktop 的窗口逻辑。退出应用使用 **⌘Q** 或托盘退出。
+
 If a page such as Wishlist or Curated frames stops opening after a Server upgrade, refresh the Desktop window with **⌘R** on macOS or **Ctrl+R** on Windows, or reconnect to the same Server. An already open page can still refer to scripts removed by the upgrade. New source shows a persistent page-load error with **Reload app**; that explicit action fetches the current entry document and retries the intended page, including its filters. It does not automatically interrupt playback/uploads or clear login/storage. Missing `/assets/` files return an uncached 404 instead of the SPA document. The recovery UI requires an updated Server-hosted frontend; it cannot patch an older page already loaded in Desktop. See [diagnosis and verification](plan/2026-10-02-remote-page-navigation-recovery.md).
 
 - **Settings → Network & devices → Server connections** shows the current server name/address and health status, plus saved servers with a current-connection badge. **Add server** opens an in-page dialog with name/address fields; saving closes it and refreshes the list without switching servers. Invalid/duplicate addresses show inline errors; save failures preserve the draft. **Manage servers** opens the local manager; returning to settings refreshes the list. Other saved rows can request a switch, using the same native confirmation. The card requires the new Desktop bridge and is hidden in browsers/older Desktop versions.

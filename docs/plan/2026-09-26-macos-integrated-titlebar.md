@@ -16,3 +16,10 @@
 - `NODE_OPTIONS=--no-experimental-webstorage pnpm test src/layouts/AppShell.test.ts src/components/jav-library/AppSidebar.test.ts`：31 项通过。默认 Node 实验性 Web Storage 与测试的 jsdom localStorage 冲突；关闭该实验特性后通过，未修改业务存储逻辑。
 - Web API 生产构建（含类型检查）通过；前端修改文件 ESLint 无错误；Electron TS 文件未纳入当前 ESLint 配置，由编译与桌面测试检查。
 - 本次未执行完整跨浏览器、DPR、90%–150% 缩放或 Windows 实机矩阵，未单独测量当前窗口 DPR。窄窗口/阅读器/锁屏避让已实现，仍需后续人工矩阵验证。
+
+## 2026-10-02：关闭后点击 Dock 恢复窗口
+
+- 主窗口关闭时通过 `hide()` 保留 renderer，旧 `activate` 仅在 `getAllWindows().length === 0` 时打开窗口，导致隐藏窗口存在时点击 Dock 无响应。
+- 应用已就绪且未退出时，`activate` 直接调用既有 `showMainWindow()`；恢复已有主窗口不重载页面，不创建重复窗口。无主窗口时打开本地服务器管理窗口，并补齐管理窗口的最小化恢复。退出期间与启动未就绪时不拉起窗口。
+- `electron/main.activation.test.ts` 通过模拟 Electron 生命周期执行真实主入口，覆盖隐藏／最小化主窗口、管理窗口最小化／关闭重开、就绪与退出边界。完整 Electron 测试 10 文件、85 项通过；`pnpm build:electron:main`（主进程 TypeScript 编译与本地管理页构建）通过。
+- 本轮未操作已安装 macOS 应用或生成发布包；真实 Dock 点击验收仍待新版 Desktop 实装。无需更新 Server，无新增 API、IPC 或配置。
