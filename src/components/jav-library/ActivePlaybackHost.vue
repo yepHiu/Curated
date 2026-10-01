@@ -14,6 +14,7 @@ const unregisterControls = props.host.registerMediaControls({
   // 所有停止路径（包括认证失效）同步保存、暂停，再移除组件。
   stop: () => { player.value?.stopHostedPlayback() },
   toggle: async () => { await player.value?.togglePlayPause() },
+  exitPip: async () => { await player.value?.exitHostedPictureInPicture() },
 })
 onBeforeUnmount(unregisterControls)
 // 播放器及播放列表读取自己的来源快照，后台页面不会改变其导航上下文。

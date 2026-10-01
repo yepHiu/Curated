@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue"
-import { RouterLink, useRoute } from "vue-router"
+import { RouterLink, useRoute, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { Pause, PictureInPicture2, Play, Square, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import { useActivePlaybackSession } from "@/composables/use-active-playback-sess
 const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const { activePlaybackSession: resumeSession, playbackSessionSnapshot, dismissActivePlaybackSession } = useActivePlaybackSession()
 const playbackHost = usePlaybackHost()
 const livePlayback = computed(() => Boolean(playbackHost?.target.value && playbackHost.pipActive.value && !playbackHost.visible.value))
@@ -34,6 +35,22 @@ function togglePlayback() {
 /** 停止先保存并暂停，再释放原生小窗和会话。 */
 function stopPlayback() {
   playbackHost?.stop()
+}
+
+/** 先让播放面成为前台，再退出小窗，避免后台关闭策略卸载正在返回的媒体。 */
+async function returnToPlayer() {
+  const movieId = playbackHost?.target.value?.movie.id
+  const target = activePlaybackResumeTarget.value
+  if (!movieId || !target) return
+  const failure = await router.push(target)
+  if (!failure) await playbackHost?.restoreNormalPlayback(movieId)
+}
+
+/** 卡片正文与返回图标使用相同行为；带修饰键的链接仍保留浏览器默认导航。 */
+function onCardClick(event: MouseEvent) {
+  if (!livePlayback.value || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+  event.preventDefault()
+  void returnToPlayer()
 }
 
 function formatSidebarPlaybackClock(seconds: number): string {
@@ -105,20 +122,6 @@ const activePlaybackCompactTitle = computed(() => {
       class="flex gap-1"
       :class="props.compact ? 'flex-col items-center' : 'justify-end px-3 pt-2'"
     >
-      <RouterLink
-        data-active-playback-return
-        :data-active-playback-compact="props.compact ? '' : undefined"
-        :to="activePlaybackResumeTarget ?? activePlaybackSession.resumeRouteTarget"
-        class="relative inline-flex shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-        :class="props.compact ? 'size-11' : 'size-11 lg:size-8'"
-        :title="props.compact ? activePlaybackCompactTitle : activePlaybackAriaLabel"
-        :aria-label="activePlaybackAriaLabel"
-      >
-        <PictureInPicture2 class="size-4" aria-hidden="true" />
-        <span v-if="props.compact" class="absolute inset-x-1.5 bottom-1.5 h-0.5 overflow-hidden rounded-full bg-primary-foreground/20" aria-hidden="true">
-          <span class="block h-full rounded-full bg-primary-foreground" :style="{ width: `${activePlaybackProgressValue}%` }" />
-        </span>
-      </RouterLink>
       <Button
         type="button"
         variant="ghost"
@@ -140,6 +143,22 @@ const activePlaybackCompactTitle = computed(() => {
       >
         <Square class="size-4" aria-hidden="true" />
       </Button>
+      <Button
+        data-active-playback-return
+        :data-active-playback-compact="props.compact ? '' : undefined"
+        type="button"
+        variant="ghost"
+        @click="returnToPlayer"
+        class="relative inline-flex shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        :class="props.compact ? 'size-11' : 'size-11 lg:size-8'"
+        :title="props.compact ? activePlaybackCompactTitle : activePlaybackAriaLabel"
+        :aria-label="activePlaybackAriaLabel"
+      >
+        <PictureInPicture2 class="size-4" aria-hidden="true" />
+        <span v-if="props.compact" class="absolute inset-x-1.5 bottom-1.5 h-0.5 overflow-hidden rounded-full bg-primary-foreground/20" aria-hidden="true">
+          <span class="block h-full rounded-full bg-primary-foreground" :style="{ width: `${activePlaybackProgressValue}%` }" />
+        </span>
+      </Button>
     </div>
     <div
       v-if="!props.compact"
@@ -148,6 +167,7 @@ const activePlaybackCompactTitle = computed(() => {
     >
       <RouterLink
         data-active-playback-card
+        @click.capture="onCardClick"
         :to="activePlaybackResumeTarget ?? activePlaybackSession.resumeRouteTarget"
         class="group flex min-w-0 flex-col gap-2 rounded-lg px-3 py-2.5 text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
         :aria-label="activePlaybackAriaLabel"

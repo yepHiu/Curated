@@ -2971,7 +2971,13 @@ async function seekHostedPlayback(seconds: number, resume: boolean) {
     void tryStartPlaybackIfRequested()
   }
 }
-defineExpose({ togglePlayPause, stopHostedPlayback, seekHostedPlayback })
+/** 返回正常播放只退出当前视频的小窗，不改变进度或播放/暂停状态。 */
+async function exitHostedPictureInPicture() {
+  if (videoRef.value && document.pictureInPictureElement === videoRef.value) {
+    await togglePictureInPicture()
+  }
+}
+defineExpose({ togglePlayPause, stopHostedPlayback, seekHostedPlayback, exitHostedPictureInPicture })
 
 const videoPreloadMode = computed(() =>
   playbackDescriptor.value?.mode === "hls" || playbackDescriptor.value?.mode === "direct"

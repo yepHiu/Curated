@@ -45,6 +45,7 @@ vi.mock("vue-router", () => ({
     template: "<a :data-to=\"JSON.stringify(to)\"><slot /></a>",
   },
   useRoute: () => routeState.value,
+  useRouter: () => ({ push: vi.fn() }),
 }))
 
 vi.mock("@/services/library-service", () => ({

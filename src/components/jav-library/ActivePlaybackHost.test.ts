@@ -235,7 +235,11 @@ beforeEach(() => {
   // 原生 PiP API 是测试唯一窗口层桩，不模拟 Vue 的生命周期。
   Object.defineProperty(document, "pictureInPictureEnabled", { configurable: true, value: true })
   Object.defineProperty(document, "pictureInPictureElement", { configurable: true, value: null })
-  Object.defineProperty(document, "exitPictureInPicture", { configurable: true, value: vi.fn().mockResolvedValue(undefined) })
+  Object.defineProperty(document, "exitPictureInPicture", { configurable: true, value: vi.fn(async () => {
+    const video = document.pictureInPictureElement
+    Object.defineProperty(document, "pictureInPictureElement", { configurable: true, value: null })
+    video?.dispatchEvent(new Event("leavepictureinpicture"))
+  }) })
   Object.defineProperty(HTMLVideoElement.prototype, "requestPictureInPicture", { configurable: true, value: vi.fn().mockResolvedValue({}) })
 })
 afterEach(() => {
@@ -267,6 +271,7 @@ describe("application-owned playback", () => {
     await test.wrapper.get("[data-active-playback-card]").trigger("click")
     await flushPromises()
     expect(test.wrapper.get("video").element).toBe(test.video)
+    expect(document.pictureInPictureElement).toBeNull()
     expect(serviceMocks.getMoviePlayback).toHaveBeenCalledTimes(1)
     expect(serviceMocks.prefetchMoviePlayback).toHaveBeenCalledTimes(1)
     expect(test.wrapper.find("[data-active-playback-controls]").exists()).toBe(false)
@@ -274,6 +279,49 @@ describe("application-owned playback", () => {
     test.wrapper.unmount()
     await flushPromises()
     if (mode === "hls") expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("session-1")
+  })
+
+  // 返回图标先完成路由导航再关闭小窗，保持同一媒体、进度及真实暂停/播放状态。
+  it.each([
+    ["direct", false], ["direct", true], ["hls", false], ["hls", true],
+  ] as const)("returns %s PiP to normal playback while playing=%s", async (mode, playing) => {
+    const test = await mountHost(mode)
+    if (playing) await test.video.play()
+    await enterPip(test.video)
+    await test.router.push("/library")
+    await flushPromises()
+    const controls = test.wrapper.get("[data-active-playback-controls]")
+    expect(controls.element.lastElementChild?.hasAttribute("data-active-playback-return")).toBe(true)
+    expect(controls.findAll("button")).toHaveLength(3)
+    await test.wrapper.get("[data-active-playback-return]").trigger("click")
+    await flushPromises()
+    expect(test.router.currentRoute.value.name).toBe("player")
+    expect(test.wrapper.get("video").element).toBe(test.video)
+    expect(document.pictureInPictureElement).toBeNull()
+    expect(test.host.pipActive.value).toBe(false)
+    expect(test.video.currentTime).toBe(30)
+    expect(test.video.paused).toBe(!playing)
+    expect(test.destroy).not.toHaveBeenCalled()
+    expect(serviceMocks.getMoviePlayback).toHaveBeenCalledTimes(1)
+    expect(test.router.currentRoute.value.query.t).toBeUndefined()
+    test.wrapper.unmount()
+  })
+
+  // 路由守卫拒绝返回时保持后台小窗，不能先退出从而触发停止。
+  it("keeps PiP alive when returning to the player is cancelled", async () => {
+    const test = await mountHost("hls")
+    await enterPip(test.video)
+    await test.router.push("/library")
+    await flushPromises()
+    const removeGuard = test.router.beforeEach(() => false)
+    await test.wrapper.get("[data-active-playback-return]").trigger("click")
+    await flushPromises()
+    expect(test.router.currentRoute.value.name).toBe("library")
+    expect(document.pictureInPictureElement).toBe(test.video)
+    expect(document.exitPictureInPicture).not.toHaveBeenCalled()
+    expect(test.wrapper.get("video").element).toBe(test.video)
+    removeGuard()
+    test.wrapper.unmount()
   })
 
   // 未开启小窗不能留下无可见控制的后台声音。
