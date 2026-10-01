@@ -1,28 +1,29 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { ChevronLeft, ChevronRight } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
-import MediaStill from "@/components/jav-library/MediaStill.vue"
-import FrameImageViewer from "@/components/jav-library/FrameImageViewer.vue"
-import { listCuratedFramesPage, type CuratedFrameDbRow } from "@/lib/curated-frames/db"
+import CuratedFrameCard from "@/components/jav-library/CuratedFrameCard.vue"
+import CuratedFrameDetailDialog from "@/components/jav-library/CuratedFrameDetailDialog.vue"
+import { listCuratedFramesPage } from "@/lib/curated-frames/db"
 import { curatedFramesRevision } from "@/lib/curated-frames/revision"
-import { curatedFrameImageUrl, curatedFrameThumbnailUrl } from "@/lib/curated-frame-image-url"
+import { curatedFrameThumbnailUrl } from "@/lib/curated-frame-image-url"
+import type { CuratedFrameDialogItem } from "@/lib/curated-frames/dialog-navigation"
+import { buildCuratedFrameNearDuplicateIndex, findCuratedFrameNearDuplicateGroups } from "@/lib/curated-frames/near-duplicates"
 import { formatTimecodeLabel } from "@/lib/player-playback-stats-format"
 
 const props = defineProps<{ movieId: string }>()
 const { t } = useI18n()
 const pageSize = 12
-type FrameEntry = { row: CuratedFrameDbRow; thumbnail: string; original: string }
-const entries = ref<FrameEntry[]>([])
+const frameDialogRef = ref<InstanceType<typeof CuratedFrameDetailDialog> | null>(null)
+const entries = ref<CuratedFrameDialogItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const failed = ref(false)
 const viewerOpen = ref(false)
-const selectedIndex = ref(0)
-const selected = computed(() => entries.value[selectedIndex.value])
+let reloadOnClose = false
+const dialogEntries = computed(() => entries.value.map((item) => ({ item, sectionActor: null })))
+const nearDuplicateIds = computed(() => [...buildCuratedFrameNearDuplicateIndex(findCuratedFrameNearDuplicateGroups(entries.value.map((entry) => entry.row), 3))])
 const hasMore = computed(() => entries.value.length < total.value)
 let nextCursor: string | undefined
 let offset = 0
@@ -30,7 +31,7 @@ let generation = 0
 
 function releaseImages() {
   for (const entry of entries.value) {
-    if (entry.original.startsWith("blob:")) URL.revokeObjectURL(entry.original)
+    if (entry.url.startsWith("blob:")) URL.revokeObjectURL(entry.url)
   }
   entries.value = []
 }
@@ -50,12 +51,12 @@ async function loadMore() {
     })
     if (requestGeneration !== generation) return
     const known = new Set(entries.value.map((entry) => entry.row.id))
-    const added: FrameEntry[] = []
+    const added: CuratedFrameDialogItem[] = []
     for (const row of page.items) {
       if (known.has(row.id)) continue
       known.add(row.id)
-      const original = row.imageBlob ? URL.createObjectURL(row.imageBlob) : curatedFrameImageUrl(row.id)
-      added.push({ row, original, thumbnail: row.imageBlob ? original : curatedFrameThumbnailUrl(row.id) })
+      const url = row.imageBlob ? URL.createObjectURL(row.imageBlob) : curatedFrameThumbnailUrl(row.id)
+      added.push({ row, url })
     }
     entries.value = [...entries.value, ...added]
     offset += page.items.length
@@ -69,10 +70,10 @@ async function loadMore() {
   }
 }
 
-watch([() => props.movieId, curatedFramesRevision], () => {
+function reload() {
   generation++
   viewerOpen.value = false
-  selectedIndex.value = 0
+  reloadOnClose = false
   releaseImages()
   total.value = 0
   offset = 0
@@ -80,20 +81,27 @@ watch([() => props.movieId, curatedFramesRevision], () => {
   loading.value = false
   failed.value = false
   void loadMore()
-}, { immediate: true })
+}
+
+watch(() => props.movieId, reload, { immediate: true })
+watch(curatedFramesRevision, () => {
+  // Tag autosave also increments the revision. Keep the active dialog and its URLs alive.
+  if (viewerOpen.value) reloadOnClose = true
+  else reload()
+})
+watch(viewerOpen, (open) => {
+  if (!open && reloadOnClose) reload()
+})
 
 onBeforeUnmount(() => {
   generation++
   releaseImages()
 })
 
-function openFrame(index: number) {
-  selectedIndex.value = index
-  viewerOpen.value = true
-}
-
-function moveFrame(delta: number) {
-  selectedIndex.value = Math.max(0, Math.min(entries.value.length - 1, selectedIndex.value + delta))
+function applyFrameTags({ id, tags }: { id: string; tags: string[] }) {
+  entries.value = entries.value.map((entry) => entry.row.id === id
+    ? { ...entry, row: { ...entry.row, tags: [...tags] } }
+    : entry)
 }
 </script>
 
@@ -107,20 +115,18 @@ function moveFrame(delta: number) {
     </CardHeader>
     <CardContent class="space-y-4" :aria-busy="loading">
       <div v-if="entries.length" class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
-        <button
-          v-for="(entry, index) in entries"
+        <CuratedFrameCard
+          v-for="entry in entries"
           :key="entry.row.id"
-          type="button"
           :data-movie-frame="entry.row.id"
-          :aria-label="t('detailPage.curatedFrameOpen', { time: formatTimecodeLabel(entry.row.positionSec) })"
-          class="min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-muted/30 text-left transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          @click="openFrame(index)"
-        >
-          <div class="relative aspect-video">
-            <MediaStill :src="entry.thumbnail" :alt="entry.row.code" fit="contain" />
-          </div>
-          <p class="px-3 py-2 text-xs tabular-nums text-muted-foreground">{{ formatTimecodeLabel(entry.row.positionSec) }}</p>
-        </button>
+          :row="entry.row"
+          :image-url="entry.url"
+          :position-label="formatTimecodeLabel(entry.row.positionSec)"
+          :batch-mode="false"
+          :selected="false"
+          :near-duplicate="nearDuplicateIds.includes(entry.row.id)"
+          @open="frameDialogRef?.open(entry)"
+        />
       </div>
       <p v-if="loading" role="status" class="text-sm text-muted-foreground">{{ t("common.loading") }}</p>
       <p v-else-if="!failed && !entries.length" class="text-sm text-muted-foreground">{{ t("detailPage.curatedFramesEmpty") }}</p>
@@ -132,34 +138,12 @@ function moveFrame(delta: number) {
     </CardContent>
   </Card>
 
-  <Dialog v-model:open="viewerOpen">
-    <DialogContent
-      class="flex h-[min(90dvh,60rem)] w-[94vw] max-w-[94vw] flex-col gap-3 overflow-hidden sm:max-w-[min(94vw,90rem)]"
-    >
-      <div
-        data-movie-frame-viewer
-        class="flex h-full min-h-0 flex-col gap-3"
-        @keydown.left.stop.prevent="moveFrame(-1)"
-        @keydown.right.stop.prevent="moveFrame(1)"
-      >
-        <DialogTitle class="pr-8">{{ t("curated.title") }} · {{ selected?.row.code }}</DialogTitle>
-        <DialogDescription class="sr-only">{{ t("detailPage.curatedFrameOpen", { time: formatTimecodeLabel(selected?.row.positionSec) }) }}</DialogDescription>
-        <FrameImageViewer
-          v-if="viewerOpen && selected"
-          :src="selected.original"
-          :alt="`${selected.row.code} · ${formatTimecodeLabel(selected.row.positionSec)}`"
-          class="min-h-0 flex-1"
-        />
-        <div class="flex shrink-0 items-center justify-center gap-4">
-          <Button variant="outline" size="icon" class="size-11" :disabled="selectedIndex <= 0" :aria-label="t('curated.previousFrame')" @click="moveFrame(-1)">
-            <ChevronLeft class="size-4" aria-hidden="true" />
-          </Button>
-          <span aria-live="polite" class="text-sm tabular-nums text-muted-foreground">{{ formatTimecodeLabel(selected?.row.positionSec) }} · {{ selectedIndex + 1 }} / {{ entries.length }}</span>
-          <Button variant="outline" size="icon" class="size-11" :disabled="selectedIndex >= entries.length - 1" :aria-label="t('curated.nextFrame')" @click="moveFrame(1)">
-            <ChevronRight class="size-4" aria-hidden="true" />
-          </Button>
-        </div>
-      </div>
-    </DialogContent>
-  </Dialog>
+  <CuratedFrameDetailDialog
+    :key="movieId"
+    ref="frameDialogRef"
+    :entries="dialogEntries"
+    :near-duplicate-ids="nearDuplicateIds"
+    @update:open="viewerOpen = $event"
+    @tags-saved="applyFrameTags"
+  />
 </template>

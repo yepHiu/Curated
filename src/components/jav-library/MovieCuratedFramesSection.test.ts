@@ -1,4 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils"
+import { defineComponent, ref } from "vue"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import MovieCuratedFramesSection from "./MovieCuratedFramesSection.vue"
 import { listCuratedFramesPage, type CuratedFrameDbRow, type CuratedFramePageResult } from "@/lib/curated-frames/db"
@@ -6,6 +7,7 @@ import { bumpCuratedFramesRevision } from "@/lib/curated-frames/revision"
 
 vi.mock("@/lib/curated-frames/db", () => ({ listCuratedFramesPage: vi.fn() }))
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock("./CuratedFrameDetailDialog.vue", () => ({ default: { name: "CuratedFrameDetailDialog", render: () => null } }))
 
 const list = vi.mocked(listCuratedFramesPage)
 function row(id: string, movieId = "movie-a"): CuratedFrameDbRow {
@@ -19,12 +21,17 @@ function render(movieId = "movie-a") {
   const wrapper = mount(MovieCuratedFramesSection, {
     props: { movieId },
     global: { stubs: {
-      Dialog: { props: ["open"], template: '<div v-if="open"><slot /></div>' },
-      DialogContent: { template: '<div><slot /></div>' },
-      DialogTitle: { template: '<h2><slot /></h2>' },
-      DialogDescription: { template: '<p><slot /></p>' },
-      MediaStill: { props: ["src", "fit"], template: '<img :src="src" />' },
-      FrameImageViewer: { props: ["src"], template: '<img data-original :src="src" />' },
+      CuratedFrameDetailDialog: defineComponent({
+        name: "CuratedFrameDetailDialog",
+        props: ["entries", "nearDuplicateIds"],
+        emits: ["update:open", "tagsSaved"],
+        setup(_, { expose, emit }) {
+          const openedId = ref("")
+          expose({ open: (item: { row: { id: string } }) => { openedId.value = item.row.id; emit("update:open", true) } })
+          return { openedId }
+        },
+        template: '<div data-shared-dialog :data-selected="openedId" />',
+      }),
     } },
   })
   wrappers.push(wrapper)
@@ -37,20 +44,26 @@ afterEach(() => {
 })
 
 describe("MovieCuratedFramesSection", () => {
-  it("filters by movie, loads thumbnails, and opens only the selected original with navigation", async () => {
+  it("filters by movie and opens the shared dialog with the clicked frame and movie-only navigation", async () => {
     list.mockResolvedValue(page([row("frame-a"), row("frame-b")]))
     const wrapper = render()
     await flushPromises()
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ movieId: "movie-a", limit: 12, offset: 0 }))
-    expect(wrapper.find("[data-original]").exists()).toBe(false)
     expect(wrapper.get('[data-movie-frame="frame-a"] img').attributes("src")).toContain("/frame-a/thumbnail")
     expect(wrapper.text()).toContain("01:05")
-    await wrapper.get('[data-movie-frame="frame-a"]').trigger("click")
-    expect(wrapper.get("[data-original]").attributes("src")).toContain("/frame-a/image")
-    await wrapper.get('[aria-label="curated.nextFrame"]').trigger("click")
-    expect(wrapper.get("[data-original]").attributes("src")).toContain("/frame-b/image")
-    await wrapper.get('[data-movie-frame-viewer]').trigger("keydown", { key: "ArrowLeft" })
-    expect(wrapper.get("[data-original]").attributes("src")).toContain("/frame-a/image")
+    await wrapper.get('[data-movie-frame="frame-a"] button').trigger("click")
+    expect(wrapper.get('[data-shared-dialog]').attributes("data-selected")).toBe("frame-a")
+    const dialog = wrapper.getComponent({ name: "CuratedFrameDetailDialog" })
+    expect(dialog.props("entries").map((entry: { item: { row: { id: string } } }) => entry.item.row.id)).toEqual(["frame-a", "frame-b"])
+    dialog.vm.$emit("tagsSaved", { id: "frame-a", tags: ["warm"] })
+    bumpCuratedFramesRevision()
+    await flushPromises()
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(dialog.props("entries")[0].item.row.tags).toEqual(["warm"])
+    expect(wrapper.get('[data-shared-dialog]').attributes("data-selected")).toBe("frame-a")
+    dialog.vm.$emit("update:open", false)
+    await flushPromises()
+    expect(list).toHaveBeenCalledTimes(2)
   })
 
   it("retains loaded frames on pagination failure and retries the same cursor without duplicates", async () => {

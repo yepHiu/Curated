@@ -1,3 +1,7 @@
+import type { CuratedFrameDbRow } from "@/lib/curated-frames/db"
+
+export type CuratedFrameDialogItem = { row: CuratedFrameDbRow; url: string }
+
 export type CuratedFrameDialogMainTab = "timeline" | "actors" | "movies"
 export type CuratedFrameDialogDirection = "previous" | "next"
 
