@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useSlots } from "vue"
+import { computed, nextTick, ref, useSlots, type HTMLAttributes } from "vue"
 import { useMediaQuery, useResizeObserver } from "@vueuse/core"
 import { ChevronUp } from "lucide-vue-next"
 import { useI18n } from "vue-i18n"
@@ -19,6 +19,7 @@ import {
   resolveMovieGridDensity,
 } from "@/lib/display-density"
 import { buildMovieGridChunkStyle } from "@/lib/movie-grid-template"
+import { cn } from "@/lib/utils"
 
 interface MovieChunk {
   id: string
@@ -36,6 +37,7 @@ const props = withDefaults(
     emptyTitle?: string
     emptyDescription?: string
     scrollPreserveKey?: string
+    scrollClass?: HTMLAttributes["class"]
   }>(),
   {
     batchMode: false,
@@ -253,7 +255,7 @@ function posterLoadPolicyForChunk(index: number) {
       :min-item-size="estimatedChunkHeight"
       :buffer="BUFFER_PX"
       :pool-size="BUFFER_CHUNKS * 2 + 7"
-      class="h-full min-h-0 overflow-y-auto pr-2"
+      :class="cn('h-full min-h-0 overflow-y-auto pr-2', props.scrollClass)"
     >
       <template #before>
         <div v-if="hasHeaderSlot" class="pb-5 lg:pb-6">
@@ -309,7 +311,7 @@ function posterLoadPolicyForChunk(index: number) {
     <div
       v-else
       :ref="setScrollerRef"
-      class="h-full min-h-0 overflow-y-auto pr-2"
+      :class="cn('h-full min-h-0 overflow-y-auto pr-2', props.scrollClass)"
     >
       <div v-if="hasHeaderSlot" class="pb-5 lg:pb-6">
         <slot name="header" />
@@ -336,7 +338,7 @@ function posterLoadPolicyForChunk(index: number) {
     </Button>
   </div>
 
-  <div v-else class="h-full min-h-0 overflow-y-auto">
+  <div v-else :class="cn('h-full min-h-0 overflow-y-auto', props.scrollClass)">
     <MediaEmptyState :filtered="emptyFiltered" :title="emptyTitle" :description="emptyDescription" />
   </div>
 </template>

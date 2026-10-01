@@ -118,12 +118,13 @@ async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) 
 <template>
   <div
     data-actor-detail-page
-    class="flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-hidden px-[var(--app-page-px)] py-[var(--app-page-py)] sm:px-[var(--app-page-px-sm)] lg:px-[var(--app-page-px-lg)] lg:py-[var(--app-page-py-lg)] xl:px-[var(--app-page-px-xl)]"
+    class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
   >
     <h1 class="sr-only">{{ actorDisplayName }}</h1>
 
     <div class="min-h-0 flex-1 overflow-hidden">
       <VirtualMovieMasonry
+        scroll-class="px-[var(--app-page-px)] py-[var(--app-page-py)] sm:px-[var(--app-page-px-sm)] lg:px-[var(--app-page-px-lg)] lg:py-[var(--app-page-py-lg)] xl:px-[var(--app-page-px-xl)]"
         :movies="actorMovies"
         :empty-title="t('mediaEmpty.title')"
         :empty-description="t('actors.detailEmptyDesc')"

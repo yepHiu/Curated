@@ -337,7 +337,7 @@ onUnmounted(() => {
         <div class="min-w-0 flex-1">
           <CardTitle>{{ t("library.actorCardTitle") }}</CardTitle>
         </div>
-        <div class="flex shrink-0 flex-wrap items-center gap-2">
+        <div class="flex max-w-full shrink-0 flex-wrap items-center gap-2">
           <slot name="actions" />
           <Button
             v-if="useWeb && profile && !initialLoading && !notFound && !loadError"
