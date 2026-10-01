@@ -35,7 +35,7 @@ Manual GitHub Actions builds provide Windows x64 component installers and an App
 
 This README is the short public entry. For setup details, configuration, packaging, and links into the rest of `docs/`, see **[docs/guide.md](docs/guide.md)**. The HTTP API reference is **[API.md](API.md)**.
 
-Native picture-in-picture keeps playing while you browse Curated, with return, pause and stop controls. See [picture-in-picture playback](docs/guide.md#picture-in-picture-across-pages).
+Native picture-in-picture keeps playing while you browse Curated, with return, pause and stop controls in the sidebar playback card. See [picture-in-picture playback](docs/guide.md#picture-in-picture-across-pages).
 
 ## Download
 
