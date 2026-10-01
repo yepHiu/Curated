@@ -1935,6 +1935,10 @@
     "ariaUnmute": "Unmute",
     "fullscreen": "Fullscreen",
     "pip": "Picture-in-picture",
+    "ariaPlay": "Play",
+    "ariaPause": "Pause",
+    "backgroundPlayback": "Picture-in-picture · Return to player",
+    "stopBackgroundPlayback": "Stop picture-in-picture playback",
     "pipError": {
       "notReady": "Video is not ready. Wait for it to load and try again.",
       "gesture": "Click the picture-in-picture button to open the window again.",

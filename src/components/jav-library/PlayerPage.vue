@@ -165,10 +165,16 @@ const props = withDefaults(
     movie: Movie
     /** 为 true 时在首帧可播后尝试自动播放（通常由路由 `?autoplay=1` 驱动） */
     autoplay?: boolean
+    /** 宿主在普通页面隐藏播放面，此时禁用全局键盘和页面导航副作用。 */
+    foreground?: boolean
   }>(),
-  { autoplay: false },
+  { autoplay: false, foreground: true },
 )
 
+const emit = defineEmits<{
+  "pip-change": [movieId: string, active: boolean]
+  "playing-change": [movieId: string, playing: boolean]
+}>()
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
@@ -351,7 +357,29 @@ const {
   // 原生操作失败给出可执行的本地化反馈，媒体错误不阻塞其它播放操作。
   pushAppToast(t(`player.pipError.${failure}`), { variant: "warning" })
 })
+let suppressPlaybackPublication = false
 const isSurfaceFullscreen = ref(false)
+watch(isPipActive, (active) => {
+  // 系统关闭小窗时通知宿主，后台实例不继续隐形播放。
+  emit("pip-change", props.movie.id, active)
+}, { flush: "sync" })
+watch(isPlaying, (playing) => {
+  // 后台控制入口显示真实媒体状态。
+  emit("playing-change", props.movie.id, playing)
+}, { flush: "sync" })
+watch(() => props.foreground, (foreground) => {
+  // 隐藏播放面后收起局部菜单，取消采集手势，避免遮挡其它路由。
+  if (!foreground) {
+    cancelCuratedPress()
+    closePlayerContextMenu()
+    closePlaylistPanel()
+    capturePreviewOpen.value = false
+    detailedStatsVisible.value = false
+    if (surfaceRef.value && document.fullscreenElement === surfaceRef.value) {
+      void document.exitFullscreen().catch(() => { /* 导航与系统退出全屏竞争时不提示。 */ })
+    }
+  }
+})
 
 function resolveActivePlaybackStatus(statusOverride?: ActivePlaybackStatus): ActivePlaybackStatus {
   if (statusOverride) return statusOverride
@@ -360,7 +388,9 @@ function resolveActivePlaybackStatus(statusOverride?: ActivePlaybackStatus): Act
   return isPlaying.value ? "playing" : "paused"
 }
 
+/** 发布可续播进度；宿主已停止后不得用卸载事件重新生成入口。 */
 function publishActivePlaybackSession(statusOverride?: ActivePlaybackStatus) {
+  if (suppressPlaybackPublication) return
   const movieId = props.movie.id.trim()
   if (!movieId || !playbackSrc.value) return
   updateActivePlaybackSession({
@@ -1277,7 +1307,9 @@ function flushPlaybackProgress() {
   publishActivePlaybackSession()
 }
 
+/** 清除已消费的续播参数，后台完成加载不能把用户导航回播放器。 */
 function stripTFromRoute() {
+  if (!props.foreground) return
   if (route.query.t === undefined || route.query.t === null || route.query.t === "") return
   const nextQuery = { ...route.query }
   delete nextQuery.t
@@ -1664,6 +1696,7 @@ watch([currentTime, totalDurationSec, isScrubbingProgress], () => {
 }, { immediate: true })
 
 function stripAutoplayFromRoute() {
+  if (!props.foreground) return
   if (route.query.autoplay !== "1") return
   const nextQuery = { ...route.query }
   delete nextQuery.autoplay
@@ -1752,7 +1785,8 @@ function onVideoEnded() {
     })
     return
   }
-  if (playlistActive.value && playlistAutoAdvance.value && playlistNext.value) {
+  // 后台结束保持当前浏览页面，不让播放列表自动导航打断浏览。
+  if (props.foreground && playlistActive.value && playlistAutoAdvance.value && playlistNext.value) {
     void openPlaylistMovie(playlistNext.value.id)
   }
 }
@@ -2065,7 +2099,9 @@ async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
   }
 }
 
+/** 仅前台播放面处理快捷键，后台小窗不接管其它页面的输入。 */
 function onPlaybackKeydown(e: KeyboardEvent) {
+  if (!props.foreground) return
   if (playerContextMenu.value && e.key === "Escape") {
     e.preventDefault()
     closePlayerContextMenu()
@@ -2137,7 +2173,9 @@ function onPlaybackKeydown(e: KeyboardEvent) {
   }
 }
 
+/** 前台按键抬起完成萃取操作，后台不消费当前页面事件。 */
 function onPlaybackKeyup(e: KeyboardEvent) {
+  if (!props.foreground) return
   if (e.code !== getCuratedCaptureKeyCode()) return
   if (!playbackSrc.value || e.ctrlKey || e.metaKey || e.altKey) return
   if (shouldIgnoreGlobalPlaybackHotkeysForTarget(e.target)) return
@@ -2917,6 +2955,23 @@ const detailedStatsModeLabel = computed(() => {
   if (mode === "direct") return "Direct"
   return "N/A"
 })
+
+/** 宿主停止入口先提交媒体时间，再暂停；最终资源由卸载钩子释放。 */
+function stopHostedPlayback() {
+  flushPlaybackProgress()
+  videoRef.value?.pause()
+  suppressPlaybackPublication = true
+}
+/** 同片显式时间链接复用活动实例，并沿用完整的 HLS 绝对时间寻址路径。 */
+async function seekHostedPlayback(seconds: number, resume: boolean) {
+  stripTFromRoute()
+  await seekToAbsolutePlaybackTime(seconds, { resumeAfterSwap: resume })
+  if (!playbackDisposed && resume) {
+    resumePlaybackWhenReady = true
+    void tryStartPlaybackIfRequested()
+  }
+}
+defineExpose({ togglePlayPause, stopHostedPlayback, seekHostedPlayback })
 
 const videoPreloadMode = computed(() =>
   playbackDescriptor.value?.mode === "hls" || playbackDescriptor.value?.mode === "direct"

@@ -6,12 +6,14 @@ import NotFoundState from "@/components/jav-library/NotFoundState.vue"
 import PlayerPage from "@/components/jav-library/PlayerPage.vue"
 import { recordMoviePlayed } from "@/lib/played-movies-storage"
 import { parseResumeSecondsFromQuery } from "@/lib/playback-progress-storage"
+import { usePlaybackHost } from "@/composables/use-playback-host"
 import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
 
 const route = useRoute()
 const libraryService = useLibraryService()
+const playbackHost = usePlaybackHost()
 const { t } = useI18n()
 
 const movieId = computed(() =>
@@ -25,6 +27,11 @@ watch(
   async (id, _old, onCleanup) => {
     let cancelled = false
     onCleanup(() => { cancelled = true })
+    // 返回当前宿主影片直接复用，不能预热出第二个 HLS 会话。
+    if (id && playbackHost?.hasMovie(id)) {
+      hydrating.value = false
+      return
+    }
     if (!id) {
       hydrating.value = false
       return
@@ -68,6 +75,7 @@ watch(
       return
     }
     recordMoviePlayed(movie.id)
+    playbackHost?.start(movie, route.query.autoplay === "1", route)
   },
   { immediate: true },
 )
@@ -82,12 +90,12 @@ watch(
       {{ t("player.loadingTarget") }}
     </div>
     <PlayerPage
-      v-else-if="selectedMovie"
+      v-else-if="selectedMovie && !playbackHost"
       :movie="selectedMovie"
       :autoplay="route.query.autoplay === '1'"
     />
     <NotFoundState
-      v-else
+      v-else-if="!selectedMovie"
       :title="t('player.notFoundTitle')"
       :description="t('player.notFoundDesc')"
     />

@@ -1935,6 +1935,10 @@
     "ariaUnmute": "取消静音",
     "fullscreen": "全屏",
     "pip": "画中画",
+    "ariaPlay": "播放",
+    "ariaPause": "暂停",
+    "backgroundPlayback": "小窗播放 · 返回播放器",
+    "stopBackgroundPlayback": "停止小窗播放",
     "pipError": {
       "notReady": "视频尚未就绪，请等待画面加载后重试。",
       "gesture": "请点击画中画按钮重新打开小窗。",

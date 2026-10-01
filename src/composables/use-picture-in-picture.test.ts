@@ -138,10 +138,14 @@ describe("picture-in-picture lifecycle", () => {
     const pending = test.controls.toggle()
     test.source.value = "/other.mp4"
     await flushPromises()
+    await test.controls.toggle()
+    expect(test.controls.pending.value).toBe(true)
+    expect(test.request).toHaveBeenCalledTimes(1)
     Object.defineProperty(document, "pictureInPictureElement", { configurable: true, value: test.video })
     finish({} as PictureInPictureWindow)
     await pending
     expect(test.exit).toHaveBeenCalledTimes(1)
+    expect(test.controls.pending.value).toBe(false)
     test.wrapper.unmount()
   })
 

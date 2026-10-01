@@ -48,6 +48,7 @@ import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { useAgentWindow } from "@/composables/use-agent-window"
 import { useAIGovernanceSync } from "@/composables/use-ai-governance-sync"
 import { openLibraryFromHomeKey } from "@/lib/home-library-navigation"
+import { providePlaybackHost } from "@/composables/use-playback-host"
 import { clearLibraryScrollSnapshot } from "@/composables/use-library-scroll-preserve"
 
 /** 实验性 Agent Window：懒加载，不进首屏 bundle（开关默认关闭时零成本） */
@@ -70,6 +71,11 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
+const playbackHost = providePlaybackHost(route)
+/** 首次播放才加载宿主与播放器，避免增加资料库首屏的媒体依赖。 */
+const ActivePlaybackHost = defineAsyncComponent(
+  () => { /* 活动影片注册后按需加载壳层播放宿主。 */ return import("@/components/jav-library/ActivePlaybackHost.vue") },
+)
 useAIGovernanceSync()
 
 const homeLibraryDrawerTransition = ref(false)
@@ -1038,6 +1044,7 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
                   <component :is="Component" />
                 </Transition>
               </RouterView>
+              <ActivePlaybackHost v-if="playbackHost.target.value" :host="playbackHost" />
             </div>
             <AgentWindowPanel v-if="agentEnabled" />
           </div>

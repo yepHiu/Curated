@@ -22,6 +22,7 @@ import type { AppPage, LibraryMode } from "@/domain/library/types"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
+import { usePlaybackHost } from "@/composables/use-playback-host"
 import { useActivePlaybackSession } from "@/composables/use-active-playback-session"
 import { useBackendHealth } from "@/composables/use-backend-health"
 import { buildBrowseRouteTarget } from "@/lib/library-query"
@@ -214,6 +215,17 @@ function formatSidebarPlaybackClock(seconds: number): string {
   return `${minutes}:${String(secs).padStart(2, "0")}`
 }
 
+const playbackHost = usePlaybackHost()
+/** 活动实例返回时不携带快照 t，避免重新 seek 到侧栏上次发布的位置。 */
+const activePlaybackResumeTarget = computed(() => {
+  const active = activePlaybackSession.value
+  if (!active || !playbackHost?.hasMovie(active.movieId)) return active?.resumeRouteTarget
+  const query = { ...playbackHost.playerRoute.query }
+  delete query.t
+  delete query.autoplay
+  return { name: "player", params: { id: active.movieId }, query, hash: playbackHost.playerRoute.hash }
+})
+
 const isSameActivePlayerRoute = computed(() => {
   const active = activePlaybackSession.value
   if (!active || route.name !== "player") return false
@@ -391,7 +403,7 @@ const getNavigationTarget = (page: AppPage) => {
       >
         <RouterLink
           data-active-playback-card
-          :to="activePlaybackSession.resumeRouteTarget"
+          :to="activePlaybackResumeTarget ?? activePlaybackSession.resumeRouteTarget"
           class="group flex min-w-0 flex-col gap-2 rounded-lg px-3 py-2.5 text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
           :aria-label="activePlaybackAriaLabel"
         >
@@ -435,7 +447,7 @@ const getNavigationTarget = (page: AppPage) => {
       <RouterLink
         v-else
         data-active-playback-compact
-        :to="activePlaybackSession.resumeRouteTarget"
+        :to="activePlaybackResumeTarget ?? activePlaybackSession.resumeRouteTarget"
         class="relative mx-auto inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background/45 text-primary outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
         :title="activePlaybackCompactTitle"
         :aria-label="activePlaybackAriaLabel"

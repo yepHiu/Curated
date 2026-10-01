@@ -79,7 +79,7 @@ export function usePictureInPicture(
       }
     } finally {
       if (exiting) exitPendingFor = null
-      if (!disposed && requestGeneration === generation) {
+      if (!disposed) {
         pending.value = false
         sync()
       }
@@ -89,7 +89,6 @@ export function usePictureInPicture(
   watch([video, source], (_values, _previous, onCleanup) => {
     // 换源令旧请求失效，并在当前元素的媒体及系统 PiP 事件上刷新准入条件。
     generation++
-    pending.value = false
     const element = video.value
     const events = ["loadedmetadata", "loadeddata", "emptied", "error", "enterpictureinpicture", "leavepictureinpicture"]
     if (element) for (const event of events) element.addEventListener(event, sync)
