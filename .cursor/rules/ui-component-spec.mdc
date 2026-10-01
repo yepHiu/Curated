@@ -24,6 +24,8 @@ Desktop 连接页 Debug 复用右下角入口与 Dialog/Tabs，限高内部滚�
 - **MUST NOT** 在业务组件中随意写死 `#rrggbb` 或任意 `rgb()` 作为主色/背景（难以随主题维护）。
 - **字体**：全局正文由 `--app-font-stack` 控制；中文界面汉字使用 HarmonyOS Sans SC，日语界面假名与汉字使用 Noto Sans JP，拉丁字母与数字使用 Noto Sans。`html lang` 选择中日字形顺序，资源均本地打包。侧栏 **Curated** 字标继续使用 **`text-primary`** + **`font-curated`**，字型使用 Outfit（本地打包的可变字体）。
 
+- **影片标签**：用户标签与 NFO／站点标签统一使用 `secondary` Badge、`border-border/60`、`bg-secondary/70`，详情悬停 `bg-secondary/90`；不用 primary 颜色区分来源，保留焦点和删除状态。
+
 ## 深色与 `dark:`（MUST 理解）
 
 - 默认主题在 **`:root`**；`html` 往往 **无** `class="dark"`。项目定义 `@custom-variant dark (&:is(.dark *))`，故 **`dark:*` 仅作用于 `.dark` 祖先内部**。

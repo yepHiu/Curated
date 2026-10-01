@@ -294,13 +294,9 @@ const handleFavoriteChange = (nextValue: boolean) => {
           <Badge
             v-for="(item, i) in cardTagsDisplay.tags"
             :key="`${i}-${item.text}`"
-            :variant="item.source === 'user' ? 'outline' : 'secondary'"
+            variant="secondary"
             data-movie-card-tag
-            :class="
-              item.source === 'user'
-                ? 'min-w-0 max-w-[4.75rem] shrink justify-start rounded-full border-primary/40 px-1.5 text-[10px] leading-tight text-primary'
-                : 'min-w-0 max-w-[4.75rem] shrink justify-start rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight'
-            "
+            class="min-w-0 max-w-[4.75rem] shrink justify-start rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight"
           >
             <span dir="ltr" class="block min-w-0 truncate text-left">{{ item.text }}</span>
           </Badge>

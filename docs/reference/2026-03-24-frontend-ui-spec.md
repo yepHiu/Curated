@@ -27,6 +27,8 @@
 - 全局排版：拉丁字母与数字使用 Noto Sans；中文界面汉字使用 HarmonyOS Sans SC，日语界面假名与汉字使用 Noto Sans JP。`html lang` 控制中日字形顺序，字体资源本地打包并在加载期间回退到系统字体。`font-sans` 跟随全局字体栈；`font-curated` 品牌标题使用本地打包的 Outfit 可变字体，覆盖侧栏、关于页和 Agent 聊天侧栏；字体许可证在「关于」页可查看。
 - 字号、字重、行高与现有页面密度保持原约定。HarmonyOS Sans SC 的未修改原始字体和许可随应用分发，“关于”页展示署名及许可入口。
 
+用户标签与 NFO／站点标签在影片卡片和详情页统一使用中性色 `secondary` Badge、`border-border/60` 与 `bg-secondary/70`；详情标签悬停使用 `bg-secondary/90`。不以主题色区分标签来源，来源仍由原有分区表达；保留键盘焦点和删除操作的语义状态色。
+
 ## 3. 目录职责
 
 | 路径 | 职责 |

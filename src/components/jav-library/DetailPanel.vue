@@ -611,14 +611,14 @@ function removeMetadataTag(tag: string) {
             <Badge
               v-for="tag in movie.userTags"
               :key="`user-${tag}`"
-              variant="outline"
+              variant="secondary"
               as-child
-              class="group h-[29px] max-h-[29px] min-h-[29px] rounded-full border-primary/35 bg-primary/5 py-0 pl-2 pr-1 text-foreground"
+              class="h-[29px] max-h-[29px] min-h-[29px] rounded-full border border-border/60 bg-secondary/70 py-0 pl-2 pr-1"
             >
               <span class="inline-flex h-full max-w-full items-center gap-0.5 rounded-[inherit] py-0 pl-1">
                 <button
                   type="button"
-                  class="flex h-full min-w-0 max-w-[12rem] cursor-pointer items-center truncate rounded-md px-1.5 text-left text-xs font-medium transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  class="flex h-full min-w-0 max-w-[12rem] cursor-pointer items-center truncate rounded-md px-1.5 text-left text-xs font-medium transition hover:bg-secondary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   :aria-label="t('detailPanel.ariaSearchInLibrary', { tag })"
                   @click="browseByTagLabel(tag)"
                 >
