@@ -176,6 +176,7 @@
     "aiReadoutEmpty": "There is no watch data to interpret in this range"
   },
   "actors": {
+    "curatedFramesEmpty": "No captured frames for this actor yet.",
     "emptyDescription": "Add movies to discover the actors in your collection.",
     "detailEyebrow": "Actor",
     "detailSubtitle": "Profile and titles from your library.",

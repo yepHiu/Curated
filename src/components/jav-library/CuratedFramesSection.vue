@@ -12,8 +12,13 @@ import type { CuratedFrameDialogItem } from "@/lib/curated-frames/dialog-navigat
 import { buildCuratedFrameNearDuplicateIndex, findCuratedFrameNearDuplicateGroups } from "@/lib/curated-frames/near-duplicates"
 import { formatTimecodeLabel } from "@/lib/player-playback-stats-format"
 
-const props = defineProps<{ movieId: string }>()
+const props = defineProps<{ movieId?: string; actorName?: string }>()
 const { t } = useI18n()
+const actor = computed(() => props.actorName?.trim() || undefined)
+const scope = computed(() => props.movieId?.trim()
+  ? { movieId: props.movieId.trim() }
+  : actor.value ? { actor: actor.value } : null)
+const scopeKey = computed(() => JSON.stringify(scope.value))
 const pageSize = 12
 const frameDialogRef = ref<InstanceType<typeof CuratedFrameDetailDialog> | null>(null)
 const entries = ref<CuratedFrameDialogItem[]>([])
@@ -22,7 +27,7 @@ const loading = ref(false)
 const failed = ref(false)
 const viewerOpen = ref(false)
 let reloadOnClose = false
-const dialogEntries = computed(() => entries.value.map((item) => ({ item, sectionActor: null })))
+const dialogEntries = computed(() => entries.value.map((item) => ({ item, sectionActor: actor.value ?? null })))
 const nearDuplicateIds = computed(() => [...buildCuratedFrameNearDuplicateIndex(findCuratedFrameNearDuplicateGroups(entries.value.map((entry) => entry.row), 3))])
 const hasMore = computed(() => entries.value.length < total.value)
 let nextCursor: string | undefined
@@ -37,13 +42,13 @@ function releaseImages() {
 }
 
 async function loadMore() {
-  if (loading.value || !props.movieId.trim()) return
+  if (loading.value || !scope.value) return
   const requestGeneration = generation
   loading.value = true
   failed.value = false
   try {
     const page = await listCuratedFramesPage({
-      movieId: props.movieId,
+      ...scope.value,
       limit: pageSize,
       offset,
       cursor: nextCursor,
@@ -83,7 +88,7 @@ function reload() {
   void loadMore()
 }
 
-watch(() => props.movieId, reload, { immediate: true })
+watch(scopeKey, reload, { immediate: true })
 watch(curatedFramesRevision, () => {
   // Tag autosave also increments the revision. Keep the active dialog and its URLs alive.
   if (viewerOpen.value) reloadOnClose = true
@@ -106,7 +111,7 @@ function applyFrameTags({ id, tags }: { id: string; tags: string[] }) {
 </script>
 
 <template>
-  <Card data-movie-curated-frames class="min-w-0 rounded-3xl border-border/70 bg-card/85">
+  <Card :data-movie-curated-frames="movieId ? '' : undefined" :data-actor-curated-frames="actor ? '' : undefined" class="min-w-0 rounded-3xl border-border/70 bg-card/85">
     <CardHeader class="flex flex-wrap items-center justify-between gap-2">
       <CardTitle>{{ t("curated.title") }}</CardTitle>
       <span v-if="total > 0" class="text-xs text-muted-foreground">
@@ -125,11 +130,11 @@ function applyFrameTags({ id, tags }: { id: string; tags: string[] }) {
           :batch-mode="false"
           :selected="false"
           :near-duplicate="nearDuplicateIds.includes(entry.row.id)"
-          @open="frameDialogRef?.open(entry)"
+          @open="frameDialogRef?.open(entry, actor ?? null)"
         />
       </div>
       <p v-if="loading" role="status" class="text-sm text-muted-foreground">{{ t("common.loading") }}</p>
-      <p v-else-if="!failed && !entries.length" class="text-sm text-muted-foreground">{{ t("detailPage.curatedFramesEmpty") }}</p>
+      <p v-else-if="!failed && !entries.length" class="text-sm text-muted-foreground">{{ t(actor ? "actors.curatedFramesEmpty" : "detailPage.curatedFramesEmpty") }}</p>
       <div v-if="failed" class="flex flex-wrap items-center gap-3" role="alert">
         <p class="text-sm text-destructive">{{ t("detailPage.curatedFramesLoadError") }}</p>
         <Button variant="outline" @click="loadMore">{{ t("curated.retryLoad") }}</Button>
@@ -139,7 +144,7 @@ function applyFrameTags({ id, tags }: { id: string; tags: string[] }) {
   </Card>
 
   <CuratedFrameDetailDialog
-    :key="movieId"
+    :key="scopeKey"
     ref="frameDialogRef"
     :entries="dialogEntries"
     :near-duplicate-ids="nearDuplicateIds"

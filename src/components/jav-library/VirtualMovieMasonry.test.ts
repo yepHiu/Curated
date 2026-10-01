@@ -36,6 +36,7 @@ vi.mock("vue-virtual-scroller", () => ({
         <template v-for="(item, index) in items" :key="item.id ?? index">
           <slot :item="item" :index="index" :active="true" />
         </template>
+        <div data-dynamic-scroller-after><slot name="after" /></div>
       </div>
     `,
   },
@@ -153,6 +154,17 @@ describe("VirtualMovieMasonry", () => {
     expect(wrapper.find("[data-masonry-header]").exists()).toBe(true)
     expect(emptyCardIndex).toBeGreaterThan(headerIndex)
     expect(html).toContain("Nothing here")
+  })
+
+  it.each([true, false])("keeps the footer inside the scroll area (has movies: %s)", (hasMovies) => {
+    const wrapper = mount(VirtualMovieMasonry, {
+      props: { movies: hasMovies ? [makeMovie('m1')] : [] },
+      slots: { footer: '<section data-frames-footer>Frames</section>' },
+    })
+    const html = wrapper.html()
+    expect(html.indexOf('data-frames-footer')).toBeGreaterThan(html.indexOf(hasMovies ? 'data-movie-card' : 'data-media-empty-state'))
+    if (hasMovies) expect(wrapper.find('[data-dynamic-scroller-after] [data-frames-footer]').exists()).toBe(true)
+    else expect(wrapper.find('.overflow-y-auto [data-frames-footer]').exists()).toBe(true)
   })
 
   it("uses default density estimates when the Retina desktop media query does not match", () => {

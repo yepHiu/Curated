@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue"
+import { computed, ref, useId, watch } from "vue"
+import { usePreferredReducedMotion } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
-import { GitMerge } from "lucide-vue-next"
+import { GitMerge, Images } from "lucide-vue-next"
 import ActorMergeDialog from "@/components/jav-library/ActorMergeDialog.vue"
 import ActorProfileCard from "@/components/jav-library/ActorProfileCard.vue"
 import VirtualMovieMasonry from "@/components/jav-library/VirtualMovieMasonry.vue"
+import CuratedFramesSection from "@/components/jav-library/CuratedFramesSection.vue"
 import { Button } from "@/components/ui/button"
 import { pushAppToast } from "@/composables/use-app-toast"
 import type { Movie } from "@/domain/movie/types"
@@ -29,6 +31,16 @@ const resolvedActorName = ref(props.actorName.trim())
 const mergeDialogOpen = ref(false)
 const profileRevision = ref(0)
 const actorDisplayName = computed(() => resolvedActorName.value || props.actorName.trim())
+const framesRegion = ref<HTMLElement | null>(null)
+const framesRegionId = useId()
+const reducedMotion = usePreferredReducedMotion()
+
+function jumpToFrames() {
+  const region = framesRegion.value
+  if (!region) return
+  region.focus({ preventScroll: true })
+  region.scrollIntoView({ block: "start", behavior: reducedMotion.value === "reduce" ? "instant" : "smooth" })
+}
 
 watch(
   () => props.actorName,
@@ -123,6 +135,17 @@ async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) 
             variant="outline"
             size="sm"
             class="min-h-11 rounded-full sm:min-h-8"
+            :aria-controls="framesRegionId"
+            @click="jumpToFrames"
+          >
+            <Images data-icon="inline-start" aria-hidden="true" />
+            {{ t("curated.title") }}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="min-h-11 rounded-full sm:min-h-8"
             @click="mergeDialogOpen = true"
           >
             <GitMerge data-icon="inline-start" aria-hidden="true" />
@@ -150,7 +173,20 @@ async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) 
             @open-details="openDetails"
             @open-player="openPlayer"
             @toggle-favorite="toggleFavorite"
-          />
+          >
+            <template #footer>
+              <section
+                :id="framesRegionId"
+                ref="framesRegion"
+                data-actor-frames-region
+                tabindex="-1"
+                :aria-label="t('curated.title')"
+                class="scroll-mt-3 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <CuratedFramesSection :key="profileRevision" :actor-name="actorDisplayName" />
+              </section>
+            </template>
+          </VirtualMovieMasonry>
         </div>
       </section>
     </div>

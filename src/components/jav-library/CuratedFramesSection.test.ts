@@ -1,9 +1,10 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { defineComponent, ref } from "vue"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import MovieCuratedFramesSection from "./MovieCuratedFramesSection.vue"
+import CuratedFramesSection from "./CuratedFramesSection.vue"
 import { listCuratedFramesPage, type CuratedFrameDbRow, type CuratedFramePageResult } from "@/lib/curated-frames/db"
 import { bumpCuratedFramesRevision } from "@/lib/curated-frames/revision"
+import type { CuratedFrameDialogItem } from "@/lib/curated-frames/dialog-navigation"
 
 vi.mock("@/lib/curated-frames/db", () => ({ listCuratedFramesPage: vi.fn() }))
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }))
@@ -17,9 +18,9 @@ function page(items: CuratedFrameDbRow[], total = items.length, nextCursor?: str
   return { items, total, nextCursor, limit: 12, offset: 0 }
 }
 const wrappers: ReturnType<typeof mount>[] = []
-function render(movieId = "movie-a") {
-  const wrapper = mount(MovieCuratedFramesSection, {
-    props: { movieId },
+function render(movieId: string | undefined = "movie-a", actorName?: string) {
+  const wrapper = mount(CuratedFramesSection, {
+    props: actorName ? { actorName } : { movieId },
     global: { stubs: {
       CuratedFrameDetailDialog: defineComponent({
         name: "CuratedFrameDetailDialog",
@@ -43,7 +44,30 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe("MovieCuratedFramesSection", () => {
+describe("CuratedFramesSection", () => {
+  it("filters frames by actor and preserves the actor context across all movie frames", async () => {
+    list.mockResolvedValue(page([row('frame-a', 'movie-a'), row('frame-b', 'movie-b')]))
+    const wrapper = render(undefined, 'Actor A')
+    await flushPromises()
+    expect(list).toHaveBeenLastCalledWith({ actor: 'Actor A', limit: 12, offset: 0, cursor: undefined, skipTotal: false })
+    const dialog = wrapper.getComponent({ name: 'CuratedFrameDetailDialog' })
+    expect(dialog.props('entries').map((entry: { item: CuratedFrameDialogItem; sectionActor: string }) => [entry.item.row.movieId, entry.sectionActor])).toEqual([
+      ['movie-a', 'Actor A'], ['movie-b', 'Actor A'],
+    ])
+    list.mockResolvedValueOnce(page([]))
+    await wrapper.setProps({ actorName: 'Canonical Actor' })
+    await flushPromises()
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ actor: 'Canonical Actor', offset: 0 }))
+    expect(wrapper.text()).toContain('actors.curatedFramesEmpty')
+    expect(wrapper.find('[data-movie-frame]').exists()).toBe(false)
+  })
+
+  it("does not request the unfiltered frame library when neither scope is available", async () => {
+    const wrapper = render('')
+    await flushPromises()
+    expect(list).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('detailPage.curatedFramesEmpty')
+  })
   it("filters by movie and opens the shared dialog with the clicked frame and movie-only navigation", async () => {
     list.mockResolvedValue(page([row("frame-a"), row("frame-b")]))
     const wrapper = render()

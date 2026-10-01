@@ -56,6 +56,7 @@ const emit = defineEmits<{
 }>()
 
 const hasHeaderSlot = computed(() => Boolean(slots.header))
+const hasFooterSlot = computed(() => Boolean(slots.footer))
 
 const batchSelectedSet = computed(() => new Set(props.batchSelectedIds ?? []))
 
@@ -240,7 +241,7 @@ function posterLoadPolicyForChunk(index: number) {
 
 <template>
   <div
-    v-if="props.movies.length || hasHeaderSlot"
+    v-if="props.movies.length || hasHeaderSlot || hasFooterSlot"
     ref="rootEl"
     class="relative h-full min-h-0"
   >
@@ -298,6 +299,11 @@ function posterLoadPolicyForChunk(index: number) {
           </div>
         </DynamicScrollerItem>
       </template>
+      <template #after>
+        <div v-if="hasFooterSlot" class="pt-6 pb-4">
+          <slot name="footer" />
+        </div>
+      </template>
     </DynamicScroller>
 
     <div
@@ -310,6 +316,9 @@ function posterLoadPolicyForChunk(index: number) {
       </div>
 
       <MediaEmptyState :filtered="emptyFiltered" :title="emptyTitle" :description="emptyDescription" />
+      <div v-if="hasFooterSlot" class="pt-6 pb-4">
+        <slot name="footer" />
+      </div>
     </div>
 
     <Button

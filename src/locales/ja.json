@@ -176,6 +176,7 @@
     "aiReadoutEmpty": "この期間には解釈できる視聴データがありません"
   },
   "actors": {
+    "curatedFramesEmpty": "この出演者のキャプチャフレームはまだありません。",
     "emptyDescription": "作品を追加すると、コレクションの出演者がここに並びます。",
     "detailEyebrow": "出演者",
     "detailSubtitle": "プロフィールとライブラリ内の作品。",

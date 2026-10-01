@@ -176,6 +176,7 @@
     "aiReadoutEmpty": "这个范围还没有可解读的观看数据"
   },
   "actors": {
+    "curatedFramesEmpty": "这位演员还没有萃取帧。",
     "emptyDescription": "添加影片后，相关演员会出现在这里。",
     "detailEyebrow": "演员",
     "detailSubtitle": "演员资料与已入库影片。",

@@ -1,5 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { Movie } from "@/domain/movie/types"
 
 const routeState = vi.hoisted(() => ({
@@ -49,6 +49,7 @@ vi.mock("@/components/jav-library/ActorProfileCard.vue", () => ({
     emits: ["resolvedName"],
     template: `<section data-actor-profile :data-actor-name="actorName" :data-show-clear-filter="String(showClearFilter)">
       <button data-resolve-name @click="$emit('resolvedName', 'Canonical Actor')" />
+      <slot name="actions" />
     </section>`,
   },
 }))
@@ -88,9 +89,14 @@ vi.mock("@/components/jav-library/VirtualMovieMasonry.vue", () => ({
           data-toggle-favorite
           @click="$emit('toggleFavorite', { movieId: movies[0]?.id, nextValue: true })"
         />
+        <slot name="footer" />
       </section>
     `,
   },
+}))
+
+vi.mock("@/components/jav-library/CuratedFramesSection.vue", () => ({
+  default: { name: "CuratedFramesSection", props: ["actorName"], template: '<div data-actor-frames :data-actor-name="actorName" />' },
 }))
 
 function movie(overrides: Partial<Movie> = {}): Movie {
@@ -121,10 +127,12 @@ async function mountPage(actorName = "Mina Kaze") {
   const { default: ActorDetailPage } = await import("./ActorDetailPage.vue")
   return mount(ActorDetailPage, {
     props: { actorName },
+    attachTo: document.body,
   })
 }
 
 describe("ActorDetailPage", () => {
+  afterEach(() => { document.body.innerHTML = "" })
   beforeEach(() => {
     routeState.name = "actor-detail"
     routeState.params = { actorName: "Mina Kaze" }
@@ -153,6 +161,20 @@ describe("ActorDetailPage", () => {
     expect(masonry.attributes("data-scroll-preserve-key")).toBe("actor-detail:Mina Kaze")
     expect(wrapper.text()).toContain("actors.detailMovieSection")
     expect(wrapper.text()).toContain("actors.movieCount:2")
+    expect(wrapper.get('[data-virtual-masonry] [data-actor-frames]').attributes('data-actor-name')).toBe("Mina Kaze")
+  })
+
+  it("jumps from the actor card to the frames region even with an empty filmography", async () => {
+    serviceState.movies = []
+    const wrapper = await mountPage()
+    const region = wrapper.get('[data-actor-frames-region]').element as HTMLElement
+    const scrollIntoView = vi.fn()
+    region.scrollIntoView = scrollIntoView
+    await wrapper.get('[data-actor-profile] button[aria-controls]').trigger('click')
+    expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: 'start' }))
+    expect(document.activeElement).toBe(region)
+    expect(wrapper.get('[data-actor-profile] button[aria-controls]').attributes('aria-controls')).toBe(region.id)
+    wrapper.unmount()
   })
 
   it("keeps actor-page context when opening detail and player routes", async () => {
@@ -195,6 +217,7 @@ describe("ActorDetailPage", () => {
       params: { actorName: "Canonical Actor" },
       query: {},
     })
+    expect(wrapper.get('[data-actor-frames]').attributes('data-actor-name')).toBe('Canonical Actor')
 
     await wrapper.get("[data-complete-merge]").trigger("click")
     await flushPromises()
@@ -203,6 +226,7 @@ describe("ActorDetailPage", () => {
       params: { actorName: "Merged Target" },
       query: {},
     })
+    expect(wrapper.get('[data-actor-frames]').attributes('data-actor-name')).toBe('Merged Target')
   })
 
   it("reloads the profile when a merge retains the currently displayed actor", async () => {
