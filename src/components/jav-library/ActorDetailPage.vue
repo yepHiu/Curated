@@ -122,73 +122,72 @@ async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) 
   >
     <h1 class="sr-only">{{ actorDisplayName }}</h1>
 
-    <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-      <ActorProfileCard
-        :key="profileRevision"
-        :actor-name="actorDisplayName"
-        :show-clear-filter="false"
-        @resolved-name="onActorNameResolved"
+    <div class="min-h-0 flex-1 overflow-hidden">
+      <VirtualMovieMasonry
+        :movies="actorMovies"
+        :empty-title="t('mediaEmpty.title')"
+        :empty-description="t('actors.detailEmptyDesc')"
+        :scroll-preserve-key="scrollPreserveKey"
+        @open-details="openDetails"
+        @open-player="openPlayer"
+        @toggle-favorite="toggleFavorite"
       >
-        <template #actions>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            class="min-h-11 rounded-full sm:min-h-8"
-            :aria-controls="framesRegionId"
-            @click="jumpToFrames"
-          >
-            <Images data-icon="inline-start" aria-hidden="true" />
-            {{ t("curated.title") }}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            class="min-h-11 rounded-full sm:min-h-8"
-            @click="mergeDialogOpen = true"
-          >
-            <GitMerge data-icon="inline-start" aria-hidden="true" />
-            {{ t("actors.merge.openAction") }}
-          </Button>
+        <template #header>
+          <div class="space-y-4">
+            <ActorProfileCard
+              :key="profileRevision"
+              :actor-name="actorDisplayName"
+              :show-clear-filter="false"
+              @resolved-name="onActorNameResolved"
+            >
+              <template #actions>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="min-h-11 rounded-full sm:min-h-8"
+                  :aria-controls="framesRegionId"
+                  @click="jumpToFrames"
+                >
+                  <Images data-icon="inline-start" aria-hidden="true" />
+                  {{ t("curated.title") }}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="min-h-11 rounded-full sm:min-h-8"
+                  @click="mergeDialogOpen = true"
+                >
+                  <GitMerge data-icon="inline-start" aria-hidden="true" />
+                  {{ t("actors.merge.openAction") }}
+                </Button>
+              </template>
+            </ActorProfileCard>
+
+            <div class="flex shrink-0 flex-wrap items-end justify-between gap-2">
+              <h2 class="text-lg font-semibold tracking-tight">
+                {{ t("actors.detailMovieSection") }}
+              </h2>
+              <p class="text-sm text-muted-foreground">
+                {{ t("actors.movieCount", { n: actorMovies.length }) }}
+              </p>
+            </div>
+          </div>
         </template>
-      </ActorProfileCard>
-
-      <section class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-        <div class="flex shrink-0 flex-wrap items-end justify-between gap-2">
-          <h2 class="text-lg font-semibold tracking-tight">
-            {{ t("actors.detailMovieSection") }}
-          </h2>
-          <p class="text-sm text-muted-foreground">
-            {{ t("actors.movieCount", { n: actorMovies.length }) }}
-          </p>
-        </div>
-
-        <div class="min-h-0 flex-1 overflow-hidden">
-          <VirtualMovieMasonry
-            :movies="actorMovies"
-            :empty-title="t('mediaEmpty.title')"
-            :empty-description="t('actors.detailEmptyDesc')"
-            :scroll-preserve-key="scrollPreserveKey"
-            @open-details="openDetails"
-            @open-player="openPlayer"
-            @toggle-favorite="toggleFavorite"
+        <template #footer>
+          <section
+            :id="framesRegionId"
+            ref="framesRegion"
+            data-actor-frames-region
+            tabindex="-1"
+            :aria-label="t('curated.title')"
+            class="scroll-mt-3 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <template #footer>
-              <section
-                :id="framesRegionId"
-                ref="framesRegion"
-                data-actor-frames-region
-                tabindex="-1"
-                :aria-label="t('curated.title')"
-                class="scroll-mt-3 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <CuratedFramesSection :key="profileRevision" :actor-name="actorDisplayName" />
-              </section>
-            </template>
-          </VirtualMovieMasonry>
-        </div>
-      </section>
+            <CuratedFramesSection :key="profileRevision" :actor-name="actorDisplayName" />
+          </section>
+        </template>
+      </VirtualMovieMasonry>
     </div>
 
     <ActorMergeDialog

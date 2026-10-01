@@ -83,6 +83,7 @@ vi.mock("@/components/jav-library/VirtualMovieMasonry.vue", () => ({
         :data-empty-description="emptyDescription"
         :data-scroll-preserve-key="scrollPreserveKey"
       >
+        <slot name="header" />
         <button data-open-details @click="$emit('openDetails', movies[0]?.id)" />
         <button data-open-player @click="$emit('openPlayer', movies[0]?.id)" />
         <button
