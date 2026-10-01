@@ -49,6 +49,8 @@ describe("MovieCuratedFramesSection", () => {
     expect(wrapper.get("[data-original]").attributes("src")).toContain("/frame-a/image")
     await wrapper.get('[aria-label="curated.nextFrame"]').trigger("click")
     expect(wrapper.get("[data-original]").attributes("src")).toContain("/frame-b/image")
+    await wrapper.get('[data-movie-frame-viewer]').trigger("keydown", { key: "ArrowLeft" })
+    expect(wrapper.get("[data-original]").attributes("src")).toContain("/frame-a/image")
   })
 
   it("retains loaded frames on pagination failure and retries the same cursor without duplicates", async () => {

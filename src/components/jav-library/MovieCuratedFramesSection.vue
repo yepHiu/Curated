@@ -135,25 +135,30 @@ function moveFrame(delta: number) {
   <Dialog v-model:open="viewerOpen">
     <DialogContent
       class="flex h-[min(90dvh,60rem)] w-[94vw] max-w-[94vw] flex-col gap-3 overflow-hidden sm:max-w-[min(94vw,90rem)]"
-      @keydown.left.prevent="moveFrame(-1)"
-      @keydown.right.prevent="moveFrame(1)"
     >
-      <DialogTitle class="pr-8">{{ t("curated.title") }} · {{ selected?.row.code }}</DialogTitle>
-      <DialogDescription class="sr-only">{{ t("detailPage.curatedFrameOpen", { time: formatTimecodeLabel(selected?.row.positionSec) }) }}</DialogDescription>
-      <FrameImageViewer
-        v-if="viewerOpen && selected"
-        :src="selected.original"
-        :alt="`${selected.row.code} · ${formatTimecodeLabel(selected.row.positionSec)}`"
-        class="min-h-0 flex-1"
-      />
-      <div class="flex shrink-0 items-center justify-center gap-4">
-        <Button variant="outline" size="icon" class="size-11" :disabled="selectedIndex <= 0" :aria-label="t('curated.previousFrame')" @click="moveFrame(-1)">
-          <ChevronLeft class="size-4" aria-hidden="true" />
-        </Button>
-        <span aria-live="polite" class="text-sm tabular-nums text-muted-foreground">{{ formatTimecodeLabel(selected?.row.positionSec) }} · {{ selectedIndex + 1 }} / {{ entries.length }}</span>
-        <Button variant="outline" size="icon" class="size-11" :disabled="selectedIndex >= entries.length - 1" :aria-label="t('curated.nextFrame')" @click="moveFrame(1)">
-          <ChevronRight class="size-4" aria-hidden="true" />
-        </Button>
+      <div
+        data-movie-frame-viewer
+        class="flex h-full min-h-0 flex-col gap-3"
+        @keydown.left.stop.prevent="moveFrame(-1)"
+        @keydown.right.stop.prevent="moveFrame(1)"
+      >
+        <DialogTitle class="pr-8">{{ t("curated.title") }} · {{ selected?.row.code }}</DialogTitle>
+        <DialogDescription class="sr-only">{{ t("detailPage.curatedFrameOpen", { time: formatTimecodeLabel(selected?.row.positionSec) }) }}</DialogDescription>
+        <FrameImageViewer
+          v-if="viewerOpen && selected"
+          :src="selected.original"
+          :alt="`${selected.row.code} · ${formatTimecodeLabel(selected.row.positionSec)}`"
+          class="min-h-0 flex-1"
+        />
+        <div class="flex shrink-0 items-center justify-center gap-4">
+          <Button variant="outline" size="icon" class="size-11" :disabled="selectedIndex <= 0" :aria-label="t('curated.previousFrame')" @click="moveFrame(-1)">
+            <ChevronLeft class="size-4" aria-hidden="true" />
+          </Button>
+          <span aria-live="polite" class="text-sm tabular-nums text-muted-foreground">{{ formatTimecodeLabel(selected?.row.positionSec) }} · {{ selectedIndex + 1 }} / {{ entries.length }}</span>
+          <Button variant="outline" size="icon" class="size-11" :disabled="selectedIndex >= entries.length - 1" :aria-label="t('curated.nextFrame')" @click="moveFrame(1)">
+            <ChevronRight class="size-4" aria-hidden="true" />
+          </Button>
+        </div>
       </div>
     </DialogContent>
   </Dialog>
