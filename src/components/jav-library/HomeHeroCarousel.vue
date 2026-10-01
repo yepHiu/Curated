@@ -342,7 +342,7 @@ onBeforeUnmount(() => {
 
         <div
           data-home-hero-progress-rail
-          class="relative mx-auto mt-3 w-[calc(100%-2rem)] max-w-[54rem] rounded-[1.4rem] bg-background/72 px-5 py-4 backdrop-blur-md sm:w-[calc(100%-2.5rem)] sm:px-7 lg:w-[calc(100%-3rem)] lg:px-10 xl:w-[calc(100%-4rem)] xl:px-14"
+          class="relative mx-auto mt-3 w-3/4 max-w-[28rem] rounded-[1.4rem] bg-background/72 px-5 py-4 backdrop-blur-md"
         >
           <div class="grid grid-cols-8 gap-2">
             <button

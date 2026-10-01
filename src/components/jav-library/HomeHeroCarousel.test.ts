@@ -66,7 +66,7 @@ describe("HomeHeroCarousel", () => {
     expect(wrapper.get("[data-home-hero-frame]").classes()).not.toContain("rounded-[2rem]")
     expect(wrapper.get("[data-home-hero-frame]").classes()).not.toContain("bg-card/35")
     expect(wrapper.get("[data-home-hero-progress-rail]").classes()).toContain("mx-auto")
-    expect(wrapper.get("[data-home-hero-progress-rail]").classes()).toContain("max-w-[54rem]")
+    expect(wrapper.get("[data-home-hero-progress-rail]").classes()).toContain("max-w-[28rem]")
     expect(wrapper.get("[data-home-hero-track]").classes()).toContain("transition-transform")
     expect(wrapper.findAll('[data-hero-slide-clone="head"]').map((slide) => slide.find("[data-hero-slide-code]").text())).toEqual(["CODE-m3", "CODE-m4"])
     expect(wrapper.findAll('[data-hero-slide-clone="tail"]').map((slide) => slide.find("[data-hero-slide-code]").text())).toEqual(["CODE-m1", "CODE-m2"])
