@@ -100,6 +100,48 @@ const activePlaybackCompactTitle = computed(() => {
     :class="props.compact ? 'flex flex-col items-center gap-1' : livePlayback ? 'flex flex-col rounded-lg border border-border/60 bg-background/45' : 'flex flex-col'"
   >
     <div
+      v-if="livePlayback"
+      data-active-playback-controls
+      class="flex gap-1"
+      :class="props.compact ? 'flex-col items-center' : 'justify-end px-3 pt-2'"
+    >
+      <RouterLink
+        data-active-playback-return
+        :data-active-playback-compact="props.compact ? '' : undefined"
+        :to="activePlaybackResumeTarget ?? activePlaybackSession.resumeRouteTarget"
+        class="relative inline-flex shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        :class="props.compact ? 'size-11' : 'size-11 lg:size-8'"
+        :title="props.compact ? activePlaybackCompactTitle : activePlaybackAriaLabel"
+        :aria-label="activePlaybackAriaLabel"
+      >
+        <PictureInPicture2 class="size-4" aria-hidden="true" />
+        <span v-if="props.compact" class="absolute inset-x-1.5 bottom-1.5 h-0.5 overflow-hidden rounded-full bg-primary-foreground/20" aria-hidden="true">
+          <span class="block h-full rounded-full bg-primary-foreground" :style="{ width: `${activePlaybackProgressValue}%` }" />
+        </span>
+      </RouterLink>
+      <Button
+        type="button"
+        variant="ghost"
+        :class="props.compact ? 'size-11' : 'size-11 lg:size-8'"
+        :aria-label="playing ? t('player.ariaPause') : t('player.ariaPlay')"
+        :title="playing ? t('player.ariaPause') : t('player.ariaPlay')"
+        @click="togglePlayback"
+      >
+        <Pause v-if="playing" class="size-4" aria-hidden="true" />
+        <Play v-else class="size-4" aria-hidden="true" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        :class="props.compact ? 'size-11' : 'size-11 lg:size-8'"
+        :aria-label="t('player.stopBackgroundPlayback')"
+        :title="t('player.stopBackgroundPlayback')"
+        @click="stopPlayback"
+      >
+        <Square class="size-4" aria-hidden="true" />
+      </Button>
+    </div>
+    <div
       v-if="!props.compact"
       class="relative min-w-0 rounded-lg"
       :class="livePlayback ? '' : 'border border-border/60 bg-background/45'"
@@ -111,16 +153,15 @@ const activePlaybackCompactTitle = computed(() => {
         :aria-label="activePlaybackAriaLabel"
       >
         <span
-          class="flex min-w-0 items-center justify-between gap-2"
-          :class="livePlayback ? '' : 'pr-10'"
+          v-if="!livePlayback"
+          class="flex min-w-0 items-center justify-between gap-2 pr-10"
         >
           <span class="inline-flex min-w-0 items-center gap-2 text-xs font-medium text-primary">
             <span class="size-2 shrink-0 rounded-full bg-primary shadow-[0_0_0_4px_hsl(var(--primary)/0.16)]" aria-hidden="true" />
             <span class="truncate">{{ entryLabel }}</span>
           </span>
           <span class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <PictureInPicture2 v-if="livePlayback" class="size-4" aria-hidden="true" />
-            <Play v-else class="size-4 fill-current" aria-hidden="true" />
+            <Play class="size-4 fill-current" aria-hidden="true" />
           </span>
         </span>
         <span class="line-clamp-2 min-w-0 text-sm font-medium leading-snug">
@@ -153,15 +194,14 @@ const activePlaybackCompactTitle = computed(() => {
     </div>
 
     <RouterLink
-      v-else
+      v-else-if="!livePlayback"
       data-active-playback-compact
       :to="activePlaybackResumeTarget ?? activePlaybackSession.resumeRouteTarget"
       class="relative mx-auto inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background/45 text-primary outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
       :title="activePlaybackCompactTitle"
       :aria-label="activePlaybackAriaLabel"
     >
-      <PictureInPicture2 v-if="livePlayback" class="size-4" aria-hidden="true" />
-      <Play v-else class="size-4 fill-current" aria-hidden="true" />
+      <Play class="size-4 fill-current" aria-hidden="true" />
       <span class="absolute inset-x-1.5 bottom-1.5 h-0.5 overflow-hidden rounded-full bg-primary/15" aria-hidden="true">
         <span
           class="block h-full rounded-full bg-primary"
@@ -169,33 +209,5 @@ const activePlaybackCompactTitle = computed(() => {
         />
       </span>
     </RouterLink>
-    <div
-      v-if="livePlayback"
-      data-active-playback-controls
-      class="flex gap-1"
-      :class="props.compact ? 'flex-col' : 'border-t border-border/60 p-1'"
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        :class="props.compact ? 'size-11' : 'h-11 flex-1'"
-        :aria-label="playing ? t('player.ariaPause') : t('player.ariaPlay')"
-        :title="playing ? t('player.ariaPause') : t('player.ariaPlay')"
-        @click="togglePlayback"
-      >
-        <Pause v-if="playing" class="size-4" aria-hidden="true" />
-        <Play v-else class="size-4" aria-hidden="true" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        :class="props.compact ? 'size-11' : 'h-11 flex-1'"
-        :aria-label="t('player.stopBackgroundPlayback')"
-        :title="t('player.stopBackgroundPlayback')"
-        @click="stopPlayback"
-      >
-        <Square class="size-4" aria-hidden="true" />
-      </Button>
-    </div>
   </section>
 </template>
