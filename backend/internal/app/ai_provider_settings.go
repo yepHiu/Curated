@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"curated-backend/internal/agent/prompts"
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/llm"
@@ -131,7 +132,7 @@ func (a *App) TestAIProvider(ctx context.Context, override *contracts.AIProvider
 	}, client)
 	completer.Observe = observation.observe
 	_, err = completer.Complete(testCtx, []llm.ChatMessage{
-		{Role: "user", Content: "Reply with only the word pong."},
+		{Role: "user", Content: prompts.ProviderProbePrompt()},
 	}, aiProviderTestOutputLimit)
 	latency := time.Since(start).Milliseconds()
 	if err != nil {

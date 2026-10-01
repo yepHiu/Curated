@@ -107,7 +107,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			return false
 		}
 		repairs++
-		messages = append(messages, llm.ChatMessage{Role: "system", Content: "Your draft was not published. You have one correction attempt. For movie facts call submit_answer ALONE with current answerRefs and available field keys. Do not repeat codes/titles in prose. If no evidence exists, explain the retrieval limitation without naming invented works. Do not perform more retrieval or writes."})
+		messages = append(messages, llm.ChatMessage{Role: "system", Content: prompts.AnswerCorrectionPrompt()})
 		return true
 	}
 
@@ -526,7 +526,7 @@ func buildMessagesWithBudget(history []llm.ChatMessage, page *contracts.AIChatCo
 		out = append(out, *memory)
 	}
 	if omitted {
-		out[0].Content += "\nEarlier conversation messages were omitted to fit the context budget. Do not assume missing facts or permissions; ask for clarification when needed."
+		out[0].Content += "\n" + prompts.HistoryOmittedPrompt()
 	}
 	out = append(out, trimmed...)
 	return out

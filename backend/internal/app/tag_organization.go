@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"curated-backend/internal/agent/core"
+	"curated-backend/internal/agent/prompts"
 	"curated-backend/internal/agent/run"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/llm"
@@ -186,7 +187,7 @@ func (a *App) wakeTagOrganization() {
 }
 
 // topicComplete 复用配置、代理与用量统计；每次请求超时有界。
-func (a *App) topicComplete(ctx context.Context, prompt string, data any) (raw string, retErr error) {
+func (a *App) topicComplete(ctx context.Context, prompt prompts.Definition, data any) (raw string, retErr error) {
 	if err := a.aiPermission(true); err != nil {
 		return "", err
 	}
@@ -194,10 +195,7 @@ func (a *App) topicComplete(ctx context.Context, prompt string, data any) (raw s
 	defer cancel()
 	ctx, observation, finish := a.beginAIRun(ctx, "action", "organize_user_tags")
 	defer func() { finish(retErr) }()
-	observation.row.PromptVersion = "topic-classification-v1"
-	if prompt == topicVocabularyPrompt {
-		observation.row.PromptVersion = "topic-vocabulary-v3"
-	}
+	observation.row.PromptVersion = prompt.Version
 	requestedConfig := a.currentAIProviderConfig()
 	requestedPolicy := a.AIGovernanceSettings()
 	cfg, err := normalizeAIProviderConfig(requestedConfig)
@@ -216,7 +214,7 @@ func (a *App) topicComplete(ctx context.Context, prompt string, data any) (raw s
 		return "", err
 	}
 	budget := run.BudgetForContext(cfg.ContextWindow)
-	messages := []llm.ChatMessage{{Role: "system", Content: prompt}, {Role: "user", Content: "<source>" + string(encoded) + "</source>"}}
+	messages := []llm.ChatMessage{{Role: "system", Content: prompt.Text}, {Role: "user", Content: "<source>" + string(encoded) + "</source>"}}
 	serialized, _ := json.Marshal(messages)
 	if len(serialized) > budget.Input {
 		return "", &core.ToolError{Code: "AI_CONTEXT_TOO_LARGE", Message: "Organization input exceeds model context budget"}
@@ -332,7 +330,7 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 		var result struct {
 			Movies []topicClassification `json:"movies"`
 		}
-		raw, e := a.topicComplete(ctx, topicClassificationPrompt, map[string]any{"vocabulary": defs, "movies": inputs})
+		raw, e := a.topicComplete(ctx, prompts.TopicClassificationPrompt(), map[string]any{"vocabulary": defs, "movies": inputs})
 		if e == nil {
 			if decodeTopicJSON(raw, &result) != nil {
 				e = &core.ToolError{Code: "AI_ORGANIZATION_INVALID_JSON", Message: "Invalid classification JSON"}
@@ -478,7 +476,7 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 			inputs = append(inputs, compactVocabularySample(input))
 		}
 		if len(inputs) > 0 {
-			raw, err := a.topicComplete(ctx, topicVocabularyPrompt, map[string]any{"existing": defs, "movies": inputs, "labelLocale": job.Locale})
+			raw, err := a.topicComplete(ctx, prompts.TopicVocabularyPrompt(), map[string]any{"existing": defs, "movies": inputs, "labelLocale": job.Locale})
 			if err != nil {
 				// Oversize checks happen locally, before sending any source to the provider.
 				if topicOrganizationErrorCode(err) == "AI_CONTEXT_TOO_LARGE" && len(items) > 1 {

@@ -12,10 +12,12 @@ const (
 	ActionInsightsNarrative = "insights_narrative"
 )
 
+// IsCommentAction 判断动作是否为笔记润色。
 func IsCommentAction(name string) bool {
 	return strings.TrimSpace(name) == ActionPolishComment
 }
 
+// IsDisplayAction 判断动作是否为展示文本翻译。
 func IsDisplayAction(name string) bool {
 	switch strings.TrimSpace(name) {
 	case ActionTranslateSummary, ActionTranslateTitle:
@@ -25,31 +27,27 @@ func IsDisplayAction(name string) bool {
 	}
 }
 
+// IsInsightsAction 判断动作是否为个人洞察说明。
 func IsInsightsAction(name string) bool {
 	return strings.TrimSpace(name) == ActionInsightsNarrative
 }
 
+// KnownAction 限定受支持的独立 AI 动作。
 func KnownAction(name string) bool {
 	return IsCommentAction(name) || IsDisplayAction(name) || IsInsightsAction(name)
 }
 
+// CommentActionPrompt 渲染笔记润色 TXT，保留当前源资料放置与消息行为。
 func CommentActionPrompt(body string) string {
-	var b strings.Builder
-	b.WriteString("You rewrite a user's private library note for Curated. ")
-	b.WriteString("Return only the rewritten note text. No title, no quotes, no markdown fences. ")
-	b.WriteString("Do not invent facts, titles, actors, scores, or plot that the source note does not contain. ")
-	b.WriteString("Detect the language of the source note yourself and keep the rewrite in that same language. ")
-	b.WriteString("Do not translate into another language. Polish the wording. Keep length similar.\n")
-	b.WriteString("<source>\n")
-	b.WriteString(body)
-	b.WriteString("\n</source>")
-	return b.String()
+	return renderPrompt("polish-comment.txt", map[string]string{"Source": body})
 }
 
+// FormatCommentActionUser 保留笔记动作现有的用户消息格式。
 func FormatCommentActionUser(body string) string {
 	return fmt.Sprintf("Note:\n%s", body)
 }
 
+// TranslateDisplayPrompt 渲染展示文本翻译 TXT，空语言与类型沿用原默认值。
 func TranslateDisplayPrompt(kind, source, locale string) string {
 	target := strings.TrimSpace(locale)
 	if target == "" {
@@ -59,52 +57,29 @@ func TranslateDisplayPrompt(kind, source, locale string) string {
 	if label == "" {
 		label = "text"
 	}
-	var b strings.Builder
-	b.WriteString("You localize a movie display ")
-	b.WriteString(label)
-	b.WriteString(" for Curated. ")
-	b.WriteString("Return only the localized ")
-	b.WriteString(label)
-	b.WriteString(" text. No quotes, no markdown fences, no extra commentary. ")
-	b.WriteString("Target language: ")
-	b.WriteString(target)
-	b.WriteString(". Keep the meaning and paragraph structure. Do not add codes, actor names, ads, or marketing copy that the source does not contain. ")
-	b.WriteString("If the text is already in the target language, return it unchanged.\n")
-	b.WriteString("<source>\n")
-	b.WriteString(source)
-	b.WriteString("\n</source>")
-	return b.String()
+	return renderPrompt("translate-display.txt", map[string]string{"Kind": label, "Locale": target, "Source": source})
 }
 
+// TranslateTitlePrompt 为标题翻译指定展示类型。
 func TranslateTitlePrompt(title, locale string) string {
 	return TranslateDisplayPrompt("title", title, locale)
 }
 
+// TranslateSummaryPrompt 为简介翻译指定展示类型。
 func TranslateSummaryPrompt(summary, locale string) string {
 	return TranslateDisplayPrompt("synopsis", summary, locale)
 }
 
+// InsightsNarrativePrompt 渲染影片个人洞察 TXT，仅使用给定统计资料。
 func InsightsNarrativePrompt(locale, payload string) string {
 	lang := strings.TrimSpace(locale)
 	if lang == "" {
 		lang = "zh-CN"
 	}
-	var b strings.Builder
-	b.WriteString("You write a short personal-insights readout for Curated. ")
-	b.WriteString("This data covers movie viewing only. Conclusions and preference inferences must stay within movies; never extrapolate to comic or photo-book libraries or all media. Do not mention those excluded libraries in the readout. ")
-	b.WriteString("Use only numbers and names inside the <source> JSON. Never invent counts, durations, ratings, or people. ")
-	b.WriteString("Write 1-2 short paragraphs plus at most two actionable hints. ")
-	b.WriteString("State that actor/tag shares use full-per-entity attribution and may sum over 100%. ")
-	b.WriteString("If a rate is null, say the denominator is empty instead of 0%. ")
-	b.WriteString("Answer in ")
-	b.WriteString(lang)
-	b.WriteString(".\n")
-	b.WriteString("<source>\n")
-	b.WriteString(payload)
-	b.WriteString("\n</source>")
-	return b.String()
+	return renderPrompt("insights-narrative.txt", map[string]string{"Locale": lang, "Source": payload})
 }
 
+// FormatPlainUser 保留独立动作的原始用户消息格式。
 func FormatPlainUser(kind, body string) string {
 	return fmt.Sprintf("%s:\n%s", kind, body)
 }

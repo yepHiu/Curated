@@ -7,6 +7,7 @@ import (
 	"curated-backend/internal/contracts"
 )
 
+// TestSystemPromptGoldenGuards 校验聊天模板的领域、证据和写入边界。
 func TestSystemPromptGoldenGuards(t *testing.T) {
 	t.Parallel()
 	got := SystemPrompt("zh-CN", &contracts.AIChatContext{
@@ -58,6 +59,7 @@ func TestSystemPromptGoldenGuards(t *testing.T) {
 	}
 }
 
+// TestSystemPromptKeepsBookPageData 确保书库页面保留正确上下文且不泄漏错误影片 ID。
 func TestSystemPromptKeepsBookPageData(t *testing.T) {
 	got := SystemPrompt("zh-CN", &contracts.AIChatContext{Route: "photo-detail", MovieID: "private-book-id", PhotoID: "photo-1", Query: "private-book-title"})
 	if strings.Contains(got, "private-book-id") {
@@ -68,10 +70,11 @@ func TestSystemPromptKeepsBookPageData(t *testing.T) {
 	}
 }
 
+// TestSystemPromptUsesExternalTemplate 校验 TXT 基础模板与动态页面上下文保持分离。
 func TestSystemPromptUsesExternalTemplate(t *testing.T) {
 	t.Parallel()
 	if !strings.Contains(systemPromptTemplate, "# Curated Agent") {
-		t.Fatal("embedded system.md lost the prompt heading")
+		t.Fatal("embedded system.txt lost the prompt heading")
 	}
 	if strings.Contains(systemPromptTemplate, "Visible page context") {
 		t.Fatal("request-scoped context must remain outside the static prompt asset")
