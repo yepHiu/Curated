@@ -156,6 +156,7 @@ import {
 } from "@/lib/navigation-intent"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
 import { getPlayerPlaylistActorName, resolvePlayerPlaylistSource } from "@/lib/player-playlist"
+import { usePictureInPicture } from "@/composables/use-picture-in-picture"
 import { usePlayerPlaylist } from "@/composables/use-player-playlist"
 import { useLibraryService } from "@/services/library-service"
 
@@ -338,8 +339,18 @@ const volume = ref([initialAudio.volumePercent])
 const playbackMuted = ref(initialAudio.muted)
 
 /** 浏览器原生画中画（Document Picture-in-Picture 除外） */
-const pipSupported = ref(false)
-const isPipActive = ref(false)
+const {
+  supported: pipSupported,
+  active: isPipActive,
+  pending: pipPending,
+  canToggle: canTogglePip,
+  sync: syncPipActiveFromDocument,
+  toggle: togglePictureInPicture,
+  exitFor: requestExitPictureInPictureFor,
+} = usePictureInPicture(videoRef, playbackSrc, (failure) => {
+  // 原生操作失败给出可执行的本地化反馈，媒体错误不阻塞其它播放操作。
+  pushAppToast(t(`player.pipError.${failure}`), { variant: "warning" })
+})
 const isSurfaceFullscreen = ref(false)
 
 function resolveActivePlaybackStatus(statusOverride?: ActivePlaybackStatus): ActivePlaybackStatus {
@@ -361,42 +372,6 @@ function publishActivePlaybackSession(statusOverride?: ActivePlaybackStatus) {
     routeQuery: route.query,
     routeHash: route.hash,
     posterUrl: props.movie.thumbUrl ?? props.movie.coverUrl,
-  })
-}
-
-function refreshPipSupport() {
-  try {
-    pipSupported.value =
-      typeof document !== "undefined" &&
-      document.pictureInPictureEnabled === true &&
-      typeof HTMLVideoElement !== "undefined" &&
-      typeof HTMLVideoElement.prototype.requestPictureInPicture === "function"
-  } catch {
-    pipSupported.value = false
-  }
-}
-
-function syncPipActiveFromDocument() {
-  const v = videoRef.value
-  isPipActive.value = Boolean(v && document.pictureInPictureElement === v)
-}
-
-function onVideoEnterPictureInPicture() {
-  isPipActive.value = true
-}
-
-function onVideoLeavePictureInPicture() {
-  isPipActive.value = false
-}
-
-function onDocumentPictureInPictureChange() {
-  syncPipActiveFromDocument()
-}
-
-function requestExitPictureInPictureFor(video: HTMLVideoElement) {
-  if (document.pictureInPictureElement !== video) return
-  void document.exitPictureInPicture().catch(() => {
-    // ignore browser PiP teardown races
   })
 }
 
@@ -893,7 +868,6 @@ watch(
       return
     }
     await nextTick()
-    refreshPipSupport()
     syncPipActiveFromDocument()
   },
   { immediate: true },
@@ -1354,12 +1328,10 @@ function onWindowBeforeUnload() {
 }
 
 onMounted(() => {
-  refreshPipSupport()
   const probe = document.createElement("video")
   if (!canPlayHlsNatively(probe)) {
     preloadHlsLibrary()
   }
-  document.addEventListener("pictureinpicturechange", onDocumentPictureInPictureChange)
   document.addEventListener("fullscreenchange", onDocumentFullscreenChange)
   window.addEventListener("keydown", onPlaybackKeydown)
   window.addEventListener("keyup", onPlaybackKeyup)
@@ -1387,7 +1359,6 @@ onUnmounted(() => {
   flushScheduledPlaybackSessionCleanup()
   void releasePlaybackSession(playbackDescriptor.value?.sessionId)
   void destroyHlsInstance()
-  document.removeEventListener("pictureinpicturechange", onDocumentPictureInPictureChange)
   document.removeEventListener("fullscreenchange", onDocumentFullscreenChange)
   window.removeEventListener("keydown", onPlaybackKeydown)
   window.removeEventListener("keyup", onPlaybackKeyup)
@@ -2134,7 +2105,7 @@ function onPlaybackKeydown(e: KeyboardEvent) {
       stepFrame(1)
       break
     case "KeyP":
-      if (pipSupported.value) {
+      if (pipSupported.value && !e.repeat) {
         e.preventDefault()
         void togglePictureInPicture()
       }
@@ -2220,20 +2191,6 @@ async function toggleFullscreen() {
     // ignore
   } finally {
     syncSurfaceFullscreenFromDocument()
-  }
-}
-
-async function togglePictureInPicture() {
-  const v = videoRef.value
-  if (!v || !playbackSrc.value || !pipSupported.value) return
-  try {
-    if (document.pictureInPictureElement === v) {
-      await document.exitPictureInPicture()
-    } else {
-      await v.requestPictureInPicture()
-    }
-  } catch {
-    // 需用户手势或编解码器不支持时可能失败，静默处理
   }
 }
 
@@ -3212,8 +3169,6 @@ const videoPreloadMode = computed(() =>
           @seeked="onVideoSeeked"
           @ended="onVideoEnded"
           @error="onVideoError"
-          @enterpictureinpicture="onVideoEnterPictureInPicture"
-          @leavepictureinpicture="onVideoLeavePictureInPicture"
         />
 
         <div
@@ -3445,12 +3400,14 @@ const videoPreloadMode = computed(() =>
                 variant="secondary"
                 size="icon"
                 class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
-                :disabled="!playbackSrc"
+                :disabled="!canTogglePip"
+                :aria-busy="pipPending"
                 :aria-pressed="isPipActive"
                 :aria-label="isPipActive ? t('player.ariaPipExit') : t('player.ariaPipEnter')"
                 @click="togglePictureInPicture"
               >
-                <PictureInPicture2 class="size-4 shrink-0" aria-hidden="true" />
+                <Loader2 v-if="pipPending" class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                <PictureInPicture2 v-else class="size-4 shrink-0" aria-hidden="true" />
               </Button>
 
               <Button

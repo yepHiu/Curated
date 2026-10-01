@@ -183,6 +183,41 @@ afterEach(() => {
 })
 
 describe("PlayerPage loading states", () => {
+  // P 自动重复不能反复开关原生小窗；一次真实按键仍能请求进入。
+  it("ignores repeated P and exposes PiP request busy state", async () => {
+    const request = vi.fn(() => {
+      // 保持请求未决，验证重复按键及按钮状态。
+      return new Promise<PictureInPictureWindow>(() => { /* 模拟浏览器等待。 */ })
+    })
+    const support = Object.getOwnPropertyDescriptor(document, "pictureInPictureEnabled")
+    const original = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, "requestPictureInPicture")
+    Object.defineProperty(document, "pictureInPictureEnabled", { configurable: true, value: true })
+    Object.defineProperty(HTMLVideoElement.prototype, "requestPictureInPicture", { configurable: true, value: request })
+    serviceMocks.getMoviePlayback.mockResolvedValue({ movieId: "movie-1", mode: "direct", url: "/video.mp4", fileName: "video.mp4" })
+    const wrapper = await mountPlayerPage()
+    try {
+      await flushPromises()
+      const video = wrapper.get("video").element
+      Object.defineProperty(video, "readyState", { configurable: true, value: 1 })
+      Object.defineProperty(video, "videoWidth", { configurable: true, value: 1920 })
+      await wrapper.get("video").trigger("loadedmetadata")
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyP", repeat: true }))
+      expect(request).not.toHaveBeenCalled()
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyP" }))
+      await nextTick()
+      expect(request).toHaveBeenCalledTimes(1)
+      const button = wrapper.get('button[aria-label="player.ariaPipEnter"]')
+      expect(button.attributes("disabled")).toBeDefined()
+      expect(button.attributes("aria-busy")).toBe("true")
+    } finally {
+      wrapper.unmount()
+      if (support) Object.defineProperty(document, "pictureInPictureEnabled", support)
+      else Reflect.deleteProperty(document, "pictureInPictureEnabled")
+      if (original) Object.defineProperty(HTMLVideoElement.prototype, "requestPictureInPicture", original)
+      else Reflect.deleteProperty(HTMLVideoElement.prototype, "requestPictureInPicture")
+    }
+  })
+
   it("reconnects fatal HLS network errors instead of changing to an unsupported direct source", async () => {
     const { loadHlsLibrary } = await import("@/lib/hls-player")
     const startLoad = vi.fn()

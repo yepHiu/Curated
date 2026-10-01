@@ -1934,6 +1934,13 @@
     "ariaUnmute": "取消静音",
     "fullscreen": "全屏",
     "pip": "画中画",
+    "pipError": {
+      "notReady": "视频尚未就绪，请等待画面加载后重试。",
+      "gesture": "请点击画中画按钮重新打开小窗。",
+      "blocked": "当前浏览器或页面权限不允许画中画。",
+      "unsupported": "当前视频或浏览器不支持画中画。",
+      "failed": "画中画操作失败，请重试。"
+    },
     "pipExit": "退出画中画",
     "ariaPipEnter": "进入画中画",
     "ariaPipExit": "退出画中画",

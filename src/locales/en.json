@@ -1934,6 +1934,13 @@
     "ariaUnmute": "Unmute",
     "fullscreen": "Fullscreen",
     "pip": "Picture-in-picture",
+    "pipError": {
+      "notReady": "Video is not ready. Wait for it to load and try again.",
+      "gesture": "Click the picture-in-picture button to open the window again.",
+      "blocked": "Your browser or page permissions block picture-in-picture.",
+      "unsupported": "This video or browser does not support picture-in-picture.",
+      "failed": "Picture-in-picture failed. Please try again."
+    },
     "pipExit": "Close picture-in-picture",
     "ariaPipEnter": "Enter picture-in-picture",
     "ariaPipExit": "Exit picture-in-picture",
