@@ -3,6 +3,12 @@ description: 日常开发速记（启动、联调、根目录政策）
 alwaysApply: true
 ---
 
+## Release batches — 2026-10-01 (current)
+
+This supersedes older release policies below. New source supports one **Curated YYYYMMDD** Release, with **-2**, **-3**, etc. for later Beijing-date batches, containing Server, Desktop or both. `pnpm release:prepare` inspects each module against its published source; `--write` prepares independent versions, immutable batch metadata and Notes for review. No change means no release. `release:version:show` shows both source versions. CD consumes the batch and never creates Full; old all-in-one CLI/publication triggers are disabled. Shared/unknown delivery inputs conservatively affect both modules and need scope review. Same-source retries reuse versions and batch identity.
+
+About & Updates remains per-component: Desktop uses desktop.json; new Server uses server-v2.json. The first Server-containing batch uses a legacy-compatible server-v tag but a dated title, and publishes both Server feeds; old server.json remains pinned to this bridge thereafter. New date-tagged Server releases require the bridge. Both components can share the bridge Release. Latest selects the greatest dated batch, with historical Full fallback until the first batch. No new HTTP API or library-config setting. Implementation is local until explicitly pushed/published; real Windows/Mac package gates remain in CD. Current operations: docs/guide.md §8; design/history: docs/plan/2026-03-31-production-packaging-and-config-strategy.md.
+
 ## Release retry — 2026-09-29
 
 Server source now targets **1.7.6**, Desktop remains **0.2.2**. The immutable server-v1.7.4 tag failed the outdated backup browser test before packaging; it is retained and will not be published. The test now follows the actual create/verify/expand/preflight flow. The subsequent 1.7.5 run passed quality, build and real upgrade, but clean install smoke used a noncanonical runner TEMP path; 1.7.6 resolves that test path and includes installer diagnostics. Neither failed tag is moved. New releases use combined module snapshot titles with ordinary hyphens. Publish Server first, then Desktop; no new Full.
@@ -43,13 +49,13 @@ This supersedes earlier Full release plans below. New production releases use on
 - **新的本地临时目录优先放到**：`.workspace/`
 - **不要**继续随意增加新的根目录临时目录
 - **禁止**在仓库内主动创建 Go 构建缓存目录：`.gocache/`、`.tmp-go/`、`.tmp-go-modcache/`
-- **release 构建现状**：`scripts/release/release_cli.py` / `scripts/release/release_lib/build_steps.py` 已切到系统临时目录承载 Go build cache，不再写 repo 内缓存目录；`pnpm release:publish` 会构建前端、release Go 后端和 Electron main process，并组装 Electron runtime 为 `release/Curated/Curated.exe`；安装器覆盖升级前会删除 `{app}/frontend-dist` 与 `{app}/resources/app/frontend-dist` 两处受管理前端产物，再复制新构建，避免旧哈希资源残留；打包会将真实 FFmpeg 放入 `resources/app/third_party/ffmpeg/bin/`，拒绝复制 Scoop shim，找不到真实运行时时失败。
-- **Windows / Mac Desktop CD**：`cd-release.yml` 接受 `full-vX.Y.Z` / `server-vX.Y.Z` / `desktop-vX.Y.Z`，构建对应组件；Full 含 Windows 三包和 Apple Silicon Desktop。旧 v-tag 流程保留在 `cd-legacy.yml`。手动默认 draft，CI/安装验收/摘要校验均通过后才能公开，已公开版本不覆盖。详见 `docs/guide.md` §8。
+- **release 构建现状**：`pnpm release:prepare` / `--write` 准备批次，`component_cd.py` 按批次构建独立包并汇总；Server 包含 Go/Web UI/FFmpeg，Desktop 只含 Electron/连接页。`pnpm release:publish` 仅发布已暂存的批次资产，完整出包优先运行 CD。Go 缓存使用系统临时目录。
+- **Windows / Mac Desktop CD**：`cd-release.yml` 接受有批次记录的 `release-YYYYMMDD[-N]`，首次 Server 桥接采用 `server-vX.Y.Z` 兼容标签；一条 Release 可含两端独立包，不生成 Full。旧 `v*` 自动发布入口已退役。手动默认 draft，全部所选平台验收通过才能公开。详见 `docs/guide.md` §8。
 - **生产包保留规则**：未得到用户明确要求时，禁止删除已经打出的生产包产物；`release/installer/*.exe` 与 `release/portable/*.zip` 都必须保留，即使准备重新打包或同版本重打，也不能主动清理既有 installer / portable 包。
 
 ## Server 版本
 
-health 的 `version` 为数字 SemVer（当前 1.5.8），`buildStamp` 单独保留构建时间戳；关于页分开展示。Server 源为 `backend/internal/version/server.json`，Desktop 源为 `scripts/release/versions/desktop.json`（0.1.0）。
+health 的 `version` 为 Server 数字 SemVer，`buildStamp` 单独保留；关于页分别显示两端版本。Server 源为 `backend/internal/version/server.json`，Desktop 源为 `scripts/release/versions/desktop.json`；用 `pnpm release:version:show` 查看当前值。
 
 ## 配置与持久化
 
@@ -100,7 +106,7 @@ health 的 `version` 为数字 SemVer（当前 1.5.8），`buildStamp` 单独保
 - **修改 API 行为**：优先改 `backend/internal/server` 与 `backend/internal/app`，前端路径集中在 `src/api/endpoints.ts`。
 - **离线路径迁移**：完全退出 Curated 后在 `backend/` 先运行 `go run ./cmd/curated -maintenance path-migrate-plan -path-from <absolute> -path-to <absolute>`；apply 额外要求新 `-backup-path` 与 `-confirm-path-migration`。自定义数据库路径同时传 `-config <path>`；不要删除 `.runtime.lock` 绕过运行时互斥。
 - **修改 README / 对外说明**：如果用户可见行为、命令入口、目录政策或公开说明变了，检查 `README.md`、`README.zh-CN.md`、`README.ja-JP.md` 是否需要同步；操作细节、配置长文和文档索引改 **`docs/guide.md`**，不要把长文写回根 README。
-- **打包历史**：`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 会向 `docs/ops/package-build-history.csv` 追加记录。
+- **打包历史**：`docs/ops/package-build-history.csv` 保留旧包台账；新批次记录在 `scripts/release/batches/`，云端 `release.json`、组件清单和 Actions 保存实际来源与校验结果。
 
 ## 规则索引
 

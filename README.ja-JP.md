@@ -41,7 +41,7 @@ Full/Server 1.7.3、Desktop 0.2.1 では Windows インストーラの簡体字�
 - **Windows インストーラ：** `Curated-Server-Setup-<version>-windows-x64.exe` と `Curated-Desktop-Setup-<version>-windows-x64.exe`。各単体 ZIP もあります。
 - **Apple Silicon Desktop：** `Curated-Desktop-<version>-macos-arm64.dmg` / `.zip`。
 
-新しい Full は公開しません。Latest は過去の Full による移行用入口として維持します。最新版は Releases 一覧または各更新チャネルで確認してください。旧一体型は公開済みの Full 1.7.3 で一度移行した後、Desktop / Server を個別に更新できます。
+新しい Full は作成しません。Release は **Curated YYYYMMDD**、同日中の追加分は **-2**、**-3** と命名し、更新のある Server／Desktop を同じ Release に含めます。各コンポーネントのバージョンと更新確認は独立します。最初の日付付き Release 公開後、Latest もこの方式に移行します。旧一体型の移行には [Full 1.7.3](https://github.com/yepHiu/Curated/releases/tag/full-v1.7.3) を使用します。
 
 ## ハイライト
 
@@ -76,7 +76,7 @@ pnpm dev
 - デスクトップシェル：`pnpm dev:electron`。
 - Windows 開発バイナリ：`pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`。
 
-バックアップ、復元、パス移行、設定キー、リリース手順は [docs/guide.md](docs/guide.md) を参照してください。CD は Windows Server / Desktop の単体パッケージと Apple Silicon Mac Desktop をビルドし、バージョンタグによる公開と手動のドラフト実行に対応しています。[リリース操作](docs/guide.md#8-release-and-packaging)を参照してください。
+バックアップ、復元、パス移行、設定キー、リリース手順は [docs/guide.md](docs/guide.md) を参照してください。CD は Windows Server / Desktop の単体パッケージと Apple Silicon Mac Desktop をビルドし、バッチタグによる公開と手動のドラフト実行に対応しています。[リリース操作](docs/guide.md#8-release-and-packaging)を参照してください。
 
 ## ドキュメント
 

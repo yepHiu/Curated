@@ -122,6 +122,8 @@
   </style>
 </head>
 <body>
+<section><h2>2026-10-01：统一 Release 批次（当前源码）</h2><p>发布标题为 Curated YYYYMMDD，同日后续使用 -2、-3。一条 Release 可包含 Server、Desktop 或两端；产品版本分别按交付变更递进。release:prepare 比较各组件已发布来源，生成版本、批次记录与说明；CD 按批次选择构建并统一验收后公开，不再创建 Full。旧出包入口已阻断。这里描述源码能力，不代表已公开新包。</p><table><thead><tr><th>能力</th><th>当前实现</th><th>验收边界</th></tr></thead><tbody><tr><td>独立检查更新</td><td>Desktop 读取 desktop.json，新 Server 读取 server-v2.json；比较组件 SemVer</td><td>按平台选包，保留远程管理权限限制</td></tr><tr><td>旧 Server 升级</td><td>首次日期批次使用兼容 server-v 标签；旧 server.json 永久保留桥接包</td><td>桥接包及 Windows/Mac 实装仍须正式 CD</td></tr><tr><td>发布与恢复</td><td>双端可共享一次 Release 和一次渠道提交；Latest 选择日期批次</td><td>公开后渠道失败只恢复清单，不覆盖资产</td></tr></tbody></table><p>详见 <a href="../guide.md#8-release-and-packaging">发布操作</a>；以下旧发布章节保留为历史记录，以本节为准。</p></section>
+
   <h1>Curated — 架构与实现逻辑</h1>
   <p><strong>2026-09-28 发布政策：</strong>后续仅发布 Desktop / Server 独立包，不再出 Full。模块有实际交付变更才递进版本；无更新模块保持版本、包和渠道。每份 Release Note 明确两端更新状态及前后版本，CD 校验标签与渠道基线。历史 Full 仅供迁移与恢复。当前 Server 1.7.3 / Desktop 0.2.1 不因本次流程调整而递进。详见 <a href="../guide.md#8-release-and-packaging">发布操作</a>。</p>
   <p class="muted">正式产品名为 <strong>Curated</strong>；仓库目录与 Go module 等标识可能仍为 <code>jav-shadcn</code>。本文档依据当前代码整理「前端如何组织」「后端如何启动与路由」「数据从 SQLite / 内存到 UI 的流向」。可直接用浏览器打开本 HTML 阅读。</p>

@@ -3,6 +3,12 @@ description: Current implementation vs target desktop architecture boundaries
 alwaysApply: true
 ---
 
+## Release batches — 2026-10-01 (current)
+
+This supersedes older release policies below. New source supports one **Curated YYYYMMDD** Release, with **-2**, **-3**, etc. for later Beijing-date batches, containing Server, Desktop or both. `pnpm release:prepare` inspects each module against its published source; `--write` prepares independent versions, immutable batch metadata and Notes for review. No change means no release. `release:version:show` shows both source versions. CD consumes the batch and never creates Full; old all-in-one CLI/publication triggers are disabled. Shared/unknown delivery inputs conservatively affect both modules and need scope review. Same-source retries reuse versions and batch identity.
+
+About & Updates remains per-component: Desktop uses desktop.json; new Server uses server-v2.json. The first Server-containing batch uses a legacy-compatible server-v tag but a dated title, and publishes both Server feeds; old server.json remains pinned to this bridge thereafter. New date-tagged Server releases require the bridge. Both components can share the bridge Release. Latest selects the greatest dated batch, with historical Full fallback until the first batch. No new HTTP API or library-config setting. Implementation is local until explicitly pushed/published; real Windows/Mac package gates remain in CD. Current operations: docs/guide.md §8; design/history: docs/plan/2026-03-31-production-packaging-and-config-strategy.md.
+
 # Architecture Boundaries
 
 ## Documentation Truth

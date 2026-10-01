@@ -1,5 +1,149 @@
 # Curated 生产打包、配置、版本与发布计划
 
+## 2026-10-01：统一 Release 批次与独立更新检测实施
+
+状态：**源码与本地验证已完成，尚未推送或公开生产包**。本节覆盖下文调研中的待实施状态；线上历史盘点仍保留当时日期和证据。
+
+- 新增 `prepare_batch.py` / `release_lib/batches.py`：从各组件已发布 sourceCommit 计算交付差异；默认 patch，仅有变更的一端进位，支持明确 minor/major。只读预览和 `--write` 分开；写入组件版本、批次 JSON、说明草稿，不创建 tag、不推送、不公开。同日使用无后缀、`-2`、`-3`，读取远端标签、本地标签和既有批次避免冲突。日期按北京时间。
+- `component_cd.py` 按批次选择 Server/Desktop/both；两端可同时 Updated，一个 Release 包含 Windows 两端和所选 Mac Desktop 包，不构建 Full。输入摘要防止准备后悄悄修改同一个文件；固定来源、独立版本、资产集合和 SHA-256 全部校验。所选 Mac 缺失或跳过不能公开双端批次。
+- Server 新代码读取 `server-v2.json` 并验证日期标签；Desktop 保留 `desktop.json`。首次 Server 发布自动采用 `server-v<version>` 兼容标签，标题仍是 `Curated YYYYMMDD[-N]`，同一批次可包含 Desktop；发布时原子写入新旧 Server 两个 feed。以后只推进 v2 feed，旧 feed 永久保留桥接包，晚升级用户仍能先安装桥接版。该过渡标签是有意保留的唯一例外；未在本轮创建。
+- 关于页继续分别对比组件 SemVer，原有本机/远程权限不变；Desktop 更新下载继续手动安装。已回归日期批次资产、此前批次 Desktop 下载、当前版本无更新、错误状态等；无需改动现有页面布局。
+- Latest 优先选择日期批次及数字序号，首次批次前保留历史 Full fallback；Notes 同步读取不可变批次并允许未更新端的历史下载链接；恢复从原提交读取批次，兼容 server-v 桥接标签内同时包含 Desktop 的 Mac 门禁要求，已公开后只恢复渠道。
+- 关闭 legacy v-tag 自动发布；旧一体包 CLI 明确拒绝新出包，`release:publish` 改为发布已暂存批次，`release:version:show` 展示两端版本。更新 guide、Notes、README 三语、项目规则、构建规范与架构说明。
+
+验证：发布脚本 **89 项（86 通过，3 项平台相关跳过）**；Electron 更新器 **10 项通过**；关于与更新、app-update 状态及本机权限前端 **34 项通过**；Go `appupdate` 开发/正式 tags 测试及 vet 通过；6 个发布相关 workflow 通过 actionlint 1.7.7；`git diff --check` 通过。正式 tags 测试暴露旧测试把 dev 回退值用于 release 的假设，现已分别验证两个构建渠道；未改变产品回退行为。
+
+本轮没有分配实际发行版本、创建标签、修改线上更新清单、重命名或删除历史 Release。Windows Inno 实装、真实旧安装包到新桥接包、Mac DMG 实装仍需新批次在正式 CD 完成，不能将本地单测视为生产包验收。当前变化归属为保守路径规则：共享/未知交付输入可能将两端都纳入，需在准备时审阅。首次桥接如果已经创建不可变 server-v 标签后又修改源码，不能挪动该标签，需要另一个未占用 Server 版本；后续日期批次不再由产品版本承担重试身份。
+
+
+## 2026-09-30：发布体系盘点与统一 Release 批次方向
+
+状态：**现状已核对，目标待实施**。本节记录用户的新方向：Release 使用「项目名 + 日期」命名，同日后续批次追加 `-2`、`-3` 等序号；一次 Release 可包含 Server、Desktop 或两者，组件按实际交付变更独立进位。该方向替代下文「两端更新必须创建两条 Release」及组合版本标题的目标约定；当前代码仍执行旧约定。本轮只做源码、GitHub 公共 API 和发布渠道的只读核对，并更新本文；没有改工作流、版本、标签或云端 Release。
+
+### 1. 已核实的线上与源码状态
+
+核对日期为 2026-09-30（Asia/Shanghai）。本地与远端 master 均为 `23271905b1cf9ae98468bc67f54a0dc7da970b30`。公共 API 可以核对公开 Release，不能据此断言不存在私有草稿；本轮未下载并重验安装包二进制。
+
+| 对象 | 已发布版本／状态 | 实际内容与证据 |
+| --- | --- | --- |
+| Server | **1.7.6** | [server-v1.7.6](https://github.com/yepHiu/Curated/releases/tag/server-v1.7.6)，北京时间 09-29 02:19:02 公开；Windows x64 EXE、ZIP，另含 Server manifest、release manifest 与校验和 |
+| Desktop | **0.2.2** | [desktop-v0.2.2](https://github.com/yepHiu/Curated/releases/tag/desktop-v0.2.2)，北京时间 09-29 02:32:54 公开；Windows x64 EXE、ZIP 与 macOS arm64 DMG、ZIP，另含 Desktop manifest、release manifest 与校验和 |
+| GitHub Latest | **Full 1.7.3** | [Latest](https://github.com/yepHiu/Curated/releases/latest) 仍选中 `full-v1.7.3`，这是现有代码主动维持的历史迁移入口 |
+| Server 更新渠道 | **1.7.6** | [`release-channels/server.json`](https://raw.githubusercontent.com/yepHiu/Curated/release-channels/server.json)，与公开资产的名称和来源记录一致 |
+| Desktop 更新渠道 | **0.2.2** | [`release-channels/desktop.json`](https://raw.githubusercontent.com/yepHiu/Curated/release-channels/desktop.json)，与公开资产的名称和来源记录一致 |
+| 当前源码版本 | Server **1.7.6** / Desktop **0.2.2** | `backend/internal/version/server.json` / `scripts/release/versions/desktop.json`；历史 Full 为 1.7.3，legacy 为 1.5.8；根 package.json 的 `0.0.1-master` 不是两端产品版本 |
+
+两条最新独立 Release 的来源都是 `c692d98ba3e2b6a3c5b5539591e600476ac56108`，但分别运行了两次 CD、建立两条 Release。标题分别为：
+
+- `Curated - Server 1.7.6 + Desktop 0.2.1 - Server update`
+- `Curated - Server 1.7.6 + Desktop 0.2.2 - Desktop update`
+
+前者写 Desktop 0.2.1 是当时已发布的版本快照，资产只有 Server；它并不表示包含 Desktop 安装包。这种「标题列两端，附件只有一端」的展示容易误读。
+
+最近失败记录也已核对 Actions 作业结果：
+
+- [`server-v1.7.4` / run 36459532612](https://github.com/yepHiu/Curated/actions/runs/36459532612)：runtime browser e2e 失败，Windows 构建和发布被跳过。
+- [`server-v1.7.5` / run 36460694900](https://github.com/yepHiu/Curated/actions/runs/36460694900)：质量门禁通过，Windows `Exercise independent installers` 失败，发布被跳过。
+- [`server-v1.7.6` / run 36462886497](https://github.com/yepHiu/Curated/actions/runs/36462886497) 与 [`desktop-v0.2.2` / run 36464384949](https://github.com/yepHiu/Curated/actions/runs/36464384949)：成功。
+
+因此 1.7.4、1.7.5 是失败的标签尝试，不是两次成功公开的产品更新。下面的历史记录说明具体原因分别是旧备份交互测试和 smoke 临时路径；本轮在线核实到失败步骤层级，没有重新读取全部原始日志。现有「不可移动标签 + 标签携带产品版本」使修正测试后换标签也占用了产品版本号。
+
+master 在这次发布之后还有 `ffb1fd1d`、`23271905` 两项 Windows 安装器布局修正，涉及共享 `Component.iss.tpl` / `Languages.iss`，尚未进入上述已发布包。下一次若发布当前安装器代码，两端均有实际交付变更；按默认 patch 规则可候选 Server 1.7.7 / Desktop 0.2.3，但本轮未分配或修改版本。
+
+### 2. 当前出包链路
+
+当前正式入口是 `.github/workflows/cd-release.yml` 与 `scripts/release/component_cd.py`：
+
+1. 人工判断变更归属、修改对应组件版本 JSON、写 `docs/release-notes/<component-tag>.md`。
+2. 创建并推送 `server-vX.Y.Z` 或 `desktop-vX.Y.Z` 标签触发 CD。普通 master push 运行 CI，并不自动决定组件更新或发布。
+3. 校验标签固定提交、版本源及说明表格；表格强制只有标签对应模块为 Updated，另一端必须 Unchanged。**当前模型不能在一个新 Release 中把两端都标为 Updated。**
+4. 对固定提交运行前端、Electron、Go、e2e 和发布脚本质量检查。
+5. 构建该组件：Server 为 Go + 托管 Web UI + FFmpeg；Desktop 为 Electron + 本地连接 UI，不包含 Server。Server 当前正式包只有 Windows x64；Desktop 同时要求 Windows x64 与 macOS arm64。
+6. 执行安装、生命周期、升级等验收，汇总固定资产集合、组件 manifest、`release.json`、`SHA256SUMS.txt`。
+7. 先建／更新 draft，上传并核对 GitHub 资产摘要；公开后推进对应组件渠道，再执行 Latest 维护。标签触发默认 publish；手动入口默认 draft。
+
+当前组件 CD **不自动递进版本，也不自动分析差异**；它只校验已填写的数字、标签、说明与线上基线是否一致。关于「哪些改动影响哪些包」，目前仍由人判断。
+
+辅助入口：
+
+| 入口 | 当前职责／问题 |
+| --- | --- |
+| `package.yml` | 手动委托组件 CD，默认只形成 draft |
+| `cd-recover.yml` / `recover_release.py` | 复用原作业已验收资产恢复发布；已公开但渠道失败时只恢复渠道，不覆盖公开资产 |
+| `release-notes.yml` / `sync_notes.py` | 根据仓库 Notes 修改已发布标题和说明；若只在云端手改标题，后续同步可能改回旧命名 |
+| `release-latest.yml` / `latest_release.py` | 强制 Latest 选择最高稳定 Full；所以手动把新独立 Release 标为 Latest 也可能被改回 |
+| `cd-legacy.yml` | 仍监听 `v*` 标签并提供手动入口；政策上已退役，技术触发入口尚未关闭 |
+| `pnpm release:publish` / `release:portable` / `release:installer` | 仍进入旧一体包脚本，省略版本时会分配 legacy patch；不是当前组件 Release 的统一入口。`publish` 在这里主要是本地打包编排，不应与 GitHub 公开动作混淆 |
+| `pnpm release:macos-desktop` | 本地 Mac 独立出包，读取 Desktop 版本，不等于完成云端 Release |
+
+现有 Guide、快速参考和构建规范中仍并列保留旧版本数字、旧推荐命令、Full 与 standalone 政策。较新的说明虽声明覆盖旧规则，但执行者仍可能进入错误链路。需要收敛成一份当前操作说明，历史内容明确归档。
+
+### 3. 建议的目标模型
+
+把发布批次与组件产品版本分开：**Release 代表一次发布，SemVer 代表具体组件的演进。** 合并 Release 容器不恢复 Full 安装器。
+
+- 展示标题采用 `Curated YYYYMMDD`，日期按北京时间（Asia/Shanghai），不含时分秒、时区后缀或 Server/Desktop 产品版本。同日首个 Release 为 `Curated 20260930`，第二个为 `Curated 20260930-2`，第三个为 `Curated 20260930-3`，依此类推；次日从无序号标题重新开始。
+- 序号按 Release 批次计算，不按附件或组件数量计算：同一 Release 同时包含 Server、Desktop 仍只占一个批次。
+- 推荐独立批次 tag 对应为 `release-20260930`、`release-20260930-2`、`release-20260930-3`。此处是方案示例，未创建标签。
+- 批次日期和序号在准备时固定，同一批次重试沿用原标识；分配时检查已有批次与标签，避免并发冲突，不能覆盖已有标签。记录 source commit、所选模块、各模块 before/after、各自已发布来源、变更理由与资产摘要。
+- 包名、安装器版本、关于页和组件更新比较仍使用各自 SemVer，例如 `Curated-Server-Setup-1.7.7-windows-x64.exe`。
+- 一个 Release 只上传本次有更新的组件包。未更新端保持版本与原下载地址，说明中标注 Unchanged 并链接最近已发布包，避免用户在 Server-only 最新 Release 中找不到 Desktop。
+
+| 本次交付变化 | Release 数量 | Server | Desktop |
+| --- | --- | --- | --- |
+| 仅 Server | 1 | 递进并出包 | 版本、包、渠道保持 |
+| 仅 Desktop | 1 | 版本、包、渠道保持 | 递进并出包 |
+| 两端都有 | 1 | 递进并出包 | 递进并出包 |
+| 两端都没有 | 0 | 保持 | 保持 |
+
+建议以各组件**上次成功发布的 source commit**为差异基线，而不是上一个总 Release 或最近标签；否则连续 Server-only 发布可能漏算 Desktop 累积改动。先生成可审阅的变更分类和版本计划，再构建、验收、发布。默认实际修复递进 patch，minor/major 由明确的功能／兼容性决策指定。发布频率可按就绪变更组织批次，不必把每个提交都变成一次 Release。
+
+变更归属必须覆盖实际依赖：Server 包含业务 Web UI；Desktop 本地 launcher 位于 `src/desktop-connection/`，还会引用共享 `src` 内容；共享锁文件、图标、安装器、随包 helper 和构建参数按实际影响归属，不能简单把所有 `src/` 都归 Server、所有 `backend/` 都只归 Server。纯文档、测试、CI 管理变化不自动进位；如果构建规则改变了交付行为则仍需算入。不要按 EXE/ZIP 字节差异决定是否有产品更新，时间戳和签名会造成噪声。
+
+### 3.1 关于与更新：一个 Release 下独立检测两端
+
+统一 Release 不合并组件的更新身份。保留 Server、Desktop 两份稳定更新清单，分别记录该组件最新成功发布的 SemVer、各平台／架构安装包 URL 和 SHA-256；来源可指向同一条或不同条 Release。客户端不解析 Release 标题中的日期／序号，也不以 GitHub Latest 的附件作为唯一更新来源。
+
+当前独立包已有此基础：Electron `desktop-updates.ts` 读取 Desktop feed，按组件、平台、架构、安装格式筛选并比较数字版本；Server `internal/appupdate/component_feed.go` 读取 Server feed，交给 app-update 服务比较 Server 版本。`SettingsAppUpdateSection.vue` 的共用检查按钮在允许本机 Server 更新时并行检查 Server 与 Desktop；远程连接沿用现有边界，只检查本机 Desktop 更新，Server 版本可见但不开放远程更新操作。浏览器没有本机 Desktop 信息，不检查 Desktop。
+
+目标发布规则：仅发布 Server 时只更新 Server 清单；仅发布 Desktop 时只更新 Desktop 清单；两端同时发布时在一个渠道提交中更新两份清单。未更新端继续指向自己的最近成功发布包，不能因当前 Release 没有它的附件就显示无更新。
+
+示例（目标行为，不代表实际发布）：
+
+| Release | 本次新增包 | 发布后 Server 清单 | 发布后 Desktop 清单 |
+| --- | --- | --- | --- |
+| `Curated 20260930` | Server 1.7.7、Desktop 0.2.3 | 1.7.7 → 本批次 Server 安装包 | 0.2.3 → 本批次 Desktop 安装包 |
+| `Curated 20260930-2` | 仅 Server 1.7.8 | 1.7.8 → 第二批次 Server 安装包 | 保持 0.2.3 → 第一批次 Desktop 安装包 |
+
+第二批次发布后，使用 Server 1.7.6 / Desktop 0.2.2 的本机用户检查更新，分别看到 Server 1.7.8、Desktop 0.2.3 可用；已经安装 Desktop 0.2.3 的用户看到 Desktop 已是最新版本。下载入口指向各自清单的确切资产，选中 Server 不下载／安装 Desktop，反之亦然。检查失败应保留为检查失败，不能当作已是最新版本。
+
+关于页继续分别展示本机 Desktop 与当前连接 Server 的产品版本及更新结果；共用一个“检查更新”按钮不要求共用一个版本号。Desktop 当前仍是下载后手动安装，合并 Release 本身不增加自动安装能力。组件清单必须在资产验收并公开后才推进，失败恢复沿用下一节规则。
+
+实施与验收需覆盖：最近 Release 只有另一端时仍能找到本组件更新、两端来自不同批次、同批两端更新、按平台选包、单端检查失败不掩盖另一端结果，以及原有本机／远程权限边界。Server 新标签格式与旧客户端的兼容迁移仍须按下一节落实。
+
+### 4. 必须一起解决的迁移边界
+
+**新 tag 对旧 Server 更新器不兼容。** `backend/internal/appupdate/component_feed.go` 的 `selectServerRelease` 只接受下载路径 tag 以 `full-v` / `server-v` 开头。直接把既有 `server.json` 指向 `release-YYYYMMDD` 或其带序号的批次 tag 会使旧客户端拒绝更新资产。Desktop 当前校验 HTTPS manifest 与组件版本，没有相同 tag 前缀限制，仍应回归验证。
+
+推荐在实施前落实桥接路径：先用旧 tag 发布能识别新批次格式的 Server；若要支持迟到用户跨多版本升级，还需让旧 feed 持续提供这个桥接版，让桥接版读新 feed（例如版本化渠道），或采用同等可验证的兼容方案。仅「先发桥接版、随后覆盖同一个旧 feed」不能保证未及时升级用户有路径。手动安装可作为明确说明的替代。具体迁移方案尚未实施。
+
+**Latest 需要重新定义。** 建议新模式下指向最近成功公开的批次；Full 1.7.3 保留为显式历史迁移链接。需同步改发布、恢复和维护入口的选择规则，并验证旧 all-in-one 客户端不会把新批次误当自己的安装包。最新批次只更新一端时，说明提供两端当前下载入口。
+
+**失败恢复与产品版本分离。** 同一不可变提交的基础设施重试保留批次／版本；修正源码或测试需要新的不可变批次提交和 tag，但不应仅因失败次数自动递进产品版本。未公开候选产品版本的复用须明确只允许未对外分发的候选；已公开／已交付安装包保持不可变。保留失败记录及生产包文件，不移动旧标签、不覆盖旧资产。
+
+**两端合并发布的一致性。** 建议所选模块及平台全部通过才公开这次 Release；其中一个失败则保持 draft、渠道不动。GitHub 公开与渠道更新不是单一事务：公开后渠道失败要保留恢复状态，复用已验收资产恢复；两端渠道可沿用一次 Git tree/commit 更新，避免分两次推进。不能发布后不断往同一公开 Release 追加其他模块。
+
+### 5. 后续实施切分与验收
+
+1. 收敛当前操作入口及文档，明确关闭或隔离旧一体包新发布入口；历史包和恢复资料继续保留。
+2. 增加批次 manifest、基于组件已发布基线的变化分类与独立版本计划；让 CD、Notes、资产集合使用同一份记录。
+3. 落实旧 Server 到新渠道／tag 格式的升级桥接；旧包到桥接包、桥接包到新批次都要真实验收。
+4. 将 CD 改为按所选组件构建并汇总到一个 Release，同步调整恢复、Notes 同步、Latest 和共享发布锁。
+5. 覆盖 Server-only、Desktop-only、both、none、单平台失败、重复执行、公开后渠道失败，以及共享依赖／安装器变更识别。
+6. 验收未更新组件版本／渠道／资产不变；两端更新只出现一个公开 Release；不再生成 Full；旧用户升级可达；云端标题不会被 Notes 同步改回旧格式。
+
+历史 Release 的批量改标题、归并或删除属于后续单独治理范围。当前优先从下一次发布建立一致模型；本次未改变线上历史。
+
 ## 2026-09-29：本次发布重试
 
 后续 `server-v1.7.5` 通过全部质量检查、构建及真实旧版升级，但 fresh install smoke 使用未 resolve 的 runner 临时路径，被严格安装目录校验阻断。隔离 fixture 使用 resolve 后路径且通过。修正 smoke 目录规范化并输出失败安装日志，Server 目标更新为 **1.7.6**；两个失败标签保留，Desktop 保留 0.2.2 并使用 Server 1.7.6 快照。

@@ -1,5 +1,11 @@
 # Agent 构建 / 编译 / 测试范式（Curated）
 
+## Release batches — 2026-10-01 (current)
+
+This supersedes older release policies below. New source supports one **Curated YYYYMMDD** Release, with **-2**, **-3**, etc. for later Beijing-date batches, containing Server, Desktop or both. `pnpm release:prepare` inspects each module against its published source; `--write` prepares independent versions, immutable batch metadata and Notes for review. No change means no release. `release:version:show` shows both source versions. CD consumes the batch and never creates Full; old all-in-one CLI/publication triggers are disabled. Shared/unknown delivery inputs conservatively affect both modules and need scope review. Same-source retries reuse versions and batch identity.
+
+About & Updates remains per-component: Desktop uses desktop.json; new Server uses server-v2.json. The first Server-containing batch uses a legacy-compatible server-v tag but a dated title, and publishes both Server feeds; old server.json remains pinned to this bridge thereafter. New date-tagged Server releases require the bridge. Both components can share the bridge Release. Latest selects the greatest dated batch, with historical Full fallback until the first batch. No new HTTP API or library-config setting. Implementation is local until explicitly pushed/published; real Windows/Mac package gates remain in CD. Current operations: docs/guide.md §8; design/history: docs/plan/2026-03-31-production-packaging-and-config-strategy.md.
+
 ## Windows installer flow — 2026-09-29
 
 Source now targets Server **1.7.4** and Desktop **0.2.2** because both independent Windows installers changed. These are prepared versions, not a publication claim; no new Full. Setup shows existing/target versions, a dedicated destination page, an overwrite/reinstall summary, then a conditional running-application page before file replacement. Fresh installs allow an empty custom local directory; upgrades retain the registered location and reject relocation. Downgrades and unsafe/program-local-data folders are blocked. Read-only probing never stops an app; explicit confirmation requests scoped graceful shutdown with retry/manual exit/recheck. Silent shutdown requires `/CLOSECURATED=1`; interactive in-app updates do not bypass the wizard. The finish page offers launch; stopped upgrades default unchecked. First Server launch opens management, upgrades start quietly. No HTTP API or library configuration changes. Local fixture installer tests and Go checks cover these branches; production CD remains required. See `docs/guide.md` (Windows installation flow) and the production packaging plan.
@@ -232,17 +238,15 @@ CI 的生产前端构建步骤显式设置 `VITE_USE_WEB_API=true`，与 Windows
 
 修改 `package.json` 脚本或默认端口时，请同步更新本文档与 `AGENTS.md` / `workspace-quick-reference.mdc` 中相关描述。
 
-## 9. 生产包版本号
+## 9. 生产包版本号与批次（2026-10-01 当前）
 
-独立组件开发目标维护在 `scripts/release/versions/{desktop,full}.json` 与 `backend/internal/version/server.json`（Go embed 与发行规划共用）；`plan-component` 只读输出包名；实际组件发行使用 `component_cd.py`，下述旧一体包链路作为 legacy 保留。Electron 编译同时生成 Desktop 本地版本元数据供关于页展示。
+Server 与 Desktop 的版本源分别为 `backend/internal/version/server.json`、`scripts/release/versions/desktop.json`。在干净且已提交的源码上执行 `pnpm release:prepare` 查看变化归属与拟定版本，再执行 `pnpm release:prepare --write` 写入版本、批次 JSON 和 Notes，审阅后提交。默认仅有交付变更的组件递进 patch；可显式指定 `--server-bump minor` / `--desktop-bump major`。`pnpm release:version:show` 展示两端源码版本，无网络写操作。
 
-- 生产包版本的唯一自动化来源是 `scripts/release/version.json`，当前基线为 `1.5.1`。
-- `pnpm release:*` 当前统一调用 `python scripts/release/release_cli.py`。
-- `pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时，都会自动执行 `patch + 1`。
-- `major` / `minor` 只允许人工通过 `pnpm release:version:set-base -- --Major <major> --Minor <minor>` 调整，并在调整时把 `patch` 重置为 `0`。
-- `pnpm release:publish` 是整机发布推荐入口，它只分配一次版本号，再复用到便携包、安装包、manifest 与 `docs/ops/package-build-history.csv` 打包台账。
-- 发布打包会把 FFmpeg 运行时放入 `resources/app/third_party/ffmpeg/bin/`：优先使用 `backend/third_party/ffmpeg/bin/`，否则从 Scoop 或 PATH 发现真实二进制；`scoop/shims` 下的 shim 不会被复制，找不到真实运行时时打包失败。
-- 未得到用户明确要求时，禁止删除已经打出的生产包产物；`release/installer/*.exe` 与 `release/portable/*.zip` 都必须保留。准备重新打包、同版本重打、清理 release 目录或整理产物时，也不能主动删除既有 installer / portable 包。
+批次标题为 `Curated YYYYMMDD`，同日后续追加 `-2`、`-3`，日期按北京时间。一条 Release 可包含两端。正式构建、安装与升级验收由批次 CD 执行；Windows x64 两端，macOS arm64 Desktop。旧一体包 `release_cli.py publish/package-portable/package-installer/set-version-base` 已阻断；`pnpm release:publish` 改为发布已暂存并校验的批次资产，优先使用 CD。
+
+本地验证：仓库根目录 `python3 -m unittest discover -s scripts/release/tests -p "test_*.py"`；工作流用 actionlint；更新器在 backend 运行 `go test ./internal/appupdate`、`go test -tags release ./internal/appupdate` 与 `go vet ./internal/appupdate`。Desktop 与关于页相关用例按 §4 运行。macOS 本地无法替代 Windows 安装器实装测试；正式发布仍须通过 CD 两端门禁。
+
+旧 Server 的 `server.json` 固定指向首次桥接包，新 Server 读取 `server-v2.json`；Desktop 继续读取 `desktop.json`。首次桥接使用兼容旧客户端的 server-v 标签但仍是日期标题，后续普通批次使用 release-日期标签。详见 guide §8。不得主动删除既有生产包或移动旧标签；无需为了失败重试递进普通批次的未发布组件版本。
 
 ## Production pinyin dictionary asset
 

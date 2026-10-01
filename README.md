@@ -39,12 +39,12 @@ Windows installer improvements are prepared for Server 1.7.4 / Desktop 0.2.2: a 
 
 Full/Server 1.7.3 and Desktop 0.2.1 add Chinese Windows setup and automatic shutdown before upgrading; Full removes registered old all-in-one installations after a verified backup. The release passed Windows/Mac CD checks; see the [migration guide](docs/guide.md#migrating-an-old-all-in-one-installation) for supported layouts and Windows acceptance.
 
-New releases ship **Desktop and Server as independent packages only**, available on **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**. Release Notes state which modules changed; an unchanged module keeps its version.
+Releases use **Curated YYYYMMDD** (then **-2**, **-3** on the same day). One Release contains updated Server and/or Desktop packages, with independent component versions and update checks. See [release operations](docs/guide.md#8-release-and-packaging).
 
 - **Windows installers:** `Curated-Server-Setup-<version>-windows-x64.exe` and `Curated-Desktop-Setup-<version>-windows-x64.exe`; independent ZIPs are also available.
 - **Apple Silicon Desktop:** `Curated-Desktop-<version>-macos-arm64.dmg` / `.zip`.
 
-No new Full packages are planned. Latest remains a historical Full migration entry; use the Releases list or component update channels for current versions. Old all-in-one users can run the published Full 1.7.3 once to migrate, then update Desktop and Server independently.
+No new Full packages are built. After the first dated batch is published, Latest follows dated batches. Old all-in-one users migrate once through [Full 1.7.3](https://github.com/yepHiu/Curated/releases/tag/full-v1.7.3); existing Server users receive a bridge to the new update feed.
 
 ## Highlights
 
