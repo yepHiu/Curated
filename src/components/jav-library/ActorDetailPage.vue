@@ -105,21 +105,7 @@ async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) 
     data-actor-detail-page
     class="flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-hidden px-[var(--app-page-px)] py-[var(--app-page-py)] sm:px-[var(--app-page-px-sm)] lg:px-[var(--app-page-px-lg)] lg:py-[var(--app-page-py-lg)] xl:px-[var(--app-page-px-xl)]"
   >
-    <header class="flex shrink-0 flex-col gap-1">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div class="min-w-0">
-          <p class="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            {{ t("actors.detailEyebrow") }}
-          </p>
-          <h1 class="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
-            {{ actorDisplayName }}
-          </h1>
-        </div>
-      </div>
-      <p class="text-sm text-muted-foreground">
-        {{ t("actors.detailSubtitle") }}
-      </p>
-    </header>
+    <h1 class="sr-only">{{ actorDisplayName }}</h1>
 
     <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <ActorProfileCard
