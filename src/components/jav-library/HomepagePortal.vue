@@ -44,6 +44,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const homeScrollRegionRef = ref<HTMLElement | null>(null)
+// Temporarily hide the recommendation feedback entry while keeping it available to restore.
+const showRecommendationFeedback = false
 const feedbackDialogOpen = ref(false)
 const { persist } = useHomeScrollPreserve({ scrollElRef: homeScrollRegionRef })
 let overscrollDistance = 0
@@ -158,6 +160,7 @@ function onHomeTouchMove(event: TouchEvent) {
         <template #action>
           <div class="flex items-center gap-1">
             <Button
+              v-if="showRecommendationFeedback"
               type="button"
               variant="ghost"
               size="icon-sm"
@@ -231,7 +234,7 @@ function onHomeTouchMove(event: TouchEvent) {
     </div>
   </div>
 
-  <Dialog v-model:open="feedbackDialogOpen">
+  <Dialog v-if="showRecommendationFeedback" v-model:open="feedbackDialogOpen">
     <DialogContent class="max-h-[min(80dvh,42rem)] overflow-y-auto sm:max-w-lg">
       <DialogHeader>
         <DialogTitle>{{ t("home.recommendationManageTitle") }}</DialogTitle>
