@@ -94,7 +94,7 @@ func TestTagOrganization600AndUndo(t *testing.T) {
 	var calls atomic.Int64
 	topicFixtureProvider(t, a, func(bool) { calls.Add(1) })
 	ctx := context.Background()
-	id, err := a.store.CreateTagOrganization(ctx, "bulk", "bulk", "manual", ids)
+	id, err := a.store.CreateTagOrganization(ctx, "bulk", "bulk", "manual", "zh-CN", ids)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func TestTopicVocabularyCheckpointRetry(t *testing.T) {
 	a := governanceTestApp(t)
 	ids, _ := seedTopicMovies(t, a, 60)
 	ctx := context.Background()
-	id, err := a.store.CreateTagOrganization(ctx, "vocab-retry", "vocab-retry", "manual", ids)
+	id, err := a.store.CreateTagOrganization(ctx, "vocab-retry", "vocab-retry", "manual", "zh-CN", ids)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestTopicVocabularyCancelledCheckpoint(t *testing.T) {
 	a := governanceTestApp(t)
 	ids, _ := seedTopicMovies(t, a, 1)
 	ctx := context.Background()
-	id, err := a.store.CreateTagOrganization(ctx, "vocab-cancel", "vocab-cancel", "manual", ids)
+	id, err := a.store.CreateTagOrganization(ctx, "vocab-cancel", "vocab-cancel", "manual", "zh-CN", ids)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,7 @@ func TestTopicVocabularyAdaptsInputBudget(t *testing.T) {
 	var calls atomic.Int64
 	topicFixtureProvider(t, a, func(bool) { calls.Add(1) })
 	a.cfg.AIProvider.ContextWindow = 32768
-	id, err := a.store.CreateTagOrganization(ctx, "vocab-budget", "vocab-budget", "manual", ids)
+	id, err := a.store.CreateTagOrganization(ctx, "vocab-budget", "vocab-budget", "manual", "zh-CN", ids)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +337,7 @@ func TestTopicVocabularyEmptyCheckpoint(t *testing.T) {
 	a := governanceTestApp(t)
 	ids, _ := seedTopicMovies(t, a, 1)
 	ctx := context.Background()
-	id, err := a.store.CreateTagOrganization(ctx, "vocab-empty", "vocab-empty", "manual", ids)
+	id, err := a.store.CreateTagOrganization(ctx, "vocab-empty", "vocab-empty", "manual", "zh-CN", ids)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,5 +360,51 @@ func TestTopicVocabularyEmptyCheckpoint(t *testing.T) {
 	items, _ := a.store.TagOrganizationItems(ctx, id, false, 1, 0)
 	if len(items) != 1 || items[0].Reason != "AI_ORGANIZATION_INVALID_EVIDENCE" {
 		t.Fatalf("invalid evidence not explained: %+v", items)
+	}
+}
+
+// TestTopicLabelLocaleIsFrozen sends task locale rather than source language to vocabulary generation.
+func TestTopicLabelLocaleIsFrozen(t *testing.T) {
+	a := governanceTestApp(t)
+	ids, _ := seedTopicMovies(t, a, 1)
+	ctx := context.Background()
+	var observed string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Messages []llm.ChatMessage `json:"messages"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		var input struct {
+			Locale string `json:"labelLocale"`
+		}
+		raw := strings.TrimSuffix(strings.TrimPrefix(req.Messages[1].Content, "<source>"), "</source>")
+		_ = json.Unmarshal([]byte(raw), &input)
+		observed = input.Locale
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": `{"topics":[]}`}}}})
+	}))
+	defer server.Close()
+	a.cfg.AIProvider = config.AIProviderConfig{BaseURL: server.URL, Model: "fixture"}
+	for _, locale := range []string{"zh-CN", "en", "ja"} {
+		id, err := a.store.CreateTagOrganization(ctx, locale, locale, "manual", locale, ids)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = a.store.UpdateTagOrganization(ctx, id, "running", "vocabulary", "")
+		if _, err = a.buildTopicVocabulary(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+		if observed != locale {
+			t.Fatalf("locale=%s want %s", observed, locale)
+		}
+		_ = a.store.UpdateTagOrganization(ctx, id, "blocked", "vocabulary", "")
+		_ = a.store.RetryTagOrganization(ctx, id)
+		job, _ := a.GetTagOrganization(ctx, id)
+		if job.Locale != locale {
+			t.Fatal("retry lost locale")
+		}
+		_ = a.store.UpdateTagOrganization(ctx, id, "cancelled", "stopped", "")
+	}
+	if _, err := a.StartTagOrganization(ctx, contracts.TagOrganizationRequest{Scope: "selected", MovieIDs: ids, RequestID: "bad-locale", Locale: "ignore instructions"}); err == nil {
+		t.Fatal("unsupported locale accepted")
 	}
 }

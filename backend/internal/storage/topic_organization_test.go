@@ -44,7 +44,7 @@ func newTopicTestStore(t *testing.T) *SQLiteStore {
 func startTopicTestJob(t *testing.T, s *SQLiteStore, id string) {
 	t.Helper()
 	ctx := context.Background()
-	if _, err := s.CreateTagOrganization(ctx, id, id, "manual", []string{"a"}); err != nil {
+	if _, err := s.CreateTagOrganization(ctx, id, id, "manual", "zh-CN", []string{"a"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.UpdateTagOrganization(ctx, id, "running", "applying", ""); err != nil {

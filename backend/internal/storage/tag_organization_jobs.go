@@ -9,7 +9,7 @@ import (
 )
 
 // CreateTagOrganization 固定任务范围并通过唯一约束限制并发；相同请求返回原任务。
-func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, reason string, movieIDs []string) (string, error) {
+func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, reason, locale string, movieIDs []string) (string, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return "", err
@@ -23,7 +23,7 @@ func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, 
 	if err != sql.ErrNoRows {
 		return "", err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO ai_tag_organization_jobs(id,request_id,status,trigger_reason,created_at,updated_at) VALUES(?,?,'queued',?,?,?)`, id, requestID, reason, nowUTC(), nowUTC()); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO ai_tag_organization_jobs(id,request_id,status,trigger_reason,locale,created_at,updated_at) VALUES(?,?,'queued',?,?,?,?)`, id, requestID, reason, locale, nowUTC(), nowUTC()); err != nil {
 		return "", err
 	}
 	for _, mid := range movieIDs {
@@ -44,7 +44,7 @@ func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, 
 // GetTagOrganization 根据逐项检查点计算真实进度，重启不依赖内存计数。
 func (s *SQLiteStore) GetTagOrganization(ctx context.Context, id string) (contracts.TagOrganizationJobDTO, error) {
 	v := contracts.TagOrganizationJobDTO{}
-	err := s.db.QueryRowContext(ctx, `SELECT id,status,stage,trigger_reason,revision,created_at,updated_at,error,vocabulary_processed,vocabulary_ready FROM ai_tag_organization_jobs WHERE id=?`, id).Scan(&v.ID, &v.Status, &v.Stage, &v.TriggerReason, &v.Revision, &v.CreatedAt, &v.UpdatedAt, &v.Error, &v.VocabularyProcessed, &v.VocabularyReady)
+	err := s.db.QueryRowContext(ctx, `SELECT id,status,stage,trigger_reason,revision,created_at,updated_at,error,vocabulary_processed,vocabulary_ready,locale FROM ai_tag_organization_jobs WHERE id=?`, id).Scan(&v.ID, &v.Status, &v.Stage, &v.TriggerReason, &v.Revision, &v.CreatedAt, &v.UpdatedAt, &v.Error, &v.VocabularyProcessed, &v.VocabularyReady, &v.Locale)
 	if err != nil {
 		return v, err
 	}

@@ -9,6 +9,7 @@ export interface LibraryTopic {
 }
 export interface HomepageTopicGroup { topic: LibraryTopic; movies: Movie[] }
 export interface TagOrganizationJob {
+  locale?: "zh-CN" | "en" | "ja"
   id: string
   taskId: string
   status: "queued" | "running" | "blocked" | "completed" | "partial_failed" | "failed" | "cancelled"

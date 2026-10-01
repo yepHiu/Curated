@@ -15,8 +15,9 @@ type HomepageTopicGroupDTO struct {
 	Movies []MovieListItemDTO `json:"movies"`
 }
 
-// TagOrganizationRequest 只允许选择影片范围，不接受任意标签类型或元数据写字段。
+// TagOrganizationRequest 固定影片范围和标签语言，不接受元数据写字段。
 type TagOrganizationRequest struct {
+	Locale    string   `json:"locale,omitempty"`
 	Scope     string   `json:"scope"`
 	MovieIDs  []string `json:"movieIds,omitempty"`
 	RequestID string   `json:"requestId"`
@@ -24,6 +25,7 @@ type TagOrganizationRequest struct {
 
 // TagOrganizationJobDTO 保存可恢复整理的真实进度和触发来源。
 type TagOrganizationJobDTO struct {
+	Locale              string `json:"locale"`
 	VocabularyProcessed int    `json:"vocabularyProcessed"`
 	VocabularyReady     bool   `json:"vocabularyReady"`
 	ID                  string `json:"id"`

@@ -40,6 +40,13 @@ func (a *App) StartTagOrganization(ctx context.Context, req contracts.TagOrganiz
 	if req.RequestID == "" || len(req.RequestID) > 128 {
 		return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "requestId required"}
 	}
+	locale := req.Locale
+	if locale == "" || locale == "zh" {
+		locale = "zh-CN"
+	}
+	if locale != "zh-CN" && locale != "en" && locale != "ja" {
+		return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "unsupported label locale"}
+	}
 	ids := []string{}
 	switch req.Scope {
 	case "all":
@@ -67,7 +74,7 @@ func (a *App) StartTagOrganization(ctx context.Context, req contracts.TagOrganiz
 	if len(ids) == 0 {
 		return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "no movies to organize"}
 	}
-	id, err := a.store.CreateTagOrganization(ctx, newAgentID("tag-org-"), req.RequestID, "manual", ids)
+	id, err := a.store.CreateTagOrganization(ctx, newAgentID("tag-org-"), req.RequestID, "manual", locale, ids)
 	if err != nil {
 		return contracts.TagOrganizationJobDTO{}, err
 	}
@@ -189,7 +196,7 @@ func (a *App) topicComplete(ctx context.Context, prompt string, data any) (raw s
 	defer func() { finish(retErr) }()
 	observation.row.PromptVersion = "topic-classification-v1"
 	if prompt == topicVocabularyPrompt {
-		observation.row.PromptVersion = "topic-vocabulary-v2"
+		observation.row.PromptVersion = "topic-vocabulary-v3"
 	}
 	requestedConfig := a.currentAIProviderConfig()
 	requestedPolicy := a.AIGovernanceSettings()
@@ -471,7 +478,7 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 			inputs = append(inputs, compactVocabularySample(input))
 		}
 		if len(inputs) > 0 {
-			raw, err := a.topicComplete(ctx, topicVocabularyPrompt, map[string]any{"existing": defs, "movies": inputs})
+			raw, err := a.topicComplete(ctx, topicVocabularyPrompt, map[string]any{"existing": defs, "movies": inputs, "labelLocale": job.Locale})
 			if err != nil {
 				// Oversize checks happen locally, before sending any source to the provider.
 				if topicOrganizationErrorCode(err) == "AI_CONTEXT_TOO_LARGE" && len(items) > 1 {
