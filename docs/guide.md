@@ -275,7 +275,7 @@ In the web player, **D** steps backward and **F** steps forward while pausing pl
 
 ### Actor details and captured frames
 
-The actor profile card, filmography heading, movies, and **Curated Frames** share one scroll area; the profile card scrolls with the content. **Curated Frames** appears after the filmography. Choose **Curated Frames** on the actor profile card to jump to that section. It filters by the resolved actor name, loads 12 frames per page, and uses the same cards and full detail dialog as the frame library, including actor-specific export context. The section remains available when the filmography is empty. See [actor-page implementation](plan/2026-07-04-actor-page-and-tag-visibility-plan.md).
+The actor profile card, filmography heading, movies, and **Curated Frames** share one scroll area; the profile card scrolls with the content. **Curated Frames** appears after the filmography as a flat responsive grid matching the frame library, without an enclosing card. Choose **Curated Frames** on the actor profile card to jump to that section. It filters by the resolved actor name, loads 12 frames per page, and uses the same cards and full detail dialog as the frame library, including actor-specific export context. The section remains available when the filmography is empty. See [actor-page implementation](plan/2026-07-04-actor-page-and-tag-visibility-plan.md).
 
 ### Merging duplicate actors
 

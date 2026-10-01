@@ -186,3 +186,9 @@ The main implementation decision before Phase 2 is route shape:
 
 - 将演员资料卡与影片标题放入 `VirtualMovieMasonry` 现有 header slot，与影片、萃取帧共用滚动区域，释放窄屏浏览空间；空影片状态也沿用此结构。
 - 保留滚动位置恢复和萃取帧跳转。相关 11 项测试、类型检查、局部 ESLint 通过；浏览器在 375px / 1440px 宽度确认资料卡随滚动移动，跳转焦点正常。未运行完整 display scaling 套件。
+
+### 后续调整：萃取帧平铺
+
+- 演员页启用通用帧区块的 `unframed` 展示，去掉大卡片背景、边框和内边距，保留标题、数量和跳转焦点。
+- 直接复用萃取帧页面的 `CuratedFrameGrid` 响应式网格与大图弹窗；影片详情仍使用原卡片外观。
+- 相关 14 项测试、类型检查与局部 ESLint 通过。浏览器合成帧验证 375px 双列、1440px 五列，无横向溢出，点击可打开大图。
