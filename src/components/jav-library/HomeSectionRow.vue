@@ -15,14 +15,14 @@ const emit = defineEmits<{
 
 <template>
   <section class="flex flex-col gap-4">
-    <div class="flex items-end justify-between gap-3">
-      <div>
+    <div class="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:min-h-8">
+      <div class="min-w-0">
         <h2 class="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
           {{ title }}
         </h2>
       </div>
 
-      <div v-if="$slots.action" class="shrink-0">
+      <div v-if="$slots.action" class="flex flex-wrap items-center gap-1">
         <slot name="action" />
       </div>
     </div>

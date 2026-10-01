@@ -37,9 +37,9 @@ watch(state.revision, () => { /* 通知可用更新，不抢滚动位置。 */ i
 </script>
 
 <template>
-  <section class="flex flex-col gap-5" data-home-topics>
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold sm:text-xl">{{ t("topics.heading") }}</h2>
+  <section class="flex flex-col gap-4" data-home-topics>
+    <div class="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:min-h-8">
+      <h2 class="text-lg font-semibold tracking-tight sm:text-xl">{{ t("topics.heading") }}</h2>
       <div class="flex flex-wrap items-center gap-2">
         <span v-if="!state.connected.value" class="text-xs text-muted-foreground">{{ t("topics.disconnected") }}</span>
         <Button v-if="state.active.value" variant="ghost" size="sm" @click="state.dialogOpen.value = true">
@@ -52,8 +52,10 @@ watch(state.revision, () => { /* 通知可用更新，不抢滚动位置。 */ i
     <p v-if="loading" role="status" class="text-sm text-muted-foreground">{{ t("topics.loading") }}</p>
     <div v-else-if="failed" class="flex items-center gap-3 text-sm"><span>{{ t("topics.loadFailed") }}</span><Button variant="outline" size="sm" @click="refresh">{{ t("topics.retry") }}</Button></div>
     <p v-else-if="groups.length === 0" class="text-sm text-muted-foreground">{{ t("topics.empty") }}</p>
-    <HomeSectionRow v-for="group in groups" :key="group.topic.id" :title="group.topic.name" :movies="group.movies" @open-details="emit('openDetails', $event)" @open-player="emit('openPlayer', $event)">
-      <template #action><Button variant="ghost" size="sm" @click="hide(group.topic.id)">{{ t("topics.hide") }}</Button><Button variant="ghost" size="sm" @click="browse(group.topic.id)">{{ t("topics.viewAll", { count: group.topic.movieCount }) }} →</Button></template>
-    </HomeSectionRow>
+    <div v-if="groups.length > 0" class="flex flex-col gap-8 lg:gap-10">
+      <HomeSectionRow v-for="group in groups" :key="group.topic.id" :title="group.topic.name" :movies="group.movies" @open-details="emit('openDetails', $event)" @open-player="emit('openPlayer', $event)">
+        <template #action><Button variant="ghost" size="sm" class="min-h-11 sm:min-h-8" @click="hide(group.topic.id)">{{ t("topics.hide") }}</Button><Button variant="ghost" size="sm" class="min-h-11 sm:min-h-8" @click="browse(group.topic.id)">{{ t("topics.viewAll", { count: group.topic.movieCount }) }} →</Button></template>
+      </HomeSectionRow>
+    </div>
   </section>
 </template>

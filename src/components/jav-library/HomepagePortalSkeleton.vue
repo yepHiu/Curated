@@ -49,9 +49,8 @@ const posterSkeletons = Array.from({ length: 6 }, (_, index) => `poster-${index}
         :data-homepage-skeleton-section="sectionId"
         class="space-y-4"
       >
-        <div class="space-y-2">
+        <div class="flex min-h-11 items-center sm:min-h-8">
           <Skeleton class="h-6 w-44" />
-          <Skeleton class="h-4 w-full max-w-xl" />
         </div>
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
