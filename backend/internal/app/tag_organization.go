@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -185,6 +187,10 @@ func (a *App) topicComplete(ctx context.Context, prompt string, data any) (raw s
 	defer cancel()
 	ctx, observation, finish := a.beginAIRun(ctx, "action", "organize_user_tags")
 	defer func() { finish(retErr) }()
+	observation.row.PromptVersion = "topic-classification-v1"
+	if prompt == topicVocabularyPrompt {
+		observation.row.PromptVersion = "topic-vocabulary-v2"
+	}
 	requestedConfig := a.currentAIProviderConfig()
 	requestedPolicy := a.AIGovernanceSettings()
 	cfg, err := normalizeAIProviderConfig(requestedConfig)
@@ -253,12 +259,12 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 	}
 	a.publishTagOrganization(id)
 	defs, err := a.store.GetTagOrganizationVocabulary(ctx, id)
-	if err == nil && len(defs) == 0 {
+	if err == nil && !jobState.VocabularyReady {
 		defs, err = a.buildTopicVocabulary(ctx, id)
 	}
 	if err != nil {
 		if ctx.Err() == nil {
-			_ = a.store.UpdateTagOrganization(ctx, id, "blocked", "vocabulary", "AI_VOCABULARY_FAILED")
+			_ = a.store.UpdateTagOrganization(ctx, id, "blocked", "vocabulary", topicOrganizationErrorCode(err))
 		}
 		return
 	}
@@ -315,16 +321,22 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 			continue
 		}
 		_ = a.store.UpdateTagOrganization(ctx, id, "running", "classifying", "")
+		job.Stage = "classifying"
 		var result struct {
 			Movies []topicClassification `json:"movies"`
 		}
 		raw, e := a.topicComplete(ctx, topicClassificationPrompt, map[string]any{"vocabulary": defs, "movies": inputs})
 		if e == nil {
-			e = decodeTopicJSON(raw, &result)
+			if decodeTopicJSON(raw, &result) != nil {
+				e = &core.ToolError{Code: "AI_ORGANIZATION_INVALID_JSON", Message: "Invalid classification JSON"}
+			}
 		}
 		var matches map[string][]string
 		if e == nil {
 			matches, e = validateTopicClassification(result.Movies, inputs, defs)
+			if e != nil {
+				e = &core.ToolError{Code: "AI_ORGANIZATION_INVALID_EVIDENCE", Message: "Invalid classification evidence"}
+			}
 		}
 		if ctx.Err() != nil {
 			return
@@ -339,7 +351,7 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 		}
 		if e != nil {
 			for _, input := range inputs {
-				_ = a.store.SetTagOrganizationItem(ctx, id, input.MovieID, "failed", "AI_CLASSIFICATION_FAILED")
+				_ = a.store.SetTagOrganizationItem(ctx, id, input.MovieID, "failed", topicOrganizationErrorCode(e))
 			}
 			a.publishTagOrganization(id)
 			continue
@@ -375,6 +387,11 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 				result := gw.Invoke(core.WithUserTagTaskGrant(ctx, id), core.Call{Name: core.UserTagTaskApplyName, SessionID: id, Channel: core.ChannelAction, Args: args})
 				a.agentRT.applyMu.Unlock()
 				if result.Error != nil && result.Error.Code == "AI_RATE_LIMITED" {
+					if job.Stage != "waiting_quota" {
+						_ = a.store.UpdateTagOrganization(ctx, id, "running", "waiting_quota", "")
+						a.publishTagOrganization(id)
+						job.Stage = "waiting_quota"
+					}
 					select {
 					case <-ctx.Done():
 						return
@@ -385,6 +402,10 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 						return
 					}
 					continue
+				}
+				if job.Stage == "waiting_quota" {
+					_ = a.store.UpdateTagOrganization(ctx, id, "running", "applying", "")
+					job.Stage = "applying"
 				}
 				if result.Error != nil {
 					_ = a.store.SetTagOrganizationItem(ctx, id, input.MovieID, "conflict", "TAG_WRITE_REJECTED")
@@ -409,67 +430,102 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 	a.publishTagOrganization(id)
 }
 
-// buildTopicVocabulary 分页归纳词汇，以有界资料批次覆盖全部选中影片。
+// buildTopicVocabulary adds only new definitions and resumes completed source pages after restart.
 func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.TopicDefinition, error) {
-	defs, err := a.store.TopicVocabulary(ctx)
+	job, err := a.store.GetTagOrganization(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	for offset := 0; ; offset += 20 {
-		job, err := a.store.GetTagOrganization(ctx, id)
+	defs, err := a.store.GetTagOrganizationVocabulary(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if job.VocabularyProcessed == 0 {
+		defs, err = a.store.TopicVocabulary(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if job.Status == "cancelled" {
+	}
+	batchSize := 50
+	for offset := job.VocabularyProcessed; offset < job.Total; {
+		current, err := a.store.GetTagOrganization(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if current.Status != "running" {
 			return nil, context.Canceled
 		}
-		items, err := a.store.TagOrganizationItems(ctx, id, false, 20, offset)
+		items, err := a.store.TagOrganizationItems(ctx, id, false, batchSize, offset)
 		if err != nil {
 			return nil, err
 		}
 		if len(items) == 0 {
-			break
+			return nil, fmt.Errorf("missing vocabulary page")
 		}
-		inputs := []storage.TopicMovieInput{}
+		inputs := []topicVocabularySample{}
 		for _, item := range items {
-			v, e := a.store.TopicMovieInput(ctx, item.MovieID)
+			input, e := a.store.TopicMovieInput(ctx, item.MovieID)
 			if e != nil {
 				continue
 			}
-			if len(v.Title)+len(v.Summary) > 8000 {
-				v.Summary = ""
+			inputs = append(inputs, compactVocabularySample(input))
+		}
+		if len(inputs) > 0 {
+			raw, err := a.topicComplete(ctx, topicVocabularyPrompt, map[string]any{"existing": defs, "movies": inputs})
+			if err != nil {
+				// Oversize checks happen locally, before sending any source to the provider.
+				if topicOrganizationErrorCode(err) == "AI_CONTEXT_TOO_LARGE" && len(items) > 1 {
+					batchSize = max(1, len(items)/2)
+					continue
+				}
+				return nil, err
 			}
-			inputs = append(inputs, v)
-		}
-		raw, err := a.topicComplete(ctx, topicVocabularyPrompt, map[string]any{"existing": defs, "movies": inputs})
-		if err != nil {
-			return nil, err
-		}
-		var result struct {
-			Topics []storage.TopicDefinition `json:"topics"`
-		}
-		if err = decodeTopicJSON(raw, &result); err != nil {
-			return nil, err
-		}
-		if err = validateTopicVocabulary(result.Topics); err != nil {
-			return nil, err
-		}
-		known := map[string]bool{}
-		for _, d := range defs {
-			known[strings.ToLower(d.Name)] = true
-		}
-		for _, d := range result.Topics {
-			if !known[strings.ToLower(d.Name)] {
-				defs = append(defs, d)
+			var result struct {
+				Topics []storage.TopicDefinition `json:"topics"`
+			}
+			if err = decodeTopicJSON(raw, &result); err != nil {
+				return nil, &core.ToolError{Code: "AI_ORGANIZATION_INVALID_JSON", Message: "Invalid classification JSON"}
+			}
+			if err = validateTopicVocabulary(result.Topics); err != nil {
+				return nil, &core.ToolError{Code: "AI_ORGANIZATION_VOCABULARY_CONFLICT", Message: "Ambiguous topic vocabulary"}
+			}
+			known := map[string]bool{}
+			for _, d := range defs {
 				known[strings.ToLower(d.Name)] = true
 			}
+			for _, d := range result.Topics {
+				if !known[strings.ToLower(d.Name)] {
+					defs = append(defs, d)
+					known[strings.ToLower(d.Name)] = true
+				}
+			}
+			if err = validateTopicVocabulary(defs); err != nil {
+				return nil, &core.ToolError{Code: "AI_ORGANIZATION_VOCABULARY_CONFLICT", Message: "Ambiguous topic vocabulary"}
+			}
 		}
-		if err := validateTopicVocabulary(defs); err != nil {
-			return nil, err
+		offset += len(items)
+		if err = a.store.CheckpointTopicVocabulary(ctx, id, defs, offset, offset >= job.Total); err != nil {
+			return nil, &core.ToolError{Code: "CHECKPOINT_FAILED", Message: "Cannot save vocabulary progress"}
 		}
 		a.publishTagOrganization(id)
 	}
 	return defs, nil
+}
+
+// topicOrganizationErrorCode exposes useful failure categories without returning source text or provider bodies.
+func topicOrganizationErrorCode(err error) string {
+	var toolErr *core.ToolError
+	if errors.As(err, &toolErr) {
+		return toolErr.Code
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "AI_ORGANIZATION_TIMEOUT"
+	}
+	text := strings.ToLower(err.Error())
+	if strings.Contains(text, "truncated") || strings.Contains(text, "reasoning only") {
+		return "AI_ORGANIZATION_OUTPUT_LIMIT"
+	}
+	return "AI_ORGANIZATION_PROVIDER_FAILED"
 }
 
 // publishTagOrganization 将持久进度投影到既有任务事件，不制造逐片 toast。

@@ -7,10 +7,10 @@ const toast = vi.hoisted(() => vi.fn())
 const notify = vi.hoisted(() => vi.fn())
 vi.mock("@/services/ai-service", () => ({ useAIService: () => api }))
 vi.mock("@/services/library-service", () => ({ useLibraryService: () => api }))
-vi.mock("@/i18n", () => ({ i18n: { global: { t: (key: string) => key } } }))
+vi.mock("@/i18n", () => ({ i18n: { global: { t: (key: string, values?: Record<string, unknown>) => values ? `${key}:${JSON.stringify(values)}` : key, te: (key: string) => key === "topics.errors.AI_ORGANIZATION_TIMEOUT" } } }))
 vi.mock("@/composables/use-app-toast", () => ({ pushAppToast: toast }))
 vi.mock("@/composables/use-notification-center", () => ({ useNotificationCenter: () => ({ addNotification: notify }) }))
-import { startTagOrganizationTracking, stopTagOrganizationTracking, useTagOrganization } from "./use-tag-organization"
+import { startTagOrganizationTracking, stopTagOrganizationTracking, useTagOrganization, organizationProgressText, organizationErrorText } from "./use-tag-organization"
 
 /** Build a minimal persistent job snapshot for lifecycle tests. */
 function job(id: string, status: TagOrganizationJob["status"]): TagOrganizationJob {
@@ -52,5 +52,20 @@ describe("organization observation", () => {
   api.listTagOrganizations.mockResolvedValue([job("new","running")]); await useTagOrganization().refresh()
   resolveOld([job("stale","completed")]); await old
   expect(useTagOrganization().jobs.value[0]?.id).toBe("new")
+ })
+})
+
+
+describe("organization diagnostics", () => {
+ it("separates preparation progress from applied movies and explains quota waits", () => {
+  const preparing = { ...job("progress", "running"), total: 100, stage: "vocabulary", vocabularyProcessed: 50 }
+  expect(organizationProgressText(preparing)).toBe('topics.vocabularyProgress:{"done":50,"total":100}')
+  expect(organizationProgressText({ ...preparing, vocabularyProcessed: undefined })).toBe('topics.vocabularyProgress:{"done":0,"total":100}')
+  expect(organizationProgressText({ ...preparing, stage: "waiting_quota", processed: 10 })).toBe('topics.waitingQuota:{"done":10,"total":100}')
+  expect(organizationProgressText({ ...preparing, stage: "classifying", processed: 15 })).toBe('topics.progress:{"done":15,"total":100}')
+ })
+ it("translates known failures and never exposes unknown provider messages", () => {
+  expect(organizationErrorText("AI_ORGANIZATION_TIMEOUT")).toBe("topics.errors.AI_ORGANIZATION_TIMEOUT")
+  expect(organizationErrorText("private provider response")).toBe("topics.needsAttention")
  })
 })

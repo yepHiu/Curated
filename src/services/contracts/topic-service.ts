@@ -12,6 +12,8 @@ export interface TagOrganizationJob {
   id: string
   taskId: string
   status: "queued" | "running" | "blocked" | "completed" | "partial_failed" | "failed" | "cancelled"
+  vocabularyProcessed?: number
+  vocabularyReady?: boolean
   stage: string
   triggerReason: string
   total: number

@@ -22,6 +22,20 @@ let generation = 0
 /** 运行状态与结果状态保持分离。 */
 export function isOrganizationActive(job: TagOrganizationJob) { return job.status === "queued" || job.status === "running" }
 
+/** 显示实际阶段；词汇准备不再伪装成零片分类进度。 */
+export function organizationProgressText(job: TagOrganizationJob): string {
+  const t = i18n.global.t
+  if (job.stage === "vocabulary") return t("topics.vocabularyProgress", { done: job.vocabularyProcessed ?? 0, total: job.total })
+  if (job.stage === "waiting_quota") return t("topics.waitingQuota", { done: job.processed, total: job.total })
+  return t("topics.progress", { done: job.processed, total: job.total })
+}
+
+/** 稳定错误码映射为操作提示，不展示模型原文或数据库内部信息。 */
+export function organizationErrorText(code: string): string {
+  const key = `topics.errors.${code}`
+  return i18n.global.te(key) ? i18n.global.t(key) : i18n.global.t("topics.needsAttention")
+}
+
 /** 全屏时只保存结果，不弹提示。 */
 function notifyResult(job: TagOrganizationJob) {
   const noticeKey = `${job.id}:${job.status}:${job.revision}`

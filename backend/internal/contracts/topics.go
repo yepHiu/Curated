@@ -24,20 +24,22 @@ type TagOrganizationRequest struct {
 
 // TagOrganizationJobDTO 保存可恢复整理的真实进度和触发来源。
 type TagOrganizationJobDTO struct {
-	ID            string `json:"id"`
-	TaskID        string `json:"taskId"`
-	Status        string `json:"status"`
-	Stage         string `json:"stage"`
-	TriggerReason string `json:"triggerReason"`
-	Total         int    `json:"total"`
-	Processed     int    `json:"processed"`
-	Succeeded     int    `json:"succeeded"`
-	Unresolved    int    `json:"unresolved"`
-	Failed        int    `json:"failed"`
-	Revision      int64  `json:"revision"`
-	CreatedAt     string `json:"createdAt"`
-	UpdatedAt     string `json:"updatedAt"`
-	Error         string `json:"error,omitempty"`
+	VocabularyProcessed int    `json:"vocabularyProcessed"`
+	VocabularyReady     bool   `json:"vocabularyReady"`
+	ID                  string `json:"id"`
+	TaskID              string `json:"taskId"`
+	Status              string `json:"status"`
+	Stage               string `json:"stage"`
+	TriggerReason       string `json:"triggerReason"`
+	Total               int    `json:"total"`
+	Processed           int    `json:"processed"`
+	Succeeded           int    `json:"succeeded"`
+	Unresolved          int    `json:"unresolved"`
+	Failed              int    `json:"failed"`
+	Revision            int64  `json:"revision"`
+	CreatedAt           string `json:"createdAt"`
+	UpdatedAt           string `json:"updatedAt"`
+	Error               string `json:"error,omitempty"`
 }
 
 // TopicEvidenceDTO 只提供已核对的原文片段，不暴露路径或完整模型输入。

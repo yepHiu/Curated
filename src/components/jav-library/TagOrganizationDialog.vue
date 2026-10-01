@@ -7,7 +7,7 @@ import type { TagOrganizationItem, LibraryTopic } from "@/services/contracts/top
 import { useI18n } from "vue-i18n"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { useTagOrganization, isOrganizationActive } from "@/composables/use-tag-organization"
+import { useTagOrganization, isOrganizationActive, organizationProgressText, organizationErrorText } from "@/composables/use-tag-organization"
 
 const { t } = useI18n()
 const state = useTagOrganization()
@@ -57,11 +57,13 @@ async function showResults(id: string, more = false) {
       <Button :disabled="state.busy.value || Boolean(state.active.value)" @click="state.start">{{ t("topics.start") }}</Button>
       <div v-for="job in state.jobs.value" :key="job.id" class="space-y-3 border-t border-border py-4">
         <div class="flex flex-wrap justify-between gap-2 text-sm">
-          <span>{{ t(`topics.status.${job.status}`) }} · {{ job.processed }}/{{ job.total }}</span>
+          <span>{{ t(`topics.status.${job.status}`) }}<template v-if="!isOrganizationActive(job)"> · {{ job.processed }}/{{ job.total }}</template></span>
           <span class="text-muted-foreground">{{ new Date(job.createdAt).toLocaleString() }}</span>
         </div>
+        <p v-if="isOrganizationActive(job)" role="status" class="text-sm">{{ organizationProgressText(job) }}</p>
+        <p v-if="job.stage === 'vocabulary' && isOrganizationActive(job)" class="text-xs text-muted-foreground">{{ t("topics.vocabularyHint") }}</p>
         <p class="text-xs text-muted-foreground">{{ t("topics.trigger") }}: {{ t(`topics.reason.${job.triggerReason}`) }} · {{ t("topics.result", { success: job.succeeded, unresolved: job.unresolved, failed: job.failed }) }}</p>
-        <p v-if="job.error" class="text-xs text-destructive">{{ t("topics.needsAttention") }}</p>
+        <p v-if="job.error" class="text-xs text-destructive">{{ organizationErrorText(job.error) }}</p>
         <div class="flex flex-wrap gap-2">
           <Button variant="ghost" size="sm" :disabled="resultLoading" @click="showResults(job.id)">{{ t("topics.details") }}</Button>
           <Button v-if="isOrganizationActive(job)" variant="outline" size="sm" :disabled="state.busy.value" @click="state.cancel(job.id)">{{ t("topics.cancel") }}</Button>
@@ -75,6 +77,7 @@ async function showResults(id: string, more = false) {
           <article v-for="item in items" :key="item.movieId" class="space-y-1 border-b border-border pb-2 text-sm last:border-0">
             <RouterLink :to="{ name: 'detail', params: { id: item.movieId } }" class="font-medium hover:underline" @click="state.dialogOpen.value = false">{{ item.title }}</RouterLink>
             <p class="text-xs text-muted-foreground">{{ t(`topics.itemStatus.${item.status}`) }}</p>
+            <p v-if="item.reason && ['failed', 'conflict'].includes(item.status)" class="text-xs text-destructive">{{ organizationErrorText(item.reason) }}</p>
             <p v-for="evidence in item.evidence" :key="evidence.topic" class="break-words text-xs text-muted-foreground">{{ evidence.topic }} · {{ t(`topics.evidenceField.${evidence.field}`) }}：{{ evidence.quote }}</p>
           </article>
           <p v-if="resultLoading" role="status" class="text-sm text-muted-foreground">{{ t("topics.loading") }}</p>

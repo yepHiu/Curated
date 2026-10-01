@@ -44,7 +44,7 @@ func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, 
 // GetTagOrganization 根据逐项检查点计算真实进度，重启不依赖内存计数。
 func (s *SQLiteStore) GetTagOrganization(ctx context.Context, id string) (contracts.TagOrganizationJobDTO, error) {
 	v := contracts.TagOrganizationJobDTO{}
-	err := s.db.QueryRowContext(ctx, `SELECT id,status,stage,trigger_reason,revision,created_at,updated_at,error FROM ai_tag_organization_jobs WHERE id=?`, id).Scan(&v.ID, &v.Status, &v.Stage, &v.TriggerReason, &v.Revision, &v.CreatedAt, &v.UpdatedAt, &v.Error)
+	err := s.db.QueryRowContext(ctx, `SELECT id,status,stage,trigger_reason,revision,created_at,updated_at,error,vocabulary_processed,vocabulary_ready FROM ai_tag_organization_jobs WHERE id=?`, id).Scan(&v.ID, &v.Status, &v.Stage, &v.TriggerReason, &v.Revision, &v.CreatedAt, &v.UpdatedAt, &v.Error, &v.VocabularyProcessed, &v.VocabularyReady)
 	if err != nil {
 		return v, err
 	}
@@ -100,7 +100,7 @@ func (s *SQLiteStore) SetTagOrganizationVocabulary(ctx context.Context, id strin
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE ai_tag_organization_jobs SET vocabulary_json=? WHERE id=?`, string(data), id)
+	_, err = s.db.ExecContext(ctx, `UPDATE ai_tag_organization_jobs SET vocabulary_json=?,vocabulary_ready=1 WHERE id=?`, string(data), id)
 	return err
 }
 
@@ -187,5 +187,22 @@ func (s *SQLiteStore) SetTopicEvidence(ctx context.Context, jobID, movieID, fing
 		return err
 	}
 	_, err = s.db.ExecContext(ctx, `UPDATE ai_tag_organization_items SET evidence_json=?,input_fingerprint=? WHERE job_id=? AND movie_id=? AND status='pending' AND EXISTS(SELECT 1 FROM ai_tag_organization_jobs j WHERE j.id=job_id AND j.status='running')`, string(data), fingerprint, jobID, movieID)
+	return err
+}
+
+// CheckpointTopicVocabulary atomically persists both definitions and the last analyzed page.
+func (s *SQLiteStore) CheckpointTopicVocabulary(ctx context.Context, id string, defs []TopicDefinition, processed int, ready bool) error {
+	data, err := json.Marshal(defs)
+	if err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE ai_tag_organization_jobs SET vocabulary_json=?,vocabulary_processed=?,vocabulary_ready=?,revision=revision+1,updated_at=? WHERE id=? AND status='running' AND vocabulary_processed<=?`, string(data), processed, ready, nowUTC(), id, processed)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err == nil && count == 0 {
+		return ErrAIWriteConflict
+	}
 	return err
 }

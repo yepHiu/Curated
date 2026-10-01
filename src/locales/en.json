@@ -2405,6 +2405,22 @@
       "summary": "Summary",
       "metadataTags": "Source tag (read only)"
     },
-    "restore": "Restore topic: {name}"
+    "restore": "Restore topic: {name}",
+    "vocabularyProgress": "Building topics · {done}/{total} movies analyzed",
+    "waitingQuota": "Waiting for write allowance · {done}/{total} processed",
+    "vocabularyHint": "Build shared topics before changing user tags. Completed vocabulary batches are saved for retry.",
+    "errors": {
+      "AI_ORGANIZATION_TIMEOUT": "Model response timed out. Completed batches are saved; retry to continue.",
+      "AI_ORGANIZATION_OUTPUT_LIMIT": "Model output was truncated or contained reasoning only. Adjust the model and retry.",
+      "AI_ORGANIZATION_INVALID_JSON": "Model returned invalid classification JSON. This batch was not applied.",
+      "AI_ORGANIZATION_VOCABULARY_CONFLICT": "Topic names or aliases conflict. Completed vocabulary batches are saved.",
+      "AI_ORGANIZATION_INVALID_EVIDENCE": "Movie, topic or evidence validation failed. This batch was not applied.",
+      "AI_ORGANIZATION_PROVIDER_FAILED": "Model request failed. Check AI connection settings and retry.",
+      "AI_CONTEXT_TOO_LARGE": "Batch exceeds the model context window. Adjust capacity or reduce the scope.",
+      "AI_SETTINGS_CHANGED": "AI settings changed during organization. Retry to continue.",
+      "AI_PERMISSION_REQUIRED": "AI is disabled or read-only. Update settings to continue.",
+      "TAG_WRITE_REJECTED": "Tag write rejected, possibly due to later manual edits. New data was preserved.",
+      "CHECKPOINT_FAILED": "Unable to save progress. Check server state and retry."
+    }
   }
 }

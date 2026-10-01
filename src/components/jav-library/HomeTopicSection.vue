@@ -5,7 +5,7 @@ import { useI18n } from "vue-i18n"
 import { Button } from "@/components/ui/button"
 import HomeSectionRow from "@/components/jav-library/HomeSectionRow.vue"
 import { useLibraryService } from "@/services/library-service"
-import { useTagOrganization } from "@/composables/use-tag-organization"
+import { useTagOrganization, organizationProgressText } from "@/composables/use-tag-organization"
 import type { HomepageTopicGroup } from "@/services/contracts/topic-service"
 
 const emit = defineEmits<{ openDetails: [id: string]; openPlayer: [id: string]; loaded: [count: number] }>()
@@ -43,7 +43,7 @@ watch(state.revision, () => { /* 通知可用更新，不抢滚动位置。 */ i
       <div class="flex flex-wrap items-center gap-2">
         <span v-if="!state.connected.value" class="text-xs text-muted-foreground">{{ t("topics.disconnected") }}</span>
         <Button v-if="state.active.value" variant="ghost" size="sm" @click="state.dialogOpen.value = true">
-          {{ state.active.value.stage === 'vocabulary' ? t("topics.vocabulary") : t("topics.progress", { done: state.active.value.processed, total: state.active.value.total }) }}
+          {{ organizationProgressText(state.active.value) }}
         </Button>
         <Button v-if="updated" variant="outline" size="sm" @click="refresh">{{ t("topics.updated") }}</Button>
         <Button variant="ghost" size="sm" @click="state.dialogOpen.value = true">{{ t("topics.organize") }}</Button>

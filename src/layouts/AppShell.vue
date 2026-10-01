@@ -10,7 +10,7 @@ import DevEnvironmentBadge from "@/components/dev/DevEnvironmentBadge.vue"
 import DevPerformanceBar from "@/components/dev/DevPerformanceBar.vue"
 import { Toaster } from "@/components/ui/sonner"
 import TagOrganizationDialog from "@/components/jav-library/TagOrganizationDialog.vue"
-import { useTagOrganization, startTagOrganizationTracking, stopTagOrganizationTracking } from "@/composables/use-tag-organization"
+import { useTagOrganization, organizationProgressText, startTagOrganizationTracking, stopTagOrganizationTracking } from "@/composables/use-tag-organization"
 import ScanProgressDock from "@/components/jav-library/ScanProgressDock.vue"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1048,7 +1048,7 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
 
     <TagOrganizationDialog />
     <Button v-if="tagOrganization.active.value && !tagOrganization.quiet.value" class="fixed bottom-4 left-4 z-40" variant="secondary" size="sm" @click="tagOrganization.dialogOpen.value = true">
-      {{ t('topics.progress', { done: tagOrganization.active.value.processed, total: tagOrganization.active.value.total }) }}
+      {{ organizationProgressText(tagOrganization.active.value) }}
     </Button>
     <ScanProgressDock />
     <DevPerformanceBar v-if="isDev" v-model:debug-open="debugOpen" />

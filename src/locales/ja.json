@@ -2405,6 +2405,22 @@
       "summary": "あらすじ",
       "metadataTags": "元タグ（読み取り専用）"
     },
-    "restore": "題材を再表示：{name}"
+    "restore": "題材を再表示：{name}",
+    "vocabularyProgress": "題材を整理中 · {done}/{total} 件を分析",
+    "waitingQuota": "書き込み枠を待機中 · {done}/{total} 件処理済み",
+    "vocabularyHint": "共通題材を作成してからユーザータグに反映します。完了した分析バッチは保存され、再試行で続行できます。",
+    "errors": {
+      "AI_ORGANIZATION_TIMEOUT": "モデルがタイムアウトしました。完了分は保存されています。再試行で続行できます。",
+      "AI_ORGANIZATION_OUTPUT_LIMIT": "出力上限に達したか推論のみでした。モデルを調整して再試行してください。",
+      "AI_ORGANIZATION_INVALID_JSON": "分類JSONが不完全です。このバッチは反映されていません。",
+      "AI_ORGANIZATION_VOCABULARY_CONFLICT": "題材名または別名が競合しています。完了した分析は保存されています。",
+      "AI_ORGANIZATION_INVALID_EVIDENCE": "作品・題材・根拠の検証に失敗しました。このバッチは未反映です。",
+      "AI_ORGANIZATION_PROVIDER_FAILED": "モデルへの接続に失敗しました。AI設定を確認して再試行してください。",
+      "AI_CONTEXT_TOO_LARGE": "資料がモデル容量を超えています。容量を調整するか対象を減らしてください。",
+      "AI_SETTINGS_CHANGED": "整理中にAI設定が変更されました。再試行してください。",
+      "AI_PERMISSION_REQUIRED": "AIが無効または読み取り専用です。設定を変更して続行できます。",
+      "TAG_WRITE_REJECTED": "手動変更などにより書き込みが拒否されました。新しいデータは保持されています。",
+      "CHECKPOINT_FAILED": "進捗を保存できませんでした。サーバーを確認して再試行してください。"
+    }
   }
 }

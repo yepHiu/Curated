@@ -32,7 +32,7 @@ func topicFixtureProvider(t *testing.T, a *App, before func(bool)) {
 			http.Error(w, "invalid fixture", 400)
 			return
 		}
-		vocabulary := strings.Contains(req.Messages[0].Content, "vocabulary v1")
+		vocabulary := strings.Contains(req.Messages[0].Content, "vocabulary v")
 		if before != nil {
 			before(vocabulary)
 		}
@@ -103,7 +103,7 @@ func TestTagOrganization600AndUndo(t *testing.T) {
 	if err != nil || job.Status != "completed" || job.Succeeded != 600 {
 		t.Fatalf("job=%+v err=%v", job, err)
 	}
-	if calls.Load() != 150 {
+	if calls.Load() != 132 {
 		t.Fatalf("unbounded or missing batch requests: %d", calls.Load())
 	}
 	for _, mid := range ids {
@@ -118,7 +118,7 @@ func TestTagOrganization600AndUndo(t *testing.T) {
 	}
 	// Re-entering a completed job must not call the provider again.
 	a.runTagOrganization(ctx, id)
-	if calls.Load() != 150 {
+	if calls.Load() != 132 {
 		t.Fatal("completed job reprocessed")
 	}
 	undo, err := a.UndoTagOrganization(ctx, id)
@@ -188,5 +188,177 @@ func TestTagOrganizationCancelAndResume(t *testing.T) {
 	complete, _ := a.GetTagOrganization(ctx, job.ID)
 	if complete.Status != "completed" {
 		t.Fatal("cancel overwrote terminal status")
+	}
+}
+
+// TestTopicVocabularyCheckpointRetry keeps successful preparation across malformed model replies.
+func TestTopicVocabularyCheckpointRetry(t *testing.T) {
+	a := governanceTestApp(t)
+	ids, _ := seedTopicMovies(t, a, 60)
+	ctx := context.Background()
+	id, err := a.store.CreateTagOrganization(ctx, "vocab-retry", "vocab-retry", "manual", ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pages []int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Messages []llm.ChatMessage `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Error(err)
+			return
+		}
+		var input struct {
+			Movies   []topicVocabularySample   `json:"movies"`
+			Existing []storage.TopicDefinition `json:"existing"`
+		}
+		raw := strings.TrimSuffix(strings.TrimPrefix(req.Messages[1].Content, "<source>"), "</source>")
+		if err := json.Unmarshal([]byte(raw), &input); err != nil {
+			t.Error(err)
+			return
+		}
+		pages = append(pages, len(input.Movies))
+		content := `{"topics":[{"name":"Theme","description":"Synthetic subject","aliases":["Alias"]}]}`
+		if len(pages) == 2 {
+			content = `{"topics":`
+		}
+		if len(pages) == 3 {
+			if len(input.Existing) != 1 {
+				t.Error("retry lost prior vocabulary")
+			}
+			content = `{"topics":[]}`
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": content}}}})
+	}))
+	defer server.Close()
+	a.cfg.AIProvider = config.AIProviderConfig{BaseURL: server.URL, Model: "synthetic-topic-fixture"}
+	a.runTagOrganization(ctx, id)
+	job, _ := a.GetTagOrganization(ctx, id)
+	if job.Status != "blocked" || job.Error != "AI_ORGANIZATION_INVALID_JSON" || job.VocabularyProcessed != 50 || job.VocabularyReady || job.Processed != 0 {
+		t.Fatalf("lost preparation checkpoint: %+v", job)
+	}
+	for _, mid := range ids {
+		input, _ := a.store.TopicMovieInput(ctx, mid)
+		if !reflect.DeepEqual(input.UserTags, []string{"Alias", "Personal note"}) || !reflect.DeepEqual(input.MetadataTags, []string{"Theme"}) {
+			t.Fatal("invalid response changed tags")
+		}
+	}
+	if err := a.store.RetryTagOrganization(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.store.UpdateTagOrganization(ctx, id, "running", "vocabulary", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.buildTopicVocabulary(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	job, _ = a.GetTagOrganization(ctx, id)
+	if !job.VocabularyReady || job.VocabularyProcessed != 60 || !reflect.DeepEqual(pages, []int{50, 10, 10}) {
+		t.Fatalf("retry=%+v pages=%v", job, pages)
+	}
+	var resumedVocabulary atomic.Int64
+	topicFixtureProvider(t, a, func(vocabulary bool) {
+		if vocabulary {
+			resumedVocabulary.Add(1)
+		}
+	})
+	a.runTagOrganization(ctx, id)
+	job, _ = a.GetTagOrganization(ctx, id)
+	if job.Status != "completed" || job.Succeeded != 60 || resumedVocabulary.Load() != 0 {
+		t.Fatalf("classification resume=%+v", job)
+	}
+}
+
+// TestTopicVocabularyCancelledCheckpoint cannot revive a cancelled job with a late page.
+func TestTopicVocabularyCancelledCheckpoint(t *testing.T) {
+	a := governanceTestApp(t)
+	ids, _ := seedTopicMovies(t, a, 1)
+	ctx := context.Background()
+	id, err := a.store.CreateTagOrganization(ctx, "vocab-cancel", "vocab-cancel", "manual", ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = a.store.UpdateTagOrganization(ctx, id, "running", "vocabulary", "")
+	if err := a.CancelTagOrganization(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.store.CheckpointTopicVocabulary(ctx, id, nil, 1, true); err == nil {
+		t.Fatal("cancelled job accepted late page")
+	}
+	job, _ := a.GetTagOrganization(ctx, id)
+	if job.VocabularyReady || job.VocabularyProcessed != 0 || job.Status != "cancelled" {
+		t.Fatalf("late page=%+v", job)
+	}
+}
+
+// TestCompactVocabularySample preserves full classification evidence and marks proposal excerpts.
+func TestCompactVocabularySample(t *testing.T) {
+	input := storage.TopicMovieInput{Title: "Synthetic", Summary: strings.Repeat("字", 650), MetadataTags: []string{"Theme"}}
+	sample := compactVocabularySample(input)
+	if !sample.SummaryExcerpt || len([]rune(sample.Summary)) != 600 || len([]rune(input.Summary)) != 650 || !reflect.DeepEqual(sample.MetadataTags, input.MetadataTags) {
+		t.Fatalf("invalid excerpt: %+v", sample)
+	}
+	input.Summary = "short"
+	if sample := compactVocabularySample(input); sample.SummaryExcerpt || sample.Summary != "short" {
+		t.Fatal("short input changed")
+	}
+}
+
+// TestTopicVocabularyAdaptsInputBudget avoids blocking an entire library on a large preparation page.
+func TestTopicVocabularyAdaptsInputBudget(t *testing.T) {
+	a := governanceTestApp(t)
+	ids, _ := seedTopicMovies(t, a, 50)
+	ctx := context.Background()
+	for _, mid := range ids {
+		if err := a.store.PatchMovieUserPrefs(ctx, mid, contracts.PatchMovieInput{UserTagsSet: true, UserTags: []string{strings.Repeat("字", 60), strings.Repeat("詞", 60), strings.Repeat("文", 60), strings.Repeat("句", 60)}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var calls atomic.Int64
+	topicFixtureProvider(t, a, func(bool) { calls.Add(1) })
+	a.cfg.AIProvider.ContextWindow = 32768
+	id, err := a.store.CreateTagOrganization(ctx, "vocab-budget", "vocab-budget", "manual", ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = a.store.UpdateTagOrganization(ctx, id, "running", "vocabulary", "")
+	if _, err := a.buildTopicVocabulary(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	job, _ := a.GetTagOrganization(ctx, id)
+	if !job.VocabularyReady || job.VocabularyProcessed != 50 || calls.Load() <= 1 {
+		t.Fatalf("budget not split: %+v calls=%d", job, calls.Load())
+	}
+}
+
+// TestTopicVocabularyEmptyCheckpoint distinguishes a finished empty vocabulary from unfinished work.
+func TestTopicVocabularyEmptyCheckpoint(t *testing.T) {
+	a := governanceTestApp(t)
+	ids, _ := seedTopicMovies(t, a, 1)
+	ctx := context.Background()
+	id, err := a.store.CreateTagOrganization(ctx, "vocab-empty", "vocab-empty", "manual", ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = a.store.UpdateTagOrganization(ctx, id, "running", "vocabulary", "")
+	if err := a.store.CheckpointTopicVocabulary(ctx, id, []storage.TopicDefinition{}, 1, true); err != nil {
+		t.Fatal(err)
+	}
+	var vocabCalls atomic.Int64
+	topicFixtureProvider(t, a, func(vocabulary bool) {
+		if vocabulary {
+			vocabCalls.Add(1)
+		}
+	})
+	a.runTagOrganization(ctx, id)
+	job, _ := a.GetTagOrganization(ctx, id)
+	// The fixture's Theme result must fail against the frozen empty vocabulary, not invent a new one.
+	if vocabCalls.Load() != 0 || job.Failed != 1 || !job.VocabularyReady {
+		t.Fatalf("empty checkpoint repeated: %+v", job)
+	}
+	items, _ := a.store.TagOrganizationItems(ctx, id, false, 1, 0)
+	if len(items) != 1 || items[0].Reason != "AI_ORGANIZATION_INVALID_EVIDENCE" {
+		t.Fatalf("invalid evidence not explained: %+v", items)
 	}
 }

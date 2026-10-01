@@ -2405,6 +2405,22 @@
       "summary": "简介",
       "metadataTags": "原始标签（只读）"
     },
-    "restore": "恢复题材：{name}"
+    "restore": "恢复题材：{name}",
+    "vocabularyProgress": "正在归纳题材 · 已分析 {done}/{total} 部",
+    "waitingQuota": "等待写入额度 · 已处理 {done}/{total} 部",
+    "vocabularyHint": "先建立共用题材，再写入用户标签。已完成的归纳批次会保存，重试从断点继续。",
+    "errors": {
+      "AI_ORGANIZATION_TIMEOUT": "模型响应超时。已完成批次保留，可重试继续。",
+      "AI_ORGANIZATION_OUTPUT_LIMIT": "模型输出达到上限或只有推理内容，未获得完整分类结果。可调整模型后重试。",
+      "AI_ORGANIZATION_INVALID_JSON": "模型未返回完整的分类格式，本批次未应用。可重试。",
+      "AI_ORGANIZATION_VOCABULARY_CONFLICT": "题材名称或别名有冲突，已停止写入。已完成的归纳批次保留。",
+      "AI_ORGANIZATION_INVALID_EVIDENCE": "模型结果的影片、题材或依据未通过校验，本批次未应用。",
+      "AI_ORGANIZATION_PROVIDER_FAILED": "模型请求失败，请检查 AI 连接设置后重试。",
+      "AI_CONTEXT_TOO_LARGE": "本批资料超过模型容量。请调整上下文容量或缩小整理范围。",
+      "AI_SETTINGS_CHANGED": "整理期间 AI 设置发生变化，当前结果未应用，请重试。",
+      "AI_PERMISSION_REQUIRED": "AI 已关闭或处于只读模式。调整设置后可继续。",
+      "TAG_WRITE_REJECTED": "标签写入被拒绝，可能有后续人工修改；未覆盖新数据。",
+      "CHECKPOINT_FAILED": "保存整理进度失败，请检查服务器状态后重试。"
+    }
   }
 }
