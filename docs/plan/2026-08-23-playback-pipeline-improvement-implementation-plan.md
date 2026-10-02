@@ -7,6 +7,20 @@
 - 对照研究：`docs/plan/2026-08-23-vlc-playback-pipeline-optimization.md`
 - 既有止血：`docs/plan/2026-08-23-hls-transcode-seek.md`、`docs/plan/2026-08-22-direct-play-frame-stability.md`、`docs/plan/2026-08-16-playback-pipeline-capability-and-performance-audit.md`
 
+## 2026-10-02 · 硬编 HLS 起播提速
+
+用户反馈 AMD AMF 起播慢。代码审查确认：硬编与软编此前均先等四个约 2 秒分片，再由前端等待 8 秒连续缓冲；硬编还有 `-readrate 2.5` 上限。仅按读入限速，生成 8 秒内容需要约 3.2 秒，未计编码器初始化、解码重排、读盘和分片封装；这不是 AMD 机器实测。
+
+本次实现：
+
+- 硬编（AMF/NVENC/QSV/VideoToolbox）在非空 init、完整首片和清单引用全部就绪后交付，允许浏览器下载与剩余编码并行，不再额外等待第四片。
+- 前端按 descriptor 的实际 `transcodeProfile` 选择缓冲：已知硬编 4 秒 / 最多等 2 秒；libx264、remux 和未知档保留 8 秒 / 4 秒。保持当前点的连续 buffered、倍速换算、剩余片长及取消检查。
+- libx264 的服务端四片预缓冲 / 最多额外等 12 秒保留。硬编读入仍限速 2.5 倍，沿用进程暂停/恢复水位、完整分片发布、会话回收和有界错误恢复。
+
+在 1× 播放、编码吞吐足够且读取正常的假设下，4 秒内容的限速时间约 1.6 秒，较原 8 秒门槛少约 1.6 秒；浏览器与编码并行还可减少串行等待。不能据此承诺实际首帧耗时。较小缓冲对网络或编码抖动的余量较小；持续 `encoderSpeed < playbackRate` 仍可能卡顿，需要处理硬件、片源或 I/O 瓶颈。
+
+验证：后端 playback 全包测试及 vet、前端 3 文件 / 46 项回归、类型检查、相关文件 ESLint 与 Web API 生产构建通过（体积监管无提醒）。新增覆盖硬编首片交付、空片/未发布清单拦截、软件保留预缓冲、AMF 实际 PlayerPage 四秒起播和倍速余量。真实 FFmpeg 合成视频用 CPU 模拟 2.5 倍硬编输入节奏：最终测试首片约 1.21 秒交付，原第四片门槛约 3.66 秒达到，首片可单独解码，后续分片持续生成；这不是 AMD 显卡首帧基准。初次前端执行遇到 Node 原生 localStorage 冲突，按构建范式设置 NODE_OPTIONS=--no-experimental-webstorage 后通过。Windows AMD 实机仍待验证，无打包发布。此处为当前行为；下文 2026-08-23 的“四片硬编起播”是历史记录。
+
 ## 目标
 
 在**不换播放器壳、不嵌 VLC/Jellyfin/Kyoo、不切 DASH**的前提下，改善三个用户问题：
