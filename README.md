@@ -21,7 +21,7 @@
 
 Browse by subject with [AI user-tag organization](docs/guide.md#ai-user-tags-and-homepage-topics): explicit background tasks with resumable preparation progress, concise labels in your interface language, and NFO tags kept read-only.
 
-AI tag organization supports the whole library, one movie or selected movies, prefers existing labels, and shows sidebar progress with compact task history. See [AI user tags](docs/guide.md#ai-user-tags-and-homepage-topics).
+AI tag organization shows organized, unorganized and changed-source counts, defaults to unorganized movies, and supports updates, one movie, selected movies or explicit full reorganization. It reuses existing labels and corrects common vocabulary conflicts. See [AI user tags](docs/guide.md#ai-user-tags-and-homepage-topics).
 
 AI prompt text is maintained as [independent TXT resources](docs/guide.md#ai-prompt-txt-resources) embedded in the Server.
 

@@ -709,7 +709,8 @@ All endpoints use the existing authenticated/unlocked API boundary. No endpoint 
 | GET | `/api/library/movies?topicId=...` | User-topic membership plus existing filters |
 | GET | `/api/homepage/topics` | At most three groups of six posters `{items}` |
 | GET | `/api/ai/tag-organizations` | Latest 50 persistent jobs `{items}` |
-| POST | `/api/ai/tag-organizations` | `{scope:"all"|"selected",movieIds?:string[],requestId:string,locale?:"zh-CN"|"en"|"ja"}`; 202 job; selected 1–600 |
+| GET | `/api/ai/tag-organizations/stats` | Active library `{total,organized,unorganized,outdated,unresolved}`; unresolved is included in organized; source-fingerprint freshness, no-store |
+| POST | `/api/ai/tag-organizations` | `{scope:"all"|"selected"|"unorganized"|"outdated",movieIds?:string[],requestId:string,locale?:"zh-CN"|"en"|"ja"}`; 202 job; selected 1–600 |
 | GET | `/api/ai/tag-organizations/{jobId}` | Persistent progress/counters; frozen `locale` (default zh-CN), `vocabularyProcessed`, `vocabularyReady`; stage includes `vocabulary`, `classifying`, `applying`, `waiting_quota` |
 | GET | `/api/ai/tag-organizations/{jobId}/items?limit=25&offset=0` | Paged result/evidence records `{items}` |
 | POST | `/api/ai/tag-organizations/{jobId}/cancel` | Stop and retain committed results |
@@ -724,3 +725,7 @@ Unknown input fields/trailing JSON return 400; disabled/read-only AI returns 403
 **Mandatory convention confirmed by the user:** all future AI Agent prompt text must be maintained as independent TXT files under `backend/internal/agent/prompts/`, using the existing prompts-package loading/rendering entry points. Edit an existing TXT or add one for a new purpose; do not add inline instruction text to business code or create a separate Markdown/YAML prompt system. Dynamic data projection, message assembly, protocol fields and hard validation stay in code. Follow `.cursor/rules/backend-go-standards.mdc` for maintenance details.
 
 Built-in model instructions now use 15 independent `backend/internal/agent/prompts/*.txt` files. `templates.go` embeds/parses them once with strict missing-variable checks; Go retains bounded context projection and output/write validation. Source values are rendered once and never interpreted as templates. `system.md` moved to `system.txt`; topic calls carry text and their existing audit version together. Existing prompt text, roles and versions are preserved. TXT edits require rebuilding/restarting Server, with no hot reload, new API, configuration key or migration. Task-level immutable prompt snapshots remain pending. See `docs/guide.md` → AI prompt TXT resources for the file map and editing/testing procedure.
+
+### AI organization coverage and correction (2026-10-03)
+
+Migration 0062 persists per-movie successful/no-match analysis and backfills eligible history. Remaining scopes snapshot current source-aware status in the job transaction; empty scopes return 400 `AI_ORGANIZATION_NO_MOVIES`. Undo removes only the restored movie’s completion for that job, preserving newer analysis. New proposals normalize whitespace/duplicates and omit ambiguous aliases; invalid definitions/counts/reuse mappings get one correction then distinct `AI_ORGANIZATION_VOCABULARY_INVALID`, `AI_ORGANIZATION_VOCABULARY_LIMIT`, or `AI_ORGANIZATION_REUSE_INVALID`. Prompt versions: vocabulary v5, reuse v2. No new configuration keys. See guide → AI user tags and homepage topics.

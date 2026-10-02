@@ -19,6 +19,8 @@
 
 # Curated
 
+AI タグ整理は整理済み・未整理・要更新を集計し、既定では未整理作品のみ処理します。変更作品の更新、単体・選択範囲・全体の再整理と一般的な題材競合の自動修正に対応します。[操作ガイド](docs/guide.md#ai-user-tags-and-homepage-topics)を参照してください。
+
 Server は暗い背景、Desktop はオフホワイト（`#F5F6F8`）の背景のアイコンを使用し、中央の図柄は共通です。[ブランドガイド](docs/reference/curated-brand-guidelines.md)と[アセット一覧](icon/brand/index.html)を参照してください。
 
 Desktop の設定またはトレイからサーバー接続を保存・管理・切り替えできます。[接続ガイド](docs/guide.md#desktop-server-connections)を参照してください。

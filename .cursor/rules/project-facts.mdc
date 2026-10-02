@@ -3,6 +3,12 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-10-03 AI 整理覆盖与冲突纠正
+
+Server 新增迁移 0062 `movie_topic_analysis`，成功应用与已验证无匹配逐片原子记录资料指纹；升级回填有指纹的历史 succeeded/unresolved，排除已撤销结果。`GET /api/ai/tag-organizations/stats` 返回活跃库 total/organized/unorganized/outdated/unresolved（最后一项包含于 organized）；标题、摘要、NFO 标签变化为 outdated，个人标签/偏好不影响。POST scope 新增 unorganized/outdated，服务端事务固定范围，空范围 400 AI_ORGANIZATION_NO_MOVIES。撤销仅清除被恢复影片的对应 job 完成标记，不覆盖更晚分析。
+
+弹窗默认未整理，待更新单独操作，显式全库重整收进更多菜单；统计失败可重载并禁止未知范围提交，单片/批量保持。Web/Mock 中英日同步。归纳规范化空白/重复、放弃含混的新别名、保留已有题材归属及普通标签合法别名转换；非法内容/数量/复用映射最多纠正一次，再失败区分错误码并保留检查点。prompts TXT：vocabulary v5/reuse v2。无新配置；源码需 Server 更新/客户端刷新，未自动发布。详见 guide 与 2026-10-02-tag-organization-entry-and-history.md 的 10-03 更新。
+
 ## Release batches — 2026-10-01 (current)
 
 This supersedes older release policies below. New source supports one **Curated YYYYMMDD** Release, with **-2**, **-3**, etc. for later Beijing-date batches, containing Server, Desktop or both. `pnpm release:prepare` inspects each module against its published source; `--write` prepares independent versions, immutable batch metadata and Notes for review. No change means no release. `release:version:show` shows both source versions. CD consumes the batch and never creates Full; old all-in-one CLI/publication triggers are disabled. Shared/unknown delivery inputs conservatively affect both modules and need scope review. Same-source retries reuse versions and batch identity.
