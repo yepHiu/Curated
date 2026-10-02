@@ -67,7 +67,8 @@ def affected(path: str) -> set[str]:
         return set(MODULES)  # Windows installers of both products embed the Go helper.
     if path.startswith('backend/'):
         return {'server'}
-    if path.startswith(('src/views/', 'src/api/', 'src/services/', 'src/composables/', 'src/components/jav-library/')):
+    # The standalone launcher has its own layout and connectionMessages dictionary.
+    if path.startswith(('src/views/', 'src/layouts/', 'src/locales/', 'src/api/', 'src/services/', 'src/composables/', 'src/components/jav-library/')):
         return {'server'}
     if path == 'vite.config.ts' or path == 'index.html':
         return {'server'}

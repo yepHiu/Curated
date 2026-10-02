@@ -91,6 +91,21 @@ class BatchTests(unittest.TestCase):
         self.commit()
         self.assertIsNone(prepare_batch.plan(self.root, '20261001'))
 
+    def test_hosted_layout_and_translations_do_not_release_desktop(self):
+        self.write('src/layouts/AppShell.vue', 'Updated hosted layout')
+        self.write('src/locales/en.json', '{"topics": "Updated hosted translations"}')
+        self.commit()
+        batch = prepare_batch.plan(self.root, '20261003')
+        prepare_batch.write_plan(self.root, batch)
+        self.commit()
+        self.git('tag', batch['tag'])
+        meta = cd.metadata(self.root, batch['tag'])
+        batches.verify_changes(self.root, batch)
+        self.assertEqual(meta['component'], 'server')
+        self.assertEqual(meta['versions']['desktop'], '1.0.0')
+        self.assertEqual({asset['component'] for asset in cd.expected_assets(meta).values()}, {'server'})
+        self.assertIn('| Desktop | Unchanged | 1.0.0 | 1.0.0 |', cd.release_body(self.root, meta))
+
     def test_single_component_versions_and_channels_are_independent(self):
         batch, meta = self.prepare(('server',))
         self.assertEqual(meta['component'], 'server')
