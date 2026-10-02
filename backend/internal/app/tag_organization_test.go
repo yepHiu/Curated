@@ -228,10 +228,10 @@ func TestTopicVocabularyCheckpointRetry(t *testing.T) {
 		}
 		pages = append(pages, len(input.Movies))
 		content := `{"topics":[{"name":"Theme","description":"Synthetic subject","aliases":["Alias"]}]}`
-		if len(pages) == 2 {
+		if len(pages) == 2 || len(pages) == 3 {
 			content = `{"topics":`
 		}
-		if len(pages) == 3 {
+		if len(pages) == 4 {
 			if len(input.Existing) < 1 || !strings.Contains(raw, `"name":"Theme"`) {
 				t.Error("retry lost prior vocabulary")
 			}
@@ -262,7 +262,7 @@ func TestTopicVocabularyCheckpointRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	job, _ = a.GetTagOrganization(ctx, id)
-	if !job.VocabularyReady || job.VocabularyProcessed != 60 || !reflect.DeepEqual(pages, []int{50, 10, 10}) {
+	if !job.VocabularyReady || job.VocabularyProcessed != 60 || !reflect.DeepEqual(pages, []int{50, 10, 10, 10}) {
 		t.Fatalf("retry=%+v pages=%v", job, pages)
 	}
 	var resumedVocabulary atomic.Int64

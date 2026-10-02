@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -63,6 +64,10 @@ func (a *App) reuseTopicProposals(ctx context.Context, proposed, catalog []stora
 			}
 		}
 	}
+	// Canonical labels take precedence over aliases in legacy catalogs.
+	for _, d := range catalog {
+		owners[topicNameKey(d.Name)] = d
+	}
 	pending := map[string]int{}
 	for i, d := range proposed {
 		if existing, ok := owners[strings.ToLower(d.Name)]; ok {
@@ -84,12 +89,43 @@ func (a *App) reuseTopicProposals(ctx context.Context, proposed, catalog []stora
 				proposals = append(proposals, d)
 			}
 		}
-		raw, err := a.topicComplete(ctx, prompts.TopicReusePrompt(), map[string]any{"proposed": proposals, "existing": page})
+		mappings, err := a.topicReusePage(ctx, proposals, page)
 		if err != nil {
 			if topicOrganizationErrorCode(err) == "AI_CONTEXT_TOO_LARGE" && len(page) > 1 {
 				size = max(1, len(page)/2)
 				continue
 			}
+			return nil, err
+		}
+		for proposedName, target := range mappings {
+			i := pending[proposedName]
+			if target.Description == "" {
+				target.Description = proposed[i].Description
+			}
+			resolved[i] = target
+			delete(pending, proposedName)
+		}
+		offset = end
+	}
+	return resolved, nil
+}
+
+// topicReusePage validates the whole page before mutating any pending mapping.
+// Identical duplicate mappings are harmless; conflicting or invented targets retry.
+func (a *App) topicReusePage(ctx context.Context, proposals, page []storage.TopicDefinition) (map[string]storage.TopicDefinition, error) {
+	data := map[string]any{"proposed": proposals, "existing": page}
+	targets := map[string]storage.TopicDefinition{}
+	names := map[string]string{}
+	for _, d := range page {
+		targets[topicNameKey(d.Name)] = d
+	}
+	for _, d := range proposals {
+		names[topicNameKey(d.Name)] = d.Name
+	}
+	var validationErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		raw, err := a.topicComplete(ctx, prompts.TopicReusePrompt(), data)
+		if err != nil {
 			return nil, err
 		}
 		var result struct {
@@ -98,26 +134,24 @@ func (a *App) reuseTopicProposals(ctx context.Context, proposed, catalog []stora
 				CanonicalName string `json:"canonicalName"`
 			} `json:"matches"`
 		}
-		if err := decodeTopicJSON(raw, &result); err != nil || len(result.Matches) > len(pending) {
-			return nil, &core.ToolError{Code: "AI_ORGANIZATION_INVALID_JSON", Message: "Invalid reuse response"}
-		}
-		targets := map[string]storage.TopicDefinition{}
-		for _, d := range page {
-			targets[d.Name] = d
-		}
-		for _, match := range result.Matches {
-			i, ok := pending[match.ProposedName]
-			target, targetOK := targets[match.CanonicalName]
-			if !ok || !targetOK {
-				return nil, &core.ToolError{Code: "AI_ORGANIZATION_VOCABULARY_CONFLICT", Message: "Out of scope reuse mapping"}
+		validationErr = decodeTopicJSON(raw, &result)
+		mappings := map[string]storage.TopicDefinition{}
+		if validationErr == nil {
+			for _, match := range result.Matches {
+				name, ok := names[topicNameKey(match.ProposedName)]
+				target, targetOK := targets[topicNameKey(match.CanonicalName)]
+				old, duplicate := mappings[name]
+				if !ok || !targetOK || (duplicate && old.Name != target.Name) {
+					validationErr = fmt.Errorf("invalid reuse mapping")
+					break
+				}
+				mappings[name] = target
 			}
-			if target.Description == "" {
-				target.Description = proposed[i].Description
-			}
-			resolved[i] = target
-			delete(pending, match.ProposedName)
 		}
-		offset = end
+		if validationErr == nil {
+			return mappings, nil
+		}
+		data["validationError"] = "AI_ORGANIZATION_REUSE_INVALID"
 	}
-	return resolved, nil
+	return nil, &core.ToolError{Code: "AI_ORGANIZATION_REUSE_INVALID", Message: "Invalid topic reuse mapping after correction"}
 }

@@ -505,28 +505,15 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 		}
 		if len(inputs) > 0 {
 			catalog := topicCatalog(defs, candidates)
-			raw, err := a.topicComplete(ctx, prompts.TopicVocabularyPrompt(), map[string]any{"existing": topicVocabularyHints(catalog, inputs), "movies": inputs, "labelLocale": job.Locale})
+			proposed, err := a.proposeTopicVocabulary(ctx, inputs, catalog, job.Locale)
 			if err != nil {
-				// Oversize checks happen locally, before sending any source to the provider.
 				if topicOrganizationErrorCode(err) == "AI_CONTEXT_TOO_LARGE" && len(items) > 1 {
 					batchSize = max(1, len(items)/2)
 					continue
 				}
 				return nil, err
 			}
-			var result struct {
-				Topics []storage.TopicDefinition `json:"topics"`
-			}
-			if err = decodeTopicJSON(raw, &result); err != nil {
-				return nil, &core.ToolError{Code: "AI_ORGANIZATION_INVALID_JSON", Message: "Invalid classification JSON"}
-			}
-			if len(result.Topics) > 12 {
-				return nil, &core.ToolError{Code: "AI_ORGANIZATION_VOCABULARY_CONFLICT", Message: "Unbounded topic proposal"}
-			}
-			if err = validateTopicVocabulary(result.Topics); err != nil {
-				return nil, &core.ToolError{Code: "AI_ORGANIZATION_VOCABULARY_CONFLICT", Message: "Ambiguous topic vocabulary"}
-			}
-			proposals, err := a.reuseTopicProposals(ctx, result.Topics, catalog)
+			proposals, err := a.reuseTopicProposals(ctx, proposed, catalog)
 			if err != nil {
 				return nil, err
 			}
