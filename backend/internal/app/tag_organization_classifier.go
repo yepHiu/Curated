@@ -42,9 +42,11 @@ func decodeTopicJSON(raw string, out any) error {
 	return nil
 }
 
+const maxTopicVocabulary = 160
+
 // validateTopicVocabulary 校验题材和别名，并拒绝含混的跨题材别名映射。
 func validateTopicVocabulary(defs []storage.TopicDefinition) error {
-	if len(defs) > 160 {
+	if len(defs) > maxTopicVocabulary {
 		return fmt.Errorf("too many proposed topics")
 	}
 	owners := map[string]string{}

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -174,8 +175,8 @@ func (a *App) wakeTagOrganization() {
 	}
 }
 
-// topicComplete 复用配置、代理与用量统计；每次请求超时有界。
-func (a *App) topicComplete(ctx context.Context, prompt prompts.Definition, data any) (raw string, retErr error) {
+// topicCompleteAttempt 复用配置、代理与用量统计；每次请求超时有界。
+func (a *App) topicCompleteAttempt(ctx context.Context, prompt prompts.Definition, data any) (raw string, retErr error) {
 	if err := a.aiPermission(true); err != nil {
 		return "", err
 	}
@@ -231,6 +232,9 @@ func (a *App) newTopicApplyGateway() *core.Gateway {
 				return core.Result{}, err
 			}
 			err := a.store.ApplyMovieTopics(ctx, call.SessionID, storage.TopicMovieInput{MovieID: args.MovieID, Fingerprint: args.Fingerprint, Revision: args.Revision}, args.Names)
+			if err != nil && !errors.Is(err, storage.ErrAIWriteConflict) && !errors.Is(err, storage.ErrInvalidUserTags) && !errors.Is(err, sql.ErrNoRows) {
+				return core.Result{Error: &core.ToolError{Code: "CHECKPOINT_FAILED", Message: "Cannot commit organization checkpoint"}}, nil
+			}
 			return core.Result{OK: err == nil}, err
 		}})
 	return a.ensureAgentGateway().WithRegistry(reg)
@@ -239,6 +243,13 @@ func (a *App) newTopicApplyGateway() *core.Gateway {
 // runTagOrganization 执行固定范围并在每片提交后保存检查点。
 func (a *App) runTagOrganization(ctx context.Context, id string) {
 	defer a.publishTagOrganization(id)
+	// Unexpected storage/checkpoint exits must not strand an active job while the
+	// worker sleeps. Shutdown keeps the active checkpoint for startup recovery.
+	defer func() {
+		if ctx.Err() == nil {
+			_ = a.store.UpdateTagOrganization(ctx, id, "blocked", "stopped", "CHECKPOINT_FAILED")
+		}
+	}()
 	jobState, stateErr := a.store.GetTagOrganization(ctx, id)
 	if stateErr != nil || (jobState.Status != "queued" && jobState.Status != "running") {
 		return
@@ -265,8 +276,8 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 		_ = a.store.UpdateTagOrganization(ctx, id, "blocked", "vocabulary", "AI_PERMISSION_REQUIRED")
 		return
 	}
-	job, _ := a.store.GetTagOrganization(ctx, id)
-	if job.Status == "cancelled" {
+	job, err := a.store.GetTagOrganization(ctx, id)
+	if err != nil || job.Status != "running" {
 		return
 	}
 	a.agentRT.applyMu.Lock()
@@ -279,18 +290,21 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 		_ = a.store.UpdateTagOrganization(ctx, id, "failed", "vocabulary", "AI_VOCABULARY_INVALID")
 		return
 	}
-	_ = a.store.SetTagOrganizationVocabulary(ctx, id, defs)
+	if err = a.store.SetTagOrganizationVocabulary(ctx, id, defs); err != nil {
+		return
+	}
 	gw := a.newTopicApplyGateway()
+	batchSize := 5
 	for ctx.Err() == nil {
 		job, err = a.store.GetTagOrganization(ctx, id)
-		if err != nil || job.Status == "cancelled" {
+		if err != nil || job.Status != "running" {
 			return
 		}
 		if err = a.aiPermission(true); err != nil {
 			_ = a.store.UpdateTagOrganization(ctx, id, "blocked", "classifying", "AI_PERMISSION_REQUIRED")
 			return
 		}
-		items, err := a.store.TagOrganizationItems(ctx, id, true, 5, 0)
+		items, err := a.store.TagOrganizationItems(ctx, id, true, batchSize, 0)
 		if err != nil {
 			return
 		}
@@ -301,11 +315,18 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 		for _, item := range items {
 			input, e := a.store.TopicMovieInput(ctx, item.MovieID)
 			if e != nil {
-				_ = a.store.SetTagOrganizationItem(ctx, id, item.MovieID, "failed", "MOVIE_UNAVAILABLE")
+				if !errors.Is(e, sql.ErrNoRows) {
+					return
+				}
+				if err := a.store.SetTagOrganizationItem(ctx, id, item.MovieID, "failed", "MOVIE_UNAVAILABLE"); err != nil {
+					return
+				}
 				continue
 			}
 			if len(input.Title)+len(input.Summary) > 24000 {
-				_ = a.store.SetTagOrganizationItem(ctx, id, item.MovieID, "unresolved", "SOURCE_TOO_LONG")
+				if err := a.store.SetTagOrganizationItem(ctx, id, item.MovieID, "unresolved", "SOURCE_TOO_LONG"); err != nil {
+					return
+				}
 				continue
 			}
 			inputs = append(inputs, input)
@@ -313,7 +334,9 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 		if len(inputs) == 0 {
 			continue
 		}
-		_ = a.store.UpdateTagOrganization(ctx, id, "running", "classifying", "")
+		if err = a.store.UpdateTagOrganization(ctx, id, "running", "classifying", ""); err != nil {
+			return
+		}
 		job.Stage = "classifying"
 		var result struct {
 			Movies []topicClassification `json:"movies"`
@@ -343,8 +366,20 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 			return
 		}
 		if e != nil {
+			if !splittableTopicClassification(e) {
+				// A provider outage/configuration failure affects the job, not every
+				// remaining movie. Preserve pending items for an explicit retry.
+				_ = a.store.UpdateTagOrganization(ctx, id, "blocked", "classifying", topicOrganizationErrorCode(e))
+				return
+			}
+			if len(inputs) > 1 {
+				batchSize = max(1, len(inputs)/2)
+				continue
+			}
 			for _, input := range inputs {
-				_ = a.store.SetTagOrganizationItem(ctx, id, input.MovieID, "failed", topicOrganizationErrorCode(e))
+				if err := a.store.SetTagOrganizationItem(ctx, id, input.MovieID, "failed", topicOrganizationErrorCode(e)); err != nil {
+					return
+				}
 			}
 			a.publishTagOrganization(id)
 			continue
@@ -371,7 +406,9 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 				return
 			}
 			if len(matches[input.MovieID]) == 0 {
-				_ = a.store.SetTagOrganizationItem(ctx, id, input.MovieID, "unresolved", "INSUFFICIENT_EVIDENCE")
+				if err := a.store.SetTagOrganizationItem(ctx, id, input.MovieID, "unresolved", "INSUFFICIENT_EVIDENCE"); err != nil {
+					return
+				}
 				continue
 			}
 			args, _ := json.Marshal(map[string]any{"movieId": input.MovieID, "fingerprint": input.Fingerprint, "revision": input.Revision, "names": matches[input.MovieID]})
@@ -381,7 +418,9 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 				a.agentRT.applyMu.Unlock()
 				if result.Error != nil && result.Error.Code == "AI_RATE_LIMITED" {
 					if job.Stage != "waiting_quota" {
-						_ = a.store.UpdateTagOrganization(ctx, id, "running", "waiting_quota", "")
+						if err = a.store.UpdateTagOrganization(ctx, id, "running", "waiting_quota", ""); err != nil {
+							return
+						}
 						a.publishTagOrganization(id)
 						job.Stage = "waiting_quota"
 					}
@@ -390,22 +429,31 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 						return
 					case <-time.After(time.Second):
 					}
-					job, _ = a.store.GetTagOrganization(ctx, id)
-					if job.Status == "cancelled" {
+					job, err = a.store.GetTagOrganization(ctx, id)
+					if err != nil || job.Status != "running" {
 						return
 					}
 					continue
 				}
 				if job.Stage == "waiting_quota" {
-					_ = a.store.UpdateTagOrganization(ctx, id, "running", "applying", "")
+					if err = a.store.UpdateTagOrganization(ctx, id, "running", "applying", ""); err != nil {
+						return
+					}
 					job.Stage = "applying"
 				}
 				if result.Error != nil {
-					_ = a.store.SetTagOrganizationItem(ctx, id, input.MovieID, "conflict", "TAG_WRITE_REJECTED")
+					if result.Error.Code == "CHECKPOINT_FAILED" || result.Error.Code == "AI_TOOL_PERMISSION_DENIED" {
+						_ = a.store.UpdateTagOrganization(ctx, id, "blocked", "applying", result.Error.Code)
+						return
+					}
+					if err := a.store.SetTagOrganizationItem(ctx, id, input.MovieID, "conflict", "TAG_WRITE_REJECTED"); err != nil {
+						return
+					}
 				}
 				break
 			}
 		}
+		batchSize = 5
 		a.publishTagOrganization(id)
 	}
 	if ctx.Err() != nil {
@@ -448,6 +496,14 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 		if current.Status != "running" {
 			return nil, context.Canceled
 		}
+		if len(defs) >= maxTopicVocabulary {
+			// Freeze a full vocabulary instead of repeatedly failing on the next
+			// page. Every movie still passes through evidence-based classification.
+			if err := a.store.CheckpointTopicVocabulary(ctx, id, defs, offset, true); err != nil {
+				return nil, err
+			}
+			return defs, nil
+		}
 		items, err := a.store.TagOrganizationItems(ctx, id, false, batchSize, offset)
 		if err != nil {
 			return nil, err
@@ -459,6 +515,9 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 		for _, item := range items {
 			input, e := a.store.TopicMovieInput(ctx, item.MovieID)
 			if e != nil {
+				if !errors.Is(e, sql.ErrNoRows) {
+					return nil, e
+				}
 				continue
 			}
 			inputs = append(inputs, compactVocabularySample(input))
@@ -487,6 +546,9 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 				known[strings.ToLower(d.Name)] = true
 			}
 			for _, d := range result.Topics {
+				if len(defs) == maxTopicVocabulary {
+					break
+				}
 				if !known[strings.ToLower(d.Name)] {
 					defs = append(defs, d)
 					known[strings.ToLower(d.Name)] = true
@@ -507,6 +569,9 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 
 // topicOrganizationErrorCode exposes useful failure categories without returning source text or provider bodies.
 func topicOrganizationErrorCode(err error) string {
+	if llm.IsContextOverflow(err) {
+		return "AI_CONTEXT_TOO_LARGE"
+	}
 	var toolErr *core.ToolError
 	if errors.As(err, &toolErr) {
 		return toolErr.Code
