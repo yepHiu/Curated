@@ -28,7 +28,10 @@ func loadPromptTemplates() *template.Template {
 		if err != nil {
 			panic(fmt.Errorf("read prompt %s: %w", entry.Name(), err))
 		}
-		if _, err := set.New(entry.Name()).Parse(strings.TrimSuffix(string(body), "\n")); err != nil {
+		// Git may check TXT files out as CRLF on Windows. Normalize the embedded
+		// template before rendering; user/source values retain their original bytes.
+		text := strings.ReplaceAll(string(body), "\r\n", "\n")
+		if _, err := set.New(entry.Name()).Parse(strings.TrimSuffix(text, "\n")); err != nil {
 			panic(fmt.Errorf("parse prompt %s: %w", entry.Name(), err))
 		}
 	}
