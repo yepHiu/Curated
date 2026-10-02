@@ -447,14 +447,14 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 
 ## 2026-10-01 AI 用户标签整理与首页题材
 
-2026-10-02 大库可靠性补充：全库任务用单个 SQLite 事务固定活跃影片范围，selected 上限仍为 600。词汇累计至 160 或归纳缩至单片仍超预算时冻结，不再因下一页增长而永久冲突；未覆盖的题材按证据不足保留待归类。分类从 5 片起，输入/输出超限或无效结果时缩小批次，单片仍因词汇过长超预算时再分页词汇并验证合并结果，单片坏数据不牵连整批。临时模型故障最多三次尝试（1/2 秒可取消退避）；持续故障保留 pending 并 blocked，修复 Provider 后手动重试。检查点写入失败明确阻塞；服务关闭保留运行任务供启动恢复，成功项不重复写。无新 API/cfg/迁移；测试与边界见 `docs/plan/2026-10-02-tag-organization-large-library.md`。
+2026-10-02 大库可靠性补充：全库任务用单个 SQLite 事务固定活跃影片范围，selected 上限仍为 600。累计词汇不设160上限；单响应至多12项、归纳提示6KB有界，所有用户标签及既有题材进入复用候选，精确名称/别名直接复用，同义近义提议再分页对照（初始100项，超预算缩页），同响应提议也去重；不全局合并旧标签。分类从 5 片起，输入/输出超限或无效结果时缩小批次，单片仍因词汇过长超预算时再分页词汇并验证合并结果，单片坏数据不牵连整批。临时模型故障最多三次尝试（1/2 秒可取消退避）；持续故障保留 pending 并 blocked，修复 Provider 后手动重试。检查点写入失败明确阻塞；服务关闭保留运行任务供启动恢复，成功项不重复写。无新 API/cfg/迁移；测试与边界见 `docs/plan/2026-10-02-tag-organization-large-library.md`。
 
-首页显式发起全库整理；selected 1–600 另有 API。词汇每批至多50片、超预算自动减半、只返回新增词汇；归纳摘要至多600字并标记摘录，分类仍用完整证据；分类5片、逐片事务/检查点、恢复/取消/重试/撤销、依据分页，迁移0057/0058/0059；归纳批次持久检查点与独立进度、具体失败码、等待写额度状态。NFO只读；user题材同名隔离、人工排除/保留及修订冲突保护，独立内部网关共用写频控/审计。`GET /api/homepage/topics` 最多3×6，`library/topics`目录与隐藏，`movies?topicId`只匹配user，`ai/tag-organizations`持久任务。播放静默、重连不重放；Web/Mock均已接入。聊天发起、自动增量、详情推荐及真实Provider质量验收待做。无新增cfg键；详见guide与用户PRD§11。
+首页全库、单片右键/详情更多、批量已选均提供 AI 整理，预览范围后显式开始；selected 1–600，单个活动任务。侧栏播放区附近显示进度条/阶段/任务数，不占设置；历史最近50条限高窄行显示时间/影片数/状态，按需展开和取证据。词汇每批至多50片、超预算自动减半、只返回新增词汇；归纳摘要至多600字并标记摘录，分类仍用完整证据；分类5片、逐片事务/检查点、恢复/取消/重试/撤销、依据分页，迁移0057/0058/0059；归纳批次持久检查点与独立进度、具体失败码、等待写额度状态。NFO只读；user题材同名隔离、人工排除/保留及修订冲突保护，独立内部网关共用写频控/审计。`GET /api/homepage/topics` 最多3×6，`library/topics`目录与隐藏，`movies?topicId`只匹配user，`ai/tag-organizations`持久任务。播放静默、重连不重放；Web/Mock均已接入。聊天发起、自动增量、详情推荐及真实Provider质量验收待做。无新增cfg键；详见guide与用户PRD§11。
 
 
 ### 2026-10-01 用户标签命名
 
-整理请求附界面 `locale`（zh-CN/en/ja，省略默认中文），迁移0060固定任务语言，重试/恢复不变；词汇提示词v3要求自然短名（中文通常2–6字）和独立说明，已有词汇不自动翻译出重复项。`PATCH /api/library/topics/{topicId}` 支持互斥的 `{hidden}` 或 `{name,expectedName}`；改名保留题材/标签ID、关联、人工决定，同步历史标签快照和依据的题材名（不改引用原文），迁移0061保留改名审计，原名作为别名。活动整理、重名/别名冲突、旧名不符拒绝；不开放普通Agent自动全局改名工具。NFO只读，无新增cfg键。
+整理请求附界面 `locale`（zh-CN/en/ja，省略默认中文），迁移0060固定任务语言，重试/恢复不变；词汇提示词v4要求自然短名（中文通常2–6字）和独立说明，已有词汇不自动翻译出重复项。`PATCH /api/library/topics/{topicId}` 支持互斥的 `{hidden}` 或 `{name,expectedName}`；改名保留题材/标签ID、关联、人工决定，同步历史标签快照和依据的题材名（不改引用原文），迁移0061保留改名审计，原名作为别名。活动整理、重名/别名冲突、旧名不符拒绝；不开放普通Agent自动全局改名工具。NFO只读，无新增cfg键。
 
 ## 2026-10-02 application-owned Picture-in-Picture
 
@@ -463,4 +463,4 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 
 ## 2026-10-02 AI 独立 TXT 提示词
 
-内置提示词正文统一存于 `backend/internal/agent/prompts/*.txt`（14 个）：聊天主模板/语言/页面/筛选/提及、题材归纳/分类、润色/翻译/洞察、摘要/纠正/历史截断、连接探针。`templates.go` 用 Go embed 一次解析 text/template，严格缺变量、源资料不二次求值，去掉文件末尾一个换行且保留其他空白；不依赖安装目录或工作目录，不热更新，改 TXT 需重编译/重启 Server。模型消息、规则和版本保持原样；题材使用正文+版本对象，不再比较文本识别用途。硬验证/权限仍在 Go。任务级提示词冻结、在线编辑及模型分支尚未实施；无 API/cfg/迁移新增。详见 guide 的 AI prompt TXT resources 和 `docs/plan/2026-10-02-agent-prompt-management-research.md`。
+内置提示词正文统一存于 `backend/internal/agent/prompts/*.txt`（15 个）：聊天主模板/语言/页面/筛选/提及、题材归纳/复用/分类、润色/翻译/洞察、摘要/纠正/历史截断、连接探针。`templates.go` 用 Go embed 一次解析 text/template，严格缺变量、源资料不二次求值，去掉文件末尾一个换行且保留其他空白；不依赖安装目录或工作目录，不热更新，改 TXT 需重编译/重启 Server。模型消息、规则和版本保持原样；题材使用正文+版本对象，不再比较文本识别用途。硬验证/权限仍在 Go。任务级提示词冻结、在线编辑及模型分支尚未实施；无 API/cfg/迁移新增。详见 guide 的 AI prompt TXT resources 和 `docs/plan/2026-10-02-agent-prompt-management-research.md`。

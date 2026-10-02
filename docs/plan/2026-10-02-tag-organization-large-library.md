@@ -1,5 +1,7 @@
 # AI 标签整理的大影片库可靠性
 
+**后续需求更新**：本文件保留第一轮诊断和当时验证结果；累计 160 项冻结方案已由[标签复用、入口与历史](2026-10-02-tag-organization-entry-and-history.md)取代。当前累计词汇不设 160 上限，单次最多 12 项，普通用户标签进入分页复用候选。当前 1,200/10,000 用例验证增长到 240 项并分析完整范围，测试名称已改为 `VocabularyGrowthAndRestart`。下面的“冻结”描述仅代表第一轮历史实现。
+
 ## 问题定位
 
 本次依据代码和隔离测试定位，未读取或修改用户实际资料库、未调用付费模型。
@@ -56,7 +58,7 @@ go test ./internal/app ./internal/storage -run 'TestTagOrganization|TestTopic|Te
 
 ```powershell
 $env:CURATED_TAG_SCALE_TEST = '1'
-go test ./internal/app -run '^TestTagOrganization10000VocabularyCapAndRestart$' -count=1 -v
+go test ./internal/app -run '^TestTagOrganization10000VocabularyGrowthAndRestart$' -count=1 -v
 Remove-Item Env:CURATED_TAG_SCALE_TEST
 ```
 

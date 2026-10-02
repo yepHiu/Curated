@@ -21,6 +21,8 @@
 
 Browse by subject with [AI user-tag organization](docs/guide.md#ai-user-tags-and-homepage-topics): explicit background tasks with resumable preparation progress, concise labels in your interface language, and NFO tags kept read-only.
 
+AI tag organization supports the whole library, one movie or selected movies, prefers existing labels, and shows sidebar progress with compact task history. See [AI user tags](docs/guide.md#ai-user-tags-and-homepage-topics).
+
 AI prompt text is maintained as [independent TXT resources](docs/guide.md#ai-prompt-txt-resources) embedded in the Server.
 
 Server uses a dark icon background; Desktop uses soft off-white (`#F5F6F8`), with the same central artwork. See [brand guidelines](docs/reference/curated-brand-guidelines.md) and [asset preview](icon/brand/index.html).

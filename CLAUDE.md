@@ -698,7 +698,7 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 
 ## AI user-tag organization and topics (2026-10-01)
 
-All endpoints use the existing authenticated/unlocked API boundary. No endpoint below permits NFO writes.
+All endpoints use the existing authenticated/unlocked API boundary. No endpoint below permits NFO writes. The UI exposes all-library, single-movie (context/More menu) and selected-batch scope using the same POST endpoint; selected remains 1–600 and only one job can be active. Existing user labels and topic aliases are reused, with paged semantic reconciliation and no cumulative 160-topic cap. Sidebar progress and compact latest-50 history use the existing GET endpoints; no new API/configuration/migration.
 
 | Method | Endpoint | Behavior |
 |---|---|---|
@@ -722,4 +722,4 @@ Unknown input fields/trailing JSON return 400; disabled/read-only AI returns 403
 
 **Mandatory convention confirmed by the user:** all future AI Agent prompt text must be maintained as independent TXT files under `backend/internal/agent/prompts/`, using the existing prompts-package loading/rendering entry points. Edit an existing TXT or add one for a new purpose; do not add inline instruction text to business code or create a separate Markdown/YAML prompt system. Dynamic data projection, message assembly, protocol fields and hard validation stay in code. Follow `.cursor/rules/backend-go-standards.mdc` for maintenance details.
 
-Built-in model instructions now use 14 independent `backend/internal/agent/prompts/*.txt` files. `templates.go` embeds/parses them once with strict missing-variable checks; Go retains bounded context projection and output/write validation. Source values are rendered once and never interpreted as templates. `system.md` moved to `system.txt`; topic calls carry text and their existing audit version together. Existing prompt text, roles and versions are preserved. TXT edits require rebuilding/restarting Server, with no hot reload, new API, configuration key or migration. Task-level immutable prompt snapshots remain pending. See `docs/guide.md` → AI prompt TXT resources for the file map and editing/testing procedure.
+Built-in model instructions now use 15 independent `backend/internal/agent/prompts/*.txt` files. `templates.go` embeds/parses them once with strict missing-variable checks; Go retains bounded context projection and output/write validation. Source values are rendered once and never interpreted as templates. `system.md` moved to `system.txt`; topic calls carry text and their existing audit version together. Existing prompt text, roles and versions are preserved. TXT edits require rebuilding/restarting Server, with no hot reload, new API, configuration key or migration. Task-level immutable prompt snapshots remain pending. See `docs/guide.md` → AI prompt TXT resources for the file map and editing/testing procedure.
