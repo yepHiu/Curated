@@ -1,34 +1,34 @@
 {
   "schema": 1,
   "component": "server",
-  "version": "1.7.7",
-  "sourceCommit": "563e6881a823ffb163437b6264768df5372e1384",
+  "version": "1.7.8",
+  "sourceCommit": "1bab5c8f0baa218a9b554cf1cb9230fe89dd2bac",
   "artifacts": [
     {
       "component": "server",
       "variant": "standalone",
-      "version": "1.7.7",
+      "version": "1.7.8",
       "channel": "stable",
       "platform": "windows",
       "arch": "x64",
       "format": "exe",
-      "fileName": "Curated-Server-Setup-1.7.7-windows-x64.exe",
-      "sha256": "2199b31ce9834df9a6cd4e6612827e13dbb006d1379d3e268e05a71a12102be8",
-      "sourceCommit": "563e6881a823ffb163437b6264768df5372e1384",
-      "url": "https://github.com/yepHiu/Curated/releases/download/server-v1.7.7/Curated-Server-Setup-1.7.7-windows-x64.exe"
+      "fileName": "Curated-Server-Setup-1.7.8-windows-x64.exe",
+      "sha256": "cb5ea20a1d6f8de43a8155da3ea99727d67f8b2aa8e0305ec96a48940da54c15",
+      "sourceCommit": "1bab5c8f0baa218a9b554cf1cb9230fe89dd2bac",
+      "url": "https://github.com/yepHiu/Curated/releases/download/release-20261003/Curated-Server-Setup-1.7.8-windows-x64.exe"
     },
     {
       "component": "server",
       "variant": "standalone",
-      "version": "1.7.7",
+      "version": "1.7.8",
       "channel": "stable",
       "platform": "windows",
       "arch": "x64",
       "format": "zip",
-      "fileName": "Curated-Server-1.7.7-windows-x64.zip",
-      "sha256": "4a1f59ad85e3633249b45195700e141b3f84c8dcd042b516d5199cbb9becdbf1",
-      "sourceCommit": "563e6881a823ffb163437b6264768df5372e1384",
-      "url": "https://github.com/yepHiu/Curated/releases/download/server-v1.7.7/Curated-Server-1.7.7-windows-x64.zip"
+      "fileName": "Curated-Server-1.7.8-windows-x64.zip",
+      "sha256": "e6455cdf9c9e98f78ce8b309941173420a2efe0514563b3d3b57b90c2736ef75",
+      "sourceCommit": "1bab5c8f0baa218a9b554cf1cb9230fe89dd2bac",
+      "url": "https://github.com/yepHiu/Curated/releases/download/release-20261003/Curated-Server-1.7.8-windows-x64.zip"
     }
   ]
 }
