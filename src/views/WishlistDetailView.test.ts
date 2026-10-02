@@ -5,7 +5,10 @@ import WishlistDetailView from "./WishlistDetailView.vue"
 const service = vi.hoisted(() => ({ get: vi.fn(), assetUrl: (path: string) => `/protected${path}` }))
 vi.mock("@/services/library-service", () => ({ useLibraryService: () => ({ wishlist: service }) }))
 vi.mock("vue-router", () => ({ useRoute: () => ({ params: { id: "wish-1" } }), useRouter: () => ({ push: vi.fn() }) }))
-vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock("vue-i18n", async (importOriginal) => ({
+  ...await importOriginal<typeof import("vue-i18n")>(),
+  useI18n: () => ({ t: (key: string) => key }),
+}))
 
 describe("wishlist shared movie details", () => {
   it("passes wishlist metadata and protected images to the existing detail page", async () => {
