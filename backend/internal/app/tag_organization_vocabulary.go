@@ -89,7 +89,7 @@ func (a *App) proposeTopicVocabulary(ctx context.Context, inputs []topicVocabula
 			validationErr = &core.ToolError{Code: "AI_ORGANIZATION_VOCABULARY_LIMIT", Message: "Too many topic proposals"}
 		default:
 			var normalized []storage.TopicDefinition
-			normalized, validationErr = normalizeTopicProposals(result.Topics, catalog)
+			normalized, validationErr = normalizeTopicProposals(result.Topics, nil)
 			if validationErr == nil {
 				return normalized, nil
 			}

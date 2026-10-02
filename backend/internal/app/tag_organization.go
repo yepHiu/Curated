@@ -536,6 +536,13 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 					if known[strings.ToLower(d.Name)] {
 						continue
 					}
+					// Reserve established topic ownership, while allowing ordinary
+					// user labels to remain valid aliases for normalization.
+					cleaned, err := normalizeTopicProposals([]storage.TopicDefinition{d}, defs)
+					if err != nil {
+						return nil, err
+					}
+					d = cleaned[0]
 					defs = append(defs, d)
 					added = append(added, d)
 					known[strings.ToLower(d.Name)] = true
