@@ -6,6 +6,10 @@ Public HTTP API remains in root [`API.md`](../API.md). Folder policy for new doc
 
 If this handbook and current code disagree, treat the code as the source of truth.
 
+## Home and movie library scrolling
+
+At the bottom of Home, keep scrolling down to open All Movies. At the top of All Movies, keep scrolling up to return to Home at its previous scroll position. Mouse wheels and trackpads use a short continued scroll; on touchscreens, swipe upward at the bottom of Home or downward at the top of All Movies. The reverse transition slides the movie page down to reveal Home. Favorites, Recently Added, Trash and batch selection do not trigger this return gesture. Reduced-motion preferences shorten both transitions.
+
 ## Movie release dates
 
 Movie details show the release date (`YYYY-MM-DD`) next to the studio below the title when available; otherwise the existing year is shown. Dates come from scraped metadata, with a manually edited release date taking priority. Use **More actions → Refresh metadata** to try to fill a missing date, or **Edit movie information** to enter it. Provider data may omit dates; Mock dates are demonstration data. See [release date display](plan/2026-09-27-movie-release-date-display.md).

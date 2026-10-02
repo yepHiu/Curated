@@ -193,3 +193,10 @@ git commit -m "feat: localize homepage portal"
 - [x] Split hero transition timing so autoplay can stay smoother and slower while manual rail / preview clicks react faster.
 - [x] Rebalance hero preview depth for light mode by removing hard-coded black drop shadows and using theme-aware shadows plus brightness / saturation falloff on side previews.
 - [x] Make homepage taste radar chips clickable and route them into the appropriate browse filters (`tags` for exact tags, `library` for actor/studio filters).
+
+### 2026-10-02：首页与影片页双向滚动（已实现）
+
+- 首页底部继续向下滚动进入影片页；影片列表顶部继续向上滚动返回首页，并恢复首页离开时的位置。触屏对应为首页底部向上划、影片列表顶部向下划。
+- 影片列表使用 80px 的连续滚动/触屏阈值，忽略缩放和横向手势；滚轮间隔超过 250ms 重置累计值。收藏、最近加入、回收站与批量选择模式不触发返回。
+- AppShell 使用反向抽屉动画露出首页，尊重减少动画偏好。HomeView 保持单一元素根节点，使过渡钩子正常完成，支持反复来回切换。
+- 验证：相关 54 项单测、Chromium 两次往返滚动及位置恢复、类型检查、改动源码 ESLint 通过。首页完整测试中原有轮播宽度断言仍不匹配（测试期待 `max-w-[54rem]`，既有组件为 `max-w-[28rem]`），与本次交互无关。
