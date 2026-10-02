@@ -9,8 +9,10 @@ import {
   waitForMediaWrittenEnd,
   bufferedPlaybackSeconds,
   waitForPlaybackBuffer,
+  hlsStartupBufferOptions,
 } from "@/lib/player-hls-seek"
 
+/** 创建可派发缓冲事件的媒体桩，区分时间轴长度和实际下载范围。 */
 function fakeMedia(duration: number, bufferedEnd?: number) {
   const listeners = new Map<string, Set<EventListener>>()
   return {
@@ -182,6 +184,35 @@ describe("waitForMediaWrittenEnd", () => {
     expect(await waitForPlaybackBuffer(media, 8)).toBe(true)
     media.currentTime = 50
     expect(bufferedPlaybackSeconds(media)).toBe(0)
+  })
+
+  // 验证首播阈值确实使用当前点的连续缓冲，并在倍速下等待更多媒体数据。
+  it("starts AMF with four buffered seconds while preserving software and double-speed headroom", async () => {
+    vi.useFakeTimers()
+    const media = { ...fakeMedia(7200), currentTime: 30, playbackRate: 1,
+      buffered: {
+        length: 1,
+        // 续播缓冲从当前位置开始，不让影片总时长冒充下载量。
+        start: () => 30,
+        // 模拟已下载到第 34 秒的连续区间。
+        end: () => 34,
+      },
+    }
+    const hardware = hlsStartupBufferOptions("h264_amf")
+    expect(await waitForPlaybackBuffer(media, hardware.seconds, hardware)).toBe(true)
+
+    const software = hlsStartupBufferOptions("libx264")
+    const softwareWait = waitForPlaybackBuffer(media, software.seconds, software)
+    await vi.advanceTimersByTimeAsync(software.timeoutMs + 200)
+    expect(await softwareWait).toBe(false)
+
+    media.playbackRate = 2
+    const doubleSpeedWait = waitForPlaybackBuffer(media, hardware.seconds, hardware)
+    await vi.advanceTimersByTimeAsync(hardware.timeoutMs + 200)
+    expect(await doubleSpeedWait).toBe(false)
+    // 两倍速需要八秒媒体数据，才能提供四秒观看余量。
+    media.buffered.end = () => 38
+    expect(await waitForPlaybackBuffer(media, hardware.seconds, hardware)).toBe(true)
   })
 
   it("resolves immediately when the written window already covers the target", async () => {

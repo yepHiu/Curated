@@ -120,8 +120,7 @@ import {
   isPlaybackStatUnavailable,
 } from "@/lib/player-playback-stats-format"
 import {
-  HLS_STARTUP_BUFFER_SEC,
-  HLS_STARTUP_BUFFER_WAIT_MS,
+  hlsStartupBufferOptions,
   waitForPlaybackBuffer,
   getMediaWrittenEndSec,
   hlsSeekReuseLeadSec,
@@ -992,6 +991,7 @@ async function syncVideoSource() {
   refreshPlaybackStatsFromVideo()
 }
 
+/** 按自动播放或换流恢复请求起播，使用实际编码档选择有界的连续缓冲等待。 */
 async function tryStartPlaybackIfRequested(): Promise<boolean> {
   const v = videoRef.value
   if (!v || !playbackSrc.value) return false
@@ -1025,9 +1025,11 @@ async function tryStartPlaybackIfRequested(): Promise<boolean> {
   if (playbackMode === "hls" && hlsStartupBufferPending) {
     const waitGen = hlsWindowWaitGeneration
     isPlaybackWaiting.value = true
-    await waitForPlaybackBuffer(v, HLS_STARTUP_BUFFER_SEC, {
-      timeoutMs: HLS_STARTUP_BUFFER_WAIT_MS,
+    const startupBuffer = hlsStartupBufferOptions(playbackDescriptor.value?.transcodeProfile)
+    await waitForPlaybackBuffer(v, startupBuffer.seconds, {
+      timeoutMs: startupBuffer.timeoutMs,
       remainingSec: Math.max(0, totalDurationSec.value - getAbsolutePlaybackTime()),
+      // 换片、换流或卸载后丢弃本轮缓冲等待，避免旧请求触发起播。
       isAborted: () => waitGen !== hlsWindowWaitGeneration || videoRef.value !== v,
     })
     if (waitGen !== hlsWindowWaitGeneration || videoRef.value !== v || !playbackSrc.value) {

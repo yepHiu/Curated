@@ -183,6 +183,45 @@ afterEach(() => {
 })
 
 describe("PlayerPage loading states", () => {
+  // 确认真实 PlayerPage 使用 descriptor 的 AMF 档位，四秒连续缓冲即可自动播放。
+  it("autoplays AMF as soon as four seconds are downloaded", async () => {
+    const { loadHlsLibrary } = await import("@/lib/hls-player")
+    class FakeHls {
+      /** 提供 MSE 支持，确保测试走 HLS 分支。 */
+      static isSupported() { return true }
+      /** 媒体数据由 video 的 buffered 桩提供。 */
+      loadSource() {}
+      /** 保持同一 video，事件由测试派发。 */
+      attachMedia() {}
+      /** 模拟会话释放。 */
+      destroy() {}
+    }
+    vi.mocked(loadHlsLibrary).mockResolvedValue(FakeHls)
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({
+      movieId: "movie-1", mode: "hls", sessionId: "amf", url: "/amf.m3u8",
+      durationSec: 120, transcodeProfile: "h264_amf", sessionKind: "transcode-hls", canDirectPlay: false,
+    })
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue()
+    const wrapper = await mountPlayerPage({ autoplay: true })
+    try {
+      await flushPromises()
+      const video = wrapper.get("video").element
+      Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA })
+      Object.defineProperty(video, "buffered", { configurable: true, value: {
+        length: 1,
+        // 四秒下载区间覆盖会话原点，尚未达到旧的八秒门槛。
+        start: () => 0,
+        // 提供足够的新硬编起播余量。
+        end: () => 4,
+      } })
+      await wrapper.get("video").trigger("loadeddata")
+      await flushPromises()
+      expect(play).toHaveBeenCalledTimes(1)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   // P 自动重复不能反复开关原生小窗；一次真实按键仍能请求进入。
   it("ignores repeated P and exposes PiP request busy state", async () => {
     const request = vi.fn(() => {

@@ -623,6 +623,8 @@ func playlistReferencesSegment(playlistPath string, segmentName string) bool {
 	return strings.Contains(playlist, "#EXTINF:") && strings.Contains(playlist, segmentName)
 }
 
+// startTranscodeSession 等待完整首片后交付硬编会话，让下载与后续编码并行；
+// CPU 软件转码仍预攒四片，减少低吞吐机器起播后的缓冲耗尽。
 func startTranscodeSession(
 	ctx context.Context,
 	cmdName string,
@@ -710,7 +712,7 @@ func startTranscodeSession(
 		stderrText := strings.TrimSpace(stderr.String())
 		return nil, fmt.Errorf("%s playlist readiness failed: %w: %s", profile.Name, err, stderrText)
 	}
-	if profile.SessionKind == "transcode-hls" {
+	if profile.SessionKind == "transcode-hls" && profile.Name == "libx264" {
 		if _, err := waitForPlaylistSegmentReferenceOptional(ctx, playlistPath, hlsFourthSegmentName, state.waitCh, hlsStartupTranscodeLeadTimeout); err != nil {
 			cancel()
 			stderrText := strings.TrimSpace(stderr.String())

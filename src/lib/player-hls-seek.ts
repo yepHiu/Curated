@@ -5,6 +5,19 @@ export const HLS_SEEK_CATCHUP_INTERVAL_MS = 200
 export const HLS_STARTUP_BUFFER_SEC = 8
 export const HLS_STARTUP_BUFFER_WAIT_MS = 4_000
 
+/** 硬编首片交付后采用较短起播缓冲；软件和未知档保留保守阈值。 */
+export function hlsStartupBufferOptions(transcodeProfile?: string | null): { seconds: number; timeoutMs: number } {
+  switch ((transcodeProfile ?? "").trim().toLowerCase()) {
+    case "h264_amf":
+    case "h264_nvenc":
+    case "h264_qsv":
+    case "h264_videotoolbox":
+      return { seconds: 4, timeoutMs: 2_000 }
+    default:
+      return { seconds: HLS_STARTUP_BUFFER_SEC, timeoutMs: HLS_STARTUP_BUFFER_WAIT_MS }
+  }
+}
+
 type MediaTimeRanges = {
   length: number
   end(index: number): number

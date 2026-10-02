@@ -3,15 +3,77 @@
 package playback
 
 import (
+	"bytes"
 	"context"
 	"curated-backend/internal/executil"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+// TestFFmpegFirstSegmentStartupIsDecodable 用 CPU 模拟硬编发布节奏，验证真实
+// fMP4 首片交付即可解码。它验证 HLS 链路，不代表本机具备 AMD 硬件。
+func TestFFmpegFirstSegmentStartupIsDecodable(t *testing.T) {
+	name, err := exec.LookPath(resolveFFmpegCommand("ffmpeg"))
+	if err != nil {
+		t.Skip("FFmpeg not installed")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	source := filepath.Join(t.TempDir(), "synthetic.mp4")
+	fixture := executil.CommandContext(ctx, name, "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=64x64:rate=30", "-t", "20", "-c:v", "libx264", "-preset", "ultrafast", source)
+	if output, err := fixture.CombinedOutput(); err != nil {
+		t.Fatalf("fixture: %v %s", err, output)
+	}
+	profiles := buildTranscodeProfiles(Config{}, source, hlsSegmentPattern, "index.m3u8", buildProfileOptions{})
+	profile := profiles[len(profiles)-1]
+	// 保持真实输出参数，只用 CPU 编码模拟硬编首片交付分支及 2.5 倍输入速率。
+	profile.Name = "h264_amf"
+	for i, arg := range profile.Args {
+		if arg == "-readrate" {
+			profile.Args[i+1] = inputReadRateRemux
+		}
+	}
+	dir := t.TempDir()
+	started := time.Now()
+	state, err := startTranscodeSession(ctx, name, "synthetic", "first-segment", dir, filepath.Join(dir, "index.m3u8"), profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stopSessionState(state)
+	firstReady := time.Since(started)
+	// 真实首片必须可由 FFmpeg 解出一帧，避免仅凭文件存在误判可播。
+	init, err := os.ReadFile(filepath.Join(dir, hlsInitFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := os.ReadFile(filepath.Join(dir, hlsFirstSegmentName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decode := executil.CommandContext(ctx, name, "-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-frames:v", "1", "-f", "framemd5", "-")
+	decode.Stdin = bytes.NewReader(append(init, first...))
+	output, err := decode.CombinedOutput()
+	decodedFrame := false
+	for _, line := range strings.Split(string(output), "\n") {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") {
+			decodedFrame = true
+		}
+	}
+	if err != nil || !decodedFrame {
+		t.Fatalf("first segment decode failed: %v %s", err, output)
+	}
+	found, err := waitForPlaylistSegmentReferenceOptional(ctx, state.session.PlaylistPath, hlsFourthSegmentName, state.waitCh, 12*time.Second)
+	if err != nil || !found {
+		t.Fatalf("encoder did not continue producing segments: %v", err)
+	}
+	t.Logf("CPU-simulated 2.5x HLS: first complete segment ready in %s; old fourth-segment gate reached in %s", firstReady, time.Since(started))
+}
 
 // Uses a tiny generated video, never the user's library. Skip when FFmpeg is
 // absent; CI and packaged-runtime checks should provide it explicitly.
