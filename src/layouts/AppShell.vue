@@ -80,6 +80,7 @@ const ActivePlaybackHost = defineAsyncComponent(
 useAIGovernanceSync()
 
 const homeLibraryDrawerTransition = ref<"home-library-drawer" | "library-home-drawer">()
+const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)")
 provide(openLibraryFromHomeKey, () => {
   if (route.name !== "home" || homeLibraryDrawerTransition.value) return
 
@@ -1052,6 +1053,7 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
               <RouterView v-slot="{ Component }">
                 <Transition
                   :name="homeLibraryDrawerTransition"
+                  :duration="homeLibraryDrawerTransition ? (prefersReducedMotion ? 0 : 560) : undefined"
                   @after-enter="homeLibraryDrawerTransition = undefined"
                 >
                   <component :is="Component" />
@@ -1112,8 +1114,20 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
 </template>
 
 <style>
+.home-library-drawer-enter-active,
+.home-library-drawer-leave-active,
+.library-home-drawer-enter-active,
+.library-home-drawer-leave-active {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--background);
+}
+
 .home-library-drawer-enter-active {
   z-index: 1;
+  will-change: transform;
   box-shadow: 0 -1.5rem 3rem rgb(0 0 0 / 20%);
   transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1123,31 +1137,14 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
 }
 
 .home-library-drawer-leave-active {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  transition: opacity 560ms linear;
-}
-
-.home-library-drawer-leave-to {
-  opacity: 0.99;
-}
-
-.library-home-drawer-enter-active {
-  transition: opacity 560ms linear;
-}
-
-.library-home-drawer-enter-from {
-  opacity: 0.99;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .library-home-drawer-leave-active {
-  position: absolute;
-  inset: 0;
   z-index: 1;
-  width: 100%;
-  height: 100%;
+  pointer-events: none;
+  will-change: transform;
   box-shadow: 0 -1.5rem 3rem rgb(0 0 0 / 20%);
   transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
 }
