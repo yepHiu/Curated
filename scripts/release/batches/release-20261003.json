@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "id": "20261003",
+  "tag": "release-20261003",
+  "serverBridge": false,
+  "modules": {
+    "server": {
+      "before": "1.7.7",
+      "after": "1.7.8",
+      "changed": true,
+      "baselineCommit": "563e6881a823ffb163437b6264768df5372e1384",
+      "paths": [
+        "backend/internal/agent/prompts/templates.go",
+        "backend/internal/agent/prompts/topic-reuse.txt",
+        "backend/internal/agent/prompts/topic-vocabulary.txt",
+        "backend/internal/app/tag_organization.go",
+        "backend/internal/app/tag_organization_classifier.go",
+        "backend/internal/app/tag_organization_classify_batch.go",
+        "backend/internal/app/tag_organization_requests.go",
+        "backend/internal/app/tag_organization_reuse.go",
+        "backend/internal/contracts/wishlist.go",
+        "backend/internal/server/auth_middleware.go",
+        "backend/internal/server/request_security.go",
+        "backend/internal/server/wishlist_handlers.go",
+        "backend/internal/storage/tag_organization_jobs.go",
+        "backend/internal/storage/topic_organization.go",
+        "backend/internal/storage/wishlist_status.go",
+        "src/components/jav-library/AppSidebar.vue",
+        "src/components/jav-library/DetailPanel.vue",
+        "src/components/jav-library/HomeTopicSection.vue",
+        "src/components/jav-library/LibraryBatchActionBar.vue",
+        "src/components/jav-library/MovieLibraryContextMenu.vue",
+        "src/components/jav-library/SidebarTagOrganizationEntry.vue",
+        "src/components/jav-library/TagOrganizationDialog.vue",
+        "src/composables/use-tag-organization.ts",
+        "src/layouts/AppShell.vue",
+        "src/locales/en.json",
+        "src/locales/ja.json",
+        "src/locales/zh-CN.json",
+        "src/views/LibraryView.vue"
+      ],
+      "inputDigest": "cfec7b83c0ebdfd934ff74207833eba40a82a88566e9bc61fd112713dfcaf14a",
+      "previousArtifacts": [
+        {
+          "component": "server",
+          "variant": "standalone",
+          "version": "1.7.7",
+          "channel": "stable",
+          "platform": "windows",
+          "arch": "x64",
+          "format": "exe",
+          "fileName": "Curated-Server-Setup-1.7.7-windows-x64.exe",
+          "sha256": "2199b31ce9834df9a6cd4e6612827e13dbb006d1379d3e268e05a71a12102be8",
+          "sourceCommit": "563e6881a823ffb163437b6264768df5372e1384",
+          "url": "https://github.com/yepHiu/Curated/releases/download/server-v1.7.7/Curated-Server-Setup-1.7.7-windows-x64.exe"
+        },
+        {
+          "component": "server",
+          "variant": "standalone",
+          "version": "1.7.7",
+          "channel": "stable",
+          "platform": "windows",
+          "arch": "x64",
+          "format": "zip",
+          "fileName": "Curated-Server-1.7.7-windows-x64.zip",
+          "sha256": "4a1f59ad85e3633249b45195700e141b3f84c8dcd042b516d5199cbb9becdbf1",
+          "sourceCommit": "563e6881a823ffb163437b6264768df5372e1384",
+          "url": "https://github.com/yepHiu/Curated/releases/download/server-v1.7.7/Curated-Server-1.7.7-windows-x64.zip"
+        }
+      ]
+    },
+    "desktop": {
+      "before": "0.2.3",
+      "after": "0.2.3",
+      "changed": false,
+      "baselineCommit": "563e6881a823ffb163437b6264768df5372e1384",
+      "paths": [],
+      "inputDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "previousArtifacts": [
+        {
+          "component": "desktop",
+          "variant": "standalone",
+          "version": "0.2.3",
+          "channel": "stable",
+          "platform": "windows",
+          "arch": "x64",
+          "format": "exe",
+          "fileName": "Curated-Desktop-Setup-0.2.3-windows-x64.exe",
+          "sha256": "f02f49c96f1f0476e702c6c5e6b6f416c0a50434c18cd1aef891bc3cdff64700",
+          "sourceCommit": "563e6881a823ffb163437b6264768df5372e1384",
+          "url": "https://github.com/yepHiu/Curated/releases/download/server-v1.7.7/Curated-Desktop-Setup-0.2.3-windows-x64.exe"
+        },
+        {
+          "component": "desktop",
+          "variant": "standalone",
+          "version": "0.2.3",
+          "channel": "stable",
+          "platform": "windows",
+          "arch": "x64",
+          "format": "zip",
+          "fileName": "Curated-Desktop-0.2.3-windows-x64.zip",
+          "sha256": "0e9d9b5e1ce4d11d4d801be0d500769a033bcf119b18477e8f01fdbf287c73cf",
+          "sourceCommit": "563e6881a823ffb163437b6264768df5372e1384",
+          "url": "https://github.com/yepHiu/Curated/releases/download/server-v1.7.7/Curated-Desktop-0.2.3-windows-x64.zip"
+        },
+        {
+          "fileName": "Curated-Desktop-0.2.3-macos-arm64.dmg",
+          "sha256": "99046f9f4faa8c1a908fb87871efa7e11177cb24698f130370d1196187ed17cc",
+          "component": "desktop",
+          "variant": "standalone",
+          "channel": "stable",
+          "version": "0.2.3",
+          "platform": "macos",
+          "arch": "arm64",
+          "format": "dmg",
+          "signing": "ad-hoc",
+          "notarized": false,
+          "sourceCommit": "563e6881a823ffb163437b6264768df5372e1384",
+          "url": "https://github.com/yepHiu/Curated/releases/download/server-v1.7.7/Curated-Desktop-0.2.3-macos-arm64.dmg"
+        },
+        {
+          "fileName": "Curated-Desktop-0.2.3-macos-arm64.zip",
+          "sha256": "32f79a6aee57784f35b382bf96fed75ac950f60ad3c2796415564b22b07e10fa",
+          "component": "desktop",
+          "variant": "standalone",
+          "channel": "stable",
+          "version": "0.2.3",
+          "platform": "macos",
+          "arch": "arm64",
+          "format": "zip",
+          "signing": "ad-hoc",
+          "notarized": false,
+          "sourceCommit": "563e6881a823ffb163437b6264768df5372e1384",
+          "url": "https://github.com/yepHiu/Curated/releases/download/server-v1.7.7/Curated-Desktop-0.2.3-macos-arm64.zip"
+        }
+      ]
+    }
+  }
+}
