@@ -2371,8 +2371,16 @@
     "retry": "再試行"
   },
   "topics": {
+    "issuesTitle": "要確認の作品（{count}）",
+    "viewIssues": "問題のある作品を見る",
+    "leaveForLater": "後で対応",
+    "issuesHint": "問題のある作品をスキップし、他の作品の整理を続けます。理由を確認して再試行するか、後で対応できます。通常の整理には再度含まれません。",
+    "retryIssues": "要確認の作品を再試行",
+    "retryMovie": "この作品を再整理",
+    "noIssues": "要確認の作品はありません",
+    "completedWithIssues": "整理終了：分類済み {success} 件、該当題材なし {unresolved} 件、スキップ {failed} 件。問題一覧で理由を確認し、再試行するか選べます。",
     "coverageTitle": "作品の整理状況",
-    "coverage": {"organized": "整理済み", "unorganized": "未整理", "outdated": "要更新"},
+    "coverage": {"organized": "整理済み", "unorganized": "未整理", "outdated": "要更新", "needsAttention": "要確認"},
     "coverageFailed": "整理状況を読み込めませんでした。再試行してください。",
     "retryLoad": "再読み込み",
     "startUnorganized": "未整理の作品を整理（{count}）",
@@ -2461,6 +2469,8 @@
       "AI_CONTEXT_TOO_LARGE": "資料がモデル容量を超えています。容量を調整するか対象を減らしてください。",
       "AI_SETTINGS_CHANGED": "整理中にAI設定が変更されました。再試行してください。",
       "AI_PERMISSION_REQUIRED": "AIが無効または読み取り専用です。設定を変更して続行できます。",
+      "SOURCE_TOO_LONG": "作品の資料が長すぎるためスキップしました。短くしてから再試行できます。",
+      "MOVIE_UNAVAILABLE": "作品が削除されたか利用できないためスキップしました。",
       "TAG_WRITE_REJECTED": "手動変更などにより書き込みが拒否されました。新しいデータは保持されています。",
       "CHECKPOINT_FAILED": "進捗を保存できませんでした。サーバーを確認して再試行してください。"
     }

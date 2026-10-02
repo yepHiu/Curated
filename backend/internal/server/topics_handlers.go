@@ -14,6 +14,7 @@ import (
 
 // TopicOrganizationProvider 保持 HTTP 与业务实现解耦。
 type TopicOrganizationProvider interface {
+	TagOrganizationIssues(context.Context, int, int) ([]contracts.TagOrganizationItemDTO, error)
 	HomepageTopics(context.Context) ([]contracts.HomepageTopicGroupDTO, error)
 	StartTagOrganization(context.Context, contracts.TagOrganizationRequest) (contracts.TagOrganizationJobDTO, error)
 	ListTagOrganizations(context.Context) ([]contracts.TagOrganizationJobDTO, error)
@@ -149,6 +150,23 @@ func (h *Handler) handleTagOrganizations(w http.ResponseWriter, r *http.Request)
 		topicHTTPError(w, err)
 		return
 	}
+	writeJSON(w, 200, map[string]any{"items": v})
+}
+
+// handleTagOrganizationIssues is a bounded read; opening it never retries work.
+func (h *Handler) handleTagOrganizationIssues(w http.ResponseWriter, r *http.Request) {
+	if h.topicOrganization == nil {
+		writeAppError(w, 503, "TAG_ORGANIZATION_UNAVAILABLE", "organization unavailable")
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	v, err := h.topicOrganization.TagOrganizationIssues(r.Context(), limit, offset)
+	if err != nil {
+		topicHTTPError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, 200, map[string]any{"items": v})
 }
 

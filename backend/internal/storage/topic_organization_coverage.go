@@ -13,15 +13,16 @@ import (
 func topicOrganizationCoverageTx(ctx context.Context, tx *sql.Tx, visit func(string, string, string)) error {
 	rows, err := tx.QueryContext(ctx, `SELECT m.id,m.title,m.summary,
 	 (SELECT json_group_array(name) FROM (SELECT t.name FROM tags t JOIN movie_tags mt ON mt.tag_id=t.id WHERE mt.movie_id=m.id AND t.type='nfo' ORDER BY t.name)),
-	 COALESCE(a.input_fingerprint,''),COALESCE(a.outcome,'')
-	 FROM movies m LEFT JOIN movie_topic_analysis a ON a.movie_id=m.id WHERE `+sqlMovieActiveClause)
+	 COALESCE(a.input_fingerprint,''),COALESCE(a.outcome,''),q.movie_id IS NOT NULL
+	 FROM movies m LEFT JOIN movie_topic_analysis a ON a.movie_id=m.id LEFT JOIN movie_topic_issues q ON q.movie_id=m.id WHERE `+sqlMovieActiveClause)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var id, title, summary, tagsJSON, fingerprint, outcome string
-		if err = rows.Scan(&id, &title, &summary, &tagsJSON, &fingerprint, &outcome); err != nil {
+		var issue bool
+		if err = rows.Scan(&id, &title, &summary, &tagsJSON, &fingerprint, &outcome, &issue); err != nil {
 			return err
 		}
 		status := "unorganized"
@@ -35,13 +36,16 @@ func topicOrganizationCoverageTx(ctx context.Context, tx *sql.Tx, visit func(str
 				status = "outdated"
 			}
 		}
+		if issue {
+			status = "issues"
+		}
 		visit(id, status, outcome)
 	}
 	return rows.Err()
 }
 
 // TagOrganizationStats counts the live library, including analyzed no-match
-// movies, but excluding trash, failed attempts and vocabulary-only progress.
+// movies, with failures counted separately; trash and vocabulary-only progress do not count as completed.
 func (s *SQLiteStore) TagOrganizationStats(ctx context.Context) (contracts.TagOrganizationStatsDTO, error) {
 	stats := contracts.TagOrganizationStatsDTO{}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -59,6 +63,8 @@ func (s *SQLiteStore) TagOrganizationStats(ctx context.Context) (contracts.TagOr
 			}
 		case "outdated":
 			stats.Outdated++
+		case "issues":
+			stats.NeedsAttention++
 		default:
 			stats.Unorganized++
 		}
@@ -69,6 +75,10 @@ func (s *SQLiteStore) TagOrganizationStats(ctx context.Context) (contracts.TagOr
 func recordTopicAnalysisTx(ctx context.Context, tx *sql.Tx, jobID string, input TopicMovieInput, outcome string) error {
 	_, err := tx.ExecContext(ctx, `INSERT INTO movie_topic_analysis(movie_id,job_id,input_fingerprint,outcome,analyzed_at) VALUES(?,?,?,?,?)
 	 ON CONFLICT(movie_id) DO UPDATE SET job_id=excluded.job_id,input_fingerprint=excluded.input_fingerprint,outcome=excluded.outcome,analyzed_at=excluded.analyzed_at`, input.MovieID, jobID, input.Fingerprint, outcome, nowUTC())
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `DELETE FROM movie_topic_issues WHERE movie_id=?`, input.MovieID)
 	return err
 }
 

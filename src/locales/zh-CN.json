@@ -2371,8 +2371,16 @@
     "retry": "重试"
   },
   "topics": {
+    "issuesTitle": "待处理影片（{count}）",
+    "viewIssues": "查看问题影片",
+    "leaveForLater": "暂不处理",
+    "issuesHint": "处理有问题的影片已跳过，其他影片继续整理。可查看原因后重试，也可以暂不处理；默认整理不会再次包含它们。",
+    "retryIssues": "重试待处理影片",
+    "retryMovie": "重新整理这部",
+    "noIssues": "没有待处理影片",
+    "completedWithIssues": "整理结束：已归类 {success} 部，未匹配题材 {unresolved} 部，跳过 {failed} 部。可在待处理列表查看原因并决定是否重试。",
     "coverageTitle": "影片整理状态",
-    "coverage": {"organized": "已整理", "unorganized": "未整理", "outdated": "待更新"},
+    "coverage": {"organized": "已整理", "unorganized": "未整理", "outdated": "待更新", "needsAttention": "待处理"},
     "coverageFailed": "无法读取整理统计，请重试。",
     "retryLoad": "重新加载",
     "startUnorganized": "整理未整理影片（{count}）",
@@ -2461,6 +2469,8 @@
       "AI_CONTEXT_TOO_LARGE": "本批资料超过模型容量。请调整上下文容量或缩小整理范围。",
       "AI_SETTINGS_CHANGED": "整理期间 AI 设置发生变化，当前结果未应用，请重试。",
       "AI_PERMISSION_REQUIRED": "AI 已关闭或处于只读模式。调整设置后可继续。",
+      "SOURCE_TOO_LONG": "影片资料过长，已跳过。可精简资料后再重试。",
+      "MOVIE_UNAVAILABLE": "影片已移除或暂时不可用，已跳过。",
       "TAG_WRITE_REJECTED": "标签写入被拒绝，可能有后续人工修改；未覆盖新数据。",
       "CHECKPOINT_FAILED": "保存整理进度失败，请检查服务器状态后重试。"
     }

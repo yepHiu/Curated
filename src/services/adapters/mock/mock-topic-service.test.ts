@@ -4,15 +4,36 @@ import type { Movie } from "@/domain/movie/types"
 
 beforeEach(() => { localStorage.clear(); vi.resetModules() })
 
+it("skips a problem, finishes the other movies, and excludes it until explicitly retried", async () => {
+ let { createMockTopicServices } = await import('./mock-topic-service')
+ const movies = [{ id: 'a', title: 'Problem', summary: 'x'.repeat(24001), tags: ['Theme'], userTags: [] }, { id: 'b', title: 'Good', summary: '', tags: ['Theme'], userTags: [] }] as unknown as Movie[]
+ const patch = vi.fn((id, tags) => { movies.find(m => m.id === id)!.userTags = tags })
+ let service = createMockTopicServices(() => movies, patch)
+ const job = await service.startTagOrganization('all')
+ expect(job.status).toBe('partial_failed'); expect(job.succeeded).toBe(1); expect(job.failed).toBe(1)
+ expect((await service.getTagOrganizationStats()).needsAttention).toBe(1)
+ expect((await service.getTagOrganizationIssues())[0]?.movieId).toBe('a')
+ await expect(service.startTagOrganization('unorganized')).rejects.toThrow('AI_ORGANIZATION_NO_MOVIES')
+ vi.resetModules(); ({ createMockTopicServices } = await import('./mock-topic-service'))
+ service = createMockTopicServices(() => movies, patch)
+ expect((await service.getTagOrganizationIssues()).length).toBe(1)
+ movies[0]!.summary = 'Fixed'
+ expect((await service.getTagOrganizationStats()).needsAttention).toBe(1)
+ const retry = await service.startTagOrganization('issues')
+ expect(retry.total).toBe(1); expect(retry.succeeded).toBe(1)
+ expect(await service.getTagOrganizationIssues()).toEqual([])
+ expect((await service.getTagOrganizationStats()).organized).toBe(2)
+})
+
 it("counts no-match analysis, persists coverage, and selects changed sources separately", async () => {
  let { createMockTopicServices } = await import("./mock-topic-service")
  const movies = [{ id: "a", title: "A", summary: "", tags: ["Theme"], userTags: [] }, { id: "b", title: "B", summary: "", tags: [], userTags: [] }, { id: "trash", title: "Trash", tags: [], userTags: [], trashedAt: "2026-10-03" }] as unknown as Movie[]
  const patch = vi.fn((id, tags) => { movies.find((movie) => movie.id === id)!.userTags = tags })
  let service = createMockTopicServices(() => movies, patch)
- expect(await service.getTagOrganizationStats()).toEqual({ total: 2, organized: 0, unorganized: 2, outdated: 0, unresolved: 0 })
+ expect(await service.getTagOrganizationStats()).toEqual({ total: 2, organized: 0, unorganized: 2, outdated: 0, needsAttention: 0, unresolved: 0 })
  const job = await service.startTagOrganization("unorganized")
  expect(job.total).toBe(2)
- expect(await service.getTagOrganizationStats()).toEqual({ total: 2, organized: 2, unorganized: 0, outdated: 0, unresolved: 1 })
+ expect(await service.getTagOrganizationStats()).toEqual({ total: 2, organized: 2, unorganized: 0, outdated: 0, needsAttention: 0, unresolved: 1 })
  vi.resetModules(); ({ createMockTopicServices } = await import("./mock-topic-service"))
  service = createMockTopicServices(() => movies, patch)
  await expect(service.startTagOrganization("unorganized")).rejects.toThrow("AI_ORGANIZATION_NO_MOVIES")

@@ -26,11 +26,12 @@ type TagOrganizationRequest struct {
 // TagOrganizationStatsDTO partitions active movies by source freshness.
 // Unresolved is a subset of Organized: analyzed successfully without a match.
 type TagOrganizationStatsDTO struct {
-	Total       int `json:"total"`
-	Organized   int `json:"organized"`
-	Unorganized int `json:"unorganized"`
-	Outdated    int `json:"outdated"`
-	Unresolved  int `json:"unresolved"`
+	Total          int `json:"total"`
+	Organized      int `json:"organized"`
+	Unorganized    int `json:"unorganized"`
+	Outdated       int `json:"outdated"`
+	Unresolved     int `json:"unresolved"`
+	NeedsAttention int `json:"needsAttention"`
 }
 
 // TagOrganizationJobDTO 保存可恢复整理的真实进度和触发来源。

@@ -54,7 +54,7 @@ func (a *App) StartTagOrganization(ctx context.Context, req contracts.TagOrganiz
 	switch req.Scope {
 	case "all":
 		id, err = a.store.CreateAllTagOrganization(ctx, id, req.RequestID, "manual", locale)
-	case "unorganized", "outdated":
+	case "unorganized", "outdated", "issues":
 		id, err = a.store.CreateRemainingTagOrganization(ctx, id, req.RequestID, "manual", locale, req.Scope)
 	case "selected":
 		if len(req.MovieIDs) == 0 || len(req.MovieIDs) > 600 {
@@ -82,6 +82,11 @@ func (a *App) ListTagOrganizations(ctx context.Context) ([]contracts.TagOrganiza
 // TagOrganizationStats reads persisted completion without invoking a model.
 func (a *App) TagOrganizationStats(ctx context.Context) (contracts.TagOrganizationStatsDTO, error) {
 	return a.store.TagOrganizationStats(ctx)
+}
+
+// TagOrganizationIssues exposes movies awaiting an explicit user decision.
+func (a *App) TagOrganizationIssues(ctx context.Context, limit, offset int) ([]contracts.TagOrganizationItemDTO, error) {
+	return a.store.TagOrganizationIssues(ctx, limit, offset)
 }
 
 // GetTagOrganization 返回任务进度。
@@ -331,7 +336,7 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 				continue
 			}
 			if len(input.Title)+len(input.Summary) > 24000 {
-				if err := a.store.SetTagOrganizationItem(ctx, id, item.MovieID, "unresolved", "SOURCE_TOO_LONG"); err != nil {
+				if err := a.store.SetTagOrganizationItem(ctx, id, item.MovieID, "failed", "SOURCE_TOO_LONG"); err != nil {
 					return
 				}
 				continue
@@ -489,6 +494,9 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 	if err != nil {
 		return nil, err
 	}
+	if err := validateTopicVocabulary(defs); err != nil {
+		return nil, &core.ToolError{Code: "AI_ORGANIZATION_VOCABULARY_CONFLICT", Message: "Invalid saved vocabulary"}
+	}
 	batchSize := 50
 	for offset := job.VocabularyProcessed; offset < job.Total; {
 		current, err := a.store.GetTagOrganization(ctx, id)
@@ -507,6 +515,9 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 		}
 		inputs := []topicVocabularySample{}
 		for _, item := range items {
+			if item.Status != "pending" {
+				continue
+			}
 			input, e := a.store.TopicMovieInput(ctx, item.MovieID)
 			if e != nil {
 				if !errors.Is(e, sql.ErrNoRows) {
@@ -517,52 +528,20 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 			inputs = append(inputs, compactVocabularySample(input))
 		}
 		if len(inputs) > 0 {
-			catalog := topicCatalog(defs, candidates)
-			proposed, err := a.proposeTopicVocabulary(ctx, inputs, catalog, job.Locale)
+			next, err := a.expandTopicVocabulary(ctx, defs, topicCatalog(defs, candidates), inputs, job.Locale)
 			if err != nil {
-				if topicOrganizationErrorCode(err) == "AI_CONTEXT_TOO_LARGE" && len(items) > 1 {
+				if !splittableTopicVocabulary(err) {
+					return nil, err
+				}
+				if len(items) > 1 {
 					batchSize = max(1, len(items)/2)
 					continue
 				}
-				return nil, err
-			}
-			proposals, err := a.reuseTopicProposals(ctx, proposed, catalog)
-			if err != nil {
-				return nil, err
-			}
-			known := map[string]bool{}
-			for _, d := range defs {
-				known[strings.ToLower(d.Name)] = true
-			}
-			added := []storage.TopicDefinition{}
-			for _, d := range proposals {
-				if !known[strings.ToLower(d.Name)] {
-					// Also compare proposals from the same response, so two new
-					// synonymous names cannot bypass the existing-catalog check.
-					if len(added) > 0 {
-						reused, err := a.reuseTopicProposals(ctx, []storage.TopicDefinition{d}, added)
-						if err != nil {
-							return nil, err
-						}
-						d = reused[0]
-					}
-					if known[strings.ToLower(d.Name)] {
-						continue
-					}
-					// Reserve established topic ownership, while allowing ordinary
-					// user labels to remain valid aliases for normalization.
-					cleaned, err := normalizeTopicProposals([]storage.TopicDefinition{d}, defs)
-					if err != nil {
-						return nil, err
-					}
-					d = cleaned[0]
-					defs = append(defs, d)
-					added = append(added, d)
-					known[strings.ToLower(d.Name)] = true
+				if err = a.store.SetTagOrganizationItem(ctx, id, items[0].MovieID, "failed", "VOCABULARY_"+topicOrganizationErrorCode(err)); err != nil {
+					return nil, &core.ToolError{Code: "CHECKPOINT_FAILED", Message: "Cannot save skipped movie"}
 				}
-			}
-			if err = validateTopicVocabulary(defs); err != nil {
-				return nil, &core.ToolError{Code: "AI_ORGANIZATION_VOCABULARY_CONFLICT", Message: "Ambiguous topic vocabulary"}
+			} else {
+				defs = next
 			}
 		}
 		offset += len(items)
@@ -570,6 +549,7 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 			return nil, &core.ToolError{Code: "CHECKPOINT_FAILED", Message: "Cannot save vocabulary progress"}
 		}
 		a.publishTagOrganization(id)
+		batchSize = 50
 	}
 	return defs, nil
 }
@@ -618,4 +598,52 @@ func (a *App) publishTagOrganization(id string) {
 	case "failed", "blocked":
 		a.tasks.Fail(id, j.Error, "")
 	}
+}
+
+// expandTopicVocabulary validates a private slice before publishing any definitions.
+func (a *App) expandTopicVocabulary(ctx context.Context, previous, catalog []storage.TopicDefinition, inputs []topicVocabularySample, locale string) ([]storage.TopicDefinition, error) {
+	defs := append([]storage.TopicDefinition{}, previous...)
+	proposed, err := a.proposeTopicVocabulary(ctx, inputs, catalog, locale)
+	if err != nil {
+		return nil, err
+	}
+	proposals, err := a.reuseTopicProposals(ctx, proposed, catalog)
+	if err != nil {
+		return nil, err
+	}
+	known := map[string]bool{}
+	for _, d := range defs {
+		known[strings.ToLower(d.Name)] = true
+	}
+	added := []storage.TopicDefinition{}
+	for _, d := range proposals {
+		if !known[strings.ToLower(d.Name)] {
+			// Also compare proposals from the same response, so two new
+			// synonymous names cannot bypass the existing-catalog check.
+			if len(added) > 0 {
+				reused, err := a.reuseTopicProposals(ctx, []storage.TopicDefinition{d}, added)
+				if err != nil {
+					return nil, err
+				}
+				d = reused[0]
+			}
+			if known[strings.ToLower(d.Name)] {
+				continue
+			}
+			// Reserve established topic ownership, while allowing ordinary
+			// user labels to remain valid aliases for normalization.
+			cleaned, err := normalizeTopicProposals([]storage.TopicDefinition{d}, defs)
+			if err != nil {
+				return nil, err
+			}
+			d = cleaned[0]
+			defs = append(defs, d)
+			added = append(added, d)
+			known[strings.ToLower(d.Name)] = true
+		}
+	}
+	if err = validateTopicVocabulary(defs); err != nil {
+		return nil, &core.ToolError{Code: "AI_ORGANIZATION_VOCABULARY_CONFLICT", Message: "Ambiguous topic vocabulary"}
+	}
+	return defs, nil
 }

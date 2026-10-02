@@ -76,7 +76,7 @@ async function refreshStats() {
 
 /** 稳定错误码映射为操作提示，不展示模型原文或数据库内部信息。 */
 export function organizationErrorText(code: string): string {
-  const key = `topics.errors.${code}`
+  const key = `topics.errors.${code.replace(/^VOCABULARY_/, "")}`
   return i18n.global.te(key) ? i18n.global.t(key) : i18n.global.t("topics.needsAttention")
 }
 
@@ -86,7 +86,7 @@ function notifyResult(job: TagOrganizationJob) {
   if (notices.has(noticeKey)) return
   notices.add(noticeKey)
   const t = i18n.global.t
-  const text = job.status === "completed" ? t("topics.completed", { count: job.succeeded }) : t("topics.needsAttention")
+  const text = job.status === "completed" ? t("topics.completed", { count: job.succeeded }) : job.status === "partial_failed" ? t("topics.completedWithIssues", { success: job.succeeded, unresolved: job.unresolved, failed: job.failed }) : t("topics.needsAttention")
   useNotificationCenter().addNotification({ messageId: job.status === "completed" ? "MSG-0048" : "MSG-0049", type: "system", severity: job.status === "completed" ? "success" : "warning", title: t("topics.organize"), message: text, source: { taskId: job.id, route: "/" }, group: `tag-organization-${job.id}` })
   if (!document.fullscreenElement && !quiet.value && !dialogOpen.value) pushAppToast(text, { variant: job.status === "completed" ? "success" : "warning" })
 }
@@ -153,9 +153,17 @@ export function useTagOrganization() {
       const ids = selection.value ? [...selection.value.movieIds] : undefined
       if (ids && (ids.length === 0 || ids.length > 600)) { error.value = i18n.global.t("topics.selectionLimit"); return }
       if (!ids && (!stats.value || statsError.value || statsLoading.value)) return
-      const count = stats.value && (scope === "all" ? stats.value.total : stats.value[scope])
+      const count = stats.value && (scope === "all" ? stats.value.total : scope === "issues" ? stats.value.needsAttention : stats.value[scope])
       if (!ids && !count) { error.value = organizationErrorText("AI_ORGANIZATION_NO_MOVIES"); return }
       return operate(() => useAIService().startTagOrganization(ids ? "selected" : scope, ids))
+    },
+    retryMovie: (id: string) => {
+      if (jobs.value.some(isOrganizationActive)) return
+      return operate(() => useAIService().startTagOrganization("selected", [id]))
+    },
+    retryIssues: () => {
+      if (jobs.value.some(isOrganizationActive) || !stats.value?.needsAttention || statsLoading.value || statsError.value) return
+      return operate(() => useAIService().startTagOrganization("issues"))
     },
     cancel: (id: string) => operate(() => { /* 取消保留已写入结果。 */ return useAIService().cancelTagOrganization(id) }),
     retry: (id: string) => operate(() => { /* 只重试后端失败项。 */ return useAIService().retryTagOrganization(id) }),

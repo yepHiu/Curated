@@ -2371,8 +2371,16 @@
     "retry": "Retry"
   },
   "topics": {
+    "issuesTitle": "Movies needing attention ({count})",
+    "viewIssues": "View problem movies",
+    "leaveForLater": "Leave for later",
+    "issuesHint": "Problem movies are skipped while other movies continue. Review the reasons and retry, or leave them for later. Default organization excludes these movies.",
+    "retryIssues": "Retry problem movies",
+    "retryMovie": "Retry this movie",
+    "noIssues": "No movies need attention",
+    "completedWithIssues": "Organization finished: {success} classified, {unresolved} with no matching topic, {failed} skipped. Review the problem list and decide whether to retry.",
     "coverageTitle": "Movie organization status",
-    "coverage": {"organized": "Organized", "unorganized": "Unorganized", "outdated": "Needs update"},
+    "coverage": {"organized": "Organized", "unorganized": "Unorganized", "outdated": "Needs update", "needsAttention": "Needs attention"},
     "coverageFailed": "Could not load organization counts. Please retry.",
     "retryLoad": "Reload",
     "startUnorganized": "Organize unorganized ({count})",
@@ -2461,6 +2469,8 @@
       "AI_CONTEXT_TOO_LARGE": "Batch exceeds the model context window. Adjust capacity or reduce the scope.",
       "AI_SETTINGS_CHANGED": "AI settings changed during organization. Retry to continue.",
       "AI_PERMISSION_REQUIRED": "AI is disabled or read-only. Update settings to continue.",
+      "SOURCE_TOO_LONG": "Movie data is too long; skipped. Shorten it before retrying.",
+      "MOVIE_UNAVAILABLE": "The movie was removed or is unavailable; skipped.",
       "TAG_WRITE_REJECTED": "Tag write rejected, possibly due to later manual edits. New data was preserved.",
       "CHECKPOINT_FAILED": "Unable to save progress. Check server state and retry."
     }

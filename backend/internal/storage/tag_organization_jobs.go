@@ -23,7 +23,7 @@ func (s *SQLiteStore) CreateAllTagOrganization(ctx context.Context, id, requestI
 
 // CreateRemainingTagOrganization captures a source-aware range in the same transaction as the job.
 func (s *SQLiteStore) CreateRemainingTagOrganization(ctx context.Context, id, requestID, reason, locale, scope string) (string, error) {
-	if scope != "unorganized" && scope != "outdated" {
+	if scope != "unorganized" && scope != "outdated" && scope != "issues" {
 		return "", fmt.Errorf("invalid organization scope")
 	}
 	return s.createTagOrganization(ctx, id, requestID, reason, locale, nil, scope)
@@ -50,7 +50,7 @@ func (s *SQLiteStore) createTagOrganization(ctx context.Context, id, requestID, 
 		if _, err = tx.ExecContext(ctx, `INSERT INTO ai_tag_organization_items(job_id,movie_id) SELECT ?,m.id FROM movies m WHERE `+sqlMovieActiveClause, id); err != nil {
 			return "", err
 		}
-	} else if scope == "unorganized" || scope == "outdated" {
+	} else if scope == "unorganized" || scope == "outdated" || scope == "issues" {
 		ids := []string{}
 		if err = topicOrganizationCoverageTx(ctx, tx, func(mid, status, _ string) {
 			if status == scope {
@@ -194,8 +194,26 @@ func (s *SQLiteStore) TagOrganizationItems(ctx context.Context, id string, pendi
 
 // SetTagOrganizationItem 仅记录尚未提交项的失败／待归类，不覆盖成功检查点。
 func (s *SQLiteStore) SetTagOrganizationItem(ctx context.Context, id, movieID, status, reason string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE ai_tag_organization_items SET status=?,reason=? WHERE job_id=? AND movie_id=? AND status='pending' AND EXISTS(SELECT 1 FROM ai_tag_organization_jobs j WHERE j.id=job_id AND j.status='running')`, status, reason, id, movieID)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	result, err := tx.ExecContext(ctx, `UPDATE ai_tag_organization_items SET status=?,reason=? WHERE job_id=? AND movie_id=? AND status='pending' AND EXISTS(SELECT 1 FROM ai_tag_organization_jobs j WHERE j.id=job_id AND j.status='running')`, status, reason, id, movieID)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count > 0 && (status == "failed" || status == "conflict") {
+		_, err = tx.ExecContext(ctx, `INSERT INTO movie_topic_issues(movie_id,job_id,reason) SELECT id,?,? FROM movies WHERE id=? ON CONFLICT(movie_id) DO UPDATE SET job_id=excluded.job_id,reason=excluded.reason`, id, reason, movieID)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // RetryTagOrganization 恢复失败和未完成项，保留成功记录与撤销历史。
@@ -215,6 +233,10 @@ func (s *SQLiteStore) RetryTagOrganization(ctx context.Context, id string) error
 	}
 	if undone > 0 || status == "running" || status == "queued" || status == "completed" {
 		return fmt.Errorf("job cannot be retried")
+	}
+	// Revisit vocabulary only for pending items when a preparation failure is retried.
+	if _, err = tx.ExecContext(ctx, `UPDATE ai_tag_organization_jobs SET vocabulary_processed=0,vocabulary_ready=0 WHERE id=? AND EXISTS(SELECT 1 FROM ai_tag_organization_items i WHERE i.job_id=? AND i.status IN ('failed','conflict') AND i.reason LIKE 'VOCABULARY_%')`, id, id); err != nil {
+		return err
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE ai_tag_organization_items SET status='pending',reason='' WHERE job_id=? AND status IN ('failed','conflict')`, id); err != nil {
 		return err

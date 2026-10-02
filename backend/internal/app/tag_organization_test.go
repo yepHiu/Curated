@@ -195,7 +195,7 @@ func TestTagOrganizationCancelAndResume(t *testing.T) {
 	}
 }
 
-// TestTopicVocabularyCheckpointRetry keeps successful preparation across malformed model replies.
+// TestTopicVocabularyCheckpointRetry keeps successful preparation across provider authentication failures.
 func TestTopicVocabularyCheckpointRetry(t *testing.T) {
 	a := governanceTestApp(t)
 	ids, _ := seedTopicMovies(t, a, 60)
@@ -228,10 +228,11 @@ func TestTopicVocabularyCheckpointRetry(t *testing.T) {
 		}
 		pages = append(pages, len(input.Movies))
 		content := `{"topics":[{"name":"Theme","description":"Synthetic subject","aliases":["Alias"]}]}`
-		if len(pages) == 2 || len(pages) == 3 {
-			content = `{"topics":`
+		if len(pages) == 2 {
+			http.Error(w, "provider unavailable", 401)
+			return
 		}
-		if len(pages) == 4 {
+		if len(pages) == 3 {
 			if len(input.Existing) < 1 || !strings.Contains(raw, `"name":"Theme"`) {
 				t.Error("retry lost prior vocabulary")
 			}
@@ -243,7 +244,7 @@ func TestTopicVocabularyCheckpointRetry(t *testing.T) {
 	a.cfg.AIProvider = config.AIProviderConfig{BaseURL: server.URL, Model: "synthetic-topic-fixture"}
 	a.runTagOrganization(ctx, id)
 	job, _ := a.GetTagOrganization(ctx, id)
-	if job.Status != "blocked" || job.Error != "AI_ORGANIZATION_INVALID_JSON" || job.VocabularyProcessed != 50 || job.VocabularyReady || job.Processed != 0 {
+	if job.Status != "blocked" || job.Error != "AI_ORGANIZATION_PROVIDER_FAILED" || job.VocabularyProcessed != 50 || job.VocabularyReady || job.Processed != 0 {
 		t.Fatalf("lost preparation checkpoint: %+v", job)
 	}
 	for _, mid := range ids {
@@ -262,7 +263,7 @@ func TestTopicVocabularyCheckpointRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	job, _ = a.GetTagOrganization(ctx, id)
-	if !job.VocabularyReady || job.VocabularyProcessed != 60 || !reflect.DeepEqual(pages, []int{50, 10, 10, 10}) {
+	if !job.VocabularyReady || job.VocabularyProcessed != 60 || !reflect.DeepEqual(pages, []int{50, 10, 10}) {
 		t.Fatalf("retry=%+v pages=%v", job, pages)
 	}
 	var resumedVocabulary atomic.Int64

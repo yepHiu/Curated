@@ -40,8 +40,9 @@ export interface TagOrganizationItem {
   reason: string
   evidence: { topic: string; field: string; quote: string }[]
 }
-export type TagOrganizationScope = "all" | "selected" | "unorganized" | "outdated"
+export type TagOrganizationScope = "all" | "selected" | "unorganized" | "outdated" | "issues"
 export interface TagOrganizationStats {
+  needsAttention: number
   total: number
   organized: number
   unorganized: number
@@ -50,6 +51,7 @@ export interface TagOrganizationStats {
   unresolved: number
 }
 export interface TagOrganizationService {
+  getTagOrganizationIssues(offset?: number): Promise<TagOrganizationItem[]>
   getTagOrganizationStats(): Promise<TagOrganizationStats>
   getTagOrganizationItems(id: string, offset?: number): Promise<TagOrganizationItem[]>
   listTagOrganizations(): Promise<TagOrganizationJob[]>

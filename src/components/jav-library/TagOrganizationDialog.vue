@@ -32,9 +32,34 @@ const items = ref<TagOrganizationItem[]>([])
 const resultLoading = ref(false)
 const resultError = ref(false)
 const hasMore = ref(false)
+const issuesOpen = ref(false)
+const issues = ref<TagOrganizationItem[]>([])
+const issuesLoading = ref(false)
+const issuesError = ref(false)
+const issuesMore = ref(false)
+let issuesGeneration = 0
+
+/** A problem list is a read-only snapshot; retries always require a click. */
+async function showIssues(more = false) {
+  const request = ++issuesGeneration
+  issuesOpen.value = true
+  issuesLoading.value = true
+  issuesError.value = false
+  const offset = more ? issues.value.length : 0
+  if (!more) issues.value = []
+  try {
+    const page = await useAIService().getTagOrganizationIssues(offset)
+    if (request !== issuesGeneration) return
+    issues.value = more ? [...issues.value, ...page] : page
+    issuesMore.value = page.length === 25
+  } catch { if (request === issuesGeneration) issuesError.value = true }
+  finally { if (request === issuesGeneration) issuesLoading.value = false }
+}
+
+watch(state.revision, () => { if (state.dialogOpen.value && issuesOpen.value) void showIssues() })
 
 watch(state.dialogOpen, async (open) => {
-  if (!open) return
+  if (!open) { issuesGeneration++; issuesOpen.value = false; issuesLoading.value = false; return }
   void state.refresh()
   void state.refreshStats()
   try { hiddenTopics.value = (await useLibraryService().listTopics()).filter((topic) => topic.hidden) }
@@ -85,8 +110,8 @@ async function showResults(id: string, more = false) {
           {{ t("topics.coverageFailed") }}
           <Button variant="ghost" size="sm" class="min-h-11 lg:min-h-8" @click="state.refreshStats">{{ t("topics.retryLoad") }}</Button>
         </p>
-        <dl v-else-if="state.stats.value" class="grid grid-cols-3 gap-3 rounded-lg border border-border/60 p-3">
-          <div v-for="kind in (['organized', 'unorganized', 'outdated'] as const)" :key="kind" class="flex min-w-0 flex-col gap-1">
+        <dl v-else-if="state.stats.value" class="grid grid-cols-2 gap-3 rounded-lg border border-border/60 p-3 sm:grid-cols-4">
+          <div v-for="kind in (['organized', 'unorganized', 'outdated', 'needsAttention'] as const)" :key="kind" class="flex min-w-0 flex-col gap-1">
             <dt class="text-xs text-muted-foreground">{{ t(`topics.coverage.${kind}`) }}</dt>
             <dd class="text-lg font-medium tabular-nums" :data-organization-count="kind">{{ state.stats.value[kind] }}</dd>
           </div>
@@ -118,10 +143,37 @@ async function showResults(id: string, more = false) {
             </DropdownMenu>
           </template>
         </div>
-        <p v-if="!state.selection.value && state.stats.value && state.stats.value.total > 0 && !state.stats.value.unorganized && !state.stats.value.outdated" role="status" class="w-full text-xs text-muted-foreground">{{ t("topics.allOrganized") }}</p>
+        <p v-if="!state.selection.value && state.stats.value && state.stats.value.total > 0 && !state.stats.value.unorganized && !state.stats.value.outdated && !state.stats.value.needsAttention" role="status" class="w-full text-xs text-muted-foreground">{{ t("topics.allOrganized") }}</p>
         <p v-if="invalidSelection" role="alert" class="w-full text-xs text-destructive">{{ t("topics.selectionLimit") }}</p>
         <p v-if="!writeEnabled" class="w-full text-xs text-muted-foreground">{{ t("topics.errors.AI_PERMISSION_REQUIRED") }}</p>
       </div>
+      <section v-if="state.stats.value?.needsAttention || issuesOpen" class="flex min-w-0 flex-col gap-2" :aria-label="t('topics.issuesTitle')" data-organization-issues>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-medium">{{ t("topics.issuesTitle", { count: state.stats.value?.needsAttention ?? 0 }) }}</h3>
+          <Button v-if="!issuesOpen" variant="outline" size="sm" class="min-h-11 lg:min-h-8" @click="showIssues()">{{ t("topics.viewIssues") }}</Button>
+          <Button v-else variant="ghost" size="sm" class="min-h-11 lg:min-h-8" @click="issuesOpen = false">{{ t("topics.leaveForLater") }}</Button>
+        </div>
+        <p class="text-xs text-muted-foreground">{{ t("topics.issuesHint") }}</p>
+        <template v-if="issuesOpen">
+          <div class="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" class="min-h-11 lg:min-h-8" :disabled="state.busy.value || Boolean(state.active.value) || !writeEnabled || coverageUnavailable || !state.stats.value?.needsAttention" @click="state.retryIssues">{{ t("topics.retryIssues") }}</Button>
+            <Button variant="ghost" size="sm" class="min-h-11 lg:min-h-8" :disabled="issuesLoading" @click="showIssues()">{{ t("topics.retryLoad") }}</Button>
+          </div>
+          <p v-if="issuesError" role="alert" class="text-xs text-destructive">{{ t("topics.loadFailed") }}</p>
+          <ul class="flex max-h-60 flex-col overflow-y-auto overscroll-contain rounded-lg border border-border/60" data-organization-issue-list>
+            <li v-for="item in issues" :key="item.movieId" class="flex min-w-0 flex-wrap items-center gap-2 border-b border-border/60 p-3 last:border-0">
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
+                <RouterLink :to="{ name: 'detail', params: { id: item.movieId } }" class="break-words text-sm font-medium hover:underline" @click="state.dialogOpen.value = false">{{ item.title }}</RouterLink>
+                <p class="break-words text-xs text-muted-foreground">{{ organizationErrorText(item.reason) }}</p>
+              </div>
+              <Button variant="outline" size="sm" class="min-h-11 shrink-0 lg:min-h-8" :disabled="state.busy.value || Boolean(state.active.value) || !writeEnabled" @click="state.retryMovie(item.movieId)">{{ t("topics.retryMovie") }}</Button>
+            </li>
+          </ul>
+          <p v-if="issuesLoading" role="status" class="text-xs text-muted-foreground">{{ t("topics.loading") }}</p>
+          <p v-else-if="!issuesError && !issues.length" role="status" class="text-xs text-muted-foreground">{{ t("topics.noIssues") }}</p>
+          <Button v-if="issuesMore && !issuesError" variant="ghost" size="sm" class="min-h-11 self-start lg:min-h-8" :disabled="issuesLoading" @click="showIssues(true)">{{ t("topics.more") }}</Button>
+        </template>
+      </section>
       <section class="flex min-w-0 flex-col gap-2" :aria-label="t('topics.history')">
         <div class="flex items-center justify-between text-xs text-muted-foreground">
           <h3 class="font-medium">{{ t("topics.history") }}</h3>
@@ -157,6 +209,8 @@ async function showResults(id: string, more = false) {
             </div>
             <div v-if="expandedJob === job.id" class="flex flex-col gap-2 px-3 pb-3 text-xs" data-organization-history-detail>
               <p class="text-muted-foreground">{{ t("topics.result", { success: job.succeeded, unresolved: job.unresolved, failed: job.failed }) }}</p>
+              <p v-if="job.status === 'partial_failed'" role="status" class="text-muted-foreground">{{ t("topics.completedWithIssues", { success: job.succeeded, unresolved: job.unresolved, failed: job.failed }) }}</p>
+              <Button v-if="job.failed && state.stats.value?.needsAttention" variant="outline" size="sm" class="min-h-11 self-start lg:min-h-8" @click="showIssues()">{{ t("topics.viewIssues") }}</Button>
               <p v-if="job.error" class="text-destructive">{{ organizationErrorText(job.error) }}</p>
               <Button variant="ghost" size="sm" class="min-h-11 self-start lg:min-h-8" :disabled="resultLoading" @click="showResults(job.id)">{{ t("topics.details") }}</Button>
               <div v-if="selectedJob === job.id" class="flex flex-col gap-3">

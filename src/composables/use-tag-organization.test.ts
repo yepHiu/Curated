@@ -17,10 +17,21 @@ function job(id: string, status: TagOrganizationJob["status"]): TagOrganizationJ
  return { id, taskId: id, status, stage: "classifying", triggerReason: "manual", total: 6, processed: status === "completed" ? 6 : 0, succeeded: 6, unresolved: 0, failed: 0, revision: status === "completed" ? 2 : 1, createdAt: "2026-10-01", updatedAt: "2026-10-01" }
 }
 
-beforeEach(() => { vi.useFakeTimers(); vi.clearAllMocks(); api.getTagOrganizationStats.mockResolvedValue({ total: 6, organized: 2, unorganized: 3, outdated: 1, unresolved: 1 }); api.listTagOrganizations.mockResolvedValue([]); api.startTagOrganization.mockResolvedValue(job("started", "queued")); useTagOrganization().quiet.value = false })
+beforeEach(() => { vi.useFakeTimers(); vi.clearAllMocks(); api.getTagOrganizationStats.mockResolvedValue({ total: 6, organized: 2, unorganized: 3, outdated: 1, needsAttention: 0, unresolved: 1 }); api.listTagOrganizations.mockResolvedValue([]); api.startTagOrganization.mockResolvedValue(job("started", "queued")); useTagOrganization().quiet.value = false })
 afterEach(() => { stopTagOrganizationTracking(); vi.useRealTimers() })
 
 describe("organization observation", () => {
+ it("reports skipped movies once after completion, never during processing", async () => {
+  api.listTagOrganizations.mockResolvedValue([{ ...job('skip', 'running'), failed: 1 }])
+  await useTagOrganization().refresh()
+  expect(notify).not.toHaveBeenCalled()
+  api.listTagOrganizations.mockResolvedValue([{ ...job('skip', 'partial_failed'), succeeded: 5, failed: 1 }])
+  await useTagOrganization().refresh(); await useTagOrganization().refresh()
+  expect(notify).toHaveBeenCalledOnce()
+  expect(notify.mock.calls[0]![0].message).toContain('topics.completedWithIssues')
+  expect(notify.mock.calls[0]![0].message).toContain('"failed":1')
+  expect(api.startTagOrganization).not.toHaveBeenCalled()
+ })
  it("only reads when browsing, emits once on completion and does not replay after remount", async () => {
   api.listTagOrganizations.mockResolvedValue([job("one","running")])
   startTagOrganizationTracking(); await useTagOrganization().refresh()
@@ -71,6 +82,17 @@ describe("organization diagnostics", () => {
 })
 
 describe("organization scope", () => {
+ it("retries a problem movie or the problem queue only after explicit invocation", async () => {
+  const state = useTagOrganization()
+  api.getTagOrganizationStats.mockResolvedValue({ total: 1, organized: 0, unorganized: 0, outdated: 0, needsAttention: 1, unresolved: 0 })
+  await state.refreshStats()
+  await state.start()
+  expect(api.startTagOrganization).not.toHaveBeenCalled()
+  await state.retryMovie('problem')
+  expect(api.startTagOrganization).toHaveBeenLastCalledWith('selected', ['problem'])
+  await state.retryIssues()
+  expect(api.startTagOrganization).toHaveBeenLastCalledWith('issues')
+ })
  it("requires available coverage and never falls back to all movies", async () => {
   const state = useTagOrganization()
   state.openAll(); await state.start()
@@ -79,7 +101,7 @@ describe("organization scope", () => {
   await state.refreshStats(); await state.start()
   expect(state.statsError.value).toBe(true)
   expect(api.startTagOrganization).not.toHaveBeenCalled()
-  api.getTagOrganizationStats.mockResolvedValue({ total: 6, organized: 5, unorganized: 0, outdated: 1, unresolved: 2 })
+  api.getTagOrganizationStats.mockResolvedValue({ total: 6, organized: 5, unorganized: 0, outdated: 1, needsAttention: 0, unresolved: 2 })
   await state.refreshStats(); await state.start()
   expect(api.startTagOrganization).not.toHaveBeenCalled()
   await state.start("outdated")
@@ -88,11 +110,11 @@ describe("organization scope", () => {
   expect(api.startTagOrganization).toHaveBeenLastCalledWith("all", undefined)
  })
  it("does not let a late coverage response leak across server sessions", async () => {
-  let resolveOld!: (value: { total: number; organized: number; unorganized: number; outdated: number; unresolved: number }) => void
+  let resolveOld!: (value: { total: number; organized: number; unorganized: number; outdated: number; needsAttention: number; unresolved: number }) => void
   api.getTagOrganizationStats.mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve }))
   const pending = useTagOrganization().refreshStats()
   stopTagOrganizationTracking()
-  resolveOld({ total: 100, organized: 100, unorganized: 0, outdated: 0, unresolved: 0 })
+  resolveOld({ total: 100, organized: 100, unorganized: 0, outdated: 0, needsAttention: 0, unresolved: 0 })
   await pending
   expect(useTagOrganization().stats.value).toBeNull()
  })

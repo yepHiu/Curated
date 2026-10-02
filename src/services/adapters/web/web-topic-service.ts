@@ -29,6 +29,8 @@ export const webTopicLibrary: TopicLibraryService = {
 }
 
 export const webTagOrganization: TagOrganizationService = {
+  /** Read problems awaiting an explicit retry. */
+  async getTagOrganizationIssues(offset = 0) { return (await httpClient.get<{ items: TagOrganizationItem[] }>(`/ai/tag-organizations/issues?limit=25&offset=${offset}`)).items },
   /** Read actual library coverage without starting AI work. */
   getTagOrganizationStats() { return httpClient.get<TagOrganizationStats>("/ai/tag-organizations/stats") },
   /** 分页读取可复核的归类依据。 */

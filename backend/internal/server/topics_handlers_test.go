@@ -31,6 +31,20 @@ func (f *topicHandlerFixture) TagOrganizationStats(_ context.Context) (contracts
 	return contracts.TagOrganizationStatsDTO{Total: 6, Organized: 3, Unorganized: 2, Outdated: 1, Unresolved: 1}, nil
 }
 
+func (f *topicHandlerFixture) TagOrganizationIssues(_ context.Context, _, _ int) ([]contracts.TagOrganizationItemDTO, error) {
+	return []contracts.TagOrganizationItemDTO{{MovieID: "problem", Title: "Problem", Status: "failed", Reason: "SOURCE_TOO_LONG", Evidence: []contracts.TopicEvidenceDTO{}}}, nil
+}
+
+func TestTopicIssuesHandlerOnlyReads(t *testing.T) {
+	f := &topicHandlerFixture{}
+	h := &Handler{topicOrganization: f}
+	response := httptest.NewRecorder()
+	h.handleTagOrganizationIssues(response, httptest.NewRequest(http.MethodGet, "/api/ai/tag-organizations/issues?limit=25&offset=0", nil))
+	if response.Code != 200 || response.Header().Get("Cache-Control") != "no-store" || f.starts != 0 || !strings.Contains(response.Body.String(), `"movieId":"problem"`) {
+		t.Fatalf("response=%s", response.Body)
+	}
+}
+
 func TestTopicCoverageHandlerIsReadOnlyAndNotCached(t *testing.T) {
 	f := &topicHandlerFixture{}
 	h := &Handler{topicOrganization: f}

@@ -46,3 +46,15 @@ func splittableTopicClassification(err error) bool {
 	}
 	return false
 }
+
+// Only response/input failures can be isolated. Global service and storage
+// failures preserve pending work instead of marking every movie as a problem.
+func splittableTopicVocabulary(err error) bool {
+	switch topicOrganizationErrorCode(err) {
+	case "AI_CONTEXT_TOO_LARGE", "AI_ORGANIZATION_OUTPUT_LIMIT", "AI_ORGANIZATION_INVALID_JSON",
+		"AI_ORGANIZATION_VOCABULARY_INVALID", "AI_ORGANIZATION_VOCABULARY_LIMIT",
+		"AI_ORGANIZATION_VOCABULARY_CONFLICT", "AI_ORGANIZATION_REUSE_INVALID":
+		return true
+	}
+	return false
+}

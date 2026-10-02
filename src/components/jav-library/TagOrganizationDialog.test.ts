@@ -8,22 +8,22 @@ import SidebarTagOrganizationEntry from "./SidebarTagOrganizationEntry.vue"
 import MovieLibraryContextMenu from "./MovieLibraryContextMenu.vue"
 import type { Movie } from "@/domain/movie/types"
 
-const state = vi.hoisted(() => ({ start: vi.fn(), cancel: vi.fn(), retry: vi.fn(), undo: vi.fn(), openSelected: vi.fn(), refreshStats: vi.fn(), refresh: vi.fn(), getItems: vi.fn() }))
+const state = vi.hoisted(() => ({ start: vi.fn(), cancel: vi.fn(), retry: vi.fn(), undo: vi.fn(), openSelected: vi.fn(), refreshStats: vi.fn(), refresh: vi.fn(), getIssues: vi.fn(), retryMovie: vi.fn(), retryIssues: vi.fn(), getItems: vi.fn() }))
 const jobs = ref<TagOrganizationJob[]>([])
-const stats = ref({ total: 10, organized: 4, unorganized: 5, outdated: 1, unresolved: 2 })
+const stats = ref({ total: 10, organized: 4, unorganized: 5, outdated: 1, needsAttention: 0, unresolved: 2 })
 const statsLoading = ref(false)
 const statsError = ref(false)
 const open = ref(true)
 const selection = ref<{ movieIds: string[]; title?: string } | null>(null)
 vi.mock("@/composables/use-tag-organization", () => ({
-  useTagOrganization: () => ({ ...state, jobs, selection, stats, statsLoading, statsError, active: computed(() => jobs.value.find((job) => job.status === "running")), dialogOpen: open, connected: ref(true), error: ref(""), busy: ref(false) }),
+  useTagOrganization: () => ({ ...state, jobs, selection, revision: ref(0), stats, statsLoading, statsError, active: computed(() => jobs.value.find((job) => job.status === "running")), dialogOpen: open, connected: ref(true), error: ref(""), busy: ref(false) }),
   isOrganizationActive: (job: TagOrganizationJob) => job.status === "running",
   organizationProgressText: () => "Processing 20/100",
   organizationProgressValue: () => 20,
   organizationErrorText: (code: string) => code,
 }))
 vi.mock("@/services/library-service", () => ({ useLibraryService: () => ({ listTopics: async () => [], setTopicHidden: vi.fn() }) }))
-vi.mock("@/services/ai-service", () => ({ useAIService: () => ({ getTagOrganizationItems: state.getItems }) }))
+vi.mock("@/services/ai-service", () => ({ useAIService: () => ({ getTagOrganizationIssues: state.getIssues, getTagOrganizationItems: state.getItems }) }))
 vi.mock("@/lib/experimental-agent", () => ({ useExperimentalAgent: () => ({ writeEnabled: ref(true) }) }))
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ locale: ref("en"), t: (key: string, values?: Record<string, unknown>) => values ? `${key}:${JSON.stringify(values)}` : key }) }))
 vi.mock("@/components/ui/dialog", () => ({
@@ -36,7 +36,7 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
 function historyJob(id: string, status: TagOrganizationJob["status"]): TagOrganizationJob {
  return { id, taskId: id, status, stage: "classifying", triggerReason: "manual", total: 100, processed: 20, succeeded: 20, unresolved: 0, failed: 0, revision: 1, createdAt: "2026-10-02T10:00:00Z", updatedAt: "2026-10-02T10:01:00Z" }
 }
-beforeEach(() => { vi.clearAllMocks(); statsLoading.value = false; statsError.value = false; stats.value = { total: 10, organized: 4, unorganized: 5, outdated: 1, unresolved: 2 }; open.value = true; selection.value = null; jobs.value = []; state.getItems.mockResolvedValue([]) })
+beforeEach(() => { vi.clearAllMocks(); statsLoading.value = false; statsError.value = false; stats.value = { total: 10, organized: 4, unorganized: 5, outdated: 1, needsAttention: 0, unresolved: 2 }; open.value = true; selection.value = null; jobs.value = []; state.getIssues.mockResolvedValue([]); state.getItems.mockResolvedValue([]) })
 
 it("shows source-aware coverage and starts only the chosen remaining scope", async () => {
  const wrapper = mount(TagOrganizationDialog)
@@ -57,7 +57,7 @@ it("shows source-aware coverage and starts only the chosen remaining scope", asy
 })
 
 it("disables remaining work when every movie is already current", async () => {
- stats.value = { total: 10, organized: 10, unorganized: 0, outdated: 0, unresolved: 2 }
+ stats.value = { total: 10, organized: 10, unorganized: 0, outdated: 0, needsAttention: 0, unresolved: 2 }
  const wrapper = mount(TagOrganizationDialog)
  expect(wrapper.get('[data-organize-unorganized]').attributes('disabled')).toBeDefined()
  expect(wrapper.find('[data-organize-outdated]').exists()).toBe(false)
@@ -79,6 +79,27 @@ it("renders compact history rows and reads evidence only when requested", async 
  const details = wrapper.findAll("button").find((button) => button.text() === "topics.details")!
  await details.trigger("click"); await flushPromises()
  expect(state.getItems).toHaveBeenCalledWith("one", 0)
+ wrapper.unmount()
+})
+
+it("keeps skipped movies for a user decision without retrying on read or dismiss", async () => {
+ stats.value = { total: 10, organized: 9, unorganized: 0, outdated: 0, needsAttention: 1, unresolved: 0 }
+ state.getIssues.mockResolvedValue([{ movieId: "problem", title: "Problem movie", reason: "SOURCE_TOO_LONG", status: "failed", evidence: [] }])
+ const wrapper = mount(TagOrganizationDialog, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+ expect(wrapper.text()).not.toContain("topics.allOrganized")
+ expect(state.getIssues).not.toHaveBeenCalled()
+ await wrapper.findAll('button').find(b => b.text() === 'topics.viewIssues')!.trigger('click'); await flushPromises()
+ expect(wrapper.get('[data-organization-issue-list]').text()).toContain('Problem movie')
+ expect(wrapper.text()).toContain('SOURCE_TOO_LONG')
+ expect(state.retryMovie).not.toHaveBeenCalled(); expect(state.retryIssues).not.toHaveBeenCalled()
+ await wrapper.findAll('button').find(b => b.text() === 'topics.leaveForLater')!.trigger('click')
+ expect(wrapper.find('[data-organization-issue-list]').exists()).toBe(false)
+ expect(state.retryMovie).not.toHaveBeenCalled()
+ await wrapper.findAll('button').find(b => b.text() === 'topics.viewIssues')!.trigger('click'); await flushPromises()
+ await wrapper.findAll('button').find(b => b.text() === 'topics.retryMovie')!.trigger('click')
+ expect(state.retryMovie).toHaveBeenCalledWith('problem')
+ await wrapper.findAll('button').find(b => b.text() === 'topics.retryIssues')!.trigger('click')
+ expect(state.retryIssues).toHaveBeenCalledOnce()
  wrapper.unmount()
 })
 

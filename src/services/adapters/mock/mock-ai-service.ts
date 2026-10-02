@@ -249,6 +249,8 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
 
 export const mockAIService: AIService = {
   /** 按需加载模拟资料库，普通聊天不初始化影片偏好状态。 */
+  async getTagOrganizationIssues(offset) { return (await import("./mock-library-service")).mockTopicServices.getTagOrganizationIssues(offset) },
+  /** Read organization coverage. */
   async getTagOrganizationStats() { return (await import("./mock-library-service")).mockTopicServices.getTagOrganizationStats() },
   /** Read persistent mock task history. */
   async listTagOrganizations() { return (await import("./mock-library-service")).mockTopicServices.listTagOrganizations() },
