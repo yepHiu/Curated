@@ -27,6 +27,7 @@ function applyScroll(el: HTMLElement | null, snapshot: ScrollSnapshot) {
 async function restoreScrollSequence(
   scrollElRef: Ref<HTMLElement | null>,
   snapshot: ScrollSnapshot,
+  isCurrent: () => boolean,
 ) {
   await nextTick()
   await new Promise<void>((resolve) => {
@@ -36,6 +37,7 @@ async function restoreScrollSequence(
   })
 
   const restore = () => {
+    if (!isCurrent()) return
     applyScroll(scrollElRef.value, snapshot)
   }
 
@@ -55,6 +57,19 @@ export function useLibraryScrollPreserve(options: {
   const { scrollElRef, preserveKey } = options
   const scrollTop = ref(0)
   let detachScrollListener: (() => void) | undefined
+  let scrollAnimationFrame: number | undefined
+  let restoreRevision = 0
+
+  function cancelScrollAnimation() {
+    if (scrollAnimationFrame === undefined) return
+    cancelAnimationFrame(scrollAnimationFrame)
+    scrollAnimationFrame = undefined
+  }
+
+  function onScrollInput() {
+    restoreRevision++
+    cancelScrollAnimation()
+  }
 
   function storeSnapshot(key = preserveKey.value) {
     const normalizedKey = key.trim()
@@ -67,19 +82,40 @@ export function useLibraryScrollPreserve(options: {
     if (!normalizedKey) return
     const snapshot = libraryScrollSnapshots.get(normalizedKey)
     if (!snapshot) return
+    const revision = ++restoreRevision
+    const el = scrollElRef.value
     scrollTop.value = snapshot.top
-    await restoreScrollSequence(scrollElRef, snapshot)
+    await restoreScrollSequence(scrollElRef, snapshot, () =>
+      revision === restoreRevision && el === scrollElRef.value && normalizedKey === preserveKey.value.trim(),
+    )
   }
 
   function scrollToTop() {
     const el = scrollElRef.value
     if (!el) return
-    el.scrollTo({ top: 0, behavior: "smooth" })
+    onScrollInput()
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      el.scrollTo({ top: 0, behavior: "instant" })
+      return
+    }
+
+    // DynamicScroller adjusts scrollTop when measured item heights change,
+    // which cancels native smooth scrolling. Drive the animation ourselves.
+    const startTop = el.scrollTop
+    let startTime: number | undefined
+    const animate = (time: number) => {
+      startTime ??= time
+      const progress = Math.min(1, (time - startTime) / 500)
+      el.scrollTo({ top: startTop * (1 - progress) ** 3, behavior: "instant" })
+      scrollAnimationFrame = progress < 1 ? requestAnimationFrame(animate) : undefined
+    }
+    scrollAnimationFrame = requestAnimationFrame(animate)
   }
 
   watch(
     scrollElRef,
     (el) => {
+      onScrollInput()
       detachScrollListener?.()
       detachScrollListener = undefined
 
@@ -95,7 +131,17 @@ export function useLibraryScrollPreserve(options: {
 
       scrollTop.value = el.scrollTop
       el.addEventListener("scroll", onScroll, { passive: true })
-      detachScrollListener = () => el.removeEventListener("scroll", onScroll)
+      el.addEventListener("wheel", onScrollInput, { passive: true })
+      el.addEventListener("touchstart", onScrollInput, { passive: true })
+      el.addEventListener("pointerdown", onScrollInput, { passive: true })
+      el.addEventListener("keydown", onScrollInput)
+      detachScrollListener = () => {
+        el.removeEventListener("scroll", onScroll)
+        el.removeEventListener("wheel", onScrollInput)
+        el.removeEventListener("touchstart", onScrollInput)
+        el.removeEventListener("pointerdown", onScrollInput)
+        el.removeEventListener("keydown", onScrollInput)
+      }
       if (libraryScrollSnapshots.has(preserveKey.value.trim())) {
         void restoreSnapshot()
       }
@@ -106,6 +152,7 @@ export function useLibraryScrollPreserve(options: {
   watch(
     preserveKey,
     (nextKey, prevKey) => {
+      onScrollInput()
       if (prevKey.trim()) {
         storeSnapshot(prevKey)
       }
@@ -126,6 +173,7 @@ export function useLibraryScrollPreserve(options: {
   )
 
   onBeforeUnmount(() => {
+    onScrollInput()
     storeSnapshot()
     detachScrollListener?.()
   })
