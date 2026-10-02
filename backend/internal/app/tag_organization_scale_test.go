@@ -25,8 +25,62 @@ import (
 )
 
 type topicScaleRequest struct {
-	Existing []storage.TopicDefinition `json:"existing"`
-	Movies   []storage.TopicMovieInput `json:"movies"`
+	Existing   []storage.TopicDefinition `json:"existing"`
+	Vocabulary []storage.TopicDefinition `json:"vocabulary"`
+	Movies     []storage.TopicMovieInput `json:"movies"`
+}
+
+func TestTagOrganizationPagesOversizedExistingVocabulary(t *testing.T) {
+	a := governanceTestApp(t)
+	ids, _ := seedTopicMovies(t, a, 6)
+	ctx := context.Background()
+	defs := []storage.TopicDefinition{}
+	for i := 0; i < 50; i++ {
+		name := fmt.Sprintf("Theme-%02d", i)
+		if i == 49 {
+			name = "Theme"
+		}
+		defs = append(defs, storage.TopicDefinition{Name: name, Description: strings.Repeat("字", 300)})
+	}
+	if err := a.store.SaveTopicVocabulary(ctx, defs); err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]map[string]bool{}
+	scaleTopicProvider(t, a, func(vocabulary bool, source topicScaleRequest) (any, int) {
+		if vocabulary {
+			t.Error("oversized existing vocabulary was sent to the provider")
+			return map[string]any{"topics": []any{}}, 200
+		}
+		movies := []topicClassification{}
+		for _, input := range source.Movies {
+			if seen[input.MovieID] == nil {
+				seen[input.MovieID] = map[string]bool{}
+			}
+			movie := topicClassification{MovieID: input.MovieID, Matches: []topicMatch{}}
+			for _, def := range source.Vocabulary {
+				if seen[input.MovieID][def.Name] {
+					t.Error("vocabulary page replayed")
+				}
+				seen[input.MovieID][def.Name] = true
+				if def.Name == "Theme" {
+					movie.Matches = append(movie.Matches, topicMatch{Topic: "Theme", Field: "metadataTags", Quote: "Theme"})
+				}
+			}
+			movies = append(movies, movie)
+		}
+		return map[string]any{"movies": movies}, 200
+	})
+	id := createScaleTopicJob(t, a, ids)
+	a.runTagOrganization(ctx, id)
+	job, err := a.store.GetTagOrganization(ctx, id)
+	if err != nil || job.Status != "completed" || job.Succeeded != 6 || !job.VocabularyReady {
+		t.Fatalf("vocabulary overflow poisoned task: %+v err=%v", job, err)
+	}
+	for _, mid := range ids {
+		if len(seen[mid]) != 50 {
+			t.Fatalf("movie %s only saw %d definitions", mid, len(seen[mid]))
+		}
+	}
 }
 
 // A local HTTP provider exercises the real client, JSON validation and SQLite writes.

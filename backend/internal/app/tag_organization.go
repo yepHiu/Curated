@@ -338,22 +338,7 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 			return
 		}
 		job.Stage = "classifying"
-		var result struct {
-			Movies []topicClassification `json:"movies"`
-		}
-		raw, e := a.topicComplete(ctx, prompts.TopicClassificationPrompt(), map[string]any{"vocabulary": defs, "movies": inputs})
-		if e == nil {
-			if decodeTopicJSON(raw, &result) != nil {
-				e = &core.ToolError{Code: "AI_ORGANIZATION_INVALID_JSON", Message: "Invalid classification JSON"}
-			}
-		}
-		var matches map[string][]string
-		if e == nil {
-			matches, e = validateTopicClassification(result.Movies, inputs, defs)
-			if e != nil {
-				e = &core.ToolError{Code: "AI_ORGANIZATION_INVALID_EVIDENCE", Message: "Invalid classification evidence"}
-			}
-		}
+		decisions, matches, e := a.classifyTopicBatch(ctx, defs, inputs)
 		if ctx.Err() != nil {
 			return
 		}
@@ -393,7 +378,7 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 				return
 			}
 			evidence := []contracts.TopicEvidenceDTO{}
-			for _, decision := range result.Movies {
+			for _, decision := range decisions {
 				if decision.MovieID != input.MovieID {
 					continue
 				}
@@ -529,6 +514,14 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 				if topicOrganizationErrorCode(err) == "AI_CONTEXT_TOO_LARGE" && len(items) > 1 {
 					batchSize = max(1, len(items)/2)
 					continue
+				}
+				if topicOrganizationErrorCode(err) == "AI_CONTEXT_TOO_LARGE" && len(defs) > 0 {
+					// Existing definitions may already consume the context window.
+					// Freeze them; classification can page the vocabulary as needed.
+					if err := a.store.CheckpointTopicVocabulary(ctx, id, defs, offset, true); err != nil {
+						return nil, err
+					}
+					return defs, nil
 				}
 				return nil, err
 			}
