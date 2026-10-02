@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from "vue"
+import { computed, inject, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { HttpClientError } from "@/api/http-client"
@@ -32,6 +32,8 @@ import {
 import { applyLibraryBatchToggle } from "@/lib/library-batch-selection"
 import { bumpMovieImageVersion } from "@/lib/image-version"
 import { buildLibraryBrowseScrollKey } from "@/lib/library-scroll-key"
+import { openHomeFromLibraryKey } from "@/lib/home-library-navigation"
+import { armHomeScrollRestore } from "@/composables/use-home-scroll-preserve"
 import { buildDetailRouteFromBrowse, buildPlayerRouteFromBrowseIntent } from "@/lib/navigation-intent"
 import { isMovieRecentlyAdded } from "@/lib/library-stats"
 import { movieSearchHaystack } from "@/lib/movie-search"
@@ -47,6 +49,10 @@ const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const openHomeFromLibrary = inject(openHomeFromLibraryKey, () => {
+  armHomeScrollRestore()
+  void router.push({ name: "home" })
+})
 const libraryService = useLibraryService()
 const scanTaskTracker = useScanTaskTracker()
 const selectedTopic = ref<LibraryTopic | null>(null)
@@ -783,6 +789,8 @@ const activeStudioForPage = computed(() =>
         :active-studio-filter="activeStudioForPage"
         :actor-user-tag-suggestions="actorUserTagSuggestionPool"
         :scroll-preserve-key="libraryScrollKey"
+        :return-home-on-overscroll="route.name === 'library' && !batchMode"
+        @return-home="openHomeFromLibrary"
         @open-details="openDetails"
         @open-player="openPlayer"
         @toggle-favorite="toggleFavorite"

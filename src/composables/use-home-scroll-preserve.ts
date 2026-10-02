@@ -27,11 +27,13 @@ export function readHomeScrollSnapshot(): number | null {
   return readNumber(HOME_SCROLL_TOP_KEY)
 }
 
-export function armHomeDetailReturnRestore() {
+export function armHomeScrollRestore() {
   if (typeof window === "undefined") return
 
   window.sessionStorage.setItem(HOME_DETAIL_RETURN_ARMED_KEY, "1")
 }
+
+export const armHomeDetailReturnRestore = armHomeScrollRestore
 
 export function consumeHomeDetailReturnRestore(): number | null {
   if (typeof window === "undefined") return null

@@ -38,6 +38,7 @@ const props = withDefaults(
     emptyDescription?: string
     scrollPreserveKey?: string
     scrollClass?: HTMLAttributes["class"]
+    returnHomeOnOverscroll?: boolean
   }>(),
   {
     batchMode: false,
@@ -55,6 +56,7 @@ const emit = defineEmits<{
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
   contextMenu: [payload: { event: MouseEvent; movie: Movie }]
   toggleBatchSelect: [payload: { movieId: string; shiftKey: boolean }]
+  returnHome: []
 }>()
 
 const hasHeaderSlot = computed(() => Boolean(slots.header))
@@ -239,6 +241,56 @@ function posterLoadPolicyForChunk(index: number) {
   return resolveVirtualMoviePosterLoadPolicy(index, focusChunkIndex.value)
 }
 
+let overscrollDistance = 0
+let lastWheelTime = 0
+let touchStart: { x: number; y: number } | null = null
+
+function isAtTop() {
+  return Boolean(props.returnHomeOnOverscroll && scrollEl.value && scrollEl.value.scrollTop <= 2)
+}
+
+function onBoundaryWheel(event: WheelEvent) {
+  const now = Date.now()
+  if (now - lastWheelTime > 250) overscrollDistance = 0
+  lastWheelTime = now
+  if (!isAtTop() || event.deltaY >= 0 || event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+    overscrollDistance = 0
+    return
+  }
+
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? scrollEl.value!.clientHeight : 1
+  overscrollDistance -= event.deltaY * unit
+  if (overscrollDistance < 80) return
+
+  overscrollDistance = 0
+  emit("returnHome")
+}
+
+function onBoundaryTouchStart(event: TouchEvent) {
+  const touch = event.touches[0]
+  touchStart = isAtTop() && event.touches.length === 1 && touch
+    ? { x: touch.clientX, y: touch.clientY }
+    : null
+}
+
+function onBoundaryTouchMove(event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touchStart || !touch || event.touches.length !== 1 || !isAtTop()) {
+    touchStart = null
+    return
+  }
+  const dy = touch.clientY - touchStart.y
+  const dx = touch.clientX - touchStart.x
+  if (Math.abs(dx) > Math.abs(dy)) {
+    touchStart = null
+    return
+  }
+  if (dy < 80) return
+
+  touchStart = null
+  emit("returnHome")
+}
+
 </script>
 
 <template>
@@ -250,6 +302,10 @@ function posterLoadPolicyForChunk(index: number) {
     <DynamicScroller
       v-if="props.movies.length"
       :ref="setScrollerRef"
+      data-movie-scroll-region
+      @wheel.passive="onBoundaryWheel"
+      @touchstart.passive="onBoundaryTouchStart"
+      @touchmove.passive="onBoundaryTouchMove"
       :items="movieChunks"
       key-field="id"
       :min-item-size="estimatedChunkHeight"
@@ -311,6 +367,10 @@ function posterLoadPolicyForChunk(index: number) {
     <div
       v-else
       :ref="setScrollerRef"
+      data-movie-scroll-region
+      @wheel.passive="onBoundaryWheel"
+      @touchstart.passive="onBoundaryTouchStart"
+      @touchmove.passive="onBoundaryTouchMove"
       :class="cn('h-full min-h-0 overflow-y-auto pr-2', props.scrollClass)"
     >
       <div v-if="hasHeaderSlot" class="pb-5 lg:pb-6">
@@ -338,7 +398,15 @@ function posterLoadPolicyForChunk(index: number) {
     </Button>
   </div>
 
-  <div v-else :class="cn('h-full min-h-0 overflow-y-auto', props.scrollClass)">
+  <div
+    v-else
+    :ref="setScrollerRef"
+    data-movie-scroll-region
+    :class="cn('h-full min-h-0 overflow-y-auto', props.scrollClass)"
+    @wheel.passive="onBoundaryWheel"
+    @touchstart.passive="onBoundaryTouchStart"
+    @touchmove.passive="onBoundaryTouchMove"
+  >
     <MediaEmptyState :filtered="emptyFiltered" :title="emptyTitle" :description="emptyDescription" />
   </div>
 </template>

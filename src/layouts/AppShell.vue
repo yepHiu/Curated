@@ -47,7 +47,8 @@ import { useLibraryService } from "@/services/library-service"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { useAgentWindow } from "@/composables/use-agent-window"
 import { useAIGovernanceSync } from "@/composables/use-ai-governance-sync"
-import { openLibraryFromHomeKey } from "@/lib/home-library-navigation"
+import { openHomeFromLibraryKey, openLibraryFromHomeKey } from "@/lib/home-library-navigation"
+import { armHomeScrollRestore } from "@/composables/use-home-scroll-preserve"
 import { providePlaybackHost } from "@/composables/use-playback-host"
 import { clearLibraryScrollSnapshot } from "@/composables/use-library-scroll-preserve"
 
@@ -78,16 +79,28 @@ const ActivePlaybackHost = defineAsyncComponent(
 )
 useAIGovernanceSync()
 
-const homeLibraryDrawerTransition = ref(false)
+const homeLibraryDrawerTransition = ref<"home-library-drawer" | "library-home-drawer">()
 provide(openLibraryFromHomeKey, () => {
   if (route.name !== "home" || homeLibraryDrawerTransition.value) return
 
-  homeLibraryDrawerTransition.value = true
+  homeLibraryDrawerTransition.value = "home-library-drawer"
   clearLibraryScrollSnapshot("library")
   void router.push({ name: "library" }).then((failure) => {
-    if (failure) homeLibraryDrawerTransition.value = false
+    if (failure) homeLibraryDrawerTransition.value = undefined
   }).catch(() => {
-    homeLibraryDrawerTransition.value = false
+    homeLibraryDrawerTransition.value = undefined
+  })
+})
+
+provide(openHomeFromLibraryKey, () => {
+  if (route.name !== "library" || homeLibraryDrawerTransition.value) return
+
+  homeLibraryDrawerTransition.value = "library-home-drawer"
+  armHomeScrollRestore()
+  void router.push({ name: "home" }).then((failure) => {
+    if (failure) homeLibraryDrawerTransition.value = undefined
+  }).catch(() => {
+    homeLibraryDrawerTransition.value = undefined
   })
 })
 
@@ -1038,8 +1051,8 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
             >
               <RouterView v-slot="{ Component }">
                 <Transition
-                  :name="homeLibraryDrawerTransition ? 'home-library-drawer' : undefined"
-                  @after-enter="homeLibraryDrawerTransition = false"
+                  :name="homeLibraryDrawerTransition"
+                  @after-enter="homeLibraryDrawerTransition = undefined"
                 >
                   <component :is="Component" />
                 </Transition>
@@ -1121,9 +1134,33 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
   opacity: 0.99;
 }
 
+.library-home-drawer-enter-active {
+  transition: opacity 560ms linear;
+}
+
+.library-home-drawer-enter-from {
+  opacity: 0.99;
+}
+
+.library-home-drawer-leave-active {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  box-shadow: 0 -1.5rem 3rem rgb(0 0 0 / 20%);
+  transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.library-home-drawer-leave-to {
+  transform: translateY(100%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .home-library-drawer-enter-active,
-  .home-library-drawer-leave-active {
+  .home-library-drawer-leave-active,
+  .library-home-drawer-enter-active,
+  .library-home-drawer-leave-active {
     transition-duration: 0.01ms;
   }
 }

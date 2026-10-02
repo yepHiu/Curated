@@ -140,19 +140,21 @@ async function deleteRecommendationFeedback(feedbackId: string) {
 </script>
 
 <template>
-  <HomepagePortalSkeleton v-if="showHomepageSkeleton" />
-  <HomepageEmptyState v-else-if="showHomepageEmptyState" />
-  <HomepagePortal
-    v-else
-    :model="portalModel"
-    :recommendations-refreshing="homepageDailyRecommendations.loading.value"
-    :recommendation-feedback="recommendationFeedback"
-    :recommendation-feedback-busy="recommendationFeedbackBusy"
-    @open-details="openDetails"
-    @open-player="openPlayer"
-    @browse-library="openLibraryFromHome"
-    @refresh-recommendations="refreshRecommendations"
-    @submit-recommendation-feedback="submitRecommendationFeedback"
-    @delete-recommendation-feedback="deleteRecommendationFeedback"
-  />
+  <div class="h-full min-h-0 overflow-hidden">
+    <HomepagePortalSkeleton v-if="showHomepageSkeleton" />
+    <HomepageEmptyState v-else-if="showHomepageEmptyState" />
+    <HomepagePortal
+      v-else
+      :model="portalModel"
+      :recommendations-refreshing="homepageDailyRecommendations.loading.value"
+      :recommendation-feedback="recommendationFeedback"
+      :recommendation-feedback-busy="recommendationFeedbackBusy"
+      @open-details="openDetails"
+      @open-player="openPlayer"
+      @browse-library="openLibraryFromHome"
+      @refresh-recommendations="refreshRecommendations"
+      @submit-recommendation-feedback="submitRecommendationFeedback"
+      @delete-recommendation-feedback="deleteRecommendationFeedback"
+    />
+  </div>
 </template>

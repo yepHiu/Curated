@@ -25,6 +25,7 @@ const props = defineProps<{
   /** 演员资料卡「用户标签」联想候选（影片 userTags 等，与演员库卡同源） */
   actorUserTagSuggestions?: readonly string[]
   scrollPreserveKey?: string
+  returnHomeOnOverscroll?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -38,6 +39,7 @@ const emit = defineEmits<{
   exitBatchMode: []
   selectAllVisibleInBatch: []
   toggleBatchSelect: [payload: { movieId: string; shiftKey: boolean }]
+  returnHome: []
 }>()
 
 const { t } = useI18n()
@@ -171,6 +173,8 @@ const pageTitleKey = computed(() => {
         :batch-mode="batchModeOn"
         :batch-selected-ids="props.batchSelectedIds ?? []"
         :scroll-preserve-key="props.scrollPreserveKey"
+        :return-home-on-overscroll="props.returnHomeOnOverscroll"
+        @return-home="emit('returnHome')"
         :empty-filtered="props.mode !== 'trash' && props.hasConstraints"
         :empty-description="t(emptyDescriptionKey)"
         @open-details="emit('openDetails', $event)"

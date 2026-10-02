@@ -66,8 +66,8 @@ vi.mock("@/services/library-service", () => ({
 vi.mock("@/components/jav-library/LibraryPage.vue", () => ({
   default: {
     name: "LibraryPage",
-    props: ["visibleMovies", "activeActorFilter", "hasConstraints"],
-    emits: ["toggleFavorite", "contextMenu"],
+    props: ["visibleMovies", "activeActorFilter", "hasConstraints", "returnHomeOnOverscroll"],
+    emits: ["toggleFavorite", "contextMenu", "returnHome"],
     template: `
       <div data-library-page :data-visible-ids="visibleMovies.map((movie) => movie.id).join(',')" :data-active-actor="activeActorFilter">
         <button type="button" data-toggle-favorite @click="$emit('toggleFavorite', { movieId: 'movie-1', nextValue: true })">Favorite</button>
@@ -124,6 +124,17 @@ afterEach(() => {
 })
 
 describe("LibraryView feedback", () => {
+  it.each(["library", "favorites", "recent", "trash"])("enables return-home overscroll only on the movie library (%s)", async (name) => {
+    routeState.name = name
+    const wrapper = mount(LibraryView)
+    const page = wrapper.getComponent({ name: "LibraryPage" })
+    expect(page.props("returnHomeOnOverscroll")).toBe(name === "library")
+    if (name === "library") {
+      page.vm.$emit("returnHome")
+      expect(routerMocks.push).toHaveBeenCalledWith({ name: "home" })
+    }
+    wrapper.unmount()
+  })
   it("shows a library load error banner when the service reports one", () => {
     serviceState.loadError = "Failed to load library"
 
