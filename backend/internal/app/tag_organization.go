@@ -54,6 +54,8 @@ func (a *App) StartTagOrganization(ctx context.Context, req contracts.TagOrganiz
 	switch req.Scope {
 	case "all":
 		id, err = a.store.CreateAllTagOrganization(ctx, id, req.RequestID, "manual", locale)
+	case "unorganized", "outdated":
+		id, err = a.store.CreateRemainingTagOrganization(ctx, id, req.RequestID, "manual", locale, req.Scope)
 	case "selected":
 		if len(req.MovieIDs) == 0 || len(req.MovieIDs) > 600 {
 			return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "select 1 to 600 movies"}
@@ -63,7 +65,7 @@ func (a *App) StartTagOrganization(ctx context.Context, req contracts.TagOrganiz
 		return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "invalid scope"}
 	}
 	if errors.Is(err, storage.ErrNoOrganizationMovies) {
-		return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "no movies to organize"}
+		return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "AI_ORGANIZATION_NO_MOVIES", Message: "no movies to organize"}
 	}
 	if err != nil {
 		return contracts.TagOrganizationJobDTO{}, err
@@ -75,6 +77,11 @@ func (a *App) StartTagOrganization(ctx context.Context, req contracts.TagOrganiz
 // ListTagOrganizations 提供持久化任务快照，客户端重连只恢复状态。
 func (a *App) ListTagOrganizations(ctx context.Context) ([]contracts.TagOrganizationJobDTO, error) {
 	return a.store.ListTagOrganizations(ctx, false)
+}
+
+// TagOrganizationStats reads persisted completion without invoking a model.
+func (a *App) TagOrganizationStats(ctx context.Context) (contracts.TagOrganizationStatsDTO, error) {
+	return a.store.TagOrganizationStats(ctx)
 }
 
 // GetTagOrganization 返回任务进度。
@@ -391,8 +398,14 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 				return
 			}
 			if len(matches[input.MovieID]) == 0 {
-				if err := a.store.SetTagOrganizationItem(ctx, id, input.MovieID, "unresolved", "INSUFFICIENT_EVIDENCE"); err != nil {
-					return
+				if err := a.store.CompleteUnresolvedTopic(ctx, id, input); err != nil {
+					if !errors.Is(err, storage.ErrAIWriteConflict) && !errors.Is(err, sql.ErrNoRows) {
+						_ = a.store.UpdateTagOrganization(ctx, id, "blocked", "applying", "CHECKPOINT_FAILED")
+						return
+					}
+					if err = a.store.SetTagOrganizationItem(ctx, id, input.MovieID, "conflict", "TAG_WRITE_REJECTED"); err != nil {
+						return
+					}
 				}
 				continue
 			}

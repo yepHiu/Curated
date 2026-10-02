@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { TagOrganizationJob } from "@/services/contracts/topic-service"
 
-const api = vi.hoisted(() => ({ listTagOrganizations: vi.fn(), startTagOrganization: vi.fn(), reloadMoviesFromApi: vi.fn().mockResolvedValue(undefined) }))
+const api = vi.hoisted(() => ({ getTagOrganizationStats: vi.fn(), listTagOrganizations: vi.fn(), startTagOrganization: vi.fn(), reloadMoviesFromApi: vi.fn().mockResolvedValue(undefined) }))
 const toast = vi.hoisted(() => vi.fn())
 const notify = vi.hoisted(() => vi.fn())
 vi.mock("@/services/ai-service", () => ({ useAIService: () => api }))
@@ -17,7 +17,7 @@ function job(id: string, status: TagOrganizationJob["status"]): TagOrganizationJ
  return { id, taskId: id, status, stage: "classifying", triggerReason: "manual", total: 6, processed: status === "completed" ? 6 : 0, succeeded: 6, unresolved: 0, failed: 0, revision: status === "completed" ? 2 : 1, createdAt: "2026-10-01", updatedAt: "2026-10-01" }
 }
 
-beforeEach(() => { vi.useFakeTimers(); vi.clearAllMocks(); api.listTagOrganizations.mockResolvedValue([]); api.startTagOrganization.mockResolvedValue(job("started", "queued")); useTagOrganization().quiet.value = false })
+beforeEach(() => { vi.useFakeTimers(); vi.clearAllMocks(); api.getTagOrganizationStats.mockResolvedValue({ total: 6, organized: 2, unorganized: 3, outdated: 1, unresolved: 1 }); api.listTagOrganizations.mockResolvedValue([]); api.startTagOrganization.mockResolvedValue(job("started", "queued")); useTagOrganization().quiet.value = false })
 afterEach(() => { stopTagOrganizationTracking(); vi.useRealTimers() })
 
 describe("organization observation", () => {
@@ -71,6 +71,31 @@ describe("organization diagnostics", () => {
 })
 
 describe("organization scope", () => {
+ it("requires available coverage and never falls back to all movies", async () => {
+  const state = useTagOrganization()
+  state.openAll(); await state.start()
+  expect(api.startTagOrganization).not.toHaveBeenCalled()
+  api.getTagOrganizationStats.mockRejectedValueOnce(new Error("offline"))
+  await state.refreshStats(); await state.start()
+  expect(state.statsError.value).toBe(true)
+  expect(api.startTagOrganization).not.toHaveBeenCalled()
+  api.getTagOrganizationStats.mockResolvedValue({ total: 6, organized: 5, unorganized: 0, outdated: 1, unresolved: 2 })
+  await state.refreshStats(); await state.start()
+  expect(api.startTagOrganization).not.toHaveBeenCalled()
+  await state.start("outdated")
+  expect(api.startTagOrganization).toHaveBeenLastCalledWith("outdated", undefined)
+  await state.start("all")
+  expect(api.startTagOrganization).toHaveBeenLastCalledWith("all", undefined)
+ })
+ it("does not let a late coverage response leak across server sessions", async () => {
+  let resolveOld!: (value: { total: number; organized: number; unorganized: number; outdated: number; unresolved: number }) => void
+  api.getTagOrganizationStats.mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve }))
+  const pending = useTagOrganization().refreshStats()
+  stopTagOrganizationTracking()
+  resolveOld({ total: 100, organized: 100, unorganized: 0, outdated: 0, unresolved: 0 })
+  await pending
+  expect(useTagOrganization().stats.value).toBeNull()
+ })
  it("captures selected IDs, removes duplicates, and starts only after the explicit action", async () => {
   const state = useTagOrganization()
   const ids = ["one", "two", "one"]
@@ -86,9 +111,10 @@ describe("organization scope", () => {
   state.openSelected(["one"], "A movie")
   expect(state.selection.value?.title).toBe("A movie")
   state.openAll()
+  await state.refreshStats()
   await state.start()
   expect(state.selection.value).toBeNull()
-  expect(api.startTagOrganization).toHaveBeenCalledWith("all", undefined)
+  expect(api.startTagOrganization).toHaveBeenCalledWith("unorganized", undefined)
  })
  it("rejects empty selections, excessive selections and duplicate active jobs", async () => {
   const state = useTagOrganization()

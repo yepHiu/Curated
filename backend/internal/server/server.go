@@ -543,6 +543,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("PATCH /api/library/topics/{topicId}", h.handleGetTopic)
 	mux.HandleFunc("GET /api/homepage/topics", h.handleHomepageTopics)
 	mux.HandleFunc("GET /api/ai/tag-organizations", h.handleTagOrganizations)
+	mux.HandleFunc("GET /api/ai/tag-organizations/stats", h.handleTagOrganizationStats)
 	mux.HandleFunc("POST /api/ai/tag-organizations", h.handleTagOrganizations)
 	mux.HandleFunc("GET /api/ai/tag-organizations/{jobId}", h.handleTagOrganization)
 	mux.HandleFunc("GET /api/ai/tag-organizations/{jobId}/{operation}", h.handleTagOrganization)

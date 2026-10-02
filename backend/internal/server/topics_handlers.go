@@ -17,6 +17,7 @@ type TopicOrganizationProvider interface {
 	HomepageTopics(context.Context) ([]contracts.HomepageTopicGroupDTO, error)
 	StartTagOrganization(context.Context, contracts.TagOrganizationRequest) (contracts.TagOrganizationJobDTO, error)
 	ListTagOrganizations(context.Context) ([]contracts.TagOrganizationJobDTO, error)
+	TagOrganizationStats(context.Context) (contracts.TagOrganizationStatsDTO, error)
 	GetTagOrganization(context.Context, string) (contracts.TagOrganizationJobDTO, error)
 	TagOrganizationItems(context.Context, string, int, int) ([]contracts.TagOrganizationItemDTO, error)
 	CancelTagOrganization(context.Context, string) error
@@ -149,6 +150,21 @@ func (h *Handler) handleTagOrganizations(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, 200, map[string]any{"items": v})
+}
+
+// handleTagOrganizationStats exposes source-aware coverage of the active library.
+func (h *Handler) handleTagOrganizationStats(w http.ResponseWriter, r *http.Request) {
+	if h.topicOrganization == nil {
+		writeAppError(w, 503, "TAG_ORGANIZATION_UNAVAILABLE", "organization unavailable")
+		return
+	}
+	v, err := h.topicOrganization.TagOrganizationStats(r.Context())
+	if err != nil {
+		topicHTTPError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, 200, v)
 }
 
 // handleTagOrganization 提供详情、分页结果和显式取消／重试／撤销。

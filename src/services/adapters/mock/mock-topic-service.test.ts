@@ -3,6 +3,27 @@ import { beforeEach, expect, it, vi } from "vitest"
 import type { Movie } from "@/domain/movie/types"
 
 beforeEach(() => { localStorage.clear(); vi.resetModules() })
+
+it("counts no-match analysis, persists coverage, and selects changed sources separately", async () => {
+ let { createMockTopicServices } = await import("./mock-topic-service")
+ const movies = [{ id: "a", title: "A", summary: "", tags: ["Theme"], userTags: [] }, { id: "b", title: "B", summary: "", tags: [], userTags: [] }, { id: "trash", title: "Trash", tags: [], userTags: [], trashedAt: "2026-10-03" }] as unknown as Movie[]
+ const patch = vi.fn((id, tags) => { movies.find((movie) => movie.id === id)!.userTags = tags })
+ let service = createMockTopicServices(() => movies, patch)
+ expect(await service.getTagOrganizationStats()).toEqual({ total: 2, organized: 0, unorganized: 2, outdated: 0, unresolved: 0 })
+ const job = await service.startTagOrganization("unorganized")
+ expect(job.total).toBe(2)
+ expect(await service.getTagOrganizationStats()).toEqual({ total: 2, organized: 2, unorganized: 0, outdated: 0, unresolved: 1 })
+ vi.resetModules(); ({ createMockTopicServices } = await import("./mock-topic-service"))
+ service = createMockTopicServices(() => movies, patch)
+ await expect(service.startTagOrganization("unorganized")).rejects.toThrow("AI_ORGANIZATION_NO_MOVIES")
+ movies[0]!.summary = "Changed"
+ expect((await service.getTagOrganizationStats()).outdated).toBe(1)
+ expect((await service.startTagOrganization("outdated")).total).toBe(1)
+ expect((await service.getTagOrganizationStats()).organized).toBe(2)
+ // Undoing the older write must preserve the more recent no-change analysis.
+ await service.undoTagOrganization(job.id)
+ expect((await service.getTagOrganizationStats()).organized).toBe(2)
+})
 it("writes only user tags, exposes evidence, and undo preserves later manual edits", async () => {
  const { createMockTopicServices } = await import("./mock-topic-service")
  const movies = [{ id: "a", title: "A", tags: ["Theme"], userTags: [] }, { id: "b", title: "B", tags: ["Theme"], userTags: [] }] as unknown as Movie[]

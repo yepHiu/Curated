@@ -2,21 +2,43 @@ import type { Movie } from "@/domain/movie/types"
 import type { HomepageTopicGroup, LibraryTopic, TagOrganizationJob, TagOrganizationItem, TagOrganizationService, TopicLibraryService } from "@/services/contracts/topic-service"
 
 interface MockTopicBatch { before: Record<string, string[]>; after: Record<string, string[]>; items: TagOrganizationItem[] }
-interface MockTopicState { jobs: TagOrganizationJob[]; topics: LibraryTopic[]; batches: Record<string, MockTopicBatch> }
+interface MockTopicAnalysis { jobId: string; fingerprint: string; unresolved: boolean }
+interface MockTopicState { analysis: Record<string, MockTopicAnalysis>; jobs: TagOrganizationJob[]; topics: LibraryTopic[]; batches: Record<string, MockTopicBatch> }
 const key = "curated-mock-topic-organization-v2"
 
 /** Mock 状态和真实库分离，刷新后仍可查看结果。 */
 function loadState(): MockTopicState {
-  try { const value = JSON.parse(localStorage.getItem(key) ?? "null"); if (value?.jobs && value?.topics && value?.batches) return value } catch { /* 不完整旧数据降级为空。 */ }
-  return { jobs: [], topics: [], batches: {} }
+  try { const value = JSON.parse(localStorage.getItem(key) ?? "null"); if (value?.jobs && value?.topics && value?.batches) return { ...value, analysis: value.analysis ?? {} } } catch { /* 不完整旧数据降级为空。 */ }
+  return { jobs: [], topics: [], batches: {}, analysis: {} }
 }
 const state = loadState()
 /** 持久化模拟任务，不调用模型。 */
 function saveState() { localStorage.setItem(key, JSON.stringify(state)) }
 
+/** Source-only fingerprint; user preference edits do not trigger reorganization. */
+function sourceFingerprint(movie: Movie) {
+  return JSON.stringify([movie.displayScrapeFallback?.title ?? movie.title, movie.displayScrapeFallback?.summary ?? movie.summary ?? "", [...movie.tags].sort()])
+}
+
+function analysisStatus(movie: Movie) {
+  const analysis = state.analysis[movie.id]
+  return !analysis ? "unorganized" : analysis.fingerprint === sourceFingerprint(movie) ? "organized" : "outdated"
+}
+
 /** 提供确定性模拟，所有写入均经既有用户标签接口。 */
 export function createMockTopicServices(movies: () => readonly Movie[], patch: (id: string, tags: string[]) => void | Promise<unknown>): TopicLibraryService & TagOrganizationService {
   return {
+    /** Partition active movies independently of whether a tag was added. */
+    async getTagOrganizationStats() {
+      const stats = { total: 0, organized: 0, unorganized: 0, outdated: 0, unresolved: 0 }
+      for (const movie of movies()) {
+        if (movie.trashedAt) continue
+        const status = analysisStatus(movie)
+        stats.total++; stats[status]++
+        if (status === "organized" && state.analysis[movie.id]?.unresolved) stats.unresolved++
+      }
+      return stats
+    },
     /** 主题目录保留隐藏条目。 */
     async listTopics() { return structuredClone(state.topics) },
     /** 结果页只显示模拟证据，分页与 Web 一致。 */
@@ -45,16 +67,22 @@ export function createMockTopicServices(movies: () => readonly Movie[], patch: (
     async listTagOrganizations() { return state.jobs.map((j) => { /* 拷贝快照。 */ return { ...j } }) },
     /** 模拟任务用源标签作为确定性题材样本，写入仅 userTags。 */
     async startTagOrganization(scope, movieIds) {
-      const selected = movies().filter((m) => { /* 模拟范围快照。 */ return scope === "all" || movieIds?.includes(m.id) })
+      const selected = movies().filter((m) => { /* 模拟范围快照。 */ return !m.trashedAt && (scope === "all" || (scope === "selected" ? movieIds?.includes(m.id) : analysisStatus(m) === scope)) })
+      if (!selected.length) throw new Error("AI_ORGANIZATION_NO_MOVIES")
       const now = new Date().toISOString()
       const job: TagOrganizationJob = { id: crypto.randomUUID(), taskId: "", status: "running", stage: "classifying", triggerReason: "manual", total: selected.length, processed: 0, succeeded: 0, unresolved: 0, failed: 0, revision: 1, createdAt: now, updatedAt: now }
       job.taskId = job.id; state.jobs.unshift(job)
       const batch: MockTopicBatch = { before: {}, after: {}, items: [] }; state.batches[job.id] = batch
       for (const movie of selected) {
         const names = movie.tags.slice(0, 3)
-        batch.before[movie.id] = [...movie.userTags]
+        const before = [...movie.userTags]
+        const fingerprint = sourceFingerprint(movie)
         const after = [...new Set([...movie.userTags, ...names])]
-        await patch(movie.id, after); batch.after[movie.id] = after
+        if (JSON.stringify([...before].sort()) !== JSON.stringify([...after].sort())) {
+          batch.before[movie.id] = before
+          await patch(movie.id, after); batch.after[movie.id] = after
+        }
+        state.analysis[movie.id] = { jobId: job.id, fingerprint, unresolved: names.length === 0 }
         for (const name of names) if (!state.topics.some((t) => { /* 复用规范名称。 */ return t.name === name })) state.topics.push({ id: `mock-topic-${encodeURIComponent(name)}`, name, description: "", movieCount: 0, hidden: false })
         batch.items.push({ movieId: movie.id, title: movie.title, status: names.length ? "succeeded" : "unresolved", reason: names.length ? "" : "INSUFFICIENT_EVIDENCE", evidence: names.map((topic) => { /* 只引用实际源标签。 */ return { topic, field: "metadataTags", quote: topic } }) })
         job.processed++; if (names.length) job.succeeded++; else job.unresolved++
@@ -74,6 +102,7 @@ export function createMockTopicServices(movies: () => readonly Movie[], patch: (
         const before = batch.before[movie.id]; if (!before) continue
         if (JSON.stringify(movie.userTags) !== JSON.stringify(batch.after[movie.id])) { conflicts++; continue }
         await patch(movie.id, before); delete batch.before[movie.id]; restored++
+        if (state.analysis[movie.id]?.jobId === id) delete state.analysis[movie.id]
       }
       saveState(); return { restored, conflicts }
     },

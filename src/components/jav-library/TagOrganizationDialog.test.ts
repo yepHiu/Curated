@@ -8,12 +8,15 @@ import SidebarTagOrganizationEntry from "./SidebarTagOrganizationEntry.vue"
 import MovieLibraryContextMenu from "./MovieLibraryContextMenu.vue"
 import type { Movie } from "@/domain/movie/types"
 
-const state = vi.hoisted(() => ({ start: vi.fn(), cancel: vi.fn(), retry: vi.fn(), undo: vi.fn(), openSelected: vi.fn(), refresh: vi.fn(), getItems: vi.fn() }))
+const state = vi.hoisted(() => ({ start: vi.fn(), cancel: vi.fn(), retry: vi.fn(), undo: vi.fn(), openSelected: vi.fn(), refreshStats: vi.fn(), refresh: vi.fn(), getItems: vi.fn() }))
 const jobs = ref<TagOrganizationJob[]>([])
+const stats = ref({ total: 10, organized: 4, unorganized: 5, outdated: 1, unresolved: 2 })
+const statsLoading = ref(false)
+const statsError = ref(false)
 const open = ref(true)
 const selection = ref<{ movieIds: string[]; title?: string } | null>(null)
 vi.mock("@/composables/use-tag-organization", () => ({
-  useTagOrganization: () => ({ ...state, jobs, selection, active: computed(() => jobs.value.find((job) => job.status === "running")), dialogOpen: open, connected: ref(true), error: ref(""), busy: ref(false) }),
+  useTagOrganization: () => ({ ...state, jobs, selection, stats, statsLoading, statsError, active: computed(() => jobs.value.find((job) => job.status === "running")), dialogOpen: open, connected: ref(true), error: ref(""), busy: ref(false) }),
   isOrganizationActive: (job: TagOrganizationJob) => job.status === "running",
   organizationProgressText: () => "Processing 20/100",
   organizationProgressValue: () => 20,
@@ -33,7 +36,34 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
 function historyJob(id: string, status: TagOrganizationJob["status"]): TagOrganizationJob {
  return { id, taskId: id, status, stage: "classifying", triggerReason: "manual", total: 100, processed: 20, succeeded: 20, unresolved: 0, failed: 0, revision: 1, createdAt: "2026-10-02T10:00:00Z", updatedAt: "2026-10-02T10:01:00Z" }
 }
-beforeEach(() => { vi.clearAllMocks(); open.value = true; selection.value = null; jobs.value = []; state.getItems.mockResolvedValue([]) })
+beforeEach(() => { vi.clearAllMocks(); statsLoading.value = false; statsError.value = false; stats.value = { total: 10, organized: 4, unorganized: 5, outdated: 1, unresolved: 2 }; open.value = true; selection.value = null; jobs.value = []; state.getItems.mockResolvedValue([]) })
+
+it("shows source-aware coverage and starts only the chosen remaining scope", async () => {
+ const wrapper = mount(TagOrganizationDialog)
+ expect(wrapper.get('[data-organization-count="organized"]').text()).toBe("4")
+ expect(wrapper.get('[data-organization-count="unorganized"]').text()).toBe("5")
+ expect(wrapper.get('[data-organization-count="outdated"]').text()).toBe("1")
+ expect(wrapper.text()).toContain('topics.analyzedWithoutMatch:{"count":2}')
+ expect(state.start).not.toHaveBeenCalled()
+ await wrapper.get('[data-organize-unorganized]').trigger('click')
+ expect(state.start).toHaveBeenLastCalledWith()
+ await wrapper.get('[data-organize-outdated]').trigger('click')
+ expect(state.start).toHaveBeenLastCalledWith('outdated')
+ statsError.value = true
+ await flushPromises()
+ expect(wrapper.get('[data-organize-unorganized]').attributes('disabled')).toBeDefined()
+ expect(wrapper.text()).toContain('topics.coverageFailed')
+ wrapper.unmount()
+})
+
+it("disables remaining work when every movie is already current", async () => {
+ stats.value = { total: 10, organized: 10, unorganized: 0, outdated: 0, unresolved: 2 }
+ const wrapper = mount(TagOrganizationDialog)
+ expect(wrapper.get('[data-organize-unorganized]').attributes('disabled')).toBeDefined()
+ expect(wrapper.find('[data-organize-outdated]').exists()).toBe(false)
+ expect(wrapper.text()).toContain('topics.allOrganized')
+ wrapper.unmount()
+})
 
 it("renders compact history rows and reads evidence only when requested", async () => {
  jobs.value = [historyJob("one", "completed"), historyJob("two", "blocked")]

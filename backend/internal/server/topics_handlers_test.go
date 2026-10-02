@@ -27,6 +27,20 @@ func (f *topicHandlerFixture) CancelTagOrganization(_ context.Context, _ string)
 	return nil
 }
 
+func (f *topicHandlerFixture) TagOrganizationStats(_ context.Context) (contracts.TagOrganizationStatsDTO, error) {
+	return contracts.TagOrganizationStatsDTO{Total: 6, Organized: 3, Unorganized: 2, Outdated: 1, Unresolved: 1}, nil
+}
+
+func TestTopicCoverageHandlerIsReadOnlyAndNotCached(t *testing.T) {
+	f := &topicHandlerFixture{}
+	h := &Handler{topicOrganization: f}
+	response := httptest.NewRecorder()
+	h.handleTagOrganizationStats(response, httptest.NewRequest(http.MethodGet, "/api/ai/tag-organizations/stats", nil))
+	if response.Code != 200 || response.Header().Get("Cache-Control") != "no-store" || f.starts != 0 || !strings.Contains(response.Body.String(), `"unorganized":2`) {
+		t.Fatalf("stats=%s headers=%v", response.Body, response.Header())
+	}
+}
+
 // TestTopicHandlersRejectMetadataWrites verifies HTTP callers cannot smuggle NFO fields or use GET mutations.
 func TestTopicHandlersRejectMetadataWrites(t *testing.T) {
 	f := &topicHandlerFixture{}

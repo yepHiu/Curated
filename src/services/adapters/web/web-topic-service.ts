@@ -1,7 +1,7 @@
 import { i18n } from "@/i18n"
 import { httpClient } from "@/api/http-client"
 import type { MovieListItemDTO } from "@/api/types"
-import type { LibraryTopic, TagOrganizationItem, TagOrganizationJob, TopicLibraryService, TagOrganizationService } from "@/services/contracts/topic-service"
+import type { TagOrganizationStats, LibraryTopic, TagOrganizationItem, TagOrganizationJob, TopicLibraryService, TagOrganizationService } from "@/services/contracts/topic-service"
 import { mapMovieListItem } from "./mappers"
 
 export const webTopicLibrary: TopicLibraryService = {
@@ -29,6 +29,8 @@ export const webTopicLibrary: TopicLibraryService = {
 }
 
 export const webTagOrganization: TagOrganizationService = {
+  /** Read actual library coverage without starting AI work. */
+  getTagOrganizationStats() { return httpClient.get<TagOrganizationStats>("/ai/tag-organizations/stats") },
   /** 分页读取可复核的归类依据。 */
   async getTagOrganizationItems(id, offset = 0) { return (await httpClient.get<{ items: TagOrganizationItem[] }>(`/ai/tag-organizations/${encodeURIComponent(id)}/items?limit=25&offset=${offset}`)).items },
   /** 重连读取快照，不重放完成提示。 */

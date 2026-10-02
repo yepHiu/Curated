@@ -23,7 +23,8 @@ const scopeLabel = computed(() => {
   if (!selected) return t("topics.allMovies")
   return selected.movieIds.length === 1 && selected.title ? selected.title : t("topics.selectedMovies", { count: selected.movieIds.length })
 })
-const startLabel = computed(() => !state.selection.value ? t("topics.start") : t("topics.startSelected", { count: state.selection.value.movieIds.length }))
+const startLabel = computed(() => !state.selection.value ? t("topics.startUnorganized", { count: state.stats.value?.unorganized ?? 0 }) : t("topics.startSelected", { count: state.selection.value.movieIds.length }))
+const coverageUnavailable = computed(() => !state.stats.value || state.statsLoading.value || state.statsError.value)
 const invalidSelection = computed(() => state.selection.value !== null && (state.selection.value.movieIds.length === 0 || state.selection.value.movieIds.length > 600))
 const expandedJob = ref("")
 const selectedJob = ref("")
@@ -35,9 +36,10 @@ const hasMore = ref(false)
 watch(state.dialogOpen, async (open) => {
   if (!open) return
   void state.refresh()
+  void state.refreshStats()
   try { hiddenTopics.value = (await useLibraryService().listTopics()).filter((topic) => topic.hidden) }
   catch { hiddenTopics.value = [] }
-})
+}, { immediate: true })
 
 function formatStartedAt(value: string) {
   return new Intl.DateTimeFormat(locale.value, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value))
@@ -74,6 +76,25 @@ async function showResults(id: string, more = false) {
       </DialogHeader>
       <p v-if="!state.connected.value" role="status" class="text-sm text-muted-foreground">{{ t("topics.disconnected") }}</p>
       <p v-if="state.error.value" role="alert" class="text-sm text-destructive">{{ state.error.value }}</p>
+      <section class="flex flex-col gap-2" :aria-label="t('topics.coverageTitle')" data-organization-coverage>
+        <div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <h3 class="font-medium">{{ t("topics.coverageTitle") }}</h3>
+          <span v-if="state.stats.value">{{ t("topics.movieCount", { count: state.stats.value.total }) }}</span>
+        </div>
+        <p v-if="state.statsError.value" role="alert" class="text-sm text-destructive">
+          {{ t("topics.coverageFailed") }}
+          <Button variant="ghost" size="sm" class="min-h-11 lg:min-h-8" @click="state.refreshStats">{{ t("topics.retryLoad") }}</Button>
+        </p>
+        <dl v-else-if="state.stats.value" class="grid grid-cols-3 gap-3 rounded-lg border border-border/60 p-3">
+          <div v-for="kind in (['organized', 'unorganized', 'outdated'] as const)" :key="kind" class="flex min-w-0 flex-col gap-1">
+            <dt class="text-xs text-muted-foreground">{{ t(`topics.coverage.${kind}`) }}</dt>
+            <dd class="text-lg font-medium tabular-nums" :data-organization-count="kind">{{ state.stats.value[kind] }}</dd>
+          </div>
+        </dl>
+        <p v-else role="status" class="text-sm text-muted-foreground">{{ t("topics.loading") }}</p>
+        <p v-if="state.stats.value?.outdated" class="text-xs text-muted-foreground">{{ t("topics.outdatedHint") }}</p>
+        <p v-if="state.stats.value?.unresolved" class="text-xs text-muted-foreground">{{ t("topics.analyzedWithoutMatch", { count: state.stats.value.unresolved }) }}</p>
+      </section>
       <div v-if="state.active.value" class="flex min-w-0 flex-col gap-2 rounded-lg bg-muted/40 p-3" data-organization-active>
         <div class="flex min-w-0 items-center justify-between gap-3 text-sm">
           <span class="min-w-0 truncate" role="status">{{ organizationProgressText(state.active.value) }}</span>
@@ -82,8 +103,22 @@ async function showResults(id: string, more = false) {
         <Progress :model-value="organizationProgressValue(state.active.value)" class="h-1" :aria-label="organizationProgressText(state.active.value)" />
       </div>
       <div v-else class="flex min-w-0 flex-wrap items-center justify-between gap-3" data-organization-scope>
-        <p class="min-w-0 flex-1 truncate text-sm font-medium" :title="scopeLabel">{{ scopeLabel }}</p>
-        <Button class="min-h-11 shrink-0 lg:min-h-9" :disabled="state.busy.value || invalidSelection || !writeEnabled" @click="state.start">{{ startLabel }}</Button>
+        <p class="w-full min-w-0 truncate text-sm font-medium sm:w-auto sm:flex-1" :title="scopeLabel">{{ scopeLabel }}</p>
+        <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <Button class="min-h-11 shrink-0 lg:min-h-9" :disabled="state.busy.value || invalidSelection || !writeEnabled || (!state.selection.value && (coverageUnavailable || !state.stats.value?.unorganized))" data-organize-unorganized @click="state.start()">{{ startLabel }}</Button>
+          <template v-if="!state.selection.value">
+            <Button v-if="state.stats.value?.outdated" variant="outline" class="min-h-11 lg:min-h-9" :disabled="state.busy.value || !writeEnabled || coverageUnavailable" data-organize-outdated @click="state.start('outdated')">{{ t("topics.startOutdated", { count: state.stats.value.outdated }) }}</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button variant="ghost" size="icon" class="size-11 lg:size-9" :aria-label="t('topics.scopeActions')" :disabled="state.busy.value || !writeEnabled || coverageUnavailable || !state.stats.value?.total"><MoreHorizontal /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end"><DropdownMenuGroup>
+                <DropdownMenuItem :disabled="state.busy.value || !writeEnabled || coverageUnavailable || !state.stats.value?.total" @select="state.start('all')">{{ t("topics.reorganizeAll") }}</DropdownMenuItem>
+              </DropdownMenuGroup></DropdownMenuContent>
+            </DropdownMenu>
+          </template>
+        </div>
+        <p v-if="!state.selection.value && state.stats.value && state.stats.value.total > 0 && !state.stats.value.unorganized && !state.stats.value.outdated" role="status" class="w-full text-xs text-muted-foreground">{{ t("topics.allOrganized") }}</p>
         <p v-if="invalidSelection" role="alert" class="w-full text-xs text-destructive">{{ t("topics.selectionLimit") }}</p>
         <p v-if="!writeEnabled" class="w-full text-xs text-muted-foreground">{{ t("topics.errors.AI_PERMISSION_REQUIRED") }}</p>
       </div>

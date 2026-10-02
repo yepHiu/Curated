@@ -40,10 +40,20 @@ export interface TagOrganizationItem {
   reason: string
   evidence: { topic: string; field: string; quote: string }[]
 }
+export type TagOrganizationScope = "all" | "selected" | "unorganized" | "outdated"
+export interface TagOrganizationStats {
+  total: number
+  organized: number
+  unorganized: number
+  outdated: number
+  /** Successfully analyzed with no matching topic; included in organized. */
+  unresolved: number
+}
 export interface TagOrganizationService {
+  getTagOrganizationStats(): Promise<TagOrganizationStats>
   getTagOrganizationItems(id: string, offset?: number): Promise<TagOrganizationItem[]>
   listTagOrganizations(): Promise<TagOrganizationJob[]>
-  startTagOrganization(scope: "all" | "selected", movieIds?: string[]): Promise<TagOrganizationJob>
+  startTagOrganization(scope: TagOrganizationScope, movieIds?: string[]): Promise<TagOrganizationJob>
   cancelTagOrganization(id: string): Promise<TagOrganizationJob>
   retryTagOrganization(id: string): Promise<TagOrganizationJob>
   undoTagOrganization(id: string): Promise<{ restored: number; conflicts: number }>

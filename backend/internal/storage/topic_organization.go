@@ -77,10 +77,18 @@ func topicMovieInputTx(ctx context.Context, tx *sql.Tx, id string) (TopicMovieIn
 		return v, err
 	}
 	_ = rows.Close()
-	data, _ := json.Marshal([]any{v.Title, v.Summary, v.MetadataTags})
-	sum := sha256.Sum256(data)
-	v.Fingerprint = hex.EncodeToString(sum[:])
+	v.Fingerprint = topicInputFingerprint(v.Title, v.Summary, v.MetadataTags)
 	return v, nil
+}
+
+// topicInputFingerprint is shared by classification and coverage reads.
+func topicInputFingerprint(title, summary string, tags []string) string {
+	if tags == nil {
+		tags = []string{}
+	}
+	data, _ := json.Marshal([]any{title, summary, tags})
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 // SaveTopicVocabulary 将受验证的规范词汇映射到用户标签，永不修改 NFO 行。
@@ -251,8 +259,8 @@ func (s *SQLiteStore) ApplyMovieTopics(ctx context.Context, jobID string, input 
 	if state == "succeeded" {
 		return nil
 	}
-	if status != "running" {
-		return fmt.Errorf("organization is not running")
+	if status != "running" || state != "pending" {
+		return ErrAIWriteConflict
 	}
 	current, err := topicMovieInputTx(ctx, tx, input.MovieID)
 	if err != nil {
@@ -325,7 +333,10 @@ func (s *SQLiteStore) ApplyMovieTopics(ctx context.Context, jobID string, input 
 			return err
 		}
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE ai_tag_organization_items SET status='succeeded',reason='' WHERE job_id=? AND movie_id=?`, jobID, input.MovieID); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE ai_tag_organization_items SET status='succeeded',reason='',input_fingerprint=? WHERE job_id=? AND movie_id=?`, input.Fingerprint, jobID, input.MovieID); err != nil {
+		return err
+	}
+	if err = recordTopicAnalysisTx(ctx, tx, jobID, input, "succeeded"); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -389,6 +400,9 @@ func (s *SQLiteStore) UndoTopicOrganization(ctx context.Context, jobID string) (
 			return out, err
 		}
 		if _, err = tx.ExecContext(ctx, `UPDATE ai_tag_organization_changes SET undone=1 WHERE job_id=? AND movie_id=?`, jobID, c.id); err != nil {
+			return out, err
+		}
+		if _, err = tx.ExecContext(ctx, `DELETE FROM movie_topic_analysis WHERE movie_id=? AND job_id=?`, c.id, jobID); err != nil {
 			return out, err
 		}
 		out.Restored++
