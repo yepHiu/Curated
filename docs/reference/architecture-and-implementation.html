@@ -489,6 +489,7 @@
   <table>
     <thead><tr><th>功能</th><th>前端</th><th>后端</th></tr></thead>
     <tbody>
+      <tr><td>AI 单片跳过与待处理（2026-10-03）</td><td>输入/结果问题逐片隔离后继续，结束汇总；问题列表分页、原因、逐片/队列重试或暂不处理</td><td>迁移 0063 问题队列与失败检查点原子持久化；stats needsAttention，GET /api/ai/tag-organizations/issues，POST scope issues。默认范围排除问题片，成功清理；归纳临时合并不泄漏失败提案，重试不重写成功片。全局故障仍暂停。</td></tr>
       <tr><td>AI 整理覆盖与冲突纠正（2026-10-03）</td><td>已整理/未整理/待更新统计；默认未整理，已变更资料单独更新，更多菜单保留全库重整；历史及单片/批量入口保留</td><td>迁移 0062 逐片分析指纹，成功/无匹配原子完成并回填历史；GET /api/ai/tag-organizations/stats，POST scope 增加 unorganized/outdated，事务固定范围。撤销不覆盖更晚分析。归纳去重与安全别名处理，非法模型内容最多纠正一次，独立错误码与检查点保留。无新配置，需要更新 Server。</td></tr>
       <tr><td>正式 AI 设置与治理</td><td>SettingsAISection 懒加载，模型、全局开关、只读、隐私、可选调用上限（默认不限）、保留期；用量/速度/失败筛选、分页请求和工具审计</td><td>aiGovernance.stepLimit=0 表示不限，已有 1–30 配置保留；达到用户上限返回 partial/tool_step_limit，写入预览返回 needs_confirmation/confirmation_required。aiGovernance 配置；GET/PATCH /api/ai/settings，GET /api/ai/usage、/api/ai/audit，POST /api/ai/cleanup。迁移 0044 记录实际 usage 和覆盖率、耗时、模型/提示词版本、工具数与错误分类；无 usage 显示未知。权限在后端执行，全局确认速率，保留期清理不撤销业务或删除聊天回执；无账单估价。</td></tr>
       <tr><td>Agent 作品事实发布</td><td>按请求引用作品，后端填入事实，展示前校验；保留来源记录与历史快照</td><td>agent-system-v6；影片仍走 answerRefs + submit_answer。漫画/写真启用后使用独立 BookRefStore、present_comics/present_photos 与 SSE book_cards；submit_answer 仍只服务影片。来源字段不混拼，库外条目不生成本地卡片。缓冲正文，answer_progress 替代原始思考，15 秒心跳，单模型调用 2 分钟。错误草稿最多修正一次后 partial/answer_rejected；message_done.answerEvidence v1 使用 events_json。保证记录引用一致性，不能保证任意自然语言或来源本身绝对准确；独立 Action 未覆盖。</td></tr>

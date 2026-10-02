@@ -709,8 +709,9 @@ All endpoints use the existing authenticated/unlocked API boundary. No endpoint 
 | GET | `/api/library/movies?topicId=...` | User-topic membership plus existing filters |
 | GET | `/api/homepage/topics` | At most three groups of six posters `{items}` |
 | GET | `/api/ai/tag-organizations` | Latest 50 persistent jobs `{items}` |
-| GET | `/api/ai/tag-organizations/stats` | Active library `{total,organized,unorganized,outdated,unresolved}`; unresolved is included in organized; source-fingerprint freshness, no-store |
-| POST | `/api/ai/tag-organizations` | `{scope:"all"|"selected"|"unorganized"|"outdated",movieIds?:string[],requestId:string,locale?:"zh-CN"|"en"|"ja"}`; 202 job; selected 1–600 |
+| GET | `/api/ai/tag-organizations/issues?limit=25&offset=0` | Persistent live-movie problem queue `{items}`; read-only, no-store |
+| GET | `/api/ai/tag-organizations/stats` | Active library `{total,organized,unorganized,outdated,needsAttention,unresolved}`; unresolved is included in organized; source-fingerprint freshness, no-store |
+| POST | `/api/ai/tag-organizations` | `{scope:"all"|"selected"|"unorganized"|"outdated"|"issues",movieIds?:string[],requestId:string,locale?:"zh-CN"|"en"|"ja"}`; 202 job; selected 1–600 |
 | GET | `/api/ai/tag-organizations/{jobId}` | Persistent progress/counters; frozen `locale` (default zh-CN), `vocabularyProcessed`, `vocabularyReady`; stage includes `vocabulary`, `classifying`, `applying`, `waiting_quota` |
 | GET | `/api/ai/tag-organizations/{jobId}/items?limit=25&offset=0` | Paged result/evidence records `{items}` |
 | POST | `/api/ai/tag-organizations/{jobId}/cancel` | Stop and retain committed results |
@@ -729,3 +730,7 @@ Built-in model instructions now use 15 independent `backend/internal/agent/promp
 ### AI organization coverage and correction (2026-10-03)
 
 Migration 0062 persists per-movie successful/no-match analysis and backfills eligible history. Remaining scopes snapshot current source-aware status in the job transaction; empty scopes return 400 `AI_ORGANIZATION_NO_MOVIES`. Undo removes only the restored movie’s completion for that job, preserving newer analysis. New proposals normalize whitespace/duplicates and omit ambiguous aliases; invalid definitions/counts/reuse mappings get one correction then distinct `AI_ORGANIZATION_VOCABULARY_INVALID`, `AI_ORGANIZATION_VOCABULARY_LIMIT`, or `AI_ORGANIZATION_REUSE_INVALID`. Prompt versions: vocabulary v5, reuse v2. No new configuration keys. See guide → AI user tags and homepage topics.
+
+### AI per-movie skip policy (2026-10-03)
+
+Migration 0063 stores pending user decisions in movie_topic_issues; failed/conflict checkpoints and problem records commit atomically, success/no-match clears the queue in the same transaction. Issues take priority over older analysis and are excluded from default unorganized/outdated scopes. Vocabulary response errors shrink to single-movie scope before skipping; staged definitions cannot leak from rejected pages. Explicit task retry re-prepares pending vocabulary failures while preserving completed items. Global outages, permissions/settings and checkpoint failures remain task blockers. Completion summarizes skipped count; users inspect, individually retry, retry scope issues, or leave for later. No configuration changes.

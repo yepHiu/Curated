@@ -19,7 +19,7 @@
 
 # Curated
 
-AI タグ整理は整理済み・未整理・要更新を集計し、既定では未整理作品のみ処理します。変更作品の更新、単体・選択範囲・全体の再整理と一般的な題材競合の自動修正に対応します。[操作ガイド](docs/guide.md#ai-user-tags-and-homepage-topics)を参照してください。
+AI タグ整理は整理済み・未整理・要更新を集計し、問題のある作品はスキップして後で確認でき、既定では未整理作品のみ処理します。変更作品の更新、単体・選択範囲・全体の再整理と一般的な題材競合の自動修正に対応します。[操作ガイド](docs/guide.md#ai-user-tags-and-homepage-topics)を参照してください。
 
 Server は暗い背景、Desktop はオフホワイト（`#F5F6F8`）の背景のアイコンを使用し、中央の図柄は共通です。[ブランドガイド](docs/reference/curated-brand-guidelines.md)と[アセット一覧](icon/brand/index.html)を参照してください。
 

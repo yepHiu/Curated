@@ -3,6 +3,10 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-10-03 AI 单片跳过与待处理列表（覆盖上一节三类统计）
+
+归纳与分类的输入/模型结果错误缩批到单片后跳过并继续，资料过长记失败；归纳合并使用临时副本，失败不泄漏提案。全局服务/权限/配置与检查点故障仍 blocked。迁移 0063 持久问题队列并回填历史，默认未整理/待更新范围排除问题片，成功/无匹配原子清理。stats 新增 needsAttention，与 organized/unorganized/outdated 构成互斥四类；GET /api/ai/tag-organizations/issues 分页读取，POST scope issues 显式重试。面板结束汇总跳过数量，提供问题片/原因、逐片重试、重试待处理、暂不处理；打开/关闭不触发 AI。旧任务重试归纳失败时只重新归纳 pending 项，不重写成功片。Web/Mock 三语同步，无新配置，未发布。
+
 ## 2026-10-03 AI 整理覆盖与冲突纠正
 
 Server 新增迁移 0062 `movie_topic_analysis`，成功应用与已验证无匹配逐片原子记录资料指纹；升级回填有指纹的历史 succeeded/unresolved，排除已撤销结果。`GET /api/ai/tag-organizations/stats` 返回活跃库 total/organized/unorganized/outdated/unresolved（最后一项包含于 organized）；标题、摘要、NFO 标签变化为 outdated，个人标签/偏好不影响。POST scope 新增 unorganized/outdated，服务端事务固定范围，空范围 400 AI_ORGANIZATION_NO_MOVIES。撤销仅清除被恢复影片的对应 job 完成标记，不覆盖更晚分析。
