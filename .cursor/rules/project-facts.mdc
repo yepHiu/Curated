@@ -447,6 +447,8 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 
 ## 2026-10-01 AI 用户标签整理与首页题材
 
+2026-10-02 大库可靠性补充：全库任务用单个 SQLite 事务固定活跃影片范围，selected 上限仍为 600。词汇累计至 160 或归纳缩至单片仍超预算时冻结，不再因下一页增长而永久冲突；未覆盖的题材按证据不足保留待归类。分类从 5 片起，输入/输出超限或无效结果时缩小批次，单片仍因词汇过长超预算时再分页词汇并验证合并结果，单片坏数据不牵连整批。临时模型故障最多三次尝试（1/2 秒可取消退避）；持续故障保留 pending 并 blocked，修复 Provider 后手动重试。检查点写入失败明确阻塞；服务关闭保留运行任务供启动恢复，成功项不重复写。无新 API/cfg/迁移；测试与边界见 `docs/plan/2026-10-02-tag-organization-large-library.md`。
+
 首页显式发起全库整理；selected 1–600 另有 API。词汇每批至多50片、超预算自动减半、只返回新增词汇；归纳摘要至多600字并标记摘录，分类仍用完整证据；分类5片、逐片事务/检查点、恢复/取消/重试/撤销、依据分页，迁移0057/0058/0059；归纳批次持久检查点与独立进度、具体失败码、等待写额度状态。NFO只读；user题材同名隔离、人工排除/保留及修订冲突保护，独立内部网关共用写频控/审计。`GET /api/homepage/topics` 最多3×6，`library/topics`目录与隐藏，`movies?topicId`只匹配user，`ai/tag-organizations`持久任务。播放静默、重连不重放；Web/Mock均已接入。聊天发起、自动增量、详情推荐及真实Provider质量验收待做。无新增cfg键；详见guide与用户PRD§11。
 
 
