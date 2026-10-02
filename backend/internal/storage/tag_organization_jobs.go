@@ -5,11 +5,23 @@ import (
 	"curated-backend/internal/contracts"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
+var ErrNoOrganizationMovies = errors.New("no eligible movies")
+
 // CreateTagOrganization 固定任务范围并通过唯一约束限制并发；相同请求返回原任务。
 func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, reason, locale string, movieIDs []string) (string, error) {
+	return s.createTagOrganization(ctx, id, requestID, reason, locale, movieIDs, false)
+}
+
+// CreateAllTagOrganization snapshots the active library without loading full movie DTOs.
+func (s *SQLiteStore) CreateAllTagOrganization(ctx context.Context, id, requestID, reason, locale string) (string, error) {
+	return s.createTagOrganization(ctx, id, requestID, reason, locale, nil, true)
+}
+
+func (s *SQLiteStore) createTagOrganization(ctx context.Context, id, requestID, reason, locale string, movieIDs []string, all bool) (string, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return "", err
@@ -26,9 +38,15 @@ func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, 
 	if _, err = tx.ExecContext(ctx, `INSERT INTO ai_tag_organization_jobs(id,request_id,status,trigger_reason,locale,created_at,updated_at) VALUES(?,?,'queued',?,?,?,?)`, id, requestID, reason, locale, nowUTC(), nowUTC()); err != nil {
 		return "", err
 	}
-	for _, mid := range movieIDs {
-		if _, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO ai_tag_organization_items(job_id,movie_id) SELECT ?,id FROM movies m WHERE id=? AND `+sqlMovieActiveClause, id, mid); err != nil {
+	if all {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO ai_tag_organization_items(job_id,movie_id) SELECT ?,m.id FROM movies m WHERE `+sqlMovieActiveClause, id); err != nil {
 			return "", err
+		}
+	} else {
+		for _, mid := range movieIDs {
+			if _, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO ai_tag_organization_items(job_id,movie_id) SELECT ?,id FROM movies m WHERE id=? AND `+sqlMovieActiveClause, id, mid); err != nil {
+				return "", err
+			}
 		}
 	}
 	var count int
@@ -36,7 +54,7 @@ func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, 
 		return "", err
 	}
 	if count == 0 {
-		return "", fmt.Errorf("no eligible movies")
+		return "", ErrNoOrganizationMovies
 	}
 	return id, tx.Commit()
 }

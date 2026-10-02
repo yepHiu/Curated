@@ -48,34 +48,22 @@ func (a *App) StartTagOrganization(ctx context.Context, req contracts.TagOrganiz
 	if locale != "zh-CN" && locale != "en" && locale != "ja" {
 		return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "unsupported label locale"}
 	}
-	ids := []string{}
+	id := newAgentID("tag-org-")
+	var err error
 	switch req.Scope {
 	case "all":
-		for offset := 0; ; {
-			page, err := a.store.ListMovies(ctx, contracts.ListMoviesRequest{Limit: 100, Offset: offset})
-			if err != nil {
-				return contracts.TagOrganizationJobDTO{}, err
-			}
-			for _, m := range page.Items {
-				ids = append(ids, m.ID)
-			}
-			offset += len(page.Items)
-			if offset >= page.Total || len(page.Items) == 0 {
-				break
-			}
-		}
+		id, err = a.store.CreateAllTagOrganization(ctx, id, req.RequestID, "manual", locale)
 	case "selected":
 		if len(req.MovieIDs) == 0 || len(req.MovieIDs) > 600 {
 			return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "select 1 to 600 movies"}
 		}
-		ids = req.MovieIDs
+		id, err = a.store.CreateTagOrganization(ctx, id, req.RequestID, "manual", locale, req.MovieIDs)
 	default:
 		return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "invalid scope"}
 	}
-	if len(ids) == 0 {
+	if errors.Is(err, storage.ErrNoOrganizationMovies) {
 		return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "no movies to organize"}
 	}
-	id, err := a.store.CreateTagOrganization(ctx, newAgentID("tag-org-"), req.RequestID, "manual", locale, ids)
 	if err != nil {
 		return contracts.TagOrganizationJobDTO{}, err
 	}
