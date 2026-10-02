@@ -472,6 +472,10 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 			return nil, err
 		}
 	}
+	candidates, err := a.store.TopicReuseCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
 	batchSize := 50
 	for offset := job.VocabularyProcessed; offset < job.Total; {
 		current, err := a.store.GetTagOrganization(ctx, id)
@@ -480,14 +484,6 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 		}
 		if current.Status != "running" {
 			return nil, context.Canceled
-		}
-		if len(defs) >= maxTopicVocabulary {
-			// Freeze a full vocabulary instead of repeatedly failing on the next
-			// page. Every movie still passes through evidence-based classification.
-			if err := a.store.CheckpointTopicVocabulary(ctx, id, defs, offset, true); err != nil {
-				return nil, err
-			}
-			return defs, nil
 		}
 		items, err := a.store.TagOrganizationItems(ctx, id, false, batchSize, offset)
 		if err != nil {
@@ -508,20 +504,13 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 			inputs = append(inputs, compactVocabularySample(input))
 		}
 		if len(inputs) > 0 {
-			raw, err := a.topicComplete(ctx, prompts.TopicVocabularyPrompt(), map[string]any{"existing": defs, "movies": inputs, "labelLocale": job.Locale})
+			catalog := topicCatalog(defs, candidates)
+			raw, err := a.topicComplete(ctx, prompts.TopicVocabularyPrompt(), map[string]any{"existing": topicVocabularyHints(catalog, inputs), "movies": inputs, "labelLocale": job.Locale})
 			if err != nil {
 				// Oversize checks happen locally, before sending any source to the provider.
 				if topicOrganizationErrorCode(err) == "AI_CONTEXT_TOO_LARGE" && len(items) > 1 {
 					batchSize = max(1, len(items)/2)
 					continue
-				}
-				if topicOrganizationErrorCode(err) == "AI_CONTEXT_TOO_LARGE" && len(defs) > 0 {
-					// Existing definitions may already consume the context window.
-					// Freeze them; classification can page the vocabulary as needed.
-					if err := a.store.CheckpointTopicVocabulary(ctx, id, defs, offset, true); err != nil {
-						return nil, err
-					}
-					return defs, nil
 				}
 				return nil, err
 			}
@@ -531,19 +520,37 @@ func (a *App) buildTopicVocabulary(ctx context.Context, id string) ([]storage.To
 			if err = decodeTopicJSON(raw, &result); err != nil {
 				return nil, &core.ToolError{Code: "AI_ORGANIZATION_INVALID_JSON", Message: "Invalid classification JSON"}
 			}
+			if len(result.Topics) > 12 {
+				return nil, &core.ToolError{Code: "AI_ORGANIZATION_VOCABULARY_CONFLICT", Message: "Unbounded topic proposal"}
+			}
 			if err = validateTopicVocabulary(result.Topics); err != nil {
 				return nil, &core.ToolError{Code: "AI_ORGANIZATION_VOCABULARY_CONFLICT", Message: "Ambiguous topic vocabulary"}
+			}
+			proposals, err := a.reuseTopicProposals(ctx, result.Topics, catalog)
+			if err != nil {
+				return nil, err
 			}
 			known := map[string]bool{}
 			for _, d := range defs {
 				known[strings.ToLower(d.Name)] = true
 			}
-			for _, d := range result.Topics {
-				if len(defs) == maxTopicVocabulary {
-					break
-				}
+			added := []storage.TopicDefinition{}
+			for _, d := range proposals {
 				if !known[strings.ToLower(d.Name)] {
+					// Also compare proposals from the same response, so two new
+					// synonymous names cannot bypass the existing-catalog check.
+					if len(added) > 0 {
+						reused, err := a.reuseTopicProposals(ctx, []storage.TopicDefinition{d}, added)
+						if err != nil {
+							return nil, err
+						}
+						d = reused[0]
+					}
+					if known[strings.ToLower(d.Name)] {
+						continue
+					}
 					defs = append(defs, d)
+					added = append(added, d)
 					known[strings.ToLower(d.Name)] = true
 				}
 			}

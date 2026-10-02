@@ -33,6 +33,10 @@ func topicFixtureProvider(t *testing.T, a *App, before func(bool)) {
 			return
 		}
 		vocabulary := strings.Contains(req.Messages[0].Content, "vocabulary v")
+		if strings.Contains(req.Messages[0].Content, "topic reuse v") {
+			_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": `{"matches":[]}`}}}})
+			return
+		}
 		if before != nil {
 			before(vocabulary)
 		}
@@ -209,6 +213,10 @@ func TestTopicVocabularyCheckpointRetry(t *testing.T) {
 			t.Error(err)
 			return
 		}
+		if strings.Contains(req.Messages[0].Content, "topic reuse v") {
+			_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": `{"matches":[]}`}}}})
+			return
+		}
 		var input struct {
 			Movies   []topicVocabularySample   `json:"movies"`
 			Existing []storage.TopicDefinition `json:"existing"`
@@ -224,7 +232,7 @@ func TestTopicVocabularyCheckpointRetry(t *testing.T) {
 			content = `{"topics":`
 		}
 		if len(pages) == 3 {
-			if len(input.Existing) != 1 {
+			if len(input.Existing) < 1 || !strings.Contains(raw, `"name":"Theme"`) {
 				t.Error("retry lost prior vocabulary")
 			}
 			content = `{"topics":[]}`

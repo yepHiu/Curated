@@ -159,6 +159,33 @@ func (s *SQLiteStore) TopicVocabulary(ctx context.Context) ([]TopicDefinition, e
 	return out, rows.Err()
 }
 
+// TopicReuseCatalog includes ordinary user labels as candidates without making
+// them homepage topics. Established topics and frequently used labels come first.
+func (s *SQLiteStore) TopicReuseCatalog(ctx context.Context) ([]TopicDefinition, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT t.name,COALESCE(p.description,''),COALESCE(p.aliases_json,'[]')
+	FROM tags t LEFT JOIN library_topics p ON p.tag_id=t.id
+	LEFT JOIN (SELECT tag_id,COUNT(*) AS uses FROM movie_tags GROUP BY tag_id) usage ON usage.tag_id=t.id
+	WHERE t.type='user' ORDER BY (p.id IS NOT NULL) DESC,
+	COALESCE(usage.uses,0) DESC,t.name COLLATE NOCASE,t.id`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := []TopicDefinition{}
+	for rows.Next() {
+		var d TopicDefinition
+		var aliases string
+		if err := rows.Scan(&d.Name, &d.Description, &aliases); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(aliases), &d.Aliases); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
 // recordManualTopicDecisionsTx 记录真实人工增删，保留对 AI 后续整理的约束。
 func recordManualTopicDecisionsTx(ctx context.Context, tx *sql.Tx, movieID string, names []string) error {
 	if err := recordManualUserTagDecisionsTx(ctx, tx, movieID, names); err != nil {

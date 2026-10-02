@@ -48,7 +48,6 @@ func TestTagOrganizationPagesOversizedExistingVocabulary(t *testing.T) {
 	seen := map[string]map[string]bool{}
 	scaleTopicProvider(t, a, func(vocabulary bool, source topicScaleRequest) (any, int) {
 		if vocabulary {
-			t.Error("oversized existing vocabulary was sent to the provider")
 			return map[string]any{"topics": []any{}}, 200
 		}
 		movies := []topicClassification{}
@@ -100,6 +99,10 @@ func scaleTopicProvider(t *testing.T, a *App, reply func(bool, topicScaleRequest
 		if err := json.Unmarshal([]byte(raw), &source); err != nil {
 			t.Error(err)
 		}
+		if strings.Contains(req.Messages[0].Content, "topic reuse v") {
+			_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": `{"matches":[]}`}}}})
+			return
+		}
 		result, status := reply(strings.Contains(req.Messages[0].Content, "vocabulary v"), source)
 		if status != 200 {
 			http.Error(w, "synthetic provider failure", status)
@@ -130,12 +133,12 @@ func createScaleTopicJob(t *testing.T, a *App, ids []string) string {
 	return id
 }
 
-func TestTagOrganization1200VocabularyCapAndRestart(t *testing.T) {
+func TestTagOrganization1200VocabularyGrowthAndRestart(t *testing.T) {
 	testTagOrganizationScaleAndRestart(t, 1200)
 }
 
 // The 10,000-movie write/audit run is opt-in; the 1,200-movie regression runs in CI.
-func TestTagOrganization10000VocabularyCapAndRestart(t *testing.T) {
+func TestTagOrganization10000VocabularyGrowthAndRestart(t *testing.T) {
 	if os.Getenv("CURATED_TAG_SCALE_TEST") != "1" {
 		t.Skip("set CURATED_TAG_SCALE_TEST=1 for the 10,000-movie end-to-end fixture")
 	}
@@ -152,7 +155,8 @@ func testTagOrganizationScaleAndRestart(t *testing.T, count int) {
 		if vocabulary {
 			vocabCalls.Add(1)
 			defs := []storage.TopicDefinition{}
-			for i := len(source.Existing); i < len(source.Existing)+12; i++ {
+			start := int(vocabCalls.Load()-1) * 12
+			for i := start; i < min(start+12, 240); i++ {
 				name := fmt.Sprintf("Theme-%03d", i)
 				if i == 0 {
 					name = "Theme"
@@ -169,11 +173,11 @@ func testTagOrganizationScaleAndRestart(t *testing.T, count int) {
 	id := createScaleTopicJob(t, a, ids)
 	a.runTagOrganization(ctx, id)
 	job, err := a.store.GetTagOrganization(context.Background(), id)
-	if err != nil || job.Status != "running" || job.Succeeded != 40 || !job.VocabularyReady || job.VocabularyProcessed != 700 {
+	if err != nil || job.Status != "running" || job.Succeeded != 40 || !job.VocabularyReady || job.VocabularyProcessed != count {
 		t.Fatalf("interrupted job=%+v err=%v", job, err)
 	}
 	defs, err := a.store.GetTagOrganizationVocabulary(context.Background(), id)
-	if err != nil || len(defs) != 160 || vocabCalls.Load() != 14 {
+	if err != nil || len(defs) != 240 || vocabCalls.Load() != int64(count/50) {
 		t.Fatalf("vocabulary size=%d calls=%d err=%v", len(defs), vocabCalls.Load(), err)
 	}
 	before := map[string]int64{}
@@ -191,7 +195,7 @@ func testTagOrganizationScaleAndRestart(t *testing.T, count int) {
 	if err != nil || job.Status != "completed" || job.Succeeded != count || job.Failed != 0 {
 		t.Fatalf("resumed job=%+v err=%v", job, err)
 	}
-	if vocabCalls.Load() != 14 || classificationCalls.Load() != int64(count/5+1) {
+	if vocabCalls.Load() != int64(count/50) || classificationCalls.Load() != int64(count/5+1) {
 		t.Fatalf("repeated checkpoints: vocabulary=%d classification=%d", vocabCalls.Load(), classificationCalls.Load())
 	}
 	unchanged := 0

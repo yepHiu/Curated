@@ -56,7 +56,11 @@ type Definition struct {
 
 // TopicVocabularyPrompt 返回题材词汇归纳模板及其既有版本。
 func TopicVocabularyPrompt() Definition {
-	return Definition{Text: renderPrompt("topic-vocabulary.txt", nil), Version: "topic-vocabulary-v3"}
+	return Definition{Text: renderPrompt("topic-vocabulary.txt", nil), Version: "topic-vocabulary-v4"}
+}
+
+func TopicReusePrompt() Definition {
+	return Definition{Text: renderPrompt("topic-reuse.txt", nil), Version: "topic-reuse-v1"}
 }
 
 // TopicClassificationPrompt 返回影片分类模板及其既有版本。
