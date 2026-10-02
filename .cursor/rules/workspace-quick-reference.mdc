@@ -68,7 +68,7 @@ health 的 `version` 为 Server 数字 SemVer，`buildStamp` 单独保留；关�
   - `autoActorProfileScrape`
   - `autoDownloadUpdates`
   - `launchAtLogin`
-  - `browserPluginEnabled`（设置 → 网络与设备 → 浏览器插件联动，默认关闭，保存立即生效，无需凭证）
+  - `browserPluginEnabled`（设置 → 网络与设备 → 浏览器插件联动，默认关闭，保存立即生效，无需凭证；插件状态同步需运行新版 Server 的 `/api/integrations/wishlist/status`，并重新加载扩展）
   - `lanEnabled`（设置 → 网络与设备；不要求 PIN，改监听要完全退出）
   - `backupDirectory`
   - `proxy`
