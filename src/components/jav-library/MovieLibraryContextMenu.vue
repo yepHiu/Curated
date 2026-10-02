@@ -2,9 +2,11 @@
 import { onClickOutside, useEventListener } from "@vueuse/core"
 import { computed, nextTick, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { FolderOpen, Pencil, RefreshCw, Trash2 } from "lucide-vue-next"
+import { FolderOpen, Pencil, RefreshCw, Sparkles, Trash2 } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { cn } from "@/lib/utils"
+import { useExperimentalAgent } from "@/lib/experimental-agent"
+import { useTagOrganization } from "@/composables/use-tag-organization"
 
 const props = defineProps<{
   movie: Movie
@@ -24,6 +26,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { writeEnabled: aiEnabled } = useExperimentalAgent()
+const tagOrganization = useTagOrganization()
 
 const menuRef = ref<HTMLElement | null>(null)
 
@@ -122,6 +126,10 @@ watch(
       @mouseleave="close"
     >
       <template v-if="!isTrashed">
+        <button v-if="aiEnabled" type="button" role="menuitem" data-ai-organize-movie :class="itemClass" :disabled="tagOrganization.busy.value || Boolean(tagOrganization.active.value)" @click="tagOrganization.openSelected([movie.id], movie.title); close()">
+          <Sparkles aria-hidden="true" />
+          {{ t("topics.action") }}
+        </button>
         <button
           type="button"
           role="menuitem"

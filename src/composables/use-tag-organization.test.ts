@@ -10,14 +10,14 @@ vi.mock("@/services/library-service", () => ({ useLibraryService: () => api }))
 vi.mock("@/i18n", () => ({ i18n: { global: { t: (key: string, values?: Record<string, unknown>) => values ? `${key}:${JSON.stringify(values)}` : key, te: (key: string) => key === "topics.errors.AI_ORGANIZATION_TIMEOUT" } } }))
 vi.mock("@/composables/use-app-toast", () => ({ pushAppToast: toast }))
 vi.mock("@/composables/use-notification-center", () => ({ useNotificationCenter: () => ({ addNotification: notify }) }))
-import { startTagOrganizationTracking, stopTagOrganizationTracking, useTagOrganization, organizationProgressText, organizationErrorText } from "./use-tag-organization"
+import { startTagOrganizationTracking, stopTagOrganizationTracking, useTagOrganization, organizationProgressText, organizationProgressValue, organizationErrorText } from "./use-tag-organization"
 
 /** Build a minimal persistent job snapshot for lifecycle tests. */
 function job(id: string, status: TagOrganizationJob["status"]): TagOrganizationJob {
  return { id, taskId: id, status, stage: "classifying", triggerReason: "manual", total: 6, processed: status === "completed" ? 6 : 0, succeeded: 6, unresolved: 0, failed: 0, revision: status === "completed" ? 2 : 1, createdAt: "2026-10-01", updatedAt: "2026-10-01" }
 }
 
-beforeEach(() => { vi.useFakeTimers(); vi.clearAllMocks(); api.listTagOrganizations.mockResolvedValue([]); useTagOrganization().quiet.value = false })
+beforeEach(() => { vi.useFakeTimers(); vi.clearAllMocks(); api.listTagOrganizations.mockResolvedValue([]); api.startTagOrganization.mockResolvedValue(job("started", "queued")); useTagOrganization().quiet.value = false })
 afterEach(() => { stopTagOrganizationTracking(); vi.useRealTimers() })
 
 describe("organization observation", () => {
@@ -67,5 +67,42 @@ describe("organization diagnostics", () => {
  it("translates known failures and never exposes unknown provider messages", () => {
   expect(organizationErrorText("AI_ORGANIZATION_TIMEOUT")).toBe("topics.errors.AI_ORGANIZATION_TIMEOUT")
   expect(organizationErrorText("private provider response")).toBe("topics.needsAttention")
+ })
+})
+
+describe("organization scope", () => {
+ it("captures selected IDs, removes duplicates, and starts only after the explicit action", async () => {
+  const state = useTagOrganization()
+  const ids = ["one", "two", "one"]
+  state.openSelected(ids)
+  ids.push("outside")
+  expect(state.dialogOpen.value).toBe(true)
+  expect(api.startTagOrganization).not.toHaveBeenCalled()
+  await state.start()
+  expect(api.startTagOrganization).toHaveBeenCalledWith("selected", ["one", "two"])
+ })
+ it("captures a single movie title and switches back to the full-library scope", async () => {
+  const state = useTagOrganization()
+  state.openSelected(["one"], "A movie")
+  expect(state.selection.value?.title).toBe("A movie")
+  state.openAll()
+  await state.start()
+  expect(state.selection.value).toBeNull()
+  expect(api.startTagOrganization).toHaveBeenCalledWith("all", undefined)
+ })
+ it("rejects empty selections, excessive selections and duplicate active jobs", async () => {
+  const state = useTagOrganization()
+  state.openSelected([]); await state.start()
+  state.openSelected(Array.from({ length: 601 }, (_, i) => String(i))); await state.start()
+  state.jobs.value = [job("active", "running")]
+  state.openSelected(["one"]); await state.start()
+  expect(api.startTagOrganization).not.toHaveBeenCalled()
+ })
+ it("shows stage-specific progress and bounds invalid counts", () => {
+  const running = { ...job("progress", "running"), total: 100, processed: 20, vocabularyProcessed: 60 }
+  expect(organizationProgressValue({ ...running, stage: "vocabulary" })).toBe(60)
+  expect(organizationProgressValue(running)).toBe(20)
+  expect(organizationProgressValue({ ...running, total: 0 })).toBe(0)
+  expect(organizationProgressValue({ ...running, processed: 200 })).toBe(100)
  })
 })

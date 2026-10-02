@@ -53,3 +53,8 @@ describe("LibraryBatchActionBar integration", () => {
     wrapper.unmount()
   })
 })
+
+vi.mock("@/composables/use-tag-organization", async () => {
+  const { ref } = await import("vue")
+  return { useTagOrganization: () => ({ busy: ref(false), active: ref(undefined) }) }
+})

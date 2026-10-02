@@ -2371,10 +2371,15 @@
     "retry": "重试"
   },
   "topics": {
+    "selectionLimit": "请选择 1–600 部影片",
+    "action": "AI 整理",
+    "selectedMovies": "已选择 {count} 部影片",
+    "allMovies": "整个片库",
+    "startSelected": "整理 {count} 部影片",
     "heading": "从一个题材开始逛",
     "organize": "AI 整理标签",
     "start": "整理整个片库",
-    "explanation": "根据影片资料整理用户标签，NFO 原始标签保持不变。开始后在后台运行，可取消或撤销。",
+    "explanation": "优先复用已有标签，按需补充新题材。仅整理用户标签，可停止或撤销。",
     "completed": "整理完成：已归类 {count} 部",
     "needsAttention": "标签整理需要处理，请查看任务结果",
     "disconnected": "整理状态暂不可用",

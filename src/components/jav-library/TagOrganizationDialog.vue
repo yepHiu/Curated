@@ -1,16 +1,25 @@
 <script setup lang="ts">
-import { ref, watch } from "vue"
+import { computed, ref, watch } from "vue"
 import { RouterLink } from "vue-router"
 import { useLibraryService } from "@/services/library-service"
 import { useAIService } from "@/services/ai-service"
 import type { TagOrganizationItem, LibraryTopic } from "@/services/contracts/topic-service"
 import { useI18n } from "vue-i18n"
+import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useTagOrganization, isOrganizationActive, organizationProgressText, organizationErrorText } from "@/composables/use-tag-organization"
 
 const { t } = useI18n()
 const state = useTagOrganization()
+const { writeEnabled } = useExperimentalAgent()
+const scopeLabel = computed(() => {
+  const selected = state.selection.value
+  if (!selected) return t("topics.allMovies")
+  return selected.movieIds.length === 1 && selected.title ? selected.title : t("topics.selectedMovies", { count: selected.movieIds.length })
+})
+const startLabel = computed(() => !state.selection.value ? t("topics.start") : t("topics.startSelected", { count: state.selection.value.movieIds.length }))
+const invalidSelection = computed(() => state.selection.value !== null && (state.selection.value.movieIds.length === 0 || state.selection.value.movieIds.length > 600))
 const hiddenTopics = ref<LibraryTopic[]>([])
 watch(state.dialogOpen, async (open) => {
   // 进入整理面板时读取隐藏题材，不触发整理。
@@ -54,7 +63,12 @@ async function showResults(id: string, more = false) {
       <div v-if="hiddenTopics.length" class="flex flex-wrap gap-2">
         <Button v-for="topic in hiddenTopics" :key="topic.id" variant="outline" size="sm" @click="restoreTopic(topic.id)">{{ t("topics.restore", { name: topic.name }) }}</Button>
       </div>
-      <Button :disabled="state.busy.value || Boolean(state.active.value)" @click="state.start">{{ t("topics.start") }}</Button>
+      <div v-if="!state.active.value" class="flex min-w-0 flex-wrap items-center justify-between gap-3" data-organization-scope>
+        <p class="min-w-0 flex-1 truncate text-sm font-medium" :title="scopeLabel">{{ scopeLabel }}</p>
+        <Button class="min-h-11 shrink-0 lg:min-h-9" :disabled="state.busy.value || invalidSelection || !writeEnabled" @click="state.start">{{ startLabel }}</Button>
+        <p v-if="invalidSelection" role="alert" class="w-full text-xs text-destructive">{{ t("topics.selectionLimit") }}</p>
+        <p v-if="!writeEnabled" class="w-full text-xs text-muted-foreground">{{ t("topics.errors.AI_PERMISSION_REQUIRED") }}</p>
+      </div>
       <div v-for="job in state.jobs.value" :key="job.id" class="space-y-3 border-t border-border py-4">
         <div class="flex flex-wrap justify-between gap-2 text-sm">
           <span>{{ t(`topics.status.${job.status}`) }}<template v-if="!isOrganizationActive(job)"> · {{ job.processed }}/{{ job.total }}</template></span>

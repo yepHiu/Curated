@@ -43,6 +43,7 @@ import { hasPlayedMovie, playedMovieCount } from "@/lib/played-movies-storage"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
 import { compareAddedAtDesc, compareMoviesByLibrarySort } from "@/lib/movie-sort"
 import { useLibraryService } from "@/services/library-service"
+import { useTagOrganization } from "@/composables/use-tag-organization"
 
 const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
 
@@ -54,6 +55,7 @@ const openHomeFromLibrary = inject(openHomeFromLibraryKey, () => {
   void router.push({ name: "home" })
 })
 const libraryService = useLibraryService()
+const tagOrganization = useTagOrganization()
 const scanTaskTracker = useScanTaskTracker()
 const selectedTopic = ref<LibraryTopic | null>(null)
 const topicLoadError = ref("")
@@ -820,6 +822,7 @@ const activeStudioForPage = computed(() =>
       @remove-favorite="runBatchRemoveFavorite"
       @add-user-tag="runBatchAddUserTag"
       @refresh-metadata="runBatchRefreshMetadata"
+      @organize-tags="tagOrganization.openSelected([...batchSelectedIds])"
       @move-to-trash="runBatchMoveToTrash"
       @restore="runBatchRestore"
       @permanent-delete="runBatchPermanentDelete"

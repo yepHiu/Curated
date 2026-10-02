@@ -11,6 +11,7 @@ const error = ref("")
 const busy = ref(false)
 const connected = ref(true)
 const dialogOpen = ref(false)
+const selection = ref<{ movieIds: string[]; title?: string } | null>(null)
 const revision = ref(0)
 const quiet = ref(false)
 const notices = new Set<string>()
@@ -28,6 +29,25 @@ export function organizationProgressText(job: TagOrganizationJob): string {
   if (job.stage === "vocabulary") return t("topics.vocabularyProgress", { done: job.vocabularyProcessed ?? 0, total: job.total })
   if (job.stage === "waiting_quota") return t("topics.waitingQuota", { done: job.processed, total: job.total })
   return t("topics.progress", { done: job.processed, total: job.total })
+}
+
+/** Preparation and classification each have their own measured progress. */
+export function organizationProgressValue(job: TagOrganizationJob): number {
+  const done = job.stage === "vocabulary" ? job.vocabularyProcessed ?? 0 : job.processed
+  return job.total > 0 ? Math.max(0, Math.min(100, done * 100 / job.total)) : 0
+}
+
+/** Menus capture the current selection; later grid changes cannot expand the task. */
+function openSelected(movieIds: readonly string[], title?: string) {
+  selection.value = { movieIds: [...new Set(movieIds)], title }
+  error.value = ""
+  dialogOpen.value = true
+}
+
+function openAll() {
+  selection.value = null
+  error.value = ""
+  dialogOpen.value = true
 }
 
 /** 稳定错误码映射为操作提示，不展示模型原文或数据库内部信息。 */
@@ -81,7 +101,7 @@ export function startTagOrganizationTracking() {
 /** 锁定或离开壳层后撤销观察，不取消服务端任务。 */
 export function stopTagOrganizationTracking() {
   if (timer) clearInterval(timer)
-  timer = undefined; generation++; loading = undefined; initialized = false; jobs.value = []; dialogOpen.value = false
+  timer = undefined; generation++; loading = undefined; initialized = false; jobs.value = []; dialogOpen.value = false; selection.value = null
   window.removeEventListener("curated:tag-organization-updated", onTaskEvent)
 }
 
@@ -97,10 +117,15 @@ async function operate(action: () => Promise<unknown>) {
 /** 首页与全局状态组件共享同一实例。 */
 export function useTagOrganization() {
   return {
-    jobs, error, busy, connected, dialogOpen, revision, quiet,
+    jobs, error, busy, connected, dialogOpen, revision, quiet, selection, openAll, openSelected,
     active: computed(() => { /* 优先展示活动任务。 */ return jobs.value.find(isOrganizationActive) }),
     refresh: refreshJobs,
-    start: () => operate(() => { /* 明确点击才发起全库整理。 */ return useAIService().startTagOrganization("all") }),
+    start: () => {
+      if (jobs.value.some(isOrganizationActive)) return
+      const ids = selection.value ? [...selection.value.movieIds] : undefined
+      if (ids && (ids.length === 0 || ids.length > 600)) { error.value = i18n.global.t("topics.selectionLimit"); return }
+      return operate(() => useAIService().startTagOrganization(ids ? "selected" : "all", ids))
+    },
     cancel: (id: string) => operate(() => { /* 取消保留已写入结果。 */ return useAIService().cancelTagOrganization(id) }),
     retry: (id: string) => operate(() => { /* 只重试后端失败项。 */ return useAIService().retryTagOrganization(id) }),
     undo: (id: string) => operate(async () => { /* 撤销反馈显式报告冲突。 */ const result = await useAIService().undoTagOrganization(id); error.value = i18n.global.t("topics.undoResult", result) }),

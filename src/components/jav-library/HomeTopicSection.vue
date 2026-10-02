@@ -41,7 +41,7 @@ watch(state.revision, () => { /* 通知可用更新，不抢滚动位置。 */ i
           {{ organizationProgressText(state.active.value) }}
         </Button>
         <Button v-if="updated" variant="outline" size="sm" @click="refresh">{{ t("topics.updated") }}</Button>
-        <Button variant="ghost" size="sm" @click="state.dialogOpen.value = true">{{ t("topics.organize") }}</Button>
+        <Button variant="ghost" size="sm" @click="state.openAll">{{ t("topics.organize") }}</Button>
       </div>
     </div>
     <p v-if="loading" role="status" class="text-sm text-muted-foreground">{{ t("topics.loading") }}</p>

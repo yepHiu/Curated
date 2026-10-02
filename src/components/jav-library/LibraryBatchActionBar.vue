@@ -2,7 +2,7 @@
 import { useFocusWithin } from "@vueuse/core"
 import { computed, nextTick, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { Heart, HeartOff, RefreshCw, RotateCcw, Tag, Trash2, X } from "lucide-vue-next"
+import { Heart, HeartOff, RefreshCw, RotateCcw, Sparkles, Tag, Trash2, X } from "lucide-vue-next"
 import type { LibraryMode } from "@/domain/library/types"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,6 +17,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-keyboard"
 import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
+import { useExperimentalAgent } from "@/lib/experimental-agent"
+import { useTagOrganization } from "@/composables/use-tag-organization"
 
 const props = withDefaults(
   defineProps<{
@@ -41,12 +43,15 @@ const emit = defineEmits<{
   removeFavorite: []
   addUserTag: [tag: string]
   refreshMetadata: []
+  organizeTags: []
   moveToTrash: []
   restore: []
   permanentDelete: []
 }>()
 
 const { t } = useI18n()
+const { writeEnabled: aiEnabled } = useExperimentalAgent()
+const tagOrganization = useTagOrganization()
 
 const isTrash = () => props.mode === "trash"
 
@@ -184,6 +189,10 @@ const { highlightIndex, onTagSuggestKeydown } = useUserTagSuggestKeyboard({
           </Button>
         </template>
         <template v-else>
+          <Button v-if="aiEnabled" type="button" variant="outline" size="sm" data-ai-organize-selected class="min-h-11 rounded-xl lg:min-h-8" :disabled="selectedCount === 0 || selectedCount > 600 || operationBusy || scrapeBusy || tagOrganization.busy.value || Boolean(tagOrganization.active.value)" :title="selectedCount > 600 ? t('topics.selectionLimit') : undefined" @click="emit('organizeTags')">
+            <Sparkles data-icon="inline-start" />
+            {{ t("topics.action") }}
+          </Button>
           <Button
             type="button"
             variant="outline"

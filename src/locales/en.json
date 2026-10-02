@@ -2371,10 +2371,15 @@
     "retry": "Retry"
   },
   "topics": {
+    "selectionLimit": "Select 1–600 movies",
+    "action": "AI organize",
+    "selectedMovies": "{count} selected movies",
+    "allMovies": "Entire library",
+    "startSelected": "Organize {count} movies",
     "heading": "Start with a theme",
     "organize": "Organize tags with AI",
     "start": "Organize the library",
-    "explanation": "Organize user tags from movie information. Original NFO tags stay unchanged. Runs in the background; you can stop or undo it.",
+    "explanation": "Reuse existing labels first and add subjects when needed. Only user tags change; you can stop or undo.",
     "completed": "Organized {count} movies",
     "needsAttention": "Tag organization needs attention. Review the task results.",
     "disconnected": "Organization status unavailable",

@@ -17,3 +17,15 @@ it("writes only user tags, exposes evidence, and undo preserves later manual edi
  expect(movies[0]!.userTags).toEqual(["Manual"])
  expect((await service.getHomepageTopics())).toEqual([])
 })
+
+it("organizes only the selected movies and records the selected count", async () => {
+ const { createMockTopicServices } = await import("./mock-topic-service")
+ const movies = [{ id: "a", title: "A", tags: ["Theme"], userTags: [] }, { id: "b", title: "B", tags: ["Other"], userTags: ["Manual"] }] as unknown as Movie[]
+ const patch = vi.fn((id, tags) => { movies.find((movie) => movie.id === id)!.userTags = tags })
+ const service = createMockTopicServices(() => movies, patch)
+ const job = await service.startTagOrganization("selected", ["a"])
+ expect(job.total).toBe(1)
+ expect(patch).toHaveBeenCalledTimes(1)
+ expect(patch).toHaveBeenCalledWith("a", ["Theme"])
+ expect(movies[1]!.userTags).toEqual(["Manual"])
+})

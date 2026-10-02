@@ -2371,10 +2371,15 @@
     "retry": "再試行"
   },
   "topics": {
+    "selectionLimit": "1〜600 本の作品を選択してください",
+    "action": "AI 整理",
+    "selectedMovies": "選択した {count} 本",
+    "allMovies": "ライブラリ全体",
+    "startSelected": "{count} 本を整理",
     "heading": "テーマから探す",
     "organize": "AI でタグを整理",
     "start": "ライブラリを整理",
-    "explanation": "作品情報からユーザータグを整理します。元の NFO タグは変更しません。バックグラウンドで実行し、中止・取り消しができます。",
+    "explanation": "既存のタグを優先し、必要に応じて新しい題材を追加します。ユーザータグのみ変更し、停止や取り消しができます。",
     "completed": "{count} 本を分類しました",
     "needsAttention": "タグ整理の結果を確認してください",
     "disconnected": "整理状況を取得できません",

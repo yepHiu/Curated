@@ -11,6 +11,7 @@ import {
   PlayCircle,
   RefreshCw,
   Star,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-vue-next"
@@ -44,6 +45,7 @@ import { formatMovieSummaryForDisplay } from "@/lib/format-movie-summary"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { useAIActionRequest } from "@/composables/use-ai-action-request"
 import { useAIService } from "@/services/ai-service"
+import { useTagOrganization } from "@/composables/use-tag-organization"
 import { AIServiceError } from "@/services/contracts/ai-service"
 import { getMovieImageVersion } from "@/lib/image-version"
 import { sourcePageLink } from "@/lib/source-page-link"
@@ -82,6 +84,7 @@ const summaryDisplay = computed(() =>
 )
 const { writeEnabled: agentEnabled } = useExperimentalAgent()
 const aiService = useAIService()
+const tagOrganization = useTagOrganization()
 const titleAction = useAIActionRequest(aiService)
 const summaryAction = useAIActionRequest(aiService)
 const translatedTitle = ref("")
@@ -433,6 +436,10 @@ function removeMetadataTag(tag: string) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" class="min-w-[11rem]">
               <DropdownMenuGroup>
+                <DropdownMenuItem v-if="agentEnabled" data-ai-organize-movie :disabled="tagOrganization.busy.value || Boolean(tagOrganization.active.value)" @click="tagOrganization.openSelected([movie.id], movie.title)">
+                  <Sparkles aria-hidden="true" />
+                  {{ t("topics.action") }}
+                </DropdownMenuItem>
                 <DropdownMenuItem @click="movieEditOpen = true">
                   <Pencil
                     class="size-4 shrink-0"
