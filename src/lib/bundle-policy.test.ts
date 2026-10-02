@@ -2,7 +2,7 @@
 import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { build } from "vite"
 import { bundleBudgetPlugin } from "../../vite.bundle-budget"
 import { evaluateSize, loadPolicy, loadSnapshot, metricKeys } from "../../vite.bundle-policy"
@@ -37,6 +37,7 @@ function fixture() {
 
 /** 所有测试结束均释放临时目录，包括预期失败的构建。 */
 afterEach(() => {
+  vi.unstubAllEnvs()
   for (const root of temporaryDirectories.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
@@ -90,6 +91,7 @@ describe("tiered bundle governance", () => {
 
   /** 实际构建统计 public/CSS/动态块；严重超限仍先留下两个报告。 */
   it("writes diagnostics before failing a real oversized Vite build", async () => {
+    vi.stubEnv("VITE_USE_WEB_API", "true")
     const root = fixture()
     const warningPolicy = structuredClone(policy)
     warningPolicy.metrics.distRaw.warn = 100
