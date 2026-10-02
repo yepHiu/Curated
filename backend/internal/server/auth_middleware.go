@@ -14,8 +14,8 @@ func (h *Handler) withAuthLock(next http.Handler) http.Handler {
 			return
 		}
 
-		// 愿望单提交入口受插件联动开关控制，不授予其他 API 权限。
-		if r.Method == http.MethodPost && r.URL.Path == wishlistIntakePath {
+		// 插件提交/成员状态入口受联动开关控制，不授予其他 API 权限。
+		if r.Method == http.MethodPost && wishlistIntegrationPath(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}

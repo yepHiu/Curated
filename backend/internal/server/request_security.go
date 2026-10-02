@@ -31,7 +31,7 @@ func (h *Handler) withRequestSecurity(next http.Handler) http.Handler {
 		origin := strings.TrimSpace(r.Header.Get("Origin"))
 		if origin != "" {
 			w.Header().Add("Vary", "Origin")
-			if !browserOriginAllowed(origin, r, h.cfg) && !(r.URL.Path == wishlistIntakePath && (r.Method == http.MethodPost || r.Method == http.MethodOptions) && wishlistExtensionOrigin(origin)) {
+			if !browserOriginAllowed(origin, r, h.cfg) && !(wishlistIntegrationPath(r.URL.Path) && (r.Method == http.MethodPost || r.Method == http.MethodOptions) && wishlistExtensionOrigin(origin)) {
 				writeAppError(w, http.StatusForbidden, contracts.ErrorCodeForbidden, "browser origin is not allowed")
 				return
 			}
@@ -46,7 +46,7 @@ func (h *Handler) withRequestSecurity(next http.Handler) http.Handler {
 			return
 		}
 
-		if isAPIPath(r.URL.Path) && (r.URL.Path == wishlistIntakePath || strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Curated-Client")), "Curated-Plugin") || wishlistExtensionOrigin(origin)) && !h.browserPluginEnabled() {
+		if isAPIPath(r.URL.Path) && (wishlistIntegrationPath(r.URL.Path) || strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Curated-Client")), "Curated-Plugin") || wishlistExtensionOrigin(origin)) && !h.browserPluginEnabled() {
 			writeAppError(w, http.StatusForbidden, "BROWSER_PLUGIN_DISABLED", "browser plugin integration is disabled")
 			return
 		}

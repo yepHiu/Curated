@@ -18,6 +18,38 @@ import (
 )
 
 const wishlistIntakePath = "/api/integrations/wishlist/items"
+const wishlistStatusPath = "/api/integrations/wishlist/status"
+
+// wishlistIntegrationPath 只包含插件提交及最小成员状态读取，不放开应用愿望单路由。
+func wishlistIntegrationPath(path string) bool {
+	return path == wishlistIntakePath || path == wishlistStatusPath
+}
+
+// handleWishlistStatus 只读取请求的 1–100 个番号的成员状态，受实时联动开关控制。
+func (h *Handler) handleWishlistStatus(w http.ResponseWriter, r *http.Request) {
+	if !h.browserPluginEnabled() {
+		writeAppError(w, http.StatusForbidden, "BROWSER_PLUGIN_DISABLED", "browser plugin integration is disabled")
+		return
+	}
+	if h.store == nil {
+		writeAppError(w, http.StatusServiceUnavailable, "COMMON_UNAVAILABLE", "wishlist unavailable")
+		return
+	}
+	var body struct {
+		Codes []string `json:"codes"`
+	}
+	if err := decodeWishlistJSON(w, r, &body); err != nil {
+		writeAppError(w, http.StatusBadRequest, "WISHLIST_INVALID_INPUT", "expected 1–100 codes")
+		return
+	}
+	status, err := h.store.WishlistStatus(r.Context(), body.Codes)
+	if err != nil {
+		wishlistError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, status)
+}
 
 var wishlistRates = struct {
 	sync.Mutex
@@ -256,6 +288,7 @@ func (h *Handler) handleWishlistAsset(w http.ResponseWriter, r *http.Request) {
 // registerWishlistRoutes 集中注册愿望单及有限权限的外部提交入口。
 func (h *Handler) registerWishlistRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST "+wishlistIntakePath, h.handleAddWishlist)
+	mux.HandleFunc("POST "+wishlistStatusPath, h.handleWishlistStatus)
 	mux.HandleFunc("GET /api/wishlist/items", h.handleWishlistList)
 	mux.HandleFunc("GET /api/wishlist/items/{id}", h.handleWishlistItem)
 	mux.HandleFunc("GET /api/wishlist/items/{id}/playback", h.handleWishlistPlayback)

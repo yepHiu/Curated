@@ -1,5 +1,14 @@
 package contracts
 
+// WishlistStatusDTO 仅公开所请求番号的愿望单成员状态，不包含条目资料。
+type WishlistStatusDTO struct {
+	StatusMap map[string]WishlistMembershipDTO `json:"statusMap"`
+}
+
+type WishlistMembershipDTO struct {
+	Added bool `json:"added"`
+}
+
 // WishlistMetadata 是与本地文件无关的影片资料，字段来源由 provider 标识。
 type WishlistMetadata struct {
 	Title          string   `json:"title"`
