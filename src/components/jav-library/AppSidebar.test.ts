@@ -291,3 +291,8 @@ describe("AppSidebar", () => {
     expect(insightsLink?.attributes("data-to")).toBe('{"name":"insights"}')
   })
 })
+
+vi.mock("@/composables/use-tag-organization", async () => {
+  const { ref } = await import("vue")
+  return { useTagOrganization: () => ({ busy: ref(false), active: ref(undefined), jobs: ref([]), connected: ref(true), dialogOpen: ref(false), openSelected: vi.fn() }), organizationProgressText: () => "", organizationProgressValue: () => 0 }
+})

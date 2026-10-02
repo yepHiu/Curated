@@ -20,6 +20,7 @@ import type { AppPage, LibraryMode } from "@/domain/library/types"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import SidebarPlaybackEntry from "@/components/jav-library/SidebarPlaybackEntry.vue"
+import SidebarTagOrganizationEntry from "@/components/jav-library/SidebarTagOrganizationEntry.vue"
 import { useBackendHealth } from "@/composables/use-backend-health"
 import { buildBrowseRouteTarget } from "@/lib/library-query"
 import { statusDotClass } from "@/lib/ui/status-tone"
@@ -328,6 +329,7 @@ const getNavigationTarget = (page: AppPage) => {
     />
 
     <SidebarPlaybackEntry :compact="props.compact" />
+    <SidebarTagOrganizationEntry :compact="props.compact" />
 
     <section
       v-if="!props.compact"
