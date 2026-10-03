@@ -21,6 +21,10 @@
 
 质量审计主计划是 [`2026-07-19-project-feature-quality-audit.md`](2026-07-19-project-feature-quality-audit.md)。Milestone A～C 已验证；Milestone D（REQ-0019～REQ-0022）已随 1.4.12 实现，真实 Chromium QA 仍待补。1.5.1 之后当前选定的下一执行入口是 [`2026-08-14-scrape-governance-implementation-plan.md`](2026-08-14-scrape-governance-implementation-plan.md)，对应 REQ-0023。消息中心改版 REQ-0024 与消息政策台账 REQ-0025 已开始落地（[`2026-08-14-message-center-repair-plan.md`](2026-08-14-message-center-repair-plan.md)、[`../prd/message-catalog.md`](../prd/message-catalog.md)），不抢刮削调度实现。资料库筛选强化 REQ-0026 见 [`2026-08-14-library-filter-strengthening.md`](2026-08-14-library-filter-strengthening.md)。退役标签浏览页 REQ-0028 见 [`2026-08-16-retire-tags-browse-page.md`](2026-08-16-retire-tags-browse-page.md)（in-progress）。演员空资料自动补刮 REQ-0027 见 [`2026-08-16-actor-missing-profile-auto-scrape.md`](2026-08-16-actor-missing-profile-auto-scrape.md)。SFW 合规产品已决定另建新项目，不在本仓库改造；容器、WebDAV、Android 与 metadata sidecar 在未进入 PRD 前不并行实施。漫画库与写真库已获准作为默认关闭的 Beta 合入主线，对应 REQ-0046 / REQ-0047，见 [`2026-09-10-comic-photo-beta-integration.md`](2026-09-10-comic-photo-beta-integration.md)。
 
+## 普通影视兼容的当前讨论（2026-10-03）
+
+用户重新提出在现有 Curated 项目支持普通电影、电视剧，并隔离成人内容。当前构思补充在既有 [合规化与元数据源解耦研究第 15 节](2026-07-18-curated-compliance-and-metadata-source-decoupling.md#15-普通电影电视剧兼容与成人内容隔离2026-10-03)，状态为 `proposed`，讨论默认普通影视、Server 显式启用成人能力、资料库/会话分区和剧/季/集模型。上文「SFW 另建项目」是此前的实施方向，本次是重新评估；没有批准实施、增加 PRD requirement 或改变现有运行行为。
+
 ## 状态流转
 
 1. `research` / `proposed` 文档可以只记录问题、证据和备选方案。

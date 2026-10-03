@@ -526,6 +526,7 @@ Use this table as the citation hub. Dated `docs/plan/*.md` files are working pap
 | [Project overview dashboard](../project-overview-dashboard.html) | Static snapshot of current delivery, active requirements, Git branches, and worktrees |
 | [PRD workflow](prd/README.md) | How to add or update requirements |
 | [Plan status rules](plan/README.md) | How to read `docs/plan/` |
+| [Film/TV compatibility and adult-content separation](plan/2026-07-18-curated-compliance-and-metadata-source-decoupling.md#15-普通电影电视剧兼容与成人内容隔离2026-10-03) | Proposed October discussion: ordinary-content defaults, library/session boundaries and series/season/episode modeling; no runtime changes |
 | [Wishlist design and implementation plan](plan/2026-09-22-wishlist.md) | Implemented code-only intake, server enrichment, persistent images, import reuse and backup; includes local verification evidence and remaining live-site acceptance |
 | [September code review and fixes](plan/2026-09-05-project-code-review.md) | Installer lifetime, Agent proxy/session isolation, frame stepping, and regression evidence |
 | [Agent charter](plan/2026-08-18-agent-charter.md) | Constitutional rules for all Agent/AI features (principles, architecture, tool registry, roadmap) |
