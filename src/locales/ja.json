@@ -1999,8 +1999,7 @@
     "prewarmingStream": "HLS ストリームを先読みしています…",
     "selectPart": "パートを選択",
     "partLabel": "パート {number}",
-    "fileCount": "{count} ファイル",
-    "historyCategory": "履歴のカテゴリー"
+    "fileCount": "{count} ファイル"
   },
   "detailPage": {
     "curatedFramesEmpty": "この作品のキャプチャフレームはまだありません。",

@@ -301,7 +301,7 @@ export function buildPlayerRouteFromActorIntent(
   }
 }
 
-/** 恢复历史中的实际文件与时间并保留历史类别。 */
+/** 恢复历史中的实际文件与时间；来源类别仅用于播放器队列。 */
 export function buildPlayerRouteFromHistoryIntent(
   movieId: string,
   resumeSec: number,
@@ -423,7 +423,7 @@ export function resolveNavigationBackLink(
     const backTarget = getNavigationBackTarget(route.query)
     if (backTarget === "history") {
       return {
-        to: { name: "history", ...(route.query.browse === "fc2" ? { query: { category: "fc2" } } : {}) },
+        to: { name: "history" },
         labelKey: "shell.backHistory",
       }
     }

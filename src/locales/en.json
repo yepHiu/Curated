@@ -1999,8 +1999,7 @@
     "prewarmingStream": "Prewarming the HLS stream…",
     "selectPart": "Select part",
     "partLabel": "Part {number}",
-    "fileCount": "{count} files",
-    "historyCategory": "History category"
+    "fileCount": "{count} files"
   },
   "detailPage": {
     "curatedFramesEmpty": "No captured frames for this movie yet.",

@@ -382,7 +382,7 @@ describe("navigation intent helpers", () => {
       resolveNavigationBackLink(
         {
           name: "player",
-          query: { back: "history" },
+          query: { back: "history", browse: "fc2" },
         },
         "movie-1",
       ),

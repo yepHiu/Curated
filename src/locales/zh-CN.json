@@ -1999,8 +1999,7 @@
     "prewarmingStream": "正在预热 HLS 播放流…",
     "selectPart": "选择分部",
     "partLabel": "第 {number} 部",
-    "fileCount": "{count} 个文件",
-    "historyCategory": "历史记录类别"
+    "fileCount": "{count} 个文件"
   },
   "detailPage": {
     "curatedFramesEmpty": "这部影片还没有萃取帧。",
