@@ -108,6 +108,16 @@ vi.mock("@/components/jav-library/MediaStill.vue", () => ({
   default: { name: "MediaStill", template: "<div />" },
 }))
 
+// 分部控件只替代渲染，保留真实 v-model 契约以验证详情的默认选择与播放目标。
+vi.mock("@/components/jav-library/MoviePartSelect.vue", () => ({
+  default: {
+    name: "MoviePartSelect",
+    props: ["files", "modelValue"],
+    emits: ["update:modelValue"],
+    template: '<div data-part-select :data-file-id="modelValue" />',
+  },
+}))
+
 vi.mock("@/components/jav-library/MovieDeleteConfirmDialog.vue", () => ({
   default: {
     name: "MovieDeleteConfirmDialog",
@@ -145,6 +155,71 @@ vi.mock("@/components/jav-library/ExpandableText.vue", () => ({
 }))
 
 describe("DetailPanel", () => {
+  const multipartFiles = [
+    { id: "part-1", partIndex: 1, fileName: "CODE-1-1.mp4", location: "D:/Library/CODE-1-1.mp4" },
+    { id: "part-2", partIndex: 2, fileName: "CODE-1-2.mp4", location: "D:/Library/CODE-1-2.mp4" },
+  ]
+
+  it("selects and plays part one on entering details even when another file was last played", async () => {
+    // 未编号文件或后续分部排在前面，也应默认选择明确的第 1 部。
+    const wrapper = mount(DetailPanel, {
+      props: { movie: makeMovie({
+        files: [
+          { id: "unnumbered", partIndex: 0, fileName: "CODE-1.mp4", location: "D:/Library/CODE-1.mp4" },
+          multipartFiles[1]!,
+          multipartFiles[0]!,
+        ],
+        playbackFileId: "part-2",
+      }) },
+    })
+
+    expect(wrapper.get("[data-part-select]").attributes("data-file-id")).toBe("part-1")
+    await wrapper.findAll("button").find(/* 用主播放动作验证实际发出的文件标识。 */ (button) => button.text() === "detailPanel.play")!.trigger("click")
+    expect(wrapper.emitted("openPlayer")).toEqual([["movie-1", "part-1"]])
+    wrapper.unmount()
+  })
+
+  it("selects part one after files arrive and preserves a manual selection on metadata refresh", async () => {
+    // 同一作品先渲染概要再加载分片，不能一直停留在未选择状态。
+    const wrapper = mount(DetailPanel, { props: { movie: makeMovie() } })
+    await wrapper.setProps({ movie: makeMovie({ files: multipartFiles }) })
+    const selector = wrapper.getComponent({ name: "MoviePartSelect" })
+    expect(selector.props("modelValue")).toBe("part-1")
+
+    selector.vm.$emit("update:modelValue", "part-2")
+    await wrapper.setProps({ movie: makeMovie({ title: "Updated title", files: [...multipartFiles] }) })
+    expect(selector.props("modelValue")).toBe("part-2")
+    await wrapper.findAll("button").find(/* 手动切换后播放所选分部。 */ (button) => button.text() === "detailPanel.play")!.trigger("click")
+    expect(wrapper.emitted("openPlayer")).toEqual([["movie-1", "part-2"]])
+    wrapper.unmount()
+  })
+
+  it("resets to part one when switching movies even if file identifiers are reused", async () => {
+    // 当前面板切换到另一部作品时，不继承上一部的手动选择。
+    const wrapper = mount(DetailPanel, { props: { movie: makeMovie({ files: multipartFiles }) } })
+    wrapper.getComponent({ name: "MoviePartSelect" }).vm.$emit("update:modelValue", "part-2")
+    await wrapper.setProps({ movie: makeMovie({ id: "movie-2", files: multipartFiles }) })
+    expect(wrapper.get("[data-part-select]").attributes("data-file-id")).toBe("part-1")
+    wrapper.unmount()
+  })
+
+  it("falls back to the first available file and clears a selection when files disappear", async () => {
+    // 第一部缺失时仍可播放现有文件；选中的文件移除后不能继续发出失效标识。
+    const laterFiles = [
+      multipartFiles[1]!,
+      { id: "part-3", partIndex: 3, fileName: "CODE-1-3.mp4", location: "D:/Library/CODE-1-3.mp4" },
+    ]
+    const wrapper = mount(DetailPanel, { props: { movie: makeMovie({ files: laterFiles }) } })
+    expect(wrapper.get("[data-part-select]").attributes("data-file-id")).toBe("part-2")
+    await wrapper.setProps({ movie: makeMovie({ files: [multipartFiles[0]!, laterFiles[1]!] }) })
+    expect(wrapper.get("[data-part-select]").attributes("data-file-id")).toBe("part-1")
+
+    await wrapper.setProps({ movie: makeMovie({ files: [] }) })
+    await wrapper.findAll("button").find(/* 列表清空后恢复无显式文件的播放契约。 */ (button) => button.text() === "detailPanel.play")!.trigger("click")
+    expect(wrapper.emitted("openPlayer")).toEqual([["movie-1", undefined]])
+    wrapper.unmount()
+  })
+
   it("translates title and synopsis in place and can restore their originals", async () => {
     useExperimentalAgent().setEnabled(true)
     runAction.mockImplementation(async (name: string) => ({ proposedText: name === "translate_title" ? "译文标题" : "译文简介" }))

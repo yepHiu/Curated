@@ -278,9 +278,20 @@ function removeMetadataTag(tag: string) {
     tags: props.movie.tags.filter((x) => x !== tag),
   })
 }
-/** 详情只保存当前选择；未选择时由播放器恢复作品最后一次播放。 */
+/** 进入详情默认选择第一部，手动选择仅在当前作品内保留。 */
 const selectedPartId = ref<string>()
-watch(/* 作品变化时重置局部文件选择。 */ () => props.movie.id, /* 作品变化时重置局部文件选择。 */ () => { selectedPartId.value = undefined })
+watch(
+  [
+    /* 切换作品时重新选择第一部。 */ () => props.movie.id,
+    /* 分片异步加载或更新后校验当前选择。 */ () => props.movie.files,
+  ],
+  /* 同作品刷新保留有效手动选择，首次进入或选中分片移除时回到第一部。 */
+  ([movieId, files], [previousMovieId]) => {
+    if (movieId === previousMovieId && files?.some(/* 保留仍在库中的分片。 */ (file) => file.id === selectedPartId.value)) return
+    selectedPartId.value = (files?.find(/* 优先显式标记为第一部的文件。 */ (file) => file.partIndex === 1) ?? files?.[0])?.id
+  },
+  { immediate: true, deep: true },
+)
 </script>
 
 <template>
