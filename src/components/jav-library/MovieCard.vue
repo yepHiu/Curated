@@ -290,7 +290,6 @@ const handleFavoriteChange = (nextValue: boolean) => {
         </div>
 
         <!-- Badge 默认含 py-0.5 + 边框，高度常 > h-5；勿用固定矮行 + overflow-hidden 以免裁切 -->
-        <Badge v-if="(movie.fileCount ?? 1) > 1" variant="outline" data-movie-file-count>{{ t("player.fileCount", { count: movie.fileCount }) }}</Badge>
         <div data-movie-tag-row class="flex min-h-6 min-w-0 items-center gap-1 overflow-hidden">
           <Badge
             v-for="(item, i) in cardTagsDisplay.tags"
@@ -313,18 +312,29 @@ const handleFavoriteChange = (nextValue: boolean) => {
       </CardContent>
     </button>
     <div class="pointer-events-none absolute inset-x-0 top-0 z-[3] p-[var(--movie-card-padding)]">
-      <Badge
-        :as="props.batchMode ? 'span' : 'a'"
-        variant="outline"
-        :href="props.batchMode ? undefined : javdbSearchUrl"
-        :target="props.batchMode ? undefined : '_blank'"
-        :rel="props.batchMode ? undefined : 'noopener noreferrer'"
-        data-movie-code-link
-        class="m-[var(--movie-card-padding)] h-5 w-fit select-none truncate rounded-full border-border/40 bg-background/90 px-1.5 text-[10px] text-foreground shadow-sm backdrop-blur-sm focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        :class="props.batchMode ? 'pointer-events-none' : 'pointer-events-auto hover:bg-background/95'"
-      >
-        {{ movie.code }}
-      </Badge>
+      <!-- 番号和文件数量共用海报左上角的纵向布局，数量标签不占用底部资料空间。 -->
+      <div class="m-[var(--movie-card-padding)] flex min-w-0 flex-col items-start gap-1">
+        <Badge
+          :as="props.batchMode ? 'span' : 'a'"
+          variant="outline"
+          :href="props.batchMode ? undefined : javdbSearchUrl"
+          :target="props.batchMode ? undefined : '_blank'"
+          :rel="props.batchMode ? undefined : 'noopener noreferrer'"
+          data-movie-code-link
+          class="h-5 w-fit max-w-full select-none truncate rounded-full border-border/40 bg-background/90 px-1.5 text-[10px] text-foreground shadow-sm backdrop-blur-sm focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          :class="props.batchMode ? 'pointer-events-none' : 'pointer-events-auto hover:bg-background/95'"
+        >
+          {{ movie.code }}
+        </Badge>
+        <Badge
+          v-if="(movie.fileCount ?? 1) > 1"
+          variant="outline"
+          data-movie-file-count
+          class="h-5 max-w-full truncate border-border/40 bg-background/90 px-1.5 text-[10px] text-muted-foreground shadow-sm backdrop-blur-sm"
+        >
+          {{ t("player.fileCount", { count: movie.fileCount }) }}
+        </Badge>
+      </div>
     </div>
   </Card>
 </template>
