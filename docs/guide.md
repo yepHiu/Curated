@@ -527,6 +527,7 @@ Use this table as the citation hub. Dated `docs/plan/*.md` files are working pap
 | [PRD workflow](prd/README.md) | How to add or update requirements |
 | [Plan status rules](plan/README.md) | How to read `docs/plan/` |
 | [Compliance and Film/TV separation research — paused](plan/2026-07-18-curated-compliance-and-metadata-source-decoupling.md#当前决定本仓库暂缓2026-10-04) | Paused here by the October 4 decision: compliance work now belongs to a separate project; earlier proposals remain historical reference, with no runtime changes |
+| [Multipart movies and dedicated FC2 browsing](plan/2026-10-04-multipart-movies-and-fc2-library.md) | Proposed support for ordered video parts and separate Movies/FC2 browsing with shared storage and tags; REQ-0056 specified and REQ-0057 triaged pending code/part relationship clarification; no runtime changes |
 | [Wishlist design and implementation plan](plan/2026-09-22-wishlist.md) | Implemented code-only intake, server enrichment, persistent images, import reuse and backup; includes local verification evidence and remaining live-site acceptance |
 | [September code review and fixes](plan/2026-09-05-project-code-review.md) | Installer lifetime, Agent proxy/session isolation, frame stepping, and regression evidence |
 | [Agent charter](plan/2026-08-18-agent-charter.md) | Constitutional rules for all Agent/AI features (principles, architecture, tool registry, roadmap) |

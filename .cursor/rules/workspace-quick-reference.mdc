@@ -7,6 +7,10 @@ alwaysApply: true
 
 用户已另开独立项目推进合规化，本仓库的合规化工作暂缓。此前合规方案中的普通影视/成人内容分区、启用向导、能力模块与公开核心中性化均保留为历史研究，不作为当前实施或排期依据；只有用户明确重新提出时再评估。当前 Curated 继续围绕现有功能维护与优化，既有刮削治理等需求按各自 PRD 状态推进。决策与历史材料见 `docs/plan/2026-07-18-curated-compliance-and-metadata-source-decoupling.md` 和 `docs/plan/README.md`。
 
+## 多分片影片与 FC2 展示需求 — 2026-10-04
+
+用户提出保留「影片」并新增「FC2」导航入口，两类分别浏览但共用存储池与标签，同时兼容多部/分片影片。REQ-0056 为 `specified`、REQ-0057 为 `triaged`；方案见 `docs/plan/2026-10-04-multipart-movies-and-fc2-library.md`。分片是否共用同一番号仍待用户确认，尚未修改运行行为。该需求属于现有成人资料库功能，不恢复上方暂缓的合规化工作。
+
 ## Release batches — 2026-10-01 (current)
 
 This supersedes older release policies below. New source supports one **Curated YYYYMMDD** Release, with **-2**, **-3**, etc. for later Beijing-date batches, containing Server, Desktop or both. `pnpm release:prepare` inspects each module against its published source; `--write` prepares independent versions, immutable batch metadata and Notes for review. No change means no release. `release:version:show` shows both source versions. CD consumes the batch and never creates Full; old all-in-one CLI/publication triggers are disabled. Shared/unknown delivery inputs conservatively affect both modules and need scope review. Same-source retries reuse versions and batch identity.
