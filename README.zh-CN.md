@@ -19,6 +19,8 @@
 
 # Curated
 
+「影片」和「FC2」分别浏览，共用存储池与标签。同一番号多个文件共用一张海报，可选择分片播放并分别续播；见 [FC2 与多文件影片说明](docs/guide.md#fc2-and-multipart-movies)。
+
 AI 整理标签显示已整理、未整理和待更新数量，单片出错跳过并汇总供用户决定，默认仅整理未整理影片；支持更新已变更资料、单片、批量及显式全库重整，并自动处理常见题材冲突。详见[操作手册](docs/guide.md#ai-user-tags-and-homepage-topics)。
 
 Server 使用深色底图标，Desktop 使用浅灰白底图标（`#F5F6F8`），中央图案保持一致。详见[品牌规范](docs/reference/curated-brand-guidelines.md)与[资源预览](icon/brand/index.html)。

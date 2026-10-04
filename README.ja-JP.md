@@ -19,6 +19,8 @@
 
 # Curated
 
+「作品」と「FC2」は別々に閲覧でき、ストレージとタグを共有します。同じ品番の複数ファイルは一枚のポスターにまとまり、パート選択と個別の再生位置に対応します。[FC2 と複数ファイルの案内](docs/guide.md#fc2-and-multipart-movies)をご覧ください。
+
 AI タグ整理は整理済み・未整理・要更新を集計し、問題のある作品はスキップして後で確認でき、既定では未整理作品のみ処理します。変更作品の更新、単体・選択範囲・全体の再整理と一般的な題材競合の自動修正に対応します。[操作ガイド](docs/guide.md#ai-user-tags-and-homepage-topics)を参照してください。
 
 Server は暗い背景、Desktop はオフホワイト（`#F5F6F8`）の背景のアイコンを使用し、中央の図柄は共通です。[ブランドガイド](docs/reference/curated-brand-guidelines.md)と[アセット一覧](icon/brand/index.html)を参照してください。

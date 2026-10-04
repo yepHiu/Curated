@@ -14,6 +14,18 @@
 
 最后核对日期：2026-06-07。
 
+## FC2 and movie file selection
+
+2026-10-04 extension, locally verified source:
+
+- `GET /api/library/movies?mode=fc2` returns FC2 only. Explicit ordinary browse modes exclude FC2; trash includes both. Omitted mode retains a shared full-library query. Category filtering precedes pagination and total counting. Saved View filters accept `mode: "fc2"` and `favoriteOnly: true`.
+- Movie list items add optional `fileCount`; `GET /api/library/movies/{id}` adds ordered `files: [{ id, partIndex, fileName, location }]`. File IDs are stable, scoped to their movie. Same normalized catalog code appends files; a rescan of the same path is idempotent.
+- Pass optional **query `fileId`** to `GET .../{id}/playback`, `GET .../{id}/stream`, `POST .../{id}/playback-session`, `POST .../{id}/native-play`, `POST .../{id}/frame`, `POST .../{id}/clips` and `PUT /api/playback/progress/{movieId}`. The query is authoritative; adding fileId only to the old JSON body does not select a file. Omitted fileId preserves old clients by choosing last-played or first file. Unknown/foreign files are rejected before media access. Playback descriptors and history progress items include the actual `fileId`.
+- `POST /api/curated-frames` metadata and frame list responses accept/include `fileId`. Omitted capture fileId binds the first file for legacy clients. Clips attached through curatedFrameId must use the same movie/file as the frame. New captures and playback links should always carry fileId. JPG/PNG/WebP exports also embed optional fileId in their metadata.
+- Import code checks add optional `fileStatus: "same-code" | "new-part" | "part-exists"`; this is catalog/part-index evidence, separate from physical destination collision checks.
+
+Migration `0064_movie_files.sql` binds old paths/progress/captures to their actual original file. Older index paths already overwritten need rescanning; no new configuration or endpoint is required. File-specific progress is retained while list history has one last-played row per movie.
+
 ## 1. 快速接入
 
 ### 1.1 Base URL

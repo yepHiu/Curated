@@ -9,7 +9,7 @@ alwaysApply: true
 
 ## 多分片影片与 FC2 展示需求 — 2026-10-04
 
-用户提出保留「影片」并新增「FC2」导航入口，两类分别浏览但共用存储池与标签，同时兼容多部/分片影片。REQ-0056 为 `specified`、REQ-0057 为 `triaged`；方案见 `docs/plan/2026-10-04-multipart-movies-and-fc2-library.md`。分片是否共用同一番号仍待用户确认，尚未修改运行行为。该需求属于现有成人资料库功能，不恢复上方暂缓的合规化工作。
+用户已确认同一番号多文件；REQ-0056 / REQ-0057 已完成源码与本地验证，未发布。侧栏「影片」与「FC2」分开，共用存储池和标签；详情/播放器可选文件，每片独立续播。新 Server 自动执行 0064 迁移，旧索引覆盖过的其它文件须升级后重扫；无新增 library-config 字段。实现与证据见 `docs/plan/2026-10-04-multipart-movies-and-fc2-library.md`。该功能不恢复合规化工作。
 
 ## Release batches — 2026-10-01 (current)
 

@@ -3,6 +3,12 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-10-04 FC2 与同番号多文件（已实现）
+
+用户已确认「同一番号的多个文件」。`/fc2` 与普通影片分开浏览，编号分类共用 `movie-category.ts`；首页/列表/相关作品/演员来源队列限定类别，历史提供类别选择，FC2 收藏通过 favorite=1。空 mode API 仍提供全库共享缓存，显式浏览 mode 在 COUNT/LIMIT 前应用类别。保存筛选支持 fc2 与 favoriteOnly。
+
+迁移 0064 建立 movie_files 和 movie_file_progress，旧 location/进度/萃取绑定原实际文件。扫描追加同番号文件，兼容 FC2 PPV 别名、数字分片及同目录多文件；整理保留 CD 序号，冲突登记原路径。列表 fileCount、详情 files，播放 descriptor/progress/curated 带 fileId；选择通过可选 query fileId 进入 typed context（movie_files.go），保持旧播放 Provider 接口。播放、HLS、源帧、clip、协议播放器均保持选择，校验归属与资料库根。作品级历史保留最后一片，文件级进度独立；宿主按 movie+requested file remount。管理删除、根移除、健康、路径迁移覆盖子文件。无配置新字段。源码本地验证，未生产发布；以前覆盖的路径须重扫。见 docs/plan/2026-10-04-multipart-movies-and-fc2-library.md、API.md 与 guide。合规化继续暂缓。
+
 ## 2026-10-03 AI 单片跳过与待处理列表（覆盖上一节三类统计）
 
 归纳与分类的输入/模型结果错误缩批到单片后跳过并继续，资料过长记失败；归纳合并使用临时副本，失败不泄漏提案。全局服务/权限/配置与检查点故障仍 blocked。迁移 0063 持久问题队列并回填历史，默认未整理/待更新范围排除问题片，成功/无匹配原子清理。stats 新增 needsAttention，与 organized/unorganized/outdated 构成互斥四类；GET /api/ai/tag-organizations/issues 分页读取，POST scope issues 显式重试。面板结束汇总跳过数量，提供问题片/原因、逐片重试、重试待处理、暂不处理；打开/关闭不触发 AI。旧任务重试归纳失败时只重新归纳 pending 项，不重写成功片。Web/Mock 三语同步，无新配置，未发布。

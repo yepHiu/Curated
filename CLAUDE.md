@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## FC2 / multipart API — 2026-10-04
+
+`GET /api/library/movies?mode=fc2` selects FC2; ordinary explicit modes exclude it, empty mode is shared full-library data. List fileCount and detail files expose same-code video files. Playback/stream/session/native-play/frame/clips and progress PUT accept query fileId; descriptors, progress and captures return source identity. Capture metadata carries fileId; clip frame attachments enforce it. Migration 0064 preserves original file identity and adds per-file progress. Storage/tag resources stay shared. Source is locally verified, not published. See API.md “FC2 and movie file selection” and guide “FC2 and multipart movies”; compliance remains paused.
+
 ## Release batches — 2026-10-01 (current)
 
 This supersedes older release policies below. New source supports one **Curated YYYYMMDD** Release, with **-2**, **-3**, etc. for later Beijing-date batches, containing Server, Desktop or both. `pnpm release:prepare` inspects each module against its published source; `--write` prepares independent versions, immutable batch metadata and Notes for review. No change means no release. `release:version:show` shows both source versions. CD consumes the batch and never creates Full; old all-in-one CLI/publication triggers are disabled. Shared/unknown delivery inputs conservatively affect both modules and need scope review. Same-source retries reuse versions and batch identity.

@@ -6,6 +6,16 @@ Public HTTP API remains in root [`API.md`](../API.md). Folder policy for new doc
 
 If this handbook and current code disagree, treat the code as the source of truth.
 
+## FC2 and multipart movies
+
+Movies and FC2 are separate sidebar entries. Movies, its favorites/recent views and Home show ordinary titles; FC2 shows FC2 catalog codes, including FC2-PPV variants. Use FC2's Favorites button for FC2 favorites and the category selector in Watch History. Storage pools, actor records, metadata/user tags, ratings and notes remain shared. Files can stay together on disk.
+
+Several files with the same catalog code now belong to one movie with one poster. The card shows the file count; details and the player offer a part selector with original filenames. Explicit CD/PART/PT/DISC/DISK numbers and numeric suffixes after the catalog code sort numerically (1, 2, 10). Unnumbered files remain available by filename; different catalog codes stay separate movies. Each file resumes its own progress. With auto-advance enabled, the next file of the same movie plays before the next movie in the queue.
+
+The new Server automatically migrates the old indexed location, progress and captures to a stable file record on startup. Existing preferences remain on the movie. Rescan after upgrading to discover additional files that older scans replaced in the index; migration alone cannot recover discarded paths. Automatic organization preserves explicit part numbers; an occupied destination keeps the source in place and indexes it without overwriting. No new library-config setting is required. The source is locally verified; this entry does not announce a production release.
+
+See the [implementation and verification record](plan/2026-10-04-multipart-movies-and-fc2-library.md) and [file selection API](../API.md#fc2-and-movie-file-selection).
+
 ## Home and movie library scrolling
 
 At the bottom of Home, keep scrolling down to open All Movies. At the top of All Movies, keep scrolling up to return to Home at its previous scroll position. Mouse wheels and trackpads use a short continued scroll; on touchscreens, swipe upward at the bottom of Home or downward at the top of All Movies. The reverse transition slides the movie page down to reveal Home. Favorites, Recently Added, Trash and batch selection do not trigger this return gesture. Reduced-motion preferences shorten both transitions.
