@@ -91,6 +91,7 @@
     "reload": "刷新应用"
   },
   "nav": {
+    "fc2": "FC2",
     "home": "首页",
     "browse": "浏览",
     "yours": "我的",
@@ -734,6 +735,7 @@
     "curatedFramesCount": "萃取帧"
   },
   "library": {
+    "fc2EmptyDescription": "这里还没有 FC2 影片。",
     "recentEmptyDescription": "新加入的影片会出现在这里。",
     "favoritesEmptyDescription": "遇到喜欢的影片，点一下收藏，就能在这里找到。",
     "emptyDescription": "添加第一部影片，开始你的收藏。",
@@ -1902,6 +1904,7 @@
     "revealFailGeneric": "无法在文件管理器中打开"
   },
   "player": {
+    "historyCategory": "历史记录类别",
     "loadingTarget": "正在加载播放目标…",
     "notFoundTitle": "播放目标未找到",
     "notFoundDesc": "此播放路由指向的影片 ID 在当前库中不可用。",

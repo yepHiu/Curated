@@ -114,18 +114,21 @@ function getActorNameQuery(query: LocationQuery): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
+/** 返回演员作品页时保留来源类别。 */
 export function buildActorDetailRoute(
   actorName: string,
   selectedMovieId?: string,
+  sourceMode: LibraryMode = "library",
 ): RouteLocationRaw {
   const selected = selectedMovieId?.trim()
   return {
     name: "actor-detail",
     params: { actorName },
-    query: selected ? { selected } : {},
+    query: { ...(selected ? { selected } : {}), ...(sourceMode === "fc2" ? { browse: "fc2" } : {}) },
   }
 }
 
+/** 返回演员作品页时保留来源类别。 */
 export function buildActorDetailRouteFromDetail(
   actorName: string,
   movieId: string,
@@ -142,12 +145,13 @@ export function buildActorDetailRouteFromDetail(
   }
 }
 
+/** 演员返回目标沿用当前 FC2 或普通影片范围。 */
 function buildActorBackLink(query: LocationQuery, movieId: string): RouteLocationRaw {
   const actorName = getActorNameQuery(query)
   if (!actorName) {
     return buildBrowseBackLink(query, movieId)
   }
-  return buildActorDetailRoute(actorName, movieId)
+  return buildActorDetailRoute(actorName, movieId, getBrowseSourceMode(query))
 }
 
 function hasExplicitBackTarget(query: LocationQuery, target: NavigationBackTarget): boolean {
@@ -249,24 +253,29 @@ export function buildPlayerRouteFromBrowseIntent(
   }
 }
 
-export function buildDetailRouteFromActor(movieId: string, actorName: string): RouteLocationRaw {
+/** 保留演员来源和 FC2 类别的详情目标。 */
+export function buildDetailRouteFromActor(movieId: string, actorName: string, sourceMode: LibraryMode = "library"): RouteLocationRaw {
   return {
     name: "detail",
     params: { id: movieId },
     query: {
       actor: actorName,
+      ...(sourceMode === "fc2" ? { browse: "fc2" } : {}),
       back: "actor",
       selected: movieId,
     },
   }
 }
 
+/** 从演员作品范围构造播放目标。 */
 export function buildPlayerRouteFromActorIntent(
   movieId: string,
   actorName: string,
+  sourceMode: LibraryMode = "library",
 ): RouteLocationRaw {
   const query: LocationQuery = {
     actor: actorName,
+    ...(sourceMode === "fc2" ? { browse: "fc2" } : {}),
     autoplay: "1",
     back: "actor",
     selected: movieId,
@@ -284,9 +293,11 @@ export function buildPlayerRouteFromActorIntent(
   }
 }
 
+/** 从当前类别历史构造续播目标。 */
 export function buildPlayerRouteFromHistoryIntent(
   movieId: string,
   resumeSec: number,
+  sourceMode: LibraryMode = "library",
 ): RouteLocationRaw {
   return {
     name: "player",
@@ -294,6 +305,7 @@ export function buildPlayerRouteFromHistoryIntent(
     query: {
       autoplay: "1",
       back: "history",
+      ...(sourceMode === "fc2" ? { browse: "fc2" } : {}),
       t: String(Math.max(0, Math.floor(resumeSec))),
     },
   }
@@ -327,6 +339,7 @@ export function buildComicReaderRouteFromSource(
   }
 }
 
+/** 按来源恢复页面与浏览类别。 */
 export function resolveNavigationBackLink(
   route: RouteLike,
   currentMovieId?: string,
@@ -397,7 +410,7 @@ export function resolveNavigationBackLink(
     const backTarget = getNavigationBackTarget(route.query)
     if (backTarget === "history") {
       return {
-        to: { name: "history" },
+        to: { name: "history", ...(route.query.browse === "fc2" ? { query: { category: "fc2" } } : {}) },
         labelKey: "shell.backHistory",
       }
     }

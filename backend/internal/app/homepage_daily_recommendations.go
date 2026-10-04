@@ -304,8 +304,10 @@ func normalizeHomepageMovieIDsExcluding(
 	return out
 }
 
+// generateHomepageDailyRecommendations 从普通影片范围生成首页推荐。
 func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error) {
 	page, err := a.store.ListMovies(ctx, contracts.ListMoviesRequest{
+		Mode:   "library",
 		Limit:  10000,
 		Offset: 0,
 	})
@@ -390,6 +392,7 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 	return dto, nil
 }
 
+// generateHomepageDailyRecommendationIDsForPreservedHero 保留 hero 时为普通影片范围补齐推荐。
 func (a *App) generateHomepageDailyRecommendationIDsForPreservedHero(
 	ctx context.Context,
 	dateUTC string,
@@ -397,6 +400,7 @@ func (a *App) generateHomepageDailyRecommendationIDsForPreservedHero(
 	excludedRecommendationMovieIDs []string,
 ) ([]string, []contracts.HomepageRecommendationItemDTO, error) {
 	page, err := a.store.ListMovies(ctx, contracts.ListMoviesRequest{
+		Mode:   "library",
 		Limit:  10000,
 		Offset: 0,
 	})

@@ -36,7 +36,7 @@ func (a *App) HomepageTopics(ctx context.Context) ([]contracts.HomepageTopicGrou
 		}
 		page := contracts.MoviesPageDTO{}
 		for offset := 0; ; offset += 100 {
-			batch, err := a.store.ListMovies(ctx, contracts.ListMoviesRequest{TopicID: topic.ID, Limit: 100, Offset: offset})
+			batch, err := a.store.ListMovies(ctx, contracts.ListMoviesRequest{Mode: "library", TopicID: topic.ID, Limit: 100, Offset: offset})
 			if err != nil {
 				return nil, err
 			}

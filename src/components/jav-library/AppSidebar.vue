@@ -135,11 +135,12 @@ const backendCompactTitle = computed(() => {
     : backendStatusText.value
 })
 
-const sidebarNavGroups = computed((): SidebarNavGroups => {
+const sidebarNavGroups = computed(/* 使用同一导航结构展示影片和 FC2 入口。 */ (): SidebarNavGroups => {
   void locale.value
   const browse: NavigationItem[] = [
     { label: t("nav.home"), page: "home", icon: House },
     { label: t("nav.library"), page: "library", icon: LibraryBig },
+    { label: t("nav.fc2"), page: "fc2", icon: Clapperboard },
   ]
 
   if (comicLibraryEnabled.value) {

@@ -91,6 +91,7 @@
     "reload": "Reload app"
   },
   "nav": {
+    "fc2": "FC2",
     "browse": "Browse",
     "yours": "Yours",
     "home": "Home",
@@ -734,6 +735,7 @@
     "curatedFramesCount": "Curated frames"
   },
   "library": {
+    "fc2EmptyDescription": "No FC2 titles yet.",
     "recentEmptyDescription": "New additions to your collection will appear here.",
     "favoritesEmptyDescription": "Favorite a movie you love and find it here.",
     "emptyDescription": "Add your first movie to start your collection.",
@@ -1902,6 +1904,7 @@
     "revealFailGeneric": "Could not open file manager"
   },
   "player": {
+    "historyCategory": "History category",
     "loadingTarget": "Loading playback target…",
     "notFoundTitle": "Player target not found",
     "notFoundDesc": "This player route points to a movie id that is not available in the current library.",

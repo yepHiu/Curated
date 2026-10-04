@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { RouterLink, useRouter } from "vue-router"
+import { RouterLink, useRoute, useRouter } from "vue-router"
 import { CheckSquare, ListChecks, Trash2, X } from "lucide-vue-next"
 import MediaEmptyState from "@/components/jav-library/MediaEmptyState.vue"
 import PlaybackHistoryCard from "@/components/jav-library/PlaybackHistoryCard.vue"
 import { HttpClientError } from "@/api/http-client"
+import { isFC2MovieCode } from "@/lib/movie-category"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -29,7 +31,14 @@ import {
 import { useLibraryService } from "@/services/library-service"
 
 const { t, locale } = useI18n()
+const route = useRoute()
 const router = useRouter()
+const category = computed({
+ /** 未指定来源时使用普通影片历史，FC2 可通过类别选择进入。 */
+ get: /* 按影片或 FC2 范围恢复历史页面。 */ () => route.query.category === "fc2" ? "fc2" : "library",
+ /** 改类别同时退出批量选择，URL 可恢复当前历史范围。 */
+ set: /* 按影片或 FC2 范围恢复历史页面。 */ (value: string) => { exitBatchMode(); void router.replace({ query: { ...route.query, category: value === "fc2" ? "fc2" : undefined } }) },
+})
 const libraryService = useLibraryService()
 
 interface HistoryRow {
@@ -46,13 +55,13 @@ const batchBusy = ref(false)
 const batchRemoveDialogOpen = ref(false)
 const batchSelectedIds = shallowRef<Set<string>>(new Set())
 
-const historyRows = computed((): HistoryRow[] => {
+const historyRows = computed(/* 按影片或 FC2 范围恢复历史页面。 */ (): HistoryRow[] => {
   void playbackProgressRevision.value
   const sorted = listSortedByUpdatedDesc()
   const out: HistoryRow[] = []
   for (const entry of sorted) {
     const movie = libraryService.getMovieById(entry.movieId)
-    if (!movie) continue
+    if (!movie || isFC2MovieCode(movie.code) !== (category.value === "fc2")) continue
     out.push({ entry, movie, updatedAt: entry.updatedAt })
   }
   return out
@@ -72,13 +81,14 @@ const dayBuckets = computed(() => {
 const isEmpty = computed(() => historyRows.value.length === 0)
 const batchSelectedCount = computed(() => batchSelectedIds.value.size)
 
+/** 从当前类别历史恢复实际文件与进度。 */
 async function openFromHistory(row: HistoryRow) {
   if (batchMode.value) {
     toggleBatchSelect(row.entry.movieId)
     return
   }
   const pos = Math.max(0, Math.floor(row.entry.positionSec))
-  await router.push(buildPlayerRouteFromHistory(row.movie.id, pos))
+  await router.push(buildPlayerRouteFromHistory(row.movie.id, pos, category.value))
 }
 
 function requestRemoveRow(row: HistoryRow) {
@@ -234,11 +244,18 @@ watch(
               </template>
             </div>
           </div>
+          <Select v-model="category">
+            <SelectTrigger class="w-40" :aria-label="t('player.historyCategory')"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectGroup>
+              <SelectItem value="library">{{ t('nav.library') }}</SelectItem>
+              <SelectItem value="fc2">{{ t('nav.fc2') }}</SelectItem>
+            </SelectGroup></SelectContent>
+          </Select>
         </header>
 
     <MediaEmptyState v-if="isEmpty" :description="t('history.empty')">
       <Button as-child variant="outline" class="min-h-11 rounded-full sm:min-h-8">
-        <RouterLink :to="{ name: 'library' }">{{ t("history.goLibrary") }}</RouterLink>
+        <RouterLink :to="{ name: category }">{{ t("history.goLibrary") }}</RouterLink>
       </Button>
     </MediaEmptyState>
 

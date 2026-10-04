@@ -36,6 +36,7 @@ import { openHomeFromLibraryKey } from "@/lib/home-library-navigation"
 import { armHomeScrollRestore } from "@/composables/use-home-scroll-preserve"
 import { buildDetailRouteFromBrowse, buildPlayerRouteFromBrowseIntent } from "@/lib/navigation-intent"
 import { isMovieRecentlyAdded } from "@/lib/library-stats"
+import { moviesInBrowseCategory } from "@/lib/movie-category"
 import { movieSearchHaystack } from "@/lib/movie-search"
 import { filterMoviesBySavedView } from "@/lib/library-saved-view-filter"
 import { getProgress, playbackProgressRevision } from "@/lib/playback-progress-storage"
@@ -566,9 +567,11 @@ watch(
   { immediate: true },
 )
 
-const libraryMovies = computed(() =>
+/** 两个海报墙先限定分类，再进行搜索、筛选和计数。 */
+const libraryMovies = computed(/* 先限定类别，再计算影响作品集合的筛选条件。 */ () => moviesInBrowseCategory(
   libraryMode.value === "trash" ? libraryService.trashedMovies.value : libraryService.movies.value,
-)
+  libraryMode.value,
+))
 const searchQuery = computed(() => getLibrarySearchQuery(route.query))
 const actorExactFilters = computed(() => getLibraryActorExactFilters(route.query))
 const actorExactQuery = computed(() =>
@@ -698,9 +701,9 @@ const queryFilteredMovies = computed(() => {
 })
 
 /** Only filters that affect membership count; sorting and navigation metadata do not. */
-const hasContentConstraints = computed(() => {
+const hasContentConstraints = computed(/* 先限定类别，再计算影响作品集合的筛选条件。 */ () => {
   const f = savedViewFilters.value
-  return Boolean(route.query.topicId || f.q || f.tag || f.actor || f.studio ||
+  return Boolean(f.favoriteOnly || route.query.topicId || f.q || f.tag || f.actor || f.studio ||
     (f.playState && f.playState !== "all") || f.userRating !== undefined || f.unrated ||
     f.resolution || f.addedWithinDays !== undefined || f.year || f.runtime || f.catalog)
 })

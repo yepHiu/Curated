@@ -23,6 +23,7 @@ import {
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
 import { useLibraryService } from "@/services/library-service"
 import { bumpMovieImageVersion } from "@/lib/image-version"
+import { isFC2MovieCode } from "@/lib/movie-category"
 import type { Movie } from "@/domain/movie/types"
 
 const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
@@ -57,6 +58,12 @@ const movieId = computed(() =>
 )
 
 const detailMovie = shallowRef<Movie | undefined>()
+/** 深链没有浏览来源时，FC2 详情的返回和标签筛选仍属于 FC2。 */
+watch(detailMovie, /* 保留当前资料的作品及文件归属。 */ (movie) => {
+ if (movie && isFC2MovieCode(movie.code) && !route.query.browse && !route.query.from) {
+  void router.replace({ query: { ...route.query, browse: "fc2" } })
+ }
+})
 const detailLoading = ref(false)
 const detailLoadError = ref("")
 const patchError = ref("")

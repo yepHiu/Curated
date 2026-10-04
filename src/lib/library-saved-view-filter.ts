@@ -164,7 +164,8 @@ export function filterMoviesBySavedView(
   runtime: SavedViewFilterRuntime,
 ): Movie[] {
   const now = runtime.now ?? new Date()
-  return movies.filter((movie) => {
+  return movies.filter(/* 检查收藏及其它成员条件以确定作品是否保留。 */ (movie) => {
+    if (filters.favoriteOnly && !movie.isFavorite) return false
     if (!matchesPlayState(movie, filters.playState, runtime)) {
       return false
     }

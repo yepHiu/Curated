@@ -215,7 +215,7 @@ async function openPlaylistMovie(movieId: string) {
     if (!actor) {
       return
     }
-    await router.push(buildPlayerRouteFromActorIntent(id, actor))
+    await router.push(buildPlayerRouteFromActorIntent(id, actor, getBrowseSourceMode(route.query)))
     return
   }
   const back = route.query.back === "detail" ? "detail" : "browse"

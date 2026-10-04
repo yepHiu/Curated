@@ -2,6 +2,8 @@
 import { computed, ref, useId, watch } from "vue"
 import { usePreferredReducedMotion } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
+import { getBrowseSourceMode } from "@/lib/library-query"
+import { moviesInBrowseCategory } from "@/lib/movie-category"
 import { useRoute, useRouter } from "vue-router"
 import { GitMerge, Images } from "lucide-vue-next"
 import ActorMergeDialog from "@/components/jav-library/ActorMergeDialog.vue"
@@ -73,12 +75,12 @@ async function onActorMerged(targetName: string) {
   })
 }
 
-const actorMovies = computed(() => {
+const actorMovies = computed(/* 演员作品结果限定来源浏览类别。 */ () => {
   const actor = actorDisplayName.value
   if (!actor) {
     return [] as Movie[]
   }
-  return libraryService.movies.value
+  return moviesInBrowseCategory(libraryService.movies.value, getBrowseSourceMode(route.query))
     .filter((movie) => movie.actors.includes(actor))
     .sort(compareByReleaseDateDesc)
 })
@@ -87,22 +89,24 @@ const scrollPreserveKey = computed(() =>
   actorDisplayName.value ? `actor-detail:${actorDisplayName.value}` : "actor-detail",
 )
 
+/** 打开作品详情并保留演员页的浏览类别。 */
 async function openDetails(movieId?: string) {
   const id = movieId?.trim()
   const actor = actorDisplayName.value
   if (!id || !actor) {
     return
   }
-  await router.push(buildDetailRouteFromActor(id, actor))
+  await router.push(buildDetailRouteFromActor(id, actor, getBrowseSourceMode(route.query)))
 }
 
+/** 从当前演员作品范围打开播放器。 */
 async function openPlayer(movieId?: string) {
   const id = movieId?.trim() || actorMovies.value[0]?.id
   const actor = actorDisplayName.value
   if (!id || !actor) {
     return
   }
-  await router.push(buildPlayerRouteFromActorIntent(id, actor))
+  await router.push(buildPlayerRouteFromActorIntent(id, actor, getBrowseSourceMode(route.query)))
 }
 
 async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) {

@@ -26,11 +26,13 @@ func NormalizeSavedViewName(value string) (string, error) {
 	return name, nil
 }
 
+// NormalizeSavedViewFilters 校验持久筛选范围，FC2 和收藏条件与普通影片共用合约。
 func NormalizeSavedViewFilters(input contracts.SavedViewFiltersV1) (contracts.SavedViewFiltersV1, error) {
 	if input.SchemaVersion != contracts.SavedViewSchemaVersion {
 		return contracts.SavedViewFiltersV1{}, errors.New("unsupported saved view schemaVersion")
 	}
 	out := contracts.SavedViewFiltersV1{
+		FavoriteOnly:  input.FavoriteOnly,
 		SchemaVersion: contracts.SavedViewSchemaVersion,
 		Mode:          strings.ToLower(strings.TrimSpace(input.Mode)),
 		Query:         strings.TrimSpace(input.Query),
@@ -48,7 +50,7 @@ func NormalizeSavedViewFilters(input contracts.SavedViewFiltersV1) (contracts.Sa
 	if out.Mode == "" {
 		out.Mode = "library"
 	}
-	if !savedViewOneOf(out.Mode, "library", "favorites", "recent", "tags", "trash") {
+	if !savedViewOneOf(out.Mode, "library", "fc2", "favorites", "recent", "tags", "trash") {
 		return contracts.SavedViewFiltersV1{}, errors.New("invalid saved view mode")
 	}
 	if out.Tab == "" {

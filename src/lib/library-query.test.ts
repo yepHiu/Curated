@@ -392,4 +392,12 @@ describe("library query helpers", () => {
     const cleared = mergeCuratedFramesQuery(merged, { cft: "" })
     expect(cleared).toEqual({ cfq: "abc" })
   })
+  it("preserves FC2 favorites in saved views and clears the filter explicitly", () => {
+    // FC2 收藏筛选保存后恢复同一范围，取消筛选时移除 URL 参数。
+    const filters = buildSavedViewFiltersV1("fc2", { favorite: "1", q: "sample" })
+    expect(filters.favoriteOnly).toBe(true)
+    expect(buildSavedViewRouteTarget(filters)).toEqual({ name: "fc2", query: { favorite: "1", q: "sample" } })
+    expect(mergeLibraryQuery({ favorite: "1", q: "sample" }, { favorite: "" })).toEqual({ q: "sample" })
+  })
+
 })

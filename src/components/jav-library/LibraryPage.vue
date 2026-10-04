@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRoute, useRouter } from "vue-router"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { CheckSquare, ListChecks, X } from "lucide-vue-next"
@@ -43,18 +44,27 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+/** FC2 收藏继续复用作品收藏字段与原有筛选控件。 */
+function toggleFC2Favorites() {
+ void router.replace({ query: { ...route.query, favorite: route.query.favorite === "1" ? undefined : "1" } })
+}
 const activeActorTrimmed = computed(() => props.activeActorFilter?.trim() ?? "")
 const activeStudioTrimmed = computed(() => props.activeStudioFilter?.trim() ?? "")
 
-const emptyDescriptionKey = computed(() => {
+const emptyDescriptionKey = computed(/* 为当前浏览类别选择标题及空态文案。 */ () => {
+  if (props.mode === "fc2") return "library.fc2EmptyDescription"
   if (props.mode === "favorites") return "library.favoritesEmptyDescription"
   if (props.mode === "recent") return "library.recentEmptyDescription"
   if (props.mode === "trash") return "library.trashEmptyDesc"
   return "library.emptyDescription"
 })
 const batchModeOn = computed(() => props.batchMode === true)
-const pageTitleKey = computed(() => {
+const pageTitleKey = computed(/* 为当前浏览类别选择标题及空态文案。 */ () => {
   switch (props.mode) {
+    case "fc2":
+      return "nav.fc2"
     case "favorites":
       return "nav.favorites"
     case "trash":
@@ -128,6 +138,7 @@ const pageTitleKey = computed(() => {
     >
       <template v-if="!batchModeOn">
         <LibrarySavedViewsControls>
+          <Button v-if="mode === 'fc2'" variant="outline" :aria-pressed="route.query.favorite === '1'" @click="toggleFC2Favorites">{{ t('nav.favorites') }}</Button>
           <Button
             type="button"
             variant="outline"

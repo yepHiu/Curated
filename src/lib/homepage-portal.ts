@@ -1,3 +1,4 @@
+import { isFC2MovieCode } from "@/lib/movie-category"
 import type { Movie } from "@/domain/movie/types"
 import type { HomepageRecommendationReasonDTO } from "@/api/types"
 import { compareByAddedAtDesc } from "@/lib/movie-sort"
@@ -94,14 +95,6 @@ function seededHeroOrder(movies: readonly Movie[], daySeed: string): Movie[] {
       return left.index - right.index
     })
     .map((entry) => entry.movie)
-}
-
-function isFC2MovieCode(code: string | undefined): boolean {
-  const normalized = (code ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/[\s_-]+/g, "")
-  return normalized.startsWith("FC2")
 }
 
 function fillHeroMovies(movies: readonly Movie[], limit: number): Movie[] {
@@ -261,6 +254,7 @@ function withHomepageDailyRecommendations(
   }
 }
 
+/** 生成普通影片首页栏目，统一排除 FC2 与回收站资料。 */
 export function buildHomepagePortalModel({
   movies,
   playbackEntries = [],
@@ -271,7 +265,10 @@ export function buildHomepagePortalModel({
   recommendationLimit = 6,
   continueLimit = 6,
 }: BuildHomepagePortalInput): HomepagePortalModel {
-  const activeMovies = movies.filter((movie) => !movie.trashedAt?.trim())
+  const activeMovies = movies.filter((movie) => {
+    // 影片首页的最近、推荐与继续观看保持相同的非 FC2 范围。
+    return !movie.trashedAt?.trim() && !isFC2MovieCode(movie.code)
+  })
   const playbackByMovieId = buildPlaybackMap(playbackEntries)
   const heroPool = activeMovies.filter((movie) => !isFC2MovieCode(movie.code))
 

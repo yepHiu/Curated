@@ -3,6 +3,7 @@ export type AppPage =
   | "wishlist-detail"
   | "home"
   | "library"
+  | "fc2"
   | "favorites"
   | "recent"
   | "tags"
@@ -23,7 +24,7 @@ export type AppPage =
   | "settings"
   | "not-found"
 
-export type LibraryMode = Extract<AppPage, "library" | "favorites" | "recent" | "tags" | "trash">
+export type LibraryMode = Extract<AppPage, "library" | "fc2" | "favorites" | "recent" | "tags" | "trash">
 export type LibraryTab = "all" | "new" | "top-rated"
 
 export interface LibraryStat {

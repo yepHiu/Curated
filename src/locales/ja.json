@@ -91,6 +91,7 @@
     "reload": "アプリを再読み込み"
   },
   "nav": {
+    "fc2": "FC2",
     "home": "ホーム",
     "browse": "ブラウズ",
     "yours": "あなたの",
@@ -734,6 +735,7 @@
     "curatedFramesCount": "萃取フレーム"
   },
   "library": {
+    "fc2EmptyDescription": "FC2 作品はまだありません。",
     "recentEmptyDescription": "新しく追加した作品がここに並びます。",
     "favoritesEmptyDescription": "気に入った作品をお気に入りにすると、ここに表示されます。",
     "emptyDescription": "最初の一本を追加して、コレクションを始めましょう。",
@@ -1902,6 +1904,7 @@
     "revealFailGeneric": "ファイルマネージャーを開けませんでした"
   },
   "player": {
+    "historyCategory": "履歴のカテゴリー",
     "loadingTarget": "再生ターゲットを読み込み中…",
     "notFoundTitle": "再生ターゲットが見つかりません",
     "notFoundDesc": "このプレイヤールートが参照する動画 ID は現在のライブラリで利用できません。",

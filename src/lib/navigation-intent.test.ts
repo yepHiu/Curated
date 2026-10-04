@@ -502,4 +502,10 @@ describe("navigation intent helpers", () => {
       to: { name: "comics" },
     })
   })
+  it("keeps FC2 category when returning from player to an actor", () => {
+    // 从 FC2 演员作品进入播放后，返回不得切回普通影片队列。
+    const result = resolveNavigationBackLink({ name: "player", query: { back: "actor", actor: "Fixture", browse: "fc2" } }, "fc2-demo")
+    expect(result?.to).toEqual({ name: "actor-detail", params: { actorName: "Fixture" }, query: { selected: "fc2-demo", browse: "fc2" } })
+  })
+
 })

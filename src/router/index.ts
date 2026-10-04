@@ -87,6 +87,12 @@ const router = createRouter({
           component: () => import("@/views/LibraryView.vue"),
         },
         {
+          path: "fc2",
+          name: "fc2",
+          // FC2 复用影片页及其服务，独立浏览范围由路由决定。
+          component: /* 按需加载共用资料库页面。 */ () => import("@/views/LibraryView.vue"),
+        },
+        {
           path: "wishlist",
           name: "wishlist",
           // 独立页面按路由加载，避免增加首屏负担。

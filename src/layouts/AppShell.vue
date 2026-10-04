@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n"
 import { onClickOutside, onKeyStroke, useFullscreen, useMediaQuery, watchDebounced } from "@vueuse/core"
 import { MessagesSquare, LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
+import { moviesInBrowseCategory } from "@/lib/movie-category"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
 import ImportMenu from "@/components/jav-library/ImportMenu.vue"
 import DevEnvironmentBadge from "@/components/dev/DevEnvironmentBadge.vue"
@@ -215,10 +216,11 @@ const hasDetailBackIntentOnPrimaryRoute = computed(
     Boolean(currentMovieId.value),
 )
 const isCuratedFramesRoute = computed(() => route.name === "curated-frames")
-const useFlushWorkspaceFrame = computed(() =>
+const useFlushWorkspaceFrame = computed(/* 壳层搜索与页面展示沿用当前浏览类别。 */ () =>
   [
     "home",
     "library",
+    "fc2",
     "favorites",
     "tags",
     "trash",
@@ -268,8 +270,8 @@ watchDebounced(
   { debounce: 150 },
 )
 
-const librarySuggestGroups = computed(() =>
-  buildLibrarySearchSuggestions(debouncedSuggestNeedle.value, libraryService.movies.value),
+const librarySuggestGroups = computed(/* 壳层搜索与页面展示沿用当前浏览类别。 */ () =>
+  buildLibrarySearchSuggestions(debouncedSuggestNeedle.value, moviesInBrowseCategory(libraryService.movies.value, resolveLibraryMode(route))),
 )
 
 /** 下拉列表渲染行：分组标题 + 可选条目（含扁平下标供键盘高亮） */

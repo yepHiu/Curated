@@ -268,7 +268,7 @@ func conflictResult() core.Result {
 func createSavedView(w LibraryWrite) core.ToolDefinition {
 	filters := object(map[string]core.Schema{
 		"schemaVersion":   intField("Must be 1; omitted defaults to 1", 1, 1),
-		"mode":            core.Schema{Type: "string", Enum: []string{"library", "favorites", "recent", "tags", "trash"}},
+		"mode":            core.Schema{Type: "string", Enum: []string{"library", "fc2", "favorites", "recent", "tags", "trash"}},
 		"q":               strField("Search query"),
 		"tag":             strField("Comma-separated tags, AND"),
 		"actor":           strField("Comma-separated actors, AND"),

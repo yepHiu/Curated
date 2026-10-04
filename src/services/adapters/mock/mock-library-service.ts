@@ -48,6 +48,7 @@ import type {
   TaskDTO,
 } from "@/api/types"
 import type { LibrarySetting } from "@/domain/library/types"
+import { isFC2MovieCode } from "@/lib/movie-category"
 import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
 import { countCuratedFrames } from "@/lib/curated-frames/db"
@@ -1980,8 +1981,9 @@ export const mockLibraryService: LibraryService = {
     if (actors.size === 0) return []
     return moviesState.value
       .filter(
-        (movie) =>
+        /* 根据当前文件和作品资料生成一致的演示结果。 */ (movie) =>
           movie.id !== id &&
+            isFC2MovieCode(movie.code) === isFC2MovieCode(source.code) &&
           !movie.trashedAt?.trim() &&
           movie.actors.some((actor) => actors.has(actor.trim().toLocaleLowerCase())),
       )

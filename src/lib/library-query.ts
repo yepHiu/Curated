@@ -9,7 +9,7 @@ import type {
 import type { LocationQuery, RouteLocationNormalizedLoaded, RouteRecordName } from "vue-router"
 import { librarySortKeyFromTab, librarySortKeys } from "@/lib/movie-sort"
 
-const libraryModes = ["library", "favorites", "recent", "tags", "trash"] as const
+const libraryModes = ["library", "fc2", "favorites", "recent", "tags", "trash"] as const
 const libraryTabs = ["all", "new", "top-rated"] as const
 const libraryPlayStates = ["all", "unwatched", "in-progress", "completed"] as const
 const libraryRuntimes = ["short", "standard", "long"] as const
@@ -287,6 +287,7 @@ export const getLibrarySortQueryForRoute = (query: LocationQuery): SavedViewSort
   return explicit
 }
 
+/** 保留可恢复的浏览条件，并移除播放临时参数。 */
 export const buildSavedViewFiltersV1 = (
   mode: LibraryMode,
   query: LocationQuery,
@@ -294,6 +295,7 @@ export const buildSavedViewFiltersV1 = (
   const sort = getLibrarySortQuery(query)
   return {
     schemaVersion: 1,
+    favoriteOnly: query.favorite === "1" || undefined,
     mode: canonicalLibraryRouteMode(mode),
     q: getLibrarySearchQuery(query).trim() || undefined,
     tag: serializeLibraryTagFilters(getLibraryTagExactFilters(query)),
@@ -312,6 +314,7 @@ export const buildSavedViewFiltersV1 = (
   }
 }
 
+/** 保留可恢复的浏览条件，并移除播放临时参数。 */
 export const buildSavedViewRouteTarget = (filters: SavedViewFiltersV1) => {
   const tab =
     filters.tab === "new" || filters.tab === "top-rated" ? filters.tab : ("all" as const)
@@ -320,6 +323,7 @@ export const buildSavedViewRouteTarget = (filters: SavedViewFiltersV1) => {
   return {
     name: canonicalLibraryRouteMode(filters.mode ?? "library"),
     query: mergeLibraryQuery({}, {
+      favorite: filters.favoriteOnly ? "1" : undefined,
       q: filters.q,
       tag: filters.tag,
       actor: filters.actor,
@@ -349,8 +353,10 @@ export const getSelectedMovieQuery = (query: LocationQuery) => {
   return undefined
 }
 
+/** 保留可恢复的浏览条件，并移除播放临时参数。 */
 export const getBrowseContextQuery = (query: LocationQuery) => ({
   browse: getBrowseSourceMode(query),
+  favorite: query.favorite === "1" ? "1" : undefined,
   q: getLibrarySearchQuery(query) || undefined,
   tag: serializeLibraryTagFilters(getLibraryTagExactFilters(query)),
   actor: serializeLibraryTagFilters(getLibraryActorExactFilters(query)),
@@ -377,6 +383,7 @@ export const getBrowseContextQuery = (query: LocationQuery) => ({
 
 type LibraryQueryPatchKey =
   | "q"
+  | "favorite"
   | "tab"
   | "selected"
   | "from"
@@ -393,6 +400,7 @@ type LibraryQueryPatchKey =
   | "runtime"
   | "catalog"
 
+/** 保留可恢复的浏览条件，并移除播放临时参数。 */
 export const mergeLibraryQuery = (
   sourceQuery: LocationQuery,
   patch: Partial<
@@ -411,6 +419,10 @@ export const mergeLibraryQuery = (
     }
 
     delete nextQuery[key]
+  }
+
+  if (hasOwnKey(patch, "favorite")) {
+    applyValue("favorite", patch.favorite === "1" ? "1" : undefined)
   }
 
   if (hasOwnKey(patch, "q")) {

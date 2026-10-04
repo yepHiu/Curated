@@ -22,8 +22,8 @@ export function buildPlayerRouteFromBrowse(
 }
 
 /** Open player from History page with an explicit history return target. */
-export function buildPlayerRouteFromHistory(movieId: string, resumeSec: number) {
-  return buildPlayerRouteFromHistoryIntent(movieId, resumeSec)
+export function buildPlayerRouteFromHistory(movieId: string, resumeSec: number, sourceMode: LibraryMode = "library") {
+  return buildPlayerRouteFromHistoryIntent(movieId, resumeSec, sourceMode)
 }
 
 /** Open player from curated-frame capture time with an explicit curated return target. */

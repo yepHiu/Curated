@@ -53,6 +53,7 @@ import { HttpClientError } from "@/api/http-client"
 import { api, movieImportUploadFileManifests } from "@/api/endpoints"
 import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
 import type { LibrarySetting } from "@/domain/library/types"
+import { isFC2MovieCode } from "@/lib/movie-category"
 import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
 import { clientVideoCodecsQueryParam, resolvePlaybackCapabilities } from "@/lib/playback-capabilities"
@@ -1326,8 +1327,9 @@ function createWebLibraryService(): LibraryService {
       if (actors.size === 0) return []
       return moviesState.value
         .filter(
-          (movie) =>
+          /* 适配文件身份及当前浏览类别的共享资料。 */ (movie) =>
             movie.id !== id &&
+            isFC2MovieCode(movie.code) === isFC2MovieCode(source.code) &&
             movie.actors.some((actor) => actors.has(actor.trim().toLocaleLowerCase())),
         )
         .slice(0, Math.max(0, limit))

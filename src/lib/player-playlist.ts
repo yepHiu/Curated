@@ -1,4 +1,5 @@
 import type { LocationQuery } from "vue-router"
+import { moviesInBrowseCategory } from "@/lib/movie-category"
 import type { Movie } from "@/domain/movie/types"
 import type { LibraryMode } from "@/domain/library/types"
 import {
@@ -91,6 +92,7 @@ export function listActorQueueMovies(movies: readonly Movie[], actorName: string
   return movies.filter((movie) => movie.actors.includes(actor))
 }
 
+/** 在当前类别内应用浏览条件生成队列。 */
 export function listLibraryQueueMovies(input: {
   movies: readonly Movie[]
   trashedMovies: readonly Movie[]
@@ -99,7 +101,7 @@ export function listLibraryQueueMovies(input: {
   getProgress: (movieId: string) => PlaybackProgressEntry | undefined
 }): Movie[] {
   const mode: LibraryMode = getBrowseSourceMode(input.query)
-  const raw = mode === "trash" ? input.trashedMovies : input.movies
+  const raw = moviesInBrowseCategory(mode === "trash" ? input.trashedMovies : input.movies, mode)
   let list: Movie[]
   if (mode === "trash") {
     list = [...raw]
@@ -135,6 +137,7 @@ export function listLibraryQueueMovies(input: {
   return list.slice().sort((left, right) => compareMoviesByLibrarySort(left, right, sort))
 }
 
+/** 按演员或浏览来源生成同类别播放队列。 */
 export function listPlayerPlaylistMovies(input: {
   source: PlayerPlaylistSource | null
   movies: readonly Movie[]
@@ -144,7 +147,7 @@ export function listPlayerPlaylistMovies(input: {
   getProgress?: (movieId: string) => PlaybackProgressEntry | undefined
 }): Movie[] {
   if (input.source === "actor") {
-    return listActorQueueMovies(input.movies, getPlayerPlaylistActorName(input.query))
+    return listActorQueueMovies(moviesInBrowseCategory(input.movies, getBrowseSourceMode(input.query)), getPlayerPlaylistActorName(input.query))
   }
   if (input.source === "browse") {
     return listLibraryQueueMovies({

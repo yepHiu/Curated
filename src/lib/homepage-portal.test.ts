@@ -46,6 +46,17 @@ function makeProgress(
 }
 
 describe("buildHomepagePortalModel", () => {
+  it("keeps FC2 out of recent, recommendations and continue watching as well as hero", () => {
+    // 同一共享缓存中的 FC2 不得进入任何普通影片首页栏目。
+    const model = buildHomepagePortalModel({
+      movies: [makeMovie("regular"), makeMovie("fc2", { code: "FC2-PPV-1234567" })],
+      playbackEntries: [{ movieId: "fc2", positionSec: 60, durationSec: 600, updatedAt: "2026-10-04" }],
+    })
+    expect(model.heroMovies.map((movie) => movie.id)).not.toContain("fc2")
+    expect(model.recentMovies.map((movie) => movie.id)).toEqual(["regular"])
+    expect(model.recommendations.map((entry) => entry.movie.id)).not.toContain("fc2")
+    expect(model.continueWatching).toEqual([])
+  })
   it("builds a deterministic 8-movie hero from the same day seed", () => {
     const movies = Array.from({ length: 12 }, (_, index) =>
       makeMovie(`m${index + 1}`, {

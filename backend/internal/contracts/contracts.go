@@ -256,6 +256,7 @@ const SavedViewSchemaVersion = 1
 // SavedViewFiltersV1 is the durable, versioned filter snapshot stored for a
 // user-created library view. Navigation-only query state is deliberately absent.
 type SavedViewFiltersV1 struct {
+	FavoriteOnly    bool     `json:"favoriteOnly,omitempty"`
 	SchemaVersion   int      `json:"schemaVersion"`
 	Mode            string   `json:"mode,omitempty"`
 	Query           string   `json:"q,omitempty"`

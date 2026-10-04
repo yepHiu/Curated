@@ -499,6 +499,7 @@ export function isImportMovieCodeCheckDTO(value: unknown): value is ImportMovieC
   )
 }
 
+/** 校验保存筛选的类别、收藏和其它成员条件。 */
 function isSavedViewFiltersV1(value: unknown): value is SavedViewFiltersV1 {
   if (!isRecord(value) || value.schemaVersion !== 1) {
     return false
@@ -507,7 +508,8 @@ function isSavedViewFiltersV1(value: unknown): value is SavedViewFiltersV1 {
   const tab = value.tab
   const playState = value.playState
   return (
-    (mode === undefined || ["library", "favorites", "recent", "tags", "trash"].includes(String(mode))) &&
+    (value.favoriteOnly === undefined || isBoolean(value.favoriteOnly)) &&
+    (mode === undefined || ["library", "fc2", "favorites", "recent", "tags", "trash"].includes(String(mode))) &&
     (tab === undefined || ["all", "new", "top-rated"].includes(String(tab))) &&
     (playState === undefined || ["all", "unwatched", "in-progress", "completed"].includes(String(playState))) &&
     isOptionalString(value.q) &&

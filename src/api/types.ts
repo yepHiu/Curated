@@ -1337,7 +1337,7 @@ export interface ActorMergeAuditListDTO {
   offset: number
 }
 
-export type SavedViewMode = "library" | "favorites" | "recent" | "tags" | "trash"
+export type SavedViewMode = "library" | "fc2" | "favorites" | "recent" | "tags" | "trash"
 export type SavedViewTab = "all" | "new" | "top-rated"
 export type SavedViewPlayState = "all" | "unwatched" | "in-progress" | "completed"
 export type SavedViewRuntime = "short" | "standard" | "long"
@@ -1352,6 +1352,7 @@ export type SavedViewSort =
   | "year"
 
 export interface SavedViewFiltersV1 {
+  favoriteOnly?: boolean
   schemaVersion: 1
   mode?: SavedViewMode
   q?: string

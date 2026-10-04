@@ -329,6 +329,14 @@ func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 		clauses = append(clauses, sqlMovieActiveClause)
 	}
 
+	// 分类条件在分页和计数前执行；空 mode 保留共享资源的全库查询。
+	fc2Clause := "UPPER(REPLACE(REPLACE(REPLACE(m.code, '-', ''), '_', ''), ' ', '')) LIKE 'FC2%'"
+	if mode == "fc2" {
+		clauses = append(clauses, fc2Clause)
+	} else if mode != "" && mode != "trash" {
+		clauses = append(clauses, "NOT ("+fc2Clause+")")
+	}
+
 	if mode == "favorites" {
 		clauses = append(clauses, "m.is_favorite = 1")
 	}
