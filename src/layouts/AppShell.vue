@@ -1053,7 +1053,9 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
               :class="routerViewFrameClass"
             >
               <RouterView v-slot="{ Component }">
+                <!-- 普通导航同步移除旧页，避免旧页在新路由布局里滞留两帧。 -->
                 <Transition
+                  :css="Boolean(homeLibraryDrawerTransition)"
                   :name="homeLibraryDrawerTransition"
                   :duration="homeLibraryDrawerTransition ? (prefersReducedMotion ? 0 : 560) : undefined"
                   @after-enter="homeLibraryDrawerTransition = undefined"

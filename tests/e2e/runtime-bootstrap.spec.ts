@@ -68,6 +68,53 @@ test("Mock navigation stays entirely behind the Mock adapter", async ({ page }) 
   expect(backendRequests).toEqual([])
 })
 
+for (const returnAction of ["header", "escape", "history"] as const) {
+  test(`movie detail returns via ${returnAction} without retaining its layout in the library`, async ({ page }) => {
+    await hideDevPerformanceBar(page)
+    await page.goto(`${MOCK_BASE_URL}/#/library`, { waitUntil: "domcontentloaded" })
+    await page.locator("[data-movie-card-id] > button:visible").first().click()
+    await expect(page).toHaveURL(/#\/detail\//)
+    await expect(page.locator("[data-detail-media-column]")).toBeVisible()
+    await expect(page.locator("[data-movie-scroll-region]")).toHaveCount(0)
+
+    // Observe every painted frame, including the two frames a CSS Transition
+    // normally retains its outgoing node even when no animation is defined.
+    await page.evaluate(() => {
+      const frame = document.querySelector<HTMLElement>("[data-router-view-frame]")
+      const detail = frame?.firstElementChild
+      if (!frame || !detail) throw new Error("Detail route has no content root")
+
+      let sampledFrames = 0
+      let overlapFrames = 0
+      const sample = () => {
+        const libraryVisible = Boolean(frame.querySelector("[data-movie-scroll-region]"))
+        if (libraryVisible && detail.isConnected) overlapFrames++
+        frame.dataset.detailReturnOverlap = String(overlapFrames)
+        if (libraryVisible && !detail.isConnected) {
+          frame.dataset.detailReturnComplete = "true"
+        } else if (++sampledFrames < 120) {
+          requestAnimationFrame(sample)
+        }
+      }
+      requestAnimationFrame(sample)
+    })
+
+    if (returnAction === "header") {
+      await page.locator("[data-shell-header] a").click()
+    } else if (returnAction === "escape") {
+      await page.keyboard.press("Escape")
+    } else {
+      await page.goBack()
+    }
+
+    await expect(page).toHaveURL(/#\/library(?:\?|$)/)
+    await expect(page.locator("[data-movie-scroll-region]")).toBeVisible()
+    const frame = page.locator("[data-router-view-frame]")
+    await expect(frame).toHaveAttribute("data-detail-return-complete", "true")
+    await expect(frame).toHaveAttribute("data-detail-return-overlap", "0")
+  })
+}
+
 test("375px library controls remain touchable without clipping or horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 })
   await hideDevPerformanceBar(page)
