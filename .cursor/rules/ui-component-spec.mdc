@@ -26,6 +26,8 @@ Desktop 连接页 Debug 复用右下角入口与 Dialog/Tabs，限高内部滚�
 
 - **影片标签**：用户标签与 NFO／站点标签统一使用 `secondary` Badge、`border-border/60`、`bg-secondary/70`，详情悬停 `bg-secondary/90`；不用 primary 颜色区分来源，保留焦点和删除状态。
 
+- **影片文件数量**：`MovieCard` 海报左上角的番号下方显示多文件数量（仅 >1），左对齐、`gap-1`，使用 outline Badge 和弱背景；普通影片与 FC2 共用，不占底部元数据区域。
+
 ## 深色与 `dark:`（MUST 理解）
 
 - 默认主题在 **`:root`**；`html` 往往 **无** `class="dark"`。项目定义 `@custom-variant dark (&:is(.dark *))`，故 **`dark:*` 仅作用于 `.dark` 祖先内部**。

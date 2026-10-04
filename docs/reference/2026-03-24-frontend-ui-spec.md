@@ -89,6 +89,7 @@
 
 ## 5. 业务组件约束
 
+- `MovieCard` 的多文件数量标签放在海报左上角番号下方，二者左对齐、间距 4px，沿用 outline Badge 和弱背景；仅文件数大于 1 时显示，不占底部标题、演员与标签区域。普通影片和 FC2 共用此布局。
 - `MovieCard`、`ActorLibraryCard`、`PlaybackHistoryCard`、`DetailPanel` 等业务组件优先保持产品语义，不应为临时展示环境或内部实验区引入专用 props。
 - 组件中的交互、表单、菜单、焦点态应尽量保留原有结构与视觉层级。
 
