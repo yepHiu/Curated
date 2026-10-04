@@ -16,6 +16,8 @@ To add another part to an indexed movie, use **Add media → Add movie**, select
 
 The new Server automatically migrates the old indexed location, progress and captures to a stable file record on startup. Existing preferences remain on the movie. Rescan after upgrading to discover additional files that older scans replaced in the index; migration alone cannot recover discarded paths. Automatic organization preserves explicit part numbers; an occupied destination keeps the source in place and indexes it without overwriting. No new library-config setting is required. The source is locally verified; this entry does not announce a production release.
 
+Opening movie details selects part 1 by default; if part 1 is absent, it selects the first available file. This also applies when the file list loads after the movie summary. A manual selection remains active during metadata refreshes, and **Play** opens that selected file. Entering another movie's details resets this choice. Playback launched without an explicit file, including existing history/resume flows, retains the last-played-file fallback.
+
 See the [implementation and verification record](plan/2026-10-04-multipart-movies-and-fc2-library.md) and [file selection API](../API.md#fc2-and-movie-file-selection).
 
 ## Home and movie library scrolling
