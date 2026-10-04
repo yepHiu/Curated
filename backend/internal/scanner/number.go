@@ -44,10 +44,13 @@ var numberPatterns = []struct {
 		re:     regexp.MustCompile(`(?i)\b(CARIBBEANCOM|CARIB)[-_ ]?(\d{6,10}[-_ ]?\d{0,4})\b`),
 		format: func(m []string) string { return "CARIBBEANCOM-" + strings.ReplaceAll(m[2], " ", "") },
 	},
-	// Standard video ID: 2-6 alpha prefix + 2-5 digit suffix (e.g. IPZZ-788, ABP-123, START-483)
+	// Standard video ID: a single attached A-Z letter is a part marker, not part of the catalog code.
 	{
-		re:     regexp.MustCompile(`(?i)\b([a-z]{2,6})[-_ ]?(\d{2,5})(?:\b|_)`),
-		format: func(m []string) string { return strings.ToUpper(m[1]) + "-" + m[2] },
+		re: regexp.MustCompile(`(?i)\b([a-z]{2,6})[-_ ]?(\d{2,5})[a-z]?(?:\b|_)`),
+		format: func(m []string) string {
+			// 只保留番号前缀及数字，A/B 分部由独立的文件序号解析处理。
+			return strings.ToUpper(m[1]) + "-" + m[2]
+		},
 	},
 }
 
@@ -67,7 +70,7 @@ func CleanFilename(rawName string) string {
 	return strings.TrimSpace(name)
 }
 
-// ExtractNumber parses a video ID from a filename.
+// ExtractNumber parses a video ID from a filename, excluding attached A-Z part letters.
 // It first cleans the filename, then tries each pattern in priority order.
 func ExtractNumber(filename string) string {
 	cleaned := CleanFilename(filename)

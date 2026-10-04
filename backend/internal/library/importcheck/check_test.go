@@ -61,3 +61,18 @@ func TestCheckDistinguishesAdditionalPart(t *testing.T) {
 		}
 	}
 }
+
+// TestCheckLetterParts 验证字母分部匹配既有作品，并将 A/B 与数字 1/2 视为相同的分部序号。
+func TestCheckLetterParts(t *testing.T) {
+	index := []IndexItem{
+		{ID: "star-380", Code: "STAR-380", PartIndexes: []int{1}},
+		{ID: "star-684", Code: "STAR-684", PartIndexes: []int{1}},
+		{ID: "ssis-562", Code: "SSIS-562", PartIndexes: []int{0}},
+	}
+	items := Check([]string{"STAR-380A.mp4", "STAR-380B.mp4", "STAR-684B-C.mp4", "SSIS-562-C.mp4"}, index)
+	for i, want := range []string{"part-exists", "new-part", "new-part", "same-code"} {
+		if items[i].FileStatus != want || len(items[i].Matches) != 1 || items[i].Matches[0].MatchKind != "exact" {
+			t.Fatalf("item=%+v want=%s with one exact match", items[i], want)
+		}
+	}
+}

@@ -547,3 +547,139 @@ func TestIntegration_RunScan_MultipartOrganize(t *testing.T) {
 		}
 	}
 }
+
+// TestIntegration_RunScan_FilenameSamples 使用用户提供的完整目录样本验证归组、整理后字节保留及重扫幂等。
+func TestIntegration_RunScan_FilenameSamples(t *testing.T) {
+	samples := []struct {
+		code  string
+		names []string
+	}{
+		{"CAWB-034", []string{"CAWB-034.mp4"}},
+		{"CAWB-049", []string{"CAWB-049.mp4"}},
+		{"CAWD-991", []string{"CAWD-991.mp4"}},
+		{"FC2-1013835", []string{"FC2-PPV-1013835.mp4"}},
+		{"FC2-4942041", []string{"FC2-PPV-4942041-1.mp4", "FC2-PPV-4942041-2.mp4"}},
+		{"FC2-4944497", []string{"FC2-PPV-4944497-1.mp4", "FC2-PPV-4944497-2.mp4"}},
+		{"FC2-4945364", []string{"FC2-PPV-4945364.mp4"}},
+		{"FC2-4953235", []string{"FC2-PPV-4953235.mp4"}},
+		{"FC2-551638", []string{"FC2-PPV-551638.mp4"}},
+		{"FC2-672842", []string{"FC2-PPV-672842.mp4"}},
+		{"FC2-725517", []string{"FC2-PPV-725517.mp4"}},
+		{"FC2-743165", []string{"FC2-PPV-743165.mp4"}},
+		{"FC2-832286", []string{"FC2-PPV-832286.mp4"}},
+		{"FC2-857170", []string{"FC2-PPV-857170.mp4"}},
+		{"FC2-934375", []string{"FC2-PPV-934375.mp4"}},
+		{"MIDA-512", []string{"MIDA-512.mp4"}},
+		{"SORA-439", []string{"SORA-439.mp4"}},
+		{"SORA-443", []string{"SORA-443.mp4"}},
+		{"SORA-620", []string{"SORA-620.mp4"}},
+		{"SORA-651", []string{"SORA-651.mp4"}},
+		{"SSIS-115", []string{"SSIS-115.mp4"}},
+		{"SSIS-195", []string{"SSIS-195.mp4"}},
+		{"SSIS-562", []string{"SSIS-562-C.mp4"}},
+		{"SSIS-588", []string{"SSIS-588-C.mp4"}},
+		{"STAR-380", []string{"STAR-380A.mp4", "STAR-380B.mp4"}},
+		{"STAR-684", []string{"STAR-684A-C.mp4", "STAR-684B-C.mp4"}},
+		{"WAAA-691", []string{"WAAA-691.mp4"}},
+	}
+	for _, organize := range []bool{false, true} {
+		t.Run(fmt.Sprintf("organize=%t", organize), func(t *testing.T) {
+			// 分别验证保留原文件名及启用自动整理两条完整扫描路径。
+			root := t.TempDir()
+			libRoot := filepath.Join(root, "lib")
+			if err := os.MkdirAll(libRoot, 0755); err != nil {
+				t.Fatal(err)
+			}
+			for _, sample := range samples {
+				for _, name := range sample.names {
+					if err := os.WriteFile(filepath.Join(libRoot, name), []byte(name), 0644); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if err := os.WriteFile(filepath.Join(libRoot, "FC2-PPV-551638 description.txt"), []byte("description"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			store, err := storage.NewSQLiteStore(filepath.Join(root, "app.db"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer store.Close()
+			ctx := context.Background()
+			if err := store.Migrate(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := store.AddLibraryPath(ctx, libRoot, "lib"); err != nil {
+				t.Fatal(err)
+			}
+			cfg := config.Default()
+			cfg.DatabasePath = filepath.Join(root, "app.db")
+			cfg.CacheDir = filepath.Join(root, "cache")
+			cfg.OrganizeLibrary = organize
+			a := newTestApp(t, store, cfg)
+			defer a.Close()
+			var output bytes.Buffer
+			taskID := startScanTask(a, store, ctx, []string{libRoot})
+			a.runScan(ctx, &output, taskID, []string{libRoot})
+			imported, updated, skipped := decodeScanFileEvents(t, &output)
+			if len(imported) != 27 || len(updated) != 4 || len(skipped) != 0 {
+				t.Fatalf("31 videos should form 27 movies: imported=%d updated=%d skipped=%+v", len(imported), len(updated), skipped)
+			}
+			movieIDs := make(map[string]string)
+			for _, event := range append(imported, updated...) {
+				if id, ok := movieIDs[event.Number]; ok && id != event.MovieID {
+					t.Fatalf("same catalog code split into different movies: %+v", event)
+				}
+				movieIDs[event.Number] = event.MovieID
+			}
+			fileIDs := make(map[string][]string)
+			for _, sample := range samples {
+				detail, err := store.GetMovieDetail(ctx, movieIDs[sample.code])
+				if err != nil {
+					t.Fatalf("%s: %v", sample.code, err)
+				}
+				if detail.Code != sample.code || len(detail.Files) != len(sample.names) {
+					t.Fatalf("%s: detail=%+v", sample.code, detail)
+				}
+				for i, file := range detail.Files {
+					wantPart := 0
+					if len(sample.names) > 1 {
+						wantPart = i + 1
+					}
+					if file.PartIndex != wantPart {
+						t.Fatalf("%s: ordered file=%+v want part=%d", sample.code, file, wantPart)
+					}
+					data, err := os.ReadFile(file.Location)
+					if err != nil || string(data) != sample.names[i] {
+						t.Fatalf("%s: file content changed: data=%q err=%v", file.Location, data, err)
+					}
+					wantName := sample.names[i]
+					if organize {
+						wantName = sample.code + ".mp4"
+						if wantPart > 0 {
+							wantName = fmt.Sprintf("%s-CD%d.mp4", sample.code, wantPart)
+						}
+					}
+					if filepath.Base(file.Location) != wantName {
+						t.Fatalf("file name=%s want=%s", file.Location, wantName)
+					}
+					fileIDs[sample.code] = append(fileIDs[sample.code], file.ID)
+				}
+			}
+			output.Reset()
+			taskID = startScanTask(a, store, ctx, []string{libRoot})
+			a.runScan(ctx, &output, taskID, []string{libRoot})
+			for _, sample := range samples {
+				detail, err := store.GetMovieDetail(ctx, movieIDs[sample.code])
+				if err != nil || len(detail.Files) != len(fileIDs[sample.code]) {
+					t.Fatalf("%s: rescan changed file count or movie identity: %v", sample.code, err)
+				}
+				for i, file := range detail.Files {
+					if file.ID != fileIDs[sample.code][i] {
+						t.Fatalf("%s: rescan changed file identity", sample.code)
+					}
+				}
+			}
+		})
+	}
+}

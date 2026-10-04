@@ -2,6 +2,7 @@ package scanner
 
 import "testing"
 
+// TestExtractNumber 验证番号提取兼容实际文件名、字母分部及版本标记。
 func TestExtractNumber(t *testing.T) {
 	t.Parallel()
 
@@ -31,6 +32,13 @@ func TestExtractNumber(t *testing.T) {
 		{"abc123.mkv", "ABC-123"},
 		{"ABC_123.avi", "ABC-123"},
 		{"ABC 123.mov", "ABC-123"},
+		{"STAR-380A.mp4", "STAR-380"},
+		{"STAR-380B.mp4", "STAR-380"},
+		{"STAR-684A-C.mp4", "STAR-684"},
+		{"STAR-684B-C.mp4", "STAR-684"},
+		{"star-684b-c.mp4", "STAR-684"},
+		{"ABC-123AB.mp4", ""},
+		{"ABC-1231080p.mp4", ""},
 
 		// === FC2 variations ===
 		{"FC2-123456.mp4", "FC2-123456"},
@@ -61,6 +69,7 @@ func TestExtractNumber(t *testing.T) {
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.filename, func(t *testing.T) {
+			// 每个样本独立校验番号，失败时附上清理后的文件名便于定位边界问题。
 			t.Parallel()
 			if actual := ExtractNumber(tc.filename); actual != tc.expected {
 				cleaned := CleanFilename(tc.filename)

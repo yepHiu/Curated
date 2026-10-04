@@ -9,9 +9,10 @@ import (
 
 var explicitPartPattern = regexp.MustCompile(`(?i)(?:^|[-_ .])(?:CD|PART|PT|DISC|DISK)[-_ .]*([0-9]{1,3})(?:[^0-9]|$)`)
 var numericPartPattern = regexp.MustCompile(`^[-_ .]+([0-9]{1,3})(?:[-_ .].*)?$`)
+var letterPartPattern = regexp.MustCompile(`(?i)^([a-z])(?:[-_ .].*)?$`)
 var fc2CodePattern = regexp.MustCompile(`(?i)^FC2[-_ ]*(?:PPV[-_ ]*)?([0-9]+)$`)
 
-// ExtractPartIndex 识别明确分片标记或番号后的数字，不把番号数字本身当成分片。
+// ExtractPartIndex 识别明确标记、数字后缀及紧接番号的 A-Z 分部；带连接符的 -C 等版本标记不算分部。
 func ExtractPartIndex(path, code string) int {
 	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	if match := explicitPartPattern.FindStringSubmatch(base); len(match) > 1 {
@@ -37,9 +38,14 @@ func ExtractPartIndex(path, code string) int {
 	if end == nil {
 		return 0
 	}
-	if match := numericPartPattern.FindStringSubmatch(base[end[1]:]); len(match) > 1 {
+	suffix := base[end[1]:]
+	if match := numericPartPattern.FindStringSubmatch(suffix); len(match) > 1 {
 		index, _ := strconv.Atoi(match[1])
 		return index
+	}
+	if match := letterPartPattern.FindStringSubmatch(suffix); len(match) > 1 {
+		// 仅接受紧接番号的一位字母，STAR-684B-C 对应第 2 部，SSIS-562-C 保持未编号。
+		return int(strings.ToUpper(match[1])[0]-'A') + 1
 	}
 	return 0
 }
