@@ -3,6 +3,10 @@ description: 日常开发速记（启动、联调、根目录政策）
 alwaysApply: true
 ---
 
+## 合规化范围决定 — 2026-10-04（当前）
+
+用户已另开独立项目推进合规化，本仓库的合规化工作暂缓。此前合规方案中的普通影视/成人内容分区、启用向导、能力模块与公开核心中性化均保留为历史研究，不作为当前实施或排期依据；只有用户明确重新提出时再评估。当前 Curated 继续围绕现有功能维护与优化，既有刮削治理等需求按各自 PRD 状态推进。决策与历史材料见 `docs/plan/2026-07-18-curated-compliance-and-metadata-source-decoupling.md` 和 `docs/plan/README.md`。
+
 ## Release batches — 2026-10-01 (current)
 
 This supersedes older release policies below. New source supports one **Curated YYYYMMDD** Release, with **-2**, **-3**, etc. for later Beijing-date batches, containing Server, Desktop or both. `pnpm release:prepare` inspects each module against its published source; `--write` prepares independent versions, immutable batch metadata and Notes for review. No change means no release. `release:version:show` shows both source versions. CD consumes the batch and never creates Full; old all-in-one CLI/publication triggers are disabled. Shared/unknown delivery inputs conservatively affect both modules and need scope review. Same-source retries reuse versions and batch identity.

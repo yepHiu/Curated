@@ -521,6 +521,8 @@ shadcn-vue CLI 识别项目为 Vite + TypeScript + Tailwind v4，配置与 alias
 
 #### 如果目标是公开分发
 
+2026-10-04 状态更新：合规化已由用户另开的独立项目推进，本仓库暂缓相关改造。下段是历史条件性建议，不作为当前排期依据；既有发布安全与配置脱敏工作仍按各自需求处理。当前决定见 [合规方案](2026-07-18-curated-compliance-and-metadata-source-decoupling.md#当前决定本仓库暂缓2026-10-04)。
+
 `2026-07-18-curated-compliance-and-metadata-source-decoupling.md` 中的 P0/P1 应立即前移；公开核心默认不访问成人元数据源，release 配置必须可复现且无本机状态。若要真正形成中性公开 Core，需要完成外部 provider extension 边界，而不是隐藏开关。
 
 #### 如果目标是 Linux / fnOS Server

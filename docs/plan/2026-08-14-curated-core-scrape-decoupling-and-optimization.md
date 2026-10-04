@@ -3,6 +3,9 @@
 日期：2026-08-14  
 状态：research  
 2026-08-14 决策：本仓库下一步只做刮削治理；SFW 不在当前项目改造，另建新项目。实施入口见 [2026-08-14-scrape-governance-implementation-plan.md](2026-08-14-scrape-governance-implementation-plan.md)，需求 `REQ-0023`。  
+
+2026-10-04 确认：用户已另开独立项目推进合规化，本仓库继续暂缓相关改造；10 月的重新评估也已暂停。此决定不暂停既有刮削治理，详见 [合规方案当前决定](2026-07-18-curated-compliance-and-metadata-source-decoupling.md#当前决定本仓库暂缓2026-10-04)。
+
 关联文档：
 - [2026-07-18-curated-compliance-and-metadata-source-decoupling.md](2026-07-18-curated-compliance-and-metadata-source-decoupling.md)
 - [2026-04-01-network-link-analysis.md](2026-04-01-network-link-analysis.md) 第 16 节
