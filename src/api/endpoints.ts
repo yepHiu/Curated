@@ -590,24 +590,28 @@ export const api = {
       .then((value) => assertApiResponse("GET /library/movies/:id", value, isMovieDetailDTO))
   },
 
-  getMoviePlayback(movieId: string, options?: { clientVideoCodecs?: string | null; startPositionSec?: number; signal?: AbortSignal }): Promise<PlaybackDescriptorDTO> {
+  /** 请求所选文件的播放描述，允许带续播目标和取消信号。 */
+  getMoviePlayback(movieId: string, options?: { fileId?: string; clientVideoCodecs?: string | null; startPositionSec?: number; signal?: AbortSignal }): Promise<PlaybackDescriptorDTO> {
     const query = new URLSearchParams()
+    if (options?.fileId) query.set("fileId", options.fileId)
     if (options?.clientVideoCodecs) query.set("clientVideoCodecs", options.clientVideoCodecs)
     if (options?.startPositionSec !== undefined) query.set("startPositionSec", String(options.startPositionSec))
     const suffix = query.size ? `?${query}` : ""
     return httpClient.get<PlaybackDescriptorDTO>(`/library/movies/${encodeURIComponent(movieId)}/playback${suffix}`, undefined, options?.signal)
   },
 
-  launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO> {
+  /** 将当前文件和时间交给服务端原生播放器。 */
+  launchNativePlayback(movieId: string, startPositionSec?: number, fileId?: string): Promise<NativePlaybackLaunchDTO> {
     return httpClient.post<NativePlaybackLaunchDTO>(
-      `/library/movies/${encodeURIComponent(movieId)}/native-play`,
+      `/library/movies/${encodeURIComponent(movieId)}/native-play${fileId ? `?fileId=${encodeURIComponent(fileId)}` : ""}`,
       startPositionSec !== undefined ? { startPositionSec } : {},
     )
   },
 
+  /** 为所选文件创建独立播放会话，保留请求取消语义。 */
   createPlaybackSession(movieId: string, body: CreatePlaybackSessionBody, signal?: AbortSignal): Promise<PlaybackDescriptorDTO> {
     return httpClient.post<PlaybackDescriptorDTO>(
-      `/library/movies/${encodeURIComponent(movieId)}/playback-session`,
+      `/library/movies/${encodeURIComponent(movieId)}/playback-session${body.fileId ? `?fileId=${encodeURIComponent(body.fileId)}` : ""}`,
       body,
       signal,
     )
@@ -766,14 +770,16 @@ export const api = {
     return httpClient.get<TaskDTO>(`/tasks/${encodeURIComponent(taskId)}`)
   },
 
+  /** 使用所选源文件导出片段。 */
   createMovieClip(movieId: string, body: CreateMovieClipBody): Promise<TaskDTO> {
-    return httpClient.post<TaskDTO>(`/library/movies/${encodeURIComponent(movieId)}/clips`, body)
+    return httpClient.post<TaskDTO>(`/library/movies/${encodeURIComponent(movieId)}/clips${body.fileId ? `?fileId=${encodeURIComponent(body.fileId)}` : ""}`, body)
   },
   cancelMovieClip(taskId: string): Promise<void> {
     return httpClient.delete(`/tasks/${encodeURIComponent(taskId)}/clip`)
   },
-  async extractMovieFrame(movieId: string, positionSec: number): Promise<Blob> {
-    const { blob } = await httpClient.postBlob(`/library/movies/${encodeURIComponent(movieId)}/frame`, { positionSec })
+  /** 从所选文件的片内时间提取源帧。 */
+  async extractMovieFrame(movieId: string, positionSec: number, fileId?: string): Promise<Blob> {
+    const { blob } = await httpClient.postBlob(`/library/movies/${encodeURIComponent(movieId)}/frame${fileId ? `?fileId=${encodeURIComponent(fileId)}` : ""}`, { positionSec })
     return blob
   },
 
@@ -787,8 +793,9 @@ export const api = {
     return httpClient.get<PlaybackProgressListDTO>("/playback/progress")
   },
 
+  /** 保存当前文件进度，同时维护作品最后播放入口。 */
   putPlaybackProgress(movieId: string, body: PutPlaybackProgressBody): Promise<void> {
-    return httpClient.put<void>(`/playback/progress/${encodeURIComponent(movieId)}`, body)
+    return httpClient.put<void>(`/playback/progress/${encodeURIComponent(movieId)}${body.fileId ? `?fileId=${encodeURIComponent(body.fileId)}` : ""}`, body)
   },
 
   deletePlaybackProgress(movieId: string): Promise<void> {

@@ -20,15 +20,16 @@ const movieId = computed(() =>
   typeof route.params.id === "string" ? route.params.id : undefined,
 )
 
+const fileId = computed(/* 请求文件变化时加载新播放目标，并取消旧目标的状态更新。 */ () => typeof route.query.fileId === "string" ? route.query.fileId : "")
 const hydrating = ref(false)
 
 watch(
-  movieId,
-  async (id, _old, onCleanup) => {
+  [movieId, fileId],
+  /* 请求文件变化时加载新播放目标，并取消旧目标的状态更新。 */ async ([id, selectedFileId], _old, onCleanup) => {
     let cancelled = false
     onCleanup(() => { cancelled = true })
     // 返回当前宿主影片直接复用，不能预热出第二个 HLS 会话。
-    if (id && playbackHost?.hasMovie(id)) {
+    if (id && playbackHost?.hasTarget(id, selectedFileId)) {
       hydrating.value = false
       return
     }
@@ -42,11 +43,12 @@ watch(
     // them. PlayerView only loads after the auth guard passes, so locked
     // startup never touches protected playback endpoints.
     const start = parseResumeSecondsFromQuery(route.query.t)
-    const cancelPrefetch = start === undefined
+    const cancelPrefetch = selectedFileId ? undefined : start === undefined
       ? libraryService.prefetchMoviePlayback(id)
       : libraryService.prefetchMoviePlayback(id, start)
     if (cancelPrefetch) onCleanup(cancelPrefetch)
-    if (libraryService.getMovieById(id)) {
+    const cached = libraryService.getMovieById(id)
+    if (cached && ((cached.fileCount ?? 1) <= 1 || cached.files !== undefined)) {
       if (!cancelled) hydrating.value = false
       return
     }
@@ -69,7 +71,7 @@ const selectedMovie = computed(() =>
 )
 
 watch(
-  [selectedMovie, hydrating],
+  [selectedMovie, hydrating, fileId],
   ([movie, busy]) => {
     if (busy || !movie) {
       return
@@ -91,6 +93,7 @@ watch(
     </div>
     <PlayerPage
       v-else-if="selectedMovie && !playbackHost"
+      :key="`${selectedMovie.id}:${fileId}`"
       :movie="selectedMovie"
       :autoplay="route.query.autoplay === '1'"
     />

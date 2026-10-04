@@ -95,6 +95,8 @@ type pathColumnSpec struct {
 
 var pathMigrationColumns = []pathColumnSpec{
 	{table: "library_paths", column: "path", targetKind: "directory", unique: true},
+	// 先迁移子文件，避免旧 location 投影触发器提前改写计划中的行。
+	{table: "movie_files", column: "location", targetKind: "file", unique: true},
 	{table: "movies", column: "location", targetKind: "file", unique: true},
 	{table: "scan_items", column: "path", targetKind: "file", unique: true, conflictScopeColumn: "task_id"},
 	{table: "media_assets", column: "local_path", targetKind: "file"},

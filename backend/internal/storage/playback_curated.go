@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"curated-backend/internal/contracts"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 
 // PlaybackProgressRow mirrors playback_progress table.
 type PlaybackProgressRow struct {
+	FileID      string
 	MovieID     string
 	PositionSec float64
 	DurationSec float64
@@ -35,31 +37,67 @@ func (s *SQLiteStore) MovieExists(ctx context.Context, movieID string) (bool, er
 
 // UpsertPlaybackProgress inserts or updates playback position and duration for a movie.
 func (s *SQLiteStore) UpsertPlaybackProgress(ctx context.Context, movieID string, positionSec, durationSec float64) error {
+	detail, err := s.GetMoviePlaybackDetail(ctx, movieID)
+	if err != nil {
+		return err
+	}
+	fileID := detail.SelectedFileID
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO playback_progress (movie_id, position_sec, duration_sec, updated_at)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT(movie_id) DO UPDATE SET
-			position_sec = excluded.position_sec,
-			duration_sec = excluded.duration_sec,
-			updated_at = excluded.updated_at
-	`, movieID, positionSec, durationSec, now)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if fileID != "" {
+		_, err = tx.ExecContext(ctx, `INSERT INTO movie_file_progress(file_id, position_sec, duration_sec, updated_at)
+   VALUES(?,?,?,?) ON CONFLICT(file_id) DO UPDATE SET position_sec=excluded.position_sec,
+   duration_sec=excluded.duration_sec, updated_at=excluded.updated_at`, fileID, positionSec, durationSec, now)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO playback_progress(movie_id, file_id, position_sec, duration_sec, updated_at)
+ VALUES(?,?,?,?,?) ON CONFLICT(movie_id) DO UPDATE SET file_id=excluded.file_id,
+ position_sec=excluded.position_sec, duration_sec=excluded.duration_sec, updated_at=excluded.updated_at`, movieID, fileID, positionSec, durationSec, now)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // DeletePlaybackProgress removes the playback progress row for a movie.
 func (s *SQLiteStore) DeletePlaybackProgress(ctx context.Context, movieID string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM playback_progress WHERE movie_id = ?`, movieID)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, `DELETE FROM movie_file_progress WHERE file_id IN (SELECT id FROM movie_files WHERE movie_id=?)`, movieID); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM playback_progress WHERE movie_id=?`, movieID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // GetPlaybackProgress returns the playback progress row for a movie, or nil if none saved.
 func (s *SQLiteStore) GetPlaybackProgress(ctx context.Context, movieID string) (*PlaybackProgressRow, error) {
 	var r PlaybackProgressRow
+	if fileID := contracts.MovieFileSelection(ctx); fileID != "" {
+		err := s.db.QueryRowContext(ctx, `SELECT mf.movie_id, fp.position_sec, fp.duration_sec, fp.updated_at, fp.file_id FROM movie_file_progress fp JOIN movie_files mf ON mf.id=fp.file_id WHERE fp.file_id=? AND mf.movie_id=?`, fileID, movieID).Scan(&r.MovieID, &r.PositionSec, &r.DurationSec, &r.UpdatedAt, &r.FileID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		return &r, nil
+	}
 	err := s.db.QueryRowContext(ctx, `
-		SELECT movie_id, position_sec, duration_sec, updated_at
+		SELECT movie_id, position_sec, duration_sec, updated_at, file_id
 		FROM playback_progress WHERE movie_id = ?
-	`, movieID).Scan(&r.MovieID, &r.PositionSec, &r.DurationSec, &r.UpdatedAt)
+	`, movieID).Scan(&r.MovieID, &r.PositionSec, &r.DurationSec, &r.UpdatedAt, &r.FileID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -72,7 +110,7 @@ func (s *SQLiteStore) GetPlaybackProgress(ctx context.Context, movieID string) (
 // ListPlaybackProgressByUpdatedDesc returns all playback progress rows ordered by most recently updated first.
 func (s *SQLiteStore) ListPlaybackProgressByUpdatedDesc(ctx context.Context) ([]PlaybackProgressRow, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT movie_id, position_sec, duration_sec, updated_at
+		SELECT movie_id, position_sec, duration_sec, updated_at, file_id
 		FROM playback_progress
 		ORDER BY updated_at DESC
 	`)
@@ -84,7 +122,7 @@ func (s *SQLiteStore) ListPlaybackProgressByUpdatedDesc(ctx context.Context) ([]
 	var out []PlaybackProgressRow
 	for rows.Next() {
 		var r PlaybackProgressRow
-		if err := rows.Scan(&r.MovieID, &r.PositionSec, &r.DurationSec, &r.UpdatedAt); err != nil {
+		if err := rows.Scan(&r.MovieID, &r.PositionSec, &r.DurationSec, &r.UpdatedAt, &r.FileID); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -94,6 +132,7 @@ func (s *SQLiteStore) ListPlaybackProgressByUpdatedDesc(ctx context.Context) ([]
 
 // CuratedFrameMeta holds list/detail metadata for a curated frame without image bytes.
 type CuratedFrameMeta struct {
+	FileID      string
 	ID          string
 	MovieID     string
 	Title       string
@@ -130,7 +169,7 @@ func (s *SQLiteStore) InsertCuratedFrame(ctx context.Context, meta CuratedFrameM
 // capture data. Later title/tag edits do not invalidate a capture receipt.
 func (s *SQLiteStore) MatchesCuratedFrameCapture(ctx context.Context, meta CuratedFrameMeta, imageBlob []byte) (bool, error) {
 	var matches bool
-	err := s.db.QueryRowContext(ctx, `SELECT movie_id = ? AND position_sec = ? AND captured_at = ? AND image_blob = ? FROM curated_frames WHERE id = ?`, meta.MovieID, meta.PositionSec, meta.CapturedAt, imageBlob, meta.ID).Scan(&matches)
+	err := s.db.QueryRowContext(ctx, `SELECT movie_id = ? AND file_id = ? AND position_sec = ? AND captured_at = ? AND image_blob = ? FROM curated_frames WHERE id = ?`, meta.MovieID, meta.FileID, meta.PositionSec, meta.CapturedAt, imageBlob, meta.ID).Scan(&matches)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -148,9 +187,9 @@ func (s *SQLiteStore) InsertCuratedFrameWithThumbnail(ctx context.Context, meta 
 		return err
 	}
 	_, err = s.db.ExecContext(ctx, `
-		INSERT INTO curated_frames (id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json, image_blob, thumb_blob)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, meta.ID, meta.MovieID, meta.Title, meta.Code, string(actorsJSON), meta.PositionSec, meta.CapturedAt, string(tagsJSON), imageBlob, thumbBlob)
+		INSERT INTO curated_frames (id, movie_id, file_id, title, code, actors_json, position_sec, captured_at, tags_json, image_blob, thumb_blob)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, meta.ID, meta.MovieID, meta.FileID, meta.Title, meta.Code, string(actorsJSON), meta.PositionSec, meta.CapturedAt, string(tagsJSON), imageBlob, thumbBlob)
 	if isSQLiteConstraint(err) {
 		return fmt.Errorf("%w: %w", ErrCuratedFrameDuplicateID, err)
 	}
@@ -239,6 +278,12 @@ func (s *SQLiteStore) CuratedFrameExists(ctx context.Context, frameID string) (b
 		return false, err
 	}
 	return true, nil
+}
+
+// GetCuratedFrameSource 返回帧的作品和视频文件归属，防止片段被挂到另一分片的静态帧。
+func (s *SQLiteStore) GetCuratedFrameSource(ctx context.Context, frameID string) (movieID, fileID string, err error) {
+	err = s.db.QueryRowContext(ctx, `SELECT movie_id, file_id FROM curated_frames WHERE id = ?`, frameID).Scan(&movieID, &fileID)
+	return
 }
 
 // UpsertCuratedFrameMotion marks a motion artifact as processing or failed.
@@ -404,7 +449,7 @@ func (s *SQLiteStore) QueryCuratedFrames(ctx context.Context, q CuratedFrameQuer
 
 	pageArgs := append(append([]any{}, args...), limit, offset)
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json
+		SELECT id, movie_id, file_id, title, code, actors_json, position_sec, captured_at, tags_json
 		FROM curated_frames`+where+`
 		ORDER BY captured_at DESC, id DESC
 		LIMIT ? OFFSET ?
@@ -418,7 +463,7 @@ func (s *SQLiteStore) QueryCuratedFrames(ctx context.Context, q CuratedFrameQuer
 	for rows.Next() {
 		var m CuratedFrameMeta
 		var actorsJSON, tagsJSON string
-		if err := rows.Scan(&m.ID, &m.MovieID, &m.Title, &m.Code, &actorsJSON, &m.PositionSec, &m.CapturedAt, &tagsJSON); err != nil {
+		if err := rows.Scan(&m.ID, &m.MovieID, &m.FileID, &m.Title, &m.Code, &actorsJSON, &m.PositionSec, &m.CapturedAt, &tagsJSON); err != nil {
 			return CuratedFramePage{}, err
 		}
 		_ = scanCuratedMeta(actorsJSON, tagsJSON, &m)
@@ -443,7 +488,7 @@ func (s *SQLiteStore) QueryCuratedFrames(ctx context.Context, q CuratedFrameQuer
 // ListCuratedFramesByCapturedAtDesc returns all curated frames ordered by capture time, newest first.
 func (s *SQLiteStore) ListCuratedFramesByCapturedAtDesc(ctx context.Context) ([]CuratedFrameMeta, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json
+		SELECT id, movie_id, file_id, title, code, actors_json, position_sec, captured_at, tags_json
 		FROM curated_frames
 		ORDER BY captured_at DESC, id DESC
 	`)
@@ -456,7 +501,7 @@ func (s *SQLiteStore) ListCuratedFramesByCapturedAtDesc(ctx context.Context) ([]
 	for rows.Next() {
 		var m CuratedFrameMeta
 		var actorsJSON, tagsJSON string
-		if err := rows.Scan(&m.ID, &m.MovieID, &m.Title, &m.Code, &actorsJSON, &m.PositionSec, &m.CapturedAt, &tagsJSON); err != nil {
+		if err := rows.Scan(&m.ID, &m.MovieID, &m.FileID, &m.Title, &m.Code, &actorsJSON, &m.PositionSec, &m.CapturedAt, &tagsJSON); err != nil {
 			return nil, err
 		}
 		_ = scanCuratedMeta(actorsJSON, tagsJSON, &m)
@@ -566,14 +611,15 @@ func (s *SQLiteStore) FindNearbyCuratedFrame(ctx context.Context, movieID string
 	var meta CuratedFrameMeta
 	var actorsJSON, tagsJSON string
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json
+		SELECT id, movie_id, file_id, title, code, actors_json, position_sec, captured_at, tags_json
 		FROM curated_frames
-		WHERE movie_id = ? AND ABS(position_sec - ?) <= ?
+		WHERE movie_id = ? AND (? = '' OR file_id = ?) AND ABS(position_sec - ?) <= ?
 		ORDER BY ABS(position_sec - ?) ASC, captured_at DESC
 		LIMIT 1
-	`, movieID, positionSec, thresholdSec, positionSec).Scan(
+	`, movieID, contracts.MovieFileSelection(ctx), contracts.MovieFileSelection(ctx), positionSec, thresholdSec, positionSec).Scan(
 		&meta.ID,
 		&meta.MovieID,
+		&meta.FileID,
 		&meta.Title,
 		&meta.Code,
 		&actorsJSON,
@@ -612,7 +658,7 @@ func (s *SQLiteStore) ListCuratedFramesForExport(ctx context.Context, ids []stri
 	byID := make(map[string]CuratedFrameExportRow, len(ids))
 	if err := forEachInClauseBatch(ids, func(batch []string) error {
 		q := fmt.Sprintf(`
-			SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json, image_blob
+			SELECT id, movie_id, file_id, title, code, actors_json, position_sec, captured_at, tags_json, image_blob
 			FROM curated_frames WHERE id IN (%s)
 		`, inClausePlaceholders(len(batch)))
 		rows, err := s.db.QueryContext(ctx, q, inClauseArgs(batch)...)
@@ -623,7 +669,7 @@ func (s *SQLiteStore) ListCuratedFramesForExport(ctx context.Context, ids []stri
 		for rows.Next() {
 			var r CuratedFrameExportRow
 			var actorsJSON, tagsJSON string
-			if err := rows.Scan(&r.ID, &r.MovieID, &r.Title, &r.Code, &actorsJSON, &r.PositionSec, &r.CapturedAt, &tagsJSON, &r.ImageBlob); err != nil {
+			if err := rows.Scan(&r.ID, &r.MovieID, &r.FileID, &r.Title, &r.Code, &actorsJSON, &r.PositionSec, &r.CapturedAt, &tagsJSON, &r.ImageBlob); err != nil {
 				_ = rows.Close()
 				return err
 			}

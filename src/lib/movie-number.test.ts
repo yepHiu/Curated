@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   classifyMovieCodes,
-  extractMovieNumber,
+  extractMovieNumber, extractMoviePartIndex,
   fileBaseName,
 } from "./movie-number"
 
@@ -43,4 +43,18 @@ describe("fileBaseName", () => {
     expect(fileBaseName("a\\b\\c.mp4")).toBe("c.mp4")
     expect(fileBaseName("a/b/c.mp4")).toBe("c.mp4")
   })
+})
+
+// 下划线分部标记不能导致 FC2 退化成 PPV 番号，质量数字也不能成为分部。
+it("extracts catalog and ordered parts independently", () => {
+    // 验证 extracts catalog and ordered parts independently。
+ for (const [name, code, part] of [
+  ["FC2PPV-1234567_2.mp4", "FC2-1234567", 2],
+  ["ABC-123-part10.mp4", "ABC-123", 10],
+  ["ABC-123_1.mp4", "ABC-123", 1],
+  ["ABC-123-1080p.mp4", "ABC-123", 0],
+ ] as const) {
+  expect(extractMovieNumber(name)).toBe(code)
+  expect(extractMoviePartIndex(name)).toBe(part)
+ }
 })

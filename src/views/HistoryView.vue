@@ -88,7 +88,7 @@ async function openFromHistory(row: HistoryRow) {
     return
   }
   const pos = Math.max(0, Math.floor(row.entry.positionSec))
-  await router.push(buildPlayerRouteFromHistory(row.movie.id, pos, category.value))
+  await router.push(buildPlayerRouteFromHistory(row.movie.id, pos, row.entry.fileId, category.value))
 }
 
 function requestRemoveRow(row: HistoryRow) {

@@ -38,3 +38,13 @@ describe("curated frame near duplicate detection", () => {
     expect(groups).toEqual([])
   })
 })
+
+// 相同作品和时间戳的不同分片不是重复萃取帧。
+it("does not merge captures from different files of the same movie", () => {
+    // 验证 does not merge captures from different files of the same movie。
+ const rows = [
+  { ...frame("a", "movie-1", 10), fileId: "one" },
+  { ...frame("b", "movie-1", 11), fileId: "two" },
+ ]
+ expect(findCuratedFrameNearDuplicateGroups(rows, 3)).toEqual([])
+})

@@ -87,15 +87,20 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 		_ = tx.Rollback()
 	}()
 
-	located, pathErr := lookupScanMovie(ctx, tx, `location = ?`, result.Path)
+	located, pathErr := lookupScanMovie(ctx, tx, `id IN (SELECT movie_id FROM movie_files WHERE location = ?)`, result.Path)
 	switch {
 	case pathErr == nil:
+		if !movieRowIsTrashed(located.trashedAt) && normalizedScanCode(located.code) == normalizedScanCode(result.Number) {
+			if err := saveScanMovieFileTx(ctx, tx, located.id, result.Number, result.Path); err != nil {
+				return ScanPersistOutcome{}, err
+			}
+		}
 		if err := tx.Commit(); err != nil {
 			return ScanPersistOutcome{}, err
 		}
 		if movieRowIsTrashed(located.trashedAt) {
 			reason := "trashed_path_indexed"
-			if located.code == result.Number {
+			if normalizedScanCode(located.code) == normalizedScanCode(result.Number) {
 				reason = "trashed_already_indexed"
 			}
 			return ScanPersistOutcome{
@@ -104,7 +109,7 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 				Reason:  reason,
 			}, nil
 		}
-		if located.code == result.Number {
+		if normalizedScanCode(located.code) == normalizedScanCode(result.Number) {
 			return ScanPersistOutcome{
 				MovieID: located.id,
 				Status:  "skipped",
@@ -120,7 +125,8 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 		return ScanPersistOutcome{}, pathErr
 	}
 
-	matched, queryErr := lookupScanMovie(ctx, tx, `code = ?`, result.Number)
+	identity := normalizedScanCode(result.Number)
+	matched, queryErr := lookupScanMovie(ctx, tx, `REPLACE(REPLACE(REPLACE(REPLACE(UPPER(code), '-', ''), '_', ''), ' ', ''), 'FC2PPV', 'FC2') = ?`, identity)
 	switch {
 	case errors.Is(queryErr, sql.ErrNoRows):
 		movieID := moviecode.NormalizeForStorageID(result.Number)
@@ -161,6 +167,9 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 			return ScanPersistOutcome{}, err
 		}
 
+		if err := saveScanMovieFileTx(ctx, tx, movieID, result.Number, result.Path); err != nil {
+			return ScanPersistOutcome{}, err
+		}
 		if err := tx.Commit(); err != nil {
 			return ScanPersistOutcome{}, err
 		}
@@ -184,13 +193,7 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 		}, nil
 	}
 
-	_, err = tx.ExecContext(
-		ctx,
-		`UPDATE movies SET location = ?, updated_at = ? WHERE id = ?`,
-		result.Path,
-		nowUTC(),
-		matched.id,
-	)
+	err = saveScanMovieFileTx(ctx, tx, matched.id, result.Number, result.Path)
 	if isSQLiteUniqueConstraint(err) {
 		if err := tx.Commit(); err != nil {
 			return ScanPersistOutcome{}, err
@@ -211,7 +214,7 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 	return ScanPersistOutcome{
 		MovieID: matched.id,
 		Status:  "updated",
-		Reason:  "path_refreshed",
+		Reason:  "file_added",
 	}, nil
 }
 
@@ -240,4 +243,9 @@ func movieRowIsTrashed(trashedAt string) bool {
 // nowUTC 返回当前 UTC 时刻的 RFC3339 文本，供入库时间与审计字段共用。
 func nowUTC() string {
 	return time.Now().UTC().Format(time.RFC3339)
+}
+
+// normalizedScanCode 统一同番号的连接符与 FC2 PPV 别名，不改变已有作品主键。
+func normalizedScanCode(code string) string {
+	return strings.ReplaceAll(strings.NewReplacer("-", "", "_", "", " ", "").Replace(strings.ToUpper(strings.TrimSpace(code))), "FC2PPV", "FC2")
 }

@@ -26,11 +26,13 @@ import (
 )
 
 const maxCuratedImageBytes = 12 << 20 // 12 MiB raw PNG/JPEG
+// mapCuratedFrameItems 投影萃取帧的来源文件与展示资料。
 func mapCuratedFrameItems(rows []storage.CuratedFrameMeta) []contracts.CuratedFrameItemDTO {
 	items := make([]contracts.CuratedFrameItemDTO, 0, len(rows))
 	for _, row := range rows {
 		item := contracts.CuratedFrameItemDTO{
 			ID:          row.ID,
+			FileID:      row.FileID,
 			MovieID:     row.MovieID,
 			Title:       row.Title,
 			Code:        row.Code,
@@ -88,6 +90,7 @@ func curatedImageNotModified(w http.ResponseWriter, r *http.Request, blob []byte
 	return false
 }
 
+// handleListPlaybackProgress 返回每部作品最后播放文件及其进度。
 func (h *Handler) handleListPlaybackProgress(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
@@ -103,6 +106,7 @@ func (h *Handler) handleListPlaybackProgress(w http.ResponseWriter, r *http.Requ
 	items := make([]contracts.PlaybackProgressItemDTO, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, contracts.PlaybackProgressItemDTO{
+			FileID:      row.FileID,
 			MovieID:     row.MovieID,
 			PositionSec: row.PositionSec,
 			DurationSec: row.DurationSec,
@@ -112,6 +116,7 @@ func (h *Handler) handleListPlaybackProgress(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, contracts.PlaybackProgressListDTO{Items: items})
 }
 
+// handlePutPlaybackProgress 校验文件归属后保存分片进度和作品历史。
 func (h *Handler) handlePutPlaybackProgress(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
@@ -144,6 +149,10 @@ func (h *Handler) handlePutPlaybackProgress(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err := h.store.UpsertPlaybackProgress(ctx, movieID, req.PositionSec, req.DurationSec); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie file not found")
+			return
+		}
 		h.logger.Error("upsert playback progress", zap.Error(err))
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save playback progress")
 		return
@@ -357,6 +366,7 @@ func readCuratedFrameCreateMultipart(r *http.Request) (contracts.CreateCuratedFr
 	return req, raw, nil
 }
 
+// handlePostCuratedFrame 保存截图来源文件，保持旧创建协议与重复回执兼容。
 func (h *Handler) handlePostCuratedFrame(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
@@ -404,7 +414,31 @@ func (h *Handler) handlePostCuratedFrame(w http.ResponseWriter, r *http.Request)
 		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
 		return
 	}
+	// 显式分片必须属于作品；旧客户端绑定原始首文件，避免上次播放片变化污染重试。
+	fileID := strings.TrimSpace(req.FileID)
+	detail, detailErr := h.store.GetMovieDetail(ctx, req.MovieID)
+	if detailErr != nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to verify movie file")
+		return
+	}
+	if fileID == "" && len(detail.Files) > 0 {
+		fileID = detail.Files[0].ID
+	}
+	if fileID != "" {
+		found := false
+		for _, file := range detail.Files {
+			if file.ID == fileID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie file not found")
+			return
+		}
+	}
 	meta := storage.CuratedFrameMeta{
+		FileID:      fileID,
 		ID:          req.ID,
 		MovieID:     req.MovieID,
 		Title:       req.Title,

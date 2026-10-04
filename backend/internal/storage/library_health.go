@@ -7,14 +7,15 @@ import (
 
 // LibraryHealthMovieRecord contains the persisted fields needed by a read-only health scan.
 type LibraryHealthMovieRecord struct {
-	ID       string
-	Title    string
-	Code     string
-	Location string
-	Provider string
-	Summary  string
-	CoverURL string
-	ThumbURL string
+	Locations []string
+	ID        string
+	Title     string
+	Code      string
+	Location  string
+	Provider  string
+	Summary   string
+	CoverURL  string
+	ThumbURL  string
 }
 
 // LibraryHealthAssetRecord contains one registered local movie asset.
@@ -88,6 +89,17 @@ func (s *SQLiteStore) InspectLibraryHealth(ctx context.Context) (LibraryHealthSn
 	}
 	if err := rows.Close(); err != nil {
 		return out, err
+	}
+
+	// 读取每部作品的全部文件，元数据检查仍只执行一次。
+	for i := range out.Movies {
+		files, err := s.ListMovieFiles(ctx, out.Movies[i].ID, out.Movies[i].Code)
+		if err != nil {
+			return out, err
+		}
+		for _, file := range files {
+			out.Movies[i].Locations = append(out.Movies[i].Locations, file.Location)
+		}
 	}
 
 	rows, err = s.db.QueryContext(ctx, `

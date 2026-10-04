@@ -80,6 +80,7 @@ func addMovieForCuratedExportHandlerTest(t *testing.T, store *storage.SQLiteStor
 	return outcome.MovieID
 }
 
+// TestHandlePostCuratedFramesExport_DefaultsToJPG 验证本次浏览类别及文件归属的兼容行为。
 func TestHandlePostCuratedFramesExport_DefaultsToJPG(t *testing.T) {
 	t.Parallel()
 
@@ -88,6 +89,7 @@ func TestHandlePostCuratedFramesExport_DefaultsToJPG(t *testing.T) {
 	if err := store.InsertCuratedFrame(context.Background(), storage.CuratedFrameMeta{
 		ID:          "frame-1",
 		MovieID:     movieID,
+		FileID:      movieID + ":primary",
 		Title:       "Export Frame",
 		Code:        "EXP-001",
 		Actors:      []string{"Airi"},
@@ -126,6 +128,10 @@ func TestHandlePostCuratedFramesExport_DefaultsToJPG(t *testing.T) {
 	}
 	if len(data) == 0 {
 		t.Fatal("expected exported image bytes")
+	}
+	// 文件来源应随图片元数据导出，不能只保留作品与片内时间。
+	if !bytes.Contains(data, []byte(`"fileId":"`+movieID+`:primary"`)) {
+		t.Fatal("export omitted source file identity")
 	}
 }
 

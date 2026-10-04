@@ -6,10 +6,12 @@ import (
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/playback"
 	"curated-backend/internal/storage"
+	"net/url"
 	"path/filepath"
 	"testing"
 )
 
+// TestExplicitDirectPlaybackDoesNotStartForcedHLS 验证本次浏览类别及文件归属的兼容行为。
 func TestExplicitDirectPlaybackDoesNotStartForcedHLS(t *testing.T) {
 	ctx := context.Background()
 	store, err := storage.NewSQLiteStore(filepath.Join(t.TempDir(), "playback.db"))
@@ -31,7 +33,7 @@ func TestExplicitDirectPlaybackDoesNotStartForcedHLS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dto.Mode != contracts.PlaybackModeDirect || dto.SessionID != "" || dto.URL != "/api/library/movies/"+movie.MovieID+"/stream" {
+	if dto.Mode != contracts.PlaybackModeDirect || dto.SessionID != "" || dto.URL != "/api/library/movies/"+movie.MovieID+"/stream?fileId="+url.QueryEscape(dto.FileID) || dto.FileID == "" {
 		t.Fatalf("not direct: %+v", dto)
 	}
 	if dto.ResumePositionSec != 42 {

@@ -1,4 +1,17 @@
+/** 同一番号下独立寻址的文件，按数字分片顺序返回。 */
+export interface MovieFile {
+ id: string
+ partIndex: number
+ fileName: string
+ location: string
+}
+
 export interface Movie {
+ /** 列表含文件数；详情含完整文件列表。 */
+ fileCount?: number
+ files?: MovieFile[]
+ /** 截图任务的不可变来源快照，不持久化为作品字段。 */
+ playbackFileId?: string
   id: string
   title: string
   code: string

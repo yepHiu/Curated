@@ -259,7 +259,8 @@ func TestIntegration_RunScan_NoImportLayoutWithoutLegacySetting(t *testing.T) {
 	}
 }
 
-func TestIntegration_RunScan_DuplicateMovieRootSecondSkipped(t *testing.T) {
+// TestIntegration_RunScan_SameMovieRootKeepsEveryFile 验证本次浏览类别及文件归属的兼容行为。
+func TestIntegration_RunScan_SameMovieRootKeepsEveryFile(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	libRoot := filepath.Join(root, "lib")
@@ -299,15 +300,16 @@ func TestIntegration_RunScan_DuplicateMovieRootSecondSkipped(t *testing.T) {
 	var buf bytes.Buffer
 	a.runScan(ctx, &buf, taskID, []string{libRoot})
 
-	imported, _, skipped := decodeScanFileEvents(t, &buf)
+	imported, updated, skipped := decodeScanFileEvents(t, &buf)
 	if len(imported) != 1 {
 		t.Fatalf("want 1 imported, got %d", len(imported))
 	}
-	if len(skipped) != 1 {
-		t.Fatalf("want 1 skipped (duplicate), got %d", len(skipped))
+	if len(skipped) != 0 || len(updated) != 1 {
+		t.Fatalf("updated=%v skipped=%v", updated, skipped)
 	}
-	if skipped[0].Reason != "duplicate_movie_root" {
-		t.Fatalf("skip reason = %q", skipped[0].Reason)
+	detail, err := store.GetMovieDetail(ctx, imported[0].MovieID)
+	if err != nil || len(detail.Files) != 2 {
+		t.Fatalf("files=%v err=%v", detail.Files, err)
 	}
 }
 
@@ -459,6 +461,7 @@ func TestIntegration_RunScan_TrashedLocationDoesNotAbortLaterImports(t *testing.
 	}
 }
 
+// TestIntegration_ClearFirstLibraryScanPendingAfterScan_Storage 验证本次浏览类别及文件归属的兼容行为。
 func TestIntegration_ClearFirstLibraryScanPendingAfterScan_Storage(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -490,6 +493,57 @@ func TestIntegration_ClearFirstLibraryScanPendingAfterScan_Storage(t *testing.T)
 	for _, p := range rows {
 		if p.ID == lp.ID && p.FirstLibraryScanPending {
 			t.Fatal("expected pending cleared for scan root under library path")
+		}
+	}
+}
+
+// TestIntegration_RunScan_MultipartOrganize confirms the complete scan path keeps each ordered part.
+func TestIntegration_RunScan_MultipartOrganize(t *testing.T) {
+	root := t.TempDir()
+	libRoot := filepath.Join(root, "lib")
+	if err := os.MkdirAll(libRoot, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []int{10, 2, 1} {
+		if err := os.WriteFile(filepath.Join(libRoot, fmt.Sprintf("FC2-1234567_%d.mp4", part)), []byte("fixture"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddLibraryPath(ctx, libRoot, "lib"); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Default()
+	cfg.DatabasePath = filepath.Join(root, "app.db")
+	cfg.CacheDir = filepath.Join(root, "cache")
+	cfg.OrganizeLibrary = true
+	a := newTestApp(t, store, cfg)
+	defer a.Close()
+	taskID := startScanTask(a, store, ctx, []string{libRoot})
+	var output bytes.Buffer
+	a.runScan(ctx, &output, taskID, []string{libRoot})
+	imported, updated, skipped := decodeScanFileEvents(t, &output)
+	if len(imported) != 1 || len(updated) != 2 || len(skipped) != 0 {
+		t.Fatalf("imported=%d updated=%d skipped=%v", len(imported), len(updated), skipped)
+	}
+	detail, err := store.GetMovieDetail(ctx, imported[0].MovieID)
+	if err != nil || len(detail.Files) != 3 {
+		t.Fatalf("files=%v err=%v", detail.Files, err)
+	}
+	for i, want := range []int{1, 2, 10} {
+		if detail.Files[i].PartIndex != want {
+			t.Fatalf("order=%v", detail.Files)
+		}
+		if _, err := os.Stat(detail.Files[i].Location); err != nil {
+			t.Fatal(err)
 		}
 	}
 }

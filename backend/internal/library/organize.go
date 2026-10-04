@@ -1,6 +1,7 @@
 package library
 
 import (
+	"curated-backend/internal/library/moviecode"
 	"errors"
 	"fmt"
 	"io"
@@ -16,7 +17,7 @@ var (
 	ErrOrganizeInvalid = errors.New("library organize: invalid path or number")
 )
 
-// OrganizeVideoFile moves the video into {parent}/{number}/{number}{ext}.
+// OrganizeVideoFile moves the video into {parent}/{number}/{number}[-CDn]{ext}, preserving explicit part numbers.
 // If the file already sits at that path, returns absPath unchanged.
 // If parent folder is already named {number}, only renames to {number}{ext} inside it.
 func OrganizeVideoFile(absPath, number string) (string, error) {
@@ -40,7 +41,11 @@ func OrganizeVideoFile(absPath, number string) (string, error) {
 		destDir = filepath.Join(parent, number)
 	}
 
-	destFile := filepath.Join(destDir, number+ext)
+	fileName := number + ext
+	if part := moviecode.ExtractPartIndex(absPath, number); part > 0 {
+		fileName = fmt.Sprintf("%s-CD%d%s", number, part, ext)
+	}
+	destFile := filepath.Join(destDir, fileName)
 
 	if strings.EqualFold(filepath.Clean(absPath), filepath.Clean(destFile)) {
 		return destFile, nil

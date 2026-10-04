@@ -2,6 +2,7 @@
 export interface CuratedFrameRecord {
   id: string
   movieId: string
+  fileId?: string
   title: string
   code: string
   actors: string[]

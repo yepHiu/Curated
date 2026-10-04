@@ -32,7 +32,6 @@ import (
 	"curated-backend/internal/desktop"
 	"curated-backend/internal/devmetrics"
 	"curated-backend/internal/library"
-	"curated-backend/internal/library/moviecode"
 	"curated-backend/internal/librarywatch"
 	"curated-backend/internal/nativeplayer"
 	"curated-backend/internal/photoscanner"
@@ -2169,6 +2168,7 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 	}
 }
 
+// runScan 逐视频整理和登记，同番号文件追加并报告任务结果。
 func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string, paths []string) {
 	ctx, cancel := context.WithTimeout(parentCtx, time.Duration(a.cfg.Tasks.ScanTimeoutSeconds)*time.Second)
 	defer cancel()
@@ -2183,8 +2183,6 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 		scanProgressFileStep    = 50
 	)
 	var lastProgressEmit time.Time
-
-	seenMovieRoots := make(map[string]struct{})
 
 	summary, err := a.scanner.Scan(ctx, taskID, paths, scanner.Hooks{
 		OnProgress: func(processed, total int, message string) {
@@ -2222,6 +2220,7 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 			}
 		},
 		OnFileDetected: func(result contracts.ScanFileResultDTO) error {
+			// 每个视频单独整理并登记，同目录同番号的文件追加到一部作品。
 			if result.Number == "" {
 				skippedCount++
 				if err := a.store.SaveScanItem(ctx, result); err != nil {
@@ -2236,14 +2235,10 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 
 			if a.OrganizeLibrary() {
 				newPath, orgErr := library.OrganizeVideoFile(result.Path, result.Number)
-				if orgErr != nil {
+				if orgErr != nil && !errors.Is(orgErr, library.ErrOrganizeConflict) {
 					skippedCount++
 					result.Status = "skipped"
-					if errors.Is(orgErr, library.ErrOrganizeConflict) {
-						result.Reason = "organize_conflict: " + orgErr.Error()
-					} else {
-						result.Reason = "organize_failed: " + orgErr.Error()
-					}
+					result.Reason = "organize_failed: " + orgErr.Error()
 					if err := a.store.SaveScanItem(ctx, result); err != nil {
 						return err
 					}
@@ -2252,24 +2247,18 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 					}
 					return nil
 				}
-				result.Path = newPath
-				result.FileName = filepath.Base(newPath)
-			}
-
-			rootKey := strings.ToLower(filepath.Clean(filepath.Dir(result.Path))) + "\x00" + moviecode.NormalizeForStorageID(result.Number)
-			if _, dup := seenMovieRoots[rootKey]; dup {
-				skippedCount++
-				result.Status = "skipped"
-				result.Reason = "duplicate_movie_root"
-				if err := a.store.SaveScanItem(ctx, result); err != nil {
-					return err
+				if orgErr == nil {
+					// 已登记文件整理改名时保留稳定 ID 和分片进度。
+					if err := a.store.RelocateMovieFile(ctx, result.Path, newPath); err != nil {
+						return err
+					}
+					result.Path = newPath
+					result.FileName = filepath.Base(newPath)
+				} else {
+					// 名称冲突保留源文件原路径并登记，不覆盖另一分片或丢弃文件。
+					a.logger.Warn("organize destination occupied; indexing original file", zap.String("path", result.Path), zap.String("number", result.Number))
 				}
-				if emitErr := a.emitEvent(output, contracts.EventScanFileSkipped, result); emitErr != nil {
-					a.logger.Error("failed to emit scan skip event", zap.Error(emitErr), zap.String("taskId", taskID))
-				}
-				return nil
 			}
-			seenMovieRoots[rootKey] = struct{}{}
 
 			outcome, err := a.store.PersistScanMovie(ctx, result)
 			if err != nil {
@@ -3163,12 +3152,13 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string, clientVideoCo
 	return a.resolvePlayback(ctx, movieID, clientVideoCodecs, startPositionSec, false)
 }
 
+// resolvePlayback 选择已校验的作品文件，恢复其进度并构建播放描述。
 func (a *App) resolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string, requestedStart *float64, forceDirect bool) (contracts.PlaybackDescriptorDTO, error) {
-	detail, err := a.store.GetMovieDetail(ctx, movieID)
+	detail, err := a.store.GetMoviePlaybackDetail(ctx, movieID)
 	if err != nil {
 		return contracts.PlaybackDescriptorDTO{}, err
 	}
-	progress, err := a.store.GetPlaybackProgress(ctx, movieID)
+	progress, err := a.store.GetPlaybackProgress(contracts.WithMovieFileSelection(ctx, detail.SelectedFileID), movieID)
 	if err != nil && a.logger != nil {
 		a.logger.Warn("get playback progress failed", zap.Error(err), zap.String("movieId", movieID))
 	}
@@ -3223,11 +3213,11 @@ func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode co
 	if mode == "" || mode == contracts.PlaybackModeDirect {
 		return a.resolvePlayback(ctx, movieID, nil, &startPositionSec, true)
 	}
-	detail, err := a.store.GetMovieDetail(ctx, movieID)
+	detail, err := a.store.GetMoviePlaybackDetail(ctx, movieID)
 	if err != nil {
 		return contracts.PlaybackDescriptorDTO{}, err
 	}
-	progress, err := a.store.GetPlaybackProgress(ctx, movieID)
+	progress, err := a.store.GetPlaybackProgress(contracts.WithMovieFileSelection(ctx, detail.SelectedFileID), movieID)
 	if err != nil && a.logger != nil {
 		a.logger.Warn("get playback progress failed", zap.Error(err), zap.String("movieId", movieID))
 	}
@@ -3283,7 +3273,7 @@ func (a *App) LaunchNativePlayback(ctx context.Context, movieID string, startPos
 	if err != nil {
 		return contracts.NativePlaybackLaunchDTO{}, err
 	}
-	detail, err := a.store.GetMovieDetail(ctx, movieID)
+	detail, err := a.store.GetMoviePlaybackDetail(ctx, movieID)
 	if err != nil {
 		return contracts.NativePlaybackLaunchDTO{}, err
 	}
@@ -3391,6 +3381,7 @@ func choosePlaybackDurationSec(probedDurationSec float64, runtimeDurationSec flo
 	return 0
 }
 
+// buildDirectPlaybackDescriptor 构建携带实际文件 ID 的直连播放描述。
 func buildDirectPlaybackDescriptor(
 	movieID string,
 	detail contracts.MovieDetailDTO,
@@ -3405,6 +3396,7 @@ func buildDirectPlaybackDescriptor(
 	}
 
 	dto := contracts.PlaybackDescriptorDTO{
+		FileID:           detail.SelectedFileID,
 		MovieID:          movieID,
 		Mode:             contracts.PlaybackModeDirect,
 		URL:              "/api/library/movies/" + url.PathEscape(movieID) + "/stream",
@@ -3427,6 +3419,9 @@ func buildDirectPlaybackDescriptor(
 		if durationSec > 0 && dto.ResumePositionSec > durationSec {
 			dto.ResumePositionSec = durationSec
 		}
+	}
+	if detail.SelectedFileID != "" {
+		dto.URL += "?fileId=" + url.QueryEscape(detail.SelectedFileID)
 	}
 	return dto
 }

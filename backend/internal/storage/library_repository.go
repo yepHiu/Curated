@@ -12,6 +12,7 @@ import (
 )
 
 type movieRow struct {
+	FileCount       int
 	ID              string
 	Title           string
 	Code            string
@@ -100,6 +101,7 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 	items := make([]contracts.MovieListItemDTO, 0, len(records))
 	for _, row := range records {
 		item := contracts.MovieListItemDTO{
+			FileCount:      row.FileCount,
 			ID:             row.ID,
 			Title:          row.Title,
 			Code:           row.Code,
@@ -166,6 +168,7 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 	}
 
 	listDTO := contracts.MovieListItemDTO{
+		FileCount:      row.FileCount,
 		ID:             row.ID,
 		Title:          row.Title,
 		Code:           row.Code,
@@ -188,7 +191,12 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 	if strings.TrimSpace(row.TrashedAt) != "" {
 		listDTO.TrashedAt = strings.TrimSpace(row.TrashedAt)
 	}
+	files, err := s.ListMovieFiles(ctx, movieID, row.Code)
+	if err != nil {
+		return contracts.MovieDetailDTO{}, err
+	}
 	return contracts.MovieDetailDTO{
+		Files:            files,
 		MovieListItemDTO: listDTO,
 		Summary:          row.Summary,
 		PreviewImages:    previewsByMovie[movieID],
@@ -201,6 +209,7 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 	}, nil
 }
 
+// scanMovieRow 将查询列读取为包含文件数量的作品行。
 func scanMovieRow(scanner interface{ Scan(dest ...any) error }, row *movieRow) error {
 	return scanner.Scan(
 		&row.ID,
@@ -223,6 +232,7 @@ func scanMovieRow(scanner interface{ Scan(dest ...any) error }, row *movieRow) e
 		&row.Provider,
 		&row.TrashedAt,
 		&row.Homepage,
+		&row.FileCount,
 	)
 }
 
@@ -275,7 +285,8 @@ SELECT m.id,
 	COALESCE(NULLIF(TRIM(m.user_release_date), ''), m.release_date) AS release_date,
 	m.cover_url, m.thumb_url, m.preview_video_url, m.provider,
 	IFNULL(m.trashed_at, '') AS trashed_at,
-	IFNULL(m.homepage, '') AS homepage`
+	IFNULL(m.homepage, '') AS homepage,
+ (SELECT COUNT(*) FROM movie_files mf WHERE mf.movie_id=m.id) AS file_count`
 
 const sqlMovieEffectiveYear = `CASE
 		WHEN NULLIF(TRIM(m.user_release_date), '') IS NOT NULL
@@ -648,9 +659,9 @@ func (s *SQLiteStore) ListMovieIDsUnderLibraryRoots(ctx context.Context, roots [
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, location, code FROM movies
-		 WHERE TRIM(COALESCE(location, '')) != '' AND TRIM(COALESCE(code, '')) != ''
-		   AND (trashed_at IS NULL OR TRIM(trashed_at) = '')`)
+		`SELECT m.id, mf.location, m.code FROM movies m JOIN movie_files mf ON mf.movie_id=m.id
+		 WHERE TRIM(mf.location) != '' AND TRIM(COALESCE(m.code, '')) != ''
+		   AND (m.trashed_at IS NULL OR TRIM(m.trashed_at) = '')`)
 	if err != nil {
 		return nil, err
 	}
@@ -735,9 +746,10 @@ func (s *SQLiteStore) FindActiveMoviesByCodes(ctx context.Context, codes []strin
 
 // MovieCodeIndexItem is a compact active-library catalog row for import code checks.
 type MovieCodeIndexItem struct {
-	ID    string
-	Code  string
-	Title string
+	PartIndexes []int
+	ID          string
+	Code        string
+	Title       string
 }
 
 // ListActiveMovieCodeIndex returns id/code/title for every active movie.
@@ -762,5 +774,21 @@ func (s *SQLiteStore) ListActiveMovieCodeIndex(ctx context.Context) ([]MovieCode
 	if out == nil {
 		out = []MovieCodeIndexItem{}
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	// 番号查重同时读取已登记分部，不把新增分部误称为重复影片。
+	for i := range out {
+		files, err := s.ListMovieFiles(ctx, out[i].ID, out[i].Code)
+		if err != nil {
+			return nil, err
+		}
+		for _, file := range files {
+			out[i].PartIndexes = append(out[i].PartIndexes, file.PartIndex)
+		}
+	}
+	return out, nil
 }

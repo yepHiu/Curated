@@ -30,6 +30,7 @@ func TestCheckMatchesExactAndSimilarLibraryCodes(t *testing.T) {
 	}
 }
 
+// TestValidateNames 验证本次浏览类别及文件归属的兼容行为。
 func TestValidateNames(t *testing.T) {
 	t.Parallel()
 	if got := ValidateNames(nil); got == "" {
@@ -47,5 +48,16 @@ func TestValidateNames(t *testing.T) {
 	}
 	if got := ValidateNames([]string{"ABC-001.mp4"}); got != "" {
 		t.Fatalf("unexpected error %q", got)
+	}
+}
+
+// TestCheckDistinguishesAdditionalPart preserves movie matches while reporting file-level novelty.
+func TestCheckDistinguishesAdditionalPart(t *testing.T) {
+	index := []IndexItem{{ID: "fc2-1234567", Code: "FC2-1234567", PartIndexes: []int{1, 3}}}
+	items := Check([]string{"FC2-1234567-CD1.mp4", "FC2-1234567_2.mp4", "FC2-1234567.mp4"}, index)
+	for i, want := range []string{"part-exists", "new-part", "same-code"} {
+		if items[i].FileStatus != want {
+			t.Fatalf("item=%+v want=%s", items[i], want)
+		}
 	}
 }

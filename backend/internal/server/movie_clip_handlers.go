@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -86,6 +87,7 @@ func (h *Handler) startMovieClipArtifactJanitor(ctx context.Context) {
 	}()
 }
 
+// handleCreateMovieClip 校验片段来源及静态帧归属，创建异步导出任务。
 func (h *Handler) handleCreateMovieClip(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
@@ -147,15 +149,26 @@ func (h *Handler) handleCreateMovieClip(w http.ResponseWriter, r *http.Request) 
 			writeAppError(w, http.StatusServiceUnavailable, contracts.ErrorCodeInternal, "clip export is not configured")
 			return
 		}
-		exists, err := h.store.CuratedFrameExists(r.Context(), curatedFrameID)
+		frameMovieID, frameFileID, err := h.store.GetCuratedFrameSource(r.Context(), curatedFrameID)
+		if errors.Is(err, sql.ErrNoRows) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "curated frame not found")
+			return
+		}
 		if err != nil {
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to verify curated frame")
 			return
 		}
-		if !exists {
-			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "curated frame not found")
+		detail, err := h.store.GetMoviePlaybackDetail(r.Context(), movieID)
+		if err != nil {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie file not found")
 			return
 		}
+		if frameMovieID != movieID || (frameFileID != "" && frameFileID != detail.SelectedFileID) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "curated frame belongs to a different movie file")
+			return
+		}
+		// 固定已经校验的文件，后续解析路径不受并发续播更新影响。
+		r = r.WithContext(contracts.WithMovieFileSelection(r.Context(), detail.SelectedFileID))
 		if err := h.store.UpsertCuratedFrameMotion(r.Context(), storage.CuratedFrameMotionMeta{
 			FrameID: curatedFrameID, Status: "processing", ContentType: movieClipContentType(format), DurationSec: duration, Width: width, FPS: fps,
 		}); err != nil {

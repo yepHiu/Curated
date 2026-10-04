@@ -211,7 +211,7 @@ export interface LibraryService extends TopicLibraryService {
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
   getTaskStatus(taskId: string): Promise<TaskDTO>
   cancelMovieClip(taskId: string): Promise<void>
-  extractMovieFrame(movieId: string, positionSec: number): Promise<Blob>
+  extractMovieFrame(movieId: string, positionSec: number, fileId?: string): Promise<Blob>
   createMovieClip(movieId: string, body: Omit<CreateMovieClipBody, "format"> & { format?: "gif" | "mp4" | "webm" }): Promise<TaskDTO>
   /** 单部影片重新刮削；Web 返回任务供轮询；mock 返回 null。 */
   refreshMovieMetadata(movieId: string): Promise<TaskDTO | null>
@@ -234,7 +234,7 @@ export interface LibraryService extends TopicLibraryService {
    * Web：返回后端给出的播放描述（当前为 direct-play，后续可扩展 remux / transcode）。
    * Mock：返回 null。
    */
-  getMoviePlayback(movieId: string, options?: { startPositionSec?: number; signal?: AbortSignal }): Promise<PlaybackDescriptorDTO | null>
+  getMoviePlayback(movieId: string, options?: { fileId?: string; startPositionSec?: number; signal?: AbortSignal }): Promise<PlaybackDescriptorDTO | null>
   /**
    * 尽力预取播放描述符（点击进入播放器时提前发起）。Web：短 TTL 一次性缓存，
    * 下一次 `getMoviePlayback` 直接消费；Mock：无操作。
@@ -245,9 +245,10 @@ export interface LibraryService extends TopicLibraryService {
     mode: PlaybackDescriptorDTO["mode"],
     startPositionSec?: number,
     signal?: AbortSignal,
+      fileId?: string,
   ): Promise<PlaybackDescriptorDTO | null>
   getPlaybackSession(sessionId: string): Promise<PlaybackSessionStatusDTO | null>
-  launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO | null>
+  launchNativePlayback(movieId: string, startPositionSec?: number, fileId?: string): Promise<NativePlaybackLaunchDTO | null>
   /**
    * 从当前库缓存中随机推荐若干部（排除自身），最多 `limit` 条（默认 6）。
    * 顺序与选集由 `movieId` 派生种子决定，同一影片在候选集合不变时可复现，避免界面无意义跳动。

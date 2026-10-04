@@ -1042,7 +1042,9 @@
     "comicImportPending": "漫画上传导入会在下一步实现中接入。",
     "comicScanning": "正在导入漫画",
     "comicCompleted": "漫画导入完成",
-    "comicFinished": "漫画导入结束"
+    "comicFinished": "漫画导入结束",
+    "newPart": "同番号新增分部",
+    "partExists": "此分部已登记"
   },
   "scanTask": {
     "fetchFailed": "无法获取扫描任务状态"
@@ -1904,7 +1906,6 @@
     "revealFailGeneric": "无法在文件管理器中打开"
   },
   "player": {
-    "historyCategory": "历史记录类别",
     "loadingTarget": "正在加载播放目标…",
     "notFoundTitle": "播放目标未找到",
     "notFoundDesc": "此播放路由指向的影片 ID 在当前库中不可用。",
@@ -1995,7 +1996,11 @@
     "preparingSeek": "正在切换播放片段…",
     "buffering": "正在缓冲播放数据…",
     "bufferingSeek": "正在跳转并补齐缓冲…",
-    "prewarmingStream": "正在预热 HLS 播放流…"
+    "prewarmingStream": "正在预热 HLS 播放流…",
+    "selectPart": "选择分部",
+    "partLabel": "第 {number} 部",
+    "fileCount": "{count} 个文件",
+    "historyCategory": "历史记录类别"
   },
   "detailPage": {
     "curatedFramesEmpty": "这部影片还没有萃取帧。",

@@ -15,12 +15,18 @@ export const playbackProgressRevision = ref(0)
 
 export interface PlaybackProgressEntry {
   movieId: string
+  fileId?: string
   positionSec: number
   durationSec: number
   updatedAt: string
 }
 
 type StoreShape = Record<string, PlaybackProgressEntry>
+
+/** JSON 元组避免电影 ID 和文件 ID 的分隔符碰撞。 */
+function fileProgressKey(movieId: string, fileId: string): string {
+ return JSON.stringify([movieId, fileId])
+}
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -30,11 +36,13 @@ function isNonNegativeFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0
 }
 
+/** 校验进度字段及可选文件标识。 */
 function isPlaybackProgressEntry(value: unknown): value is PlaybackProgressEntry {
   if (!isObjectRecord(value)) {
     return false
   }
   return (
+    (value.fileId === undefined || typeof value.fileId === "string") &&
     typeof value.movieId === "string" &&
     value.movieId.trim() !== "" &&
     isNonNegativeFiniteNumber(value.positionSec) &&
@@ -44,15 +52,18 @@ function isPlaybackProgressEntry(value: unknown): value is PlaybackProgressEntry
   )
 }
 
+/** 规范作品和文件标识，保留片内位置。 */
 function normalizeEntry(row: PlaybackProgressEntry): PlaybackProgressEntry {
   return {
     movieId: row.movieId.trim(),
+    ...(row.fileId?.trim() ? { fileId: row.fileId.trim() } : {}),
     positionSec: row.positionSec,
     durationSec: row.durationSec,
     updatedAt: row.updatedAt,
   }
 }
 
+/** 重建每片进度及每部作品唯一的最后播放快照。 */
 function normalizeStore(value: unknown): StoreShape {
   if (!isObjectRecord(value)) {
     return {}
@@ -63,7 +74,9 @@ function normalizeStore(value: unknown): StoreShape {
       continue
     }
     const normalized = normalizeEntry(row)
-    next[normalized.movieId] = normalized
+    if (normalized.fileId) next[fileProgressKey(normalized.movieId, normalized.fileId)] = normalized
+    const previous = next[normalized.movieId]
+    if (!previous || normalized.updatedAt >= previous.updatedAt) next[normalized.movieId] = normalized
   }
   return next
 }
@@ -111,12 +124,15 @@ export async function hydratePlaybackProgress(): Promise<void> {
     for (const row of items) {
       const id = row.movieId.trim()
       if (!id) continue
-      next[id] = {
+      const entry: PlaybackProgressEntry = {
         movieId: id,
+        ...(row.fileId ? { fileId: row.fileId } : {}),
         positionSec: row.positionSec,
         durationSec: row.durationSec,
         updatedAt: row.updatedAt,
       }
+      next[id] = entry
+      if (entry.fileId) next[fileProgressKey(id, entry.fileId)] = entry
     }
     cache = next
     playbackProgressRevision.value += 1
@@ -135,16 +151,20 @@ export function parseResumeSecondsFromQuery(t: unknown): number | undefined {
   return n
 }
 
-export function getProgress(movieId: string): PlaybackProgressEntry | undefined {
+/** 文件进度独立寻址；省略 fileId 时返回作品最后一次播放，供历史与续播入口使用。 */
+export function getProgress(movieId: string, fileId?: string): PlaybackProgressEntry | undefined {
   const id = movieId.trim()
   if (!id) return undefined
-  const row = cache[id]
+  const row = cache[fileId ? fileProgressKey(id, fileId) : id]
   if (!isPlaybackProgressEntry(row)) return undefined
   return normalizeEntry(row)
 }
 
+/** 只列作品历史投影，隐藏独立分片缓存条目。 */
 export function listSortedByUpdatedDesc(): PlaybackProgressEntry[] {
-  return Object.values(cache)
+  return Object.entries(cache)
+    .filter(/* 从文件缓存中提取每部作品唯一的历史投影。 */ ([key, entry]) => key === entry.movieId)
+    .map(/* 从文件缓存中提取每部作品唯一的历史投影。 */ ([, entry]) => entry)
     .filter(isPlaybackProgressEntry)
     .map(normalizeEntry)
     .sort((a, b) => {
@@ -154,7 +174,8 @@ export function listSortedByUpdatedDesc(): PlaybackProgressEntry[] {
     })
 }
 
-export function saveProgress(movieId: string, positionSec: number, durationSec: number) {
+/** 同步当前分片，并维护每部作品唯一的历史入口。 */
+export function saveProgress(movieId: string, positionSec: number, durationSec: number, fileId?: string) {
   const id = movieId.trim()
   if (!id) return
 
@@ -168,25 +189,30 @@ export function saveProgress(movieId: string, positionSec: number, durationSec: 
   const updatedAt = new Date().toISOString()
   cache[id] = {
     movieId: id,
+    ...(fileId ? { fileId } : {}),
     positionSec: pos,
     durationSec: dur,
     updatedAt,
   }
+  if (fileId) cache[fileProgressKey(id, fileId)] = cache[id]!
   if (!USE_WEB) {
     saveStore(cache)
   } else {
-    void api.putPlaybackProgress(id, { positionSec: pos, durationSec: dur }).catch(() => {
+    void api.putPlaybackProgress(id, { positionSec: pos, durationSec: dur, ...(fileId ? { fileId } : {}) }).catch(() => {
       // 内存已更新；同步失败时下次 hydrate 或重试可收敛
     })
   }
   playbackProgressRevision.value += 1
 }
 
+/** 清除作品历史及所有分片进度。 */
 export function removeProgress(movieId: string) {
   const id = movieId.trim()
   if (!id) return
   if (!cache[id]) return
-  delete cache[id]
+  for (const [key, row] of Object.entries(cache)) {
+    if (row.movieId === id) delete cache[key]
+  }
   if (!USE_WEB) {
     saveStore(cache)
   } else {
@@ -196,8 +222,8 @@ export function removeProgress(movieId: string) {
 }
 
 /** Seconds to pass as `t` when opening the player from detail/library (skip tiny / near-end). */
-export function getResumeSecondsForOpenPlayer(movieId: string): number | undefined {
-  const row = getProgress(movieId)
+export function getResumeSecondsForOpenPlayer(movieId: string, fileId?: string): number | undefined {
+  const row = getProgress(movieId, fileId)
   if (!row) return undefined
   const pos = row.positionSec
   const dur = row.durationSec

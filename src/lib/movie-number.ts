@@ -8,7 +8,7 @@ const numberPatterns: Array<{
   format: (matches: RegExpMatchArray) => string
 }> = [
   {
-    re: /\b(?:FC2[-_ ]?(?:PPV[-_ ]?)?|fc2)(\d{5,7})\b/i,
+    re: /\b(?:FC2[-_ ]?(?:PPV[-_ ]?)?|fc2)(\d{5,7})(?:\b|_)/i,
     format: (m) => `FC2-${m[1]}`,
   },
   {
@@ -28,7 +28,7 @@ const numberPatterns: Array<{
     format: (m) => `CARIBBEANCOM-${m[2]!.replace(/ /g, "")}`,
   },
   {
-    re: /\b([a-z]{2,6})[-_ ]?(\d{2,5})\b/i,
+    re: /\b([a-z]{2,6})[-_ ]?(\d{2,5})(?:\b|_)/i,
     format: (m) => `${m[1]!.toUpperCase()}-${m[2]}`,
   },
 ]
@@ -81,4 +81,18 @@ export function strongerMovieCodeMatch(
 ): MovieCodeMatchKind | "" {
   const rank = (kind: MovieCodeMatchKind | "") => (kind === "exact" ? 2 : kind === "similar" ? 1 : 0)
   return rank(left) >= rank(right) ? left : right
+}
+
+/** 明确分部序号仅来自文件名后缀，未标记文件仍通过文件名区分。 */
+export function extractMoviePartIndex(filename: string, code = extractMovieNumber(filename)): number {
+ const base = fileBaseName(filename).replace(/\.[^.]+$/, "")
+ const explicit = base.match(/(?:^|[-_ .])(?:CD|PART|PT|DISC|DISK)[-_ .]*(\d{1,3})(?:[^0-9]|$)/i)
+ if (explicit) return Number(explicit[1])
+ if (!code) return 0
+ const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/[-_ ]+/g, "[-_ ]*")
+ const pattern = code.startsWith("FC2-") ? `FC2[-_ ]*(?:PPV[-_ ]*)?${code.slice(4)}` : escaped
+ const match = new RegExp(pattern, "i").exec(base)
+ if (!match) return 0
+ const numeric = base.slice(match.index + match[0].length).match(/^[-_ .]+(\d{1,3})(?:[-_ .].*)?$/)
+ return numeric ? Number(numeric[1]) : 0
 }

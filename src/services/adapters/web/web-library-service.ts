@@ -431,6 +431,7 @@ async function refreshLibraryPathStorageStatusesFromApi() {
   }
 }
 
+/** 适配共享资料库 API，统一缓存作品与文件详情。 */
 function createWebLibraryService(): LibraryService {
   const impl: LibraryService = {
     ...webTopicLibrary,
@@ -1189,7 +1190,8 @@ function createWebLibraryService(): LibraryService {
       return await api.createMovieClip(movieId, { ...body, format: body.format ?? "gif" })
     },
     async cancelMovieClip(taskId) { await api.cancelMovieClip(taskId) },
-    async extractMovieFrame(movieId, positionSec) { return api.extractMovieFrame(movieId, positionSec) },
+    /** 从所选文件的片内时间提取源帧。 */
+    async extractMovieFrame(movieId, positionSec, fileId) { return api.extractMovieFrame(movieId, positionSec, fileId) },
 
     async refreshMovieMetadata(movieId: string): Promise<TaskDTO | null> {
       return await api.refreshMovieMetadata(movieId)
@@ -1204,12 +1206,13 @@ function createWebLibraryService(): LibraryService {
       return await api.startMetadataRefreshByPaths({ paths: cleaned })
     },
 
-    async getMoviePlayback(movieId: string, options?: { startPositionSec?: number; signal?: AbortSignal }): Promise<PlaybackDescriptorDTO | null> {
+    /** 请求所选文件的播放描述，允许带续播目标和取消信号。 */
+    async getMoviePlayback(movieId: string, options?: { fileId?: string; startPositionSec?: number; signal?: AbortSignal }): Promise<PlaybackDescriptorDTO | null> {
       const id = movieId.trim()
       if (!id) {
         return null
       }
-      const prefetched = takeFreshMoviePlaybackPrefetch(id, options?.startPositionSec, options?.signal)
+      const prefetched = options?.fileId ? undefined : takeFreshMoviePlaybackPrefetch(id, options?.startPositionSec, options?.signal)
       if (prefetched) {
         return await prefetched
       }
@@ -1219,7 +1222,7 @@ function createWebLibraryService(): LibraryService {
         throw new DOMException("Playback cancelled", "AbortError")
       }
       if (!dto.url) {
-        dto.url = moviePlaybackAbsoluteUrl(id)
+        dto.url = moviePlaybackAbsoluteUrl(id, dto.fileId ?? options?.fileId)
       }
       return dto
     },
@@ -1230,11 +1233,13 @@ function createWebLibraryService(): LibraryService {
       return prefetchMoviePlaybackRequest(id, startPositionSec)
     },
 
+    /** 为所选文件创建独立播放会话，保留请求取消语义。 */
     async createPlaybackSession(
       movieId: string,
       mode: PlaybackDescriptorDTO["mode"],
       startPositionSec?: number,
       signal?: AbortSignal,
+      fileId?: string,
     ): Promise<PlaybackDescriptorDTO | null> {
       const id = movieId.trim()
       if (!id) {
@@ -1242,6 +1247,7 @@ function createWebLibraryService(): LibraryService {
       }
       const dto = await api.createPlaybackSession(id, {
         mode,
+        fileId,
         startPositionSec,
       }, signal)
       if (signal?.aborted) {
@@ -1249,7 +1255,7 @@ function createWebLibraryService(): LibraryService {
         throw new DOMException("Playback cancelled", "AbortError")
       }
       if (!dto.url) {
-        dto.url = moviePlaybackAbsoluteUrl(id)
+        dto.url = moviePlaybackAbsoluteUrl(id, dto.fileId ?? fileId)
       }
       return dto
     },
@@ -1266,12 +1272,13 @@ function createWebLibraryService(): LibraryService {
       }
     },
 
-    async launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO | null> {
+    /** 将当前文件和时间交给服务端原生播放器。 */
+    async launchNativePlayback(movieId: string, startPositionSec?: number, fileId?: string): Promise<NativePlaybackLaunchDTO | null> {
       const id = movieId.trim()
       if (!id) {
         return null
       }
-      return await api.launchNativePlayback(id, startPositionSec)
+      return await api.launchNativePlayback(id, startPositionSec, fileId)
     },
 
     async deletePlaybackSession(sessionId: string) {
@@ -1282,12 +1289,13 @@ function createWebLibraryService(): LibraryService {
       await api.deletePlaybackSession(id)
     },
 
+    /** 多文件作品补齐文件详情，单文件保留轻量缓存路径。 */
     async ensureMovieCached(movieId: string) {
       const trimmed = movieId.trim()
       if (!trimmed) return
       if (
-        moviesState.value.some((m) => m.id === trimmed) ||
-        trashedMoviesState.value.some((m) => m.id === trimmed)
+        moviesState.value.some(/* 适配文件身份及当前浏览类别的共享资料。 */ (m) => m.id === trimmed && ((m.fileCount ?? 1) <= 1 || m.files !== undefined)) ||
+        trashedMoviesState.value.some(/* 适配文件身份及当前浏览类别的共享资料。 */ (m) => m.id === trimmed && ((m.fileCount ?? 1) <= 1 || m.files !== undefined))
       ) {
         return
       }
@@ -1317,6 +1325,7 @@ function createWebLibraryService(): LibraryService {
       return await loadMovieDetail(movieId)
     },
 
+    /** 在相同浏览类别内选择演员相关作品。 */
     getRelatedMovies(movieId, limit = 6) {
       const id = movieId.trim()
       const source = moviesState.value.find((movie) => movie.id === id)
@@ -1502,6 +1511,7 @@ function disposePlaybackPrefetch(key: string, entry: MoviePlaybackPrefetch): voi
   }).catch(() => {})
 }
 
+/** 预热默认文件描述，回退 URL 保留服务端实际文件。 */
 function prefetchMoviePlaybackRequest(movieId: string, startPositionSec?: number): () => void {
   const key = playbackPrefetchKey(movieId, startPositionSec)
   const existing = moviePlaybackPrefetches.get(key)
@@ -1511,9 +1521,9 @@ function prefetchMoviePlaybackRequest(movieId: string, startPositionSec?: number
   try {
     promise = api
       .getMoviePlayback(movieId, { clientVideoCodecs: clientVideoCodecsParam(), startPositionSec, signal: controller.signal })
-      .then((dto) => {
+      .then(/* 适配文件身份及当前浏览类别的共享资料。 */ (dto) => {
         if (!dto.url) {
-          dto.url = moviePlaybackAbsoluteUrl(movieId)
+          dto.url = moviePlaybackAbsoluteUrl(movieId, dto.fileId)
         }
         return dto
       })

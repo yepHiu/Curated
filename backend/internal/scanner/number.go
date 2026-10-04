@@ -19,7 +19,7 @@ var numberPatterns = []struct {
 }{
 	// FC2-PPV / FC2PPV / FC2 (numeric ID, 5-7 digits)
 	{
-		re: regexp.MustCompile(`(?i)\b(?:FC2[-_ ]?(?:PPV[-_ ]?)?|fc2)(\d{5,7})\b`),
+		re: regexp.MustCompile(`(?i)\b(?:FC2[-_ ]?(?:PPV[-_ ]?)?|fc2)(\d{5,7})(?:\b|_)`),
 		format: func(m []string) string {
 			return "FC2-" + m[1]
 		},
@@ -46,7 +46,7 @@ var numberPatterns = []struct {
 	},
 	// Standard video ID: 2-6 alpha prefix + 2-5 digit suffix (e.g. IPZZ-788, ABP-123, START-483)
 	{
-		re:     regexp.MustCompile(`(?i)\b([a-z]{2,6})[-_ ]?(\d{2,5})\b`),
+		re:     regexp.MustCompile(`(?i)\b([a-z]{2,6})[-_ ]?(\d{2,5})(?:\b|_)`),
 		format: func(m []string) string { return strings.ToUpper(m[1]) + "-" + m[2] },
 	},
 }

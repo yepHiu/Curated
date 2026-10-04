@@ -17,9 +17,10 @@ const (
 
 // IndexItem is a compact active-library catalog row used for import code checks.
 type IndexItem struct {
-	ID    string
-	Code  string
-	Title string
+	PartIndexes []int
+	ID          string
+	Code        string
+	Title       string
 }
 
 // Match is one library movie that matches an incoming filename's catalog code.
@@ -32,6 +33,7 @@ type Match struct {
 
 // Item is the check result for one submitted name.
 type Item struct {
+	FileStatus    string
 	Name          string
 	ExtractedCode string
 	Matches       []Match
@@ -50,6 +52,23 @@ func Check(names []string, index []IndexItem) []Item {
 		item.ExtractedCode = extracted
 		if extracted != "" {
 			item.Matches = matchIndex(extracted, index)
+			if len(item.Matches) > 0 {
+				item.FileStatus = "same-code"
+				part := moviecode.ExtractPartIndex(name, extracted)
+				if part > 0 {
+					item.FileStatus = "new-part"
+					for _, row := range index {
+						if moviecode.Classify(extracted, row.Code) != moviecode.MatchExact {
+							continue
+						}
+						for _, existing := range row.PartIndexes {
+							if existing == part {
+								item.FileStatus = "part-exists"
+							}
+						}
+					}
+				}
+			}
 		}
 		out = append(out, item)
 	}

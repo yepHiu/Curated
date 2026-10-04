@@ -255,47 +255,66 @@ func (s *SQLiteStore) DeleteLibraryPathAndPruneOrphanMovies(ctx context.Context,
 		return 0, err
 	}
 
-	rows, err := tx.QueryContext(ctx,
-		`SELECT id, location FROM movies WHERE TRIM(COALESCE(location, '')) != '' AND (trashed_at IS NULL OR TRIM(trashed_at) = '')`)
+	// 移除目录只解除该目录下文件的绑定；其它目录仍有分片时保留作品及用户资料。
+	rows, err := tx.QueryContext(ctx, `SELECT mf.id, mf.movie_id, mf.location FROM movie_files mf
+ JOIN movies m ON m.id=mf.movie_id WHERE m.trashed_at IS NULL OR TRIM(m.trashed_at)=''`)
 	if err != nil {
 		return 0, err
 	}
-	var toDelete []string
+	type orphanFile struct{ id, movieID string }
+	var orphanFiles []orphanFile
+	affected := map[string]bool{}
 	for rows.Next() {
-		var movieID, location string
-		if err := rows.Scan(&movieID, &location); err != nil {
-			_ = rows.Close()
-			return pruned, err
+		var fileID, movieID, location string
+		if err := rows.Scan(&fileID, &movieID, &location); err != nil {
+			rows.Close()
+			return 0, err
 		}
 		loc := filepath.Clean(strings.TrimSpace(location))
-		if loc == "" {
-			continue
-		}
 		if !pathHasLibraryRoot(loc, removedRoot) {
 			continue
 		}
-		stillCovered := false
-		for _, rr := range remaining {
-			r := filepath.Clean(strings.TrimSpace(rr))
-			if r == "" || r == "." {
-				continue
-			}
-			if pathHasLibraryRoot(loc, r) {
-				stillCovered = true
+		covered := false
+		for _, root := range remaining {
+			if pathHasLibraryRoot(loc, filepath.Clean(strings.TrimSpace(root))) {
+				covered = true
 				break
 			}
 		}
-		if stillCovered {
-			continue
+		if !covered {
+			orphanFiles = append(orphanFiles, orphanFile{fileID, movieID})
+			affected[movieID] = true
 		}
-		toDelete = append(toDelete, movieID)
 	}
 	if err := rows.Err(); err != nil {
-		_ = rows.Close()
-		return pruned, err
+		rows.Close()
+		return 0, err
 	}
 	if err := rows.Close(); err != nil {
-		return pruned, err
+		return 0, err
+	}
+	for _, file := range orphanFiles {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM playback_progress WHERE movie_id=? AND file_id=?`, file.movieID, file.id); err != nil {
+			return 0, err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM movie_files WHERE id=?`, file.id); err != nil {
+			return 0, err
+		}
+	}
+	var toDelete []string
+	for movieID := range affected {
+		var location string
+		err := tx.QueryRowContext(ctx, `SELECT location FROM movie_files WHERE movie_id=? ORDER BY part_index, location LIMIT 1`, movieID).Scan(&location)
+		if errors.Is(err, sql.ErrNoRows) {
+			toDelete = append(toDelete, movieID)
+			continue
+		}
+		if err != nil {
+			return 0, err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE movies SET location=?, updated_at=? WHERE id=?`, location, nowUTC(), movieID); err != nil {
+			return 0, err
+		}
 	}
 
 	for _, movieID := range toDelete {

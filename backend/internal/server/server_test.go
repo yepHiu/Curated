@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -814,6 +815,7 @@ func TestHandleStreamMovie_OKAndRange(t *testing.T) {
 	}
 }
 
+// TestHandleGetMoviePlaybackDescriptor_OK 验证本次浏览类别及文件归属的兼容行为。
 func TestHandleGetMoviePlaybackDescriptor_OK(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -883,7 +885,7 @@ func TestHandleGetMoviePlaybackDescriptor_OK(t *testing.T) {
 	if dto.Mode != contracts.PlaybackModeDirect {
 		t.Fatalf("mode = %q, want %q", dto.Mode, contracts.PlaybackModeDirect)
 	}
-	if dto.URL != "/api/library/movies/"+outcome.MovieID+"/stream" {
+	if dto.URL != "/api/library/movies/"+outcome.MovieID+"/stream?fileId="+url.QueryEscape(dto.FileID) || dto.FileID == "" {
 		t.Fatalf("url = %q", dto.URL)
 	}
 	if dto.FileName != "PLAY-DESC-001.mp4" {

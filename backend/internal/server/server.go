@@ -694,7 +694,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/ai/audit", localServerManagement(h.handleAIAudit))
 	mux.HandleFunc("POST /api/ai/cleanup", localServerManagement(h.handleAICleanup))
 
-	return WithAccessLog(h.logger, withClientTracking(h.withRequestSecurity(h.withAuthLock(mux)), h.clientTracker))
+	return WithAccessLog(h.logger, withClientTracking(h.withRequestSecurity(h.withAuthLock(withMovieFileSelection(mux))), h.clientTracker))
 }
 
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -733,7 +733,7 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mode := strings.ToLower(strings.TrimSpace(query.Get("mode")))
-	if !oneOf(mode, "", "library", "favorites", "recent", "tags", "trash") {
+	if !oneOf(mode, "", "library", "fc2", "favorites", "recent", "tags", "trash") {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid mode")
 		return
 	}
@@ -1105,6 +1105,7 @@ func parseClientVideoCodecs(r *http.Request) []string {
 	return codecs
 }
 
+// handleGetMoviePlayback 为请求文件构建播放描述，校验来源并返回实际文件身份。
 func (h *Handler) handleGetMoviePlayback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
@@ -1143,7 +1144,7 @@ func (h *Handler) handleGetMoviePlayback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	detail, err := h.store.GetMovieDetail(r.Context(), movieID)
+	detail, err := h.store.GetMoviePlaybackDetail(r.Context(), movieID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
@@ -1156,12 +1157,15 @@ func (h *Handler) handleGetMoviePlayback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	progress, err := h.store.GetPlaybackProgress(r.Context(), movieID)
+	progress, err := h.store.GetPlaybackProgress(contracts.WithMovieFileSelection(r.Context(), detail.SelectedFileID), movieID)
 	if err != nil && h.logger != nil {
 		h.logger.Warn("get playback progress failed", zap.Error(err), zap.String("movieId", movieID))
 	}
 
 	streamURL := "/api/library/movies/" + url.PathEscape(movieID) + "/stream"
+	if detail.SelectedFileID != "" {
+		streamURL += "?fileId=" + url.QueryEscape(detail.SelectedFileID)
+	}
 	fileName := filepath.Base(strings.TrimSpace(detail.Location))
 	mimeType := mime.TypeByExtension(strings.ToLower(filepath.Ext(fileName)))
 	if mimeType == "" {
@@ -1169,6 +1173,7 @@ func (h *Handler) handleGetMoviePlayback(w http.ResponseWriter, r *http.Request)
 	}
 
 	dto := contracts.PlaybackDescriptorDTO{
+		FileID:         detail.SelectedFileID,
 		MovieID:        movieID,
 		Mode:           contracts.PlaybackModeDirect,
 		URL:            streamURL,

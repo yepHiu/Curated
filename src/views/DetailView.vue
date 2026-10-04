@@ -131,13 +131,15 @@ const openDetails = async (nextMovieId: string) => {
   )
 }
 
-const openPlayer = async (nextMovieId: string) => {
+/** 从详情选定分片时将文件与播放目标一同导航。 */
+const openPlayer = async (nextMovieId: string, fileId?: string) => {
   await router.push(
     buildPlayerRouteFromBrowseIntent(
       nextMovieId,
       route.query,
       getBrowseSourceMode(route.query),
       "detail",
+      fileId,
     ),
   )
 }

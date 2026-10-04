@@ -64,7 +64,7 @@ import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import { getLocalMovieComment, putLocalMovieComment } from "@/lib/movie-comment-local-storage"
 import {
   classifyMovieCodes,
-  extractMovieNumber,
+  extractMovieNumber, extractMoviePartIndex,
   strongerMovieCodeMatch,
 } from "@/lib/movie-number"
 import { HttpClientError } from "@/api/http-client"
@@ -1824,13 +1824,14 @@ export const mockLibraryService: LibraryService = {
     defaultImportLibraryPathIdMock.value = trimmed
   },
 
+  /** 查找同番号作品并判断数字分片是否已登记。 */
   async checkImportMovieCodes(names: string[]): Promise<ImportMovieCodeCheckDTO> {
     const trimmed = names.map((name) => name.trim()).filter(Boolean)
     if (trimmed.length === 0) {
       throw mockHttpError(400, "COMMON_BAD_REQUEST", "filenames are required")
     }
     const active = moviesState.value.filter((movie) => !movie.trashedAt?.trim())
-    const items = trimmed.map((name) => {
+    const items = trimmed.map(/* 根据当前文件和作品资料生成一致的演示结果。 */ (name) => {
       const extractedCode = extractMovieNumber(name)
       const matches: ImportMovieCodeMatchDTO[] = []
       if (extractedCode) {
@@ -1851,8 +1852,12 @@ export const mockLibraryService: LibraryService = {
         }
         matches.push(...byId.values())
       }
+      const part = extractMoviePartIndex(name, extractedCode)
+      const fileStatus = matches.length === 0 ? undefined : part === 0 ? "same-code" as const
+        : active.some(/* 命中的作品已登记此序号时提示分片已存在。 */ movie => matches.some(/* 匹配作品 ID。 */ match => match.movieId === movie.id) && movie.files?.some(/* 比较明确分片序号。 */ file => file.partIndex === part)) ? "part-exists" as const : "new-part" as const
       return {
         name,
+        fileStatus,
         extractedCode: extractedCode || undefined,
         matches,
       }
@@ -1971,6 +1976,7 @@ export const mockLibraryService: LibraryService = {
     await Promise.resolve()
     return moviesState.value.find((movie) => movie.id === id)
   },
+  /** 在相同浏览类别内选择演员相关作品。 */
   getRelatedMovies(movieId, limit = 6) {
     const id = movieId.trim()
     const source = moviesState.value.find((movie) => movie.id === id)

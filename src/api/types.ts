@@ -156,6 +156,7 @@ export interface AppUpdateInstallBody {
 }
 
 export interface MovieListItemDTO {
+  fileCount?: number
   id: string
   title: string
   code: string
@@ -183,6 +184,7 @@ export interface MovieListItemDTO {
 }
 
 export interface MovieDetailDTO extends MovieListItemDTO {
+  files?: import("@/domain/movie/types").MovieFile[]
   summary: string
   previewImages?: string[]
   previewVideoUrl?: string
@@ -1122,6 +1124,7 @@ export interface ImportMovieCodeMatchDTO {
 }
 
 export interface ImportMovieCodeCheckItemDTO {
+  fileStatus?: "same-code" | "new-part" | "part-exists"
   name: string
   extractedCode?: string
   matches: ImportMovieCodeMatchDTO[]
@@ -1183,6 +1186,7 @@ export interface ActorProfileDTO {
 }
 
 export interface CreateMovieClipBody {
+  fileId?: string
   startSec: number
   endSec: number
   format: "gif" | "mp4" | "webm"
@@ -1453,6 +1457,7 @@ export interface PatchMovieBody {
 
 /** GET /playback/progress */
 export interface PlaybackProgressItemDTO {
+  fileId?: string
   movieId: string
   positionSec: number
   durationSec: number
@@ -1514,6 +1519,7 @@ export interface PingAllProvidersResponse {
 
 /** PUT /playback/progress/{movieId} */
 export interface PutPlaybackProgressBody {
+  fileId?: string
   positionSec: number
   durationSec: number
 }
@@ -1534,6 +1540,7 @@ export interface PlaybackSubtitleTrackDTO {
 }
 
 export interface PlaybackDescriptorDTO {
+  fileId?: string
   movieId: string
   mode: PlaybackMode
   sessionId?: string
@@ -1557,6 +1564,7 @@ export interface PlaybackDescriptorDTO {
 }
 
 export interface CreatePlaybackSessionBody {
+  fileId?: string
   mode?: PlaybackMode
   startPositionSec?: number
 }
@@ -1603,6 +1611,7 @@ export interface PutMovieCommentBody {
 
 /** GET /curated-frames（无图像字节，图用 GET /curated-frames/{id}/image） */
 export interface CuratedFrameItemDTO {
+  fileId?: string
   id: string
   movieId: string
   title: string
@@ -1651,6 +1660,7 @@ export interface CuratedFramesListDTO {
 
 /** POST /curated-frames */
 export interface CreateCuratedFrameBody {
+  fileId?: string
   id: string
   movieId: string
   title: string

@@ -471,6 +471,7 @@ describe("PlayerPage loading states", () => {
   })
 
   it("restarts an HLS session at the beginning when the descriptor is already near the end", async () => {
+    // 验证 restarts an HLS session at the beginning when the descriptor is already near the end。
     serviceMocks.getMoviePlayback.mockResolvedValueOnce({
       movieId: "movie-1",
       mode: "hls",
@@ -496,7 +497,7 @@ describe("PlayerPage loading states", () => {
     try {
       await flushPromises()
       await nextTick()
-      expect(serviceMocks.createPlaybackSession).toHaveBeenCalledWith("movie-1", "hls", 0, expect.any(AbortSignal))
+      expect(serviceMocks.createPlaybackSession).toHaveBeenCalledWith("movie-1", "hls", 0, expect.any(AbortSignal), undefined)
       expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("old-session")
     } finally {
       wrapper.unmount()

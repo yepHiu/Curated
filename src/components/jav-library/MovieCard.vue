@@ -290,6 +290,7 @@ const handleFavoriteChange = (nextValue: boolean) => {
         </div>
 
         <!-- Badge 默认含 py-0.5 + 边框，高度常 > h-5；勿用固定矮行 + overflow-hidden 以免裁切 -->
+        <Badge v-if="(movie.fileCount ?? 1) > 1" variant="outline" data-movie-file-count>{{ t("player.fileCount", { count: movie.fileCount }) }}</Badge>
         <div data-movie-tag-row class="flex min-h-6 min-w-0 items-center gap-1 overflow-hidden">
           <Badge
             v-for="(item, i) in cardTagsDisplay.tags"

@@ -534,7 +534,7 @@ async function submitImport() {
                   variant="warning"
                   class="shrink-0"
                 >
-                  {{ t("import.alreadyImported") }}
+                  {{ t(checkItemForFile(file)?.fileStatus === "new-part" ? "import.newPart" : checkItemForFile(file)?.fileStatus === "part-exists" ? "import.partExists" : "import.alreadyImported") }}
                 </Badge>
               </div>
               <div class="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">

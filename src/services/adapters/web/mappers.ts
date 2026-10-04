@@ -27,10 +27,12 @@ function stableHash(id: string): number {
   return Math.abs(hash)
 }
 
+/** 保留作品资料及文件数量，生成界面展示记录。 */
 export function mapMovieListItem(dto: MovieListItemDTO): Movie {
   const hash = stableHash(dto.id)
   return {
     id: dto.id,
+    fileCount: dto.fileCount,
     title: dto.title,
     code: dto.code,
     studio: dto.studio,
@@ -55,11 +57,13 @@ export function mapMovieListItem(dto: MovieListItemDTO): Movie {
   }
 }
 
+/** 将详情文件列表和资料映射到共享作品模型。 */
 export function mapMovieDetail(dto: MovieDetailDTO): Movie {
   const base = mapMovieListItem(dto)
   return {
     ...base,
     summary: dto.summary ?? "",
+    files: dto.files,
     previewImages: dto.previewImages ?? [],
     previewVideoUrl: dto.previewVideoUrl,
     metadataRating: dto.metadataRating > 0 ? dto.metadataRating : undefined,

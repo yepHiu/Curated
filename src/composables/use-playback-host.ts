@@ -7,6 +7,7 @@ import { authLockService, isAuthLockEnabled } from "@/services/auth-lock-service
 export interface HostedPlaybackTarget {
   movie: Movie
   autoplay: boolean
+  fileId: string
 }
 
 export type PlaybackHost = ReturnType<typeof createPlaybackHost>
@@ -21,20 +22,27 @@ export function createPlaybackHost(route: RouteLocationNormalizedLoaded) {
   const pipActive = ref(false)
   const playing = ref(false)
   const playerRoute = shallowReactive({ ...route, query: { ...route.query } })
-  const visible = computed(() => Boolean(target.value && route.name === "player" && route.params.id === target.value.movie.id))
+  const visible = computed(/* 按作品和请求文件匹配宿主，切片时释放上一实例。 */ () => Boolean(target.value && route.name === "player" && route.params.id === target.value.movie.id && String(route.query.fileId ?? "") === target.value.fileId))
 
   /** 当前影片返回主页面时复用实例，不重新请求 descriptor 或应用过时的续播时间。 */
   function hasMovie(movieId: string) {
     return target.value?.movie.id === movieId
   }
 
+  /** 同番号切换分片仍是独立播放目标，普通返回相同目标才复用。 */
+  function hasTarget(movieId: string, fileId = "") {
+    return hasMovie(movieId) && target.value?.fileId === fileId
+  }
+
   /** 保存播放器来源路由，防止后台播放时被其它页面的 query 和 params 污染。 */
   function start(movie: Movie, autoplay: boolean, origin: RouteLocationNormalizedLoaded) {
-    if (hasMovie(movie.id)) return
+    const fileId = typeof origin.query.fileId === "string" ? origin.query.fileId : ""
+    if (hasTarget(movie.id, fileId)) return
+    stopMedia?.()
     Object.assign(playerRoute, origin, { query: { ...origin.query }, params: { ...origin.params } })
     pipActive.value = false
     playing.value = false
-    target.value = { movie, autoplay }
+    target.value = { movie, autoplay, fileId }
   }
 
   /** 显式停止移除实例并清除续播入口；普通离页保留已有进度快照。 */
@@ -72,18 +80,18 @@ export function createPlaybackHost(route: RouteLocationNormalizedLoaded) {
   }
 
   /** 只接收当前实例事件，迟到的旧播放器退出事件不能关闭新影片。 */
-  function setPipActive(movieId: string, active: boolean) {
-    if (!hasMovie(movieId)) return
+  function setPipActive(movieId: string, active: boolean, fileId?: string) {
+    if (!hasTarget(movieId, fileId ?? target.value?.fileId)) return
     pipActive.value = active
     if (!active && !visible.value) stop(false)
   }
 
   /** 后台操作按钮与视频原生播放状态同步。 */
-  function setPlaying(movieId: string, active: boolean) {
-    if (hasMovie(movieId)) playing.value = active
+  function setPlaying(movieId: string, active: boolean, fileId?: string) {
+    if (hasTarget(movieId, fileId ?? target.value?.fileId)) playing.value = active
   }
 
-  watch(() => [route.name, route.params.id], () => {
+  watch(/* 按作品和请求文件匹配宿主，切片时释放上一实例。 */ () => [route.name, route.params.id, route.query.fileId], () => {
     // 换片立即释放旧实例；普通导航仅保留已开启的小窗。
     if (!target.value || visible.value) return
     if (route.name === "player" || !pipActive.value) stop(false)
@@ -104,7 +112,7 @@ export function createPlaybackHost(route: RouteLocationNormalizedLoaded) {
     stop()
   })
 
-  return { target, pipActive, playing, visible, playerRoute, hasMovie, start, stop, registerMediaControls, togglePlayback, restoreNormalPlayback, setPipActive, setPlaying }
+  return { target, pipActive, playing, visible, playerRoute, hasMovie, hasTarget, start, stop, registerMediaControls, togglePlayback, restoreNormalPlayback, setPipActive, setPlaying }
 }
 
 /** 在壳层提供作用域内的播放所有权，不跨服务器或重新挂载的应用共享实例。 */

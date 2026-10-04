@@ -97,6 +97,7 @@ func (h *Handler) handleScanLibraryHealth(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, report)
 }
 
+// scanLibraryHealth 按作品检查资料，逐文件检查路径可用性。
 func (h *Handler) scanLibraryHealth(ctx context.Context, limit int) (contracts.LibraryHealthReportDTO, error) {
 	snapshot, err := h.store.InspectLibraryHealth(ctx)
 	if err != nil {
@@ -213,19 +214,26 @@ func (h *Handler) scanLibraryHealth(ctx context.Context, limit int) (contracts.L
 	normalizedCodes := make(map[string][]storage.LibraryHealthMovieRecord)
 	normalizedPaths := make(map[string][]storage.LibraryHealthMovieRecord)
 	for _, movie := range snapshot.Movies {
-		if rootStatus, matched := libraryHealthStatusForPath(movie.Location, storageList.Items); matched && rootStatus.Status != contracts.LibraryPathStorageStatusOnline {
-			collector.summary.SkippedOfflineFiles++
-		} else {
-			addMovieSourceHealthFinding(collector, movie)
+		locations := movie.Locations
+		if len(locations) == 0 {
+			locations = []string{movie.Location}
+		}
+		for _, location := range locations {
+			source := movie
+			source.Location = location
+			if rootStatus, matched := libraryHealthStatusForPath(location, storageList.Items); matched && rootStatus.Status != contracts.LibraryPathStorageStatusOnline {
+				collector.summary.SkippedOfflineFiles++
+			} else {
+				addMovieSourceHealthFinding(collector, source)
+			}
+			if pathKey := normalizeLibraryHealthPath(location); pathKey != "" {
+				normalizedPaths[pathKey] = append(normalizedPaths[pathKey], source)
+			}
 		}
 
 		codeKey := strings.ToUpper(strings.TrimSpace(movie.Code))
 		if codeKey != "" {
 			normalizedCodes[codeKey] = append(normalizedCodes[codeKey], movie)
-		}
-		pathKey := normalizeLibraryHealthPath(movie.Location)
-		if pathKey != "" {
-			normalizedPaths[pathKey] = append(normalizedPaths[pathKey], movie)
 		}
 
 		if isMovieMetadataMissing(movie) {

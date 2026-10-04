@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// handleCheckImportMovieCodes 返回番号匹配及分片登记状态，供导入预览使用。
 func (h *Handler) handleCheckImportMovieCodes(w http.ResponseWriter, r *http.Request) {
 	if h.store == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "library store is not configured")
@@ -35,7 +36,7 @@ func (h *Handler) handleCheckImportMovieCodes(w http.ResponseWriter, r *http.Req
 	}
 	rows := make([]importcheck.IndexItem, 0, len(index))
 	for _, item := range index {
-		rows = append(rows, importcheck.IndexItem{ID: item.ID, Code: item.Code, Title: item.Title})
+		rows = append(rows, importcheck.IndexItem{ID: item.ID, Code: item.Code, Title: item.Title, PartIndexes: item.PartIndexes})
 	}
 	checked := importcheck.Check(body.Names, rows)
 	out := contracts.ImportMovieCodeCheckDTO{
@@ -44,6 +45,7 @@ func (h *Handler) handleCheckImportMovieCodes(w http.ResponseWriter, r *http.Req
 	for _, item := range checked {
 		dto := contracts.ImportMovieCodeCheckItemDTO{
 			Name:          item.Name,
+			FileStatus:    item.FileStatus,
 			ExtractedCode: item.ExtractedCode,
 			Matches:       make([]contracts.ImportMovieCodeMatchDTO, 0, len(item.Matches)),
 		}

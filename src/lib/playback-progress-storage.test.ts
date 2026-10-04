@@ -30,6 +30,24 @@ afterEach(() => {
 })
 
 describe("playback progress storage", () => {
+  // 不同分片保留独立进度，刷新后历史仍按作品去重并恢复最后分片。
+  it("persists individual file progress and a single last-file history entry", async () => {
+    // 验证 persists individual file progress and a single last-file history entry。
+    let storage = await importStorage()
+    storage.saveProgress("movie-1", 12, 120, "part-1")
+    storage.saveProgress("movie-1", 42, 240, "part-2")
+    expect(storage.getProgress("movie-1", "part-1")?.positionSec).toBe(12)
+    expect(storage.getProgress("movie-1", "part-2")?.positionSec).toBe(42)
+    expect(storage.getProgress("movie-1", "part-3")).toBeUndefined()
+    expect(storage.getProgress("movie-1")?.fileId).toBe("part-2")
+    expect(storage.listSortedByUpdatedDesc()).toHaveLength(1)
+    storage = await importStorage()
+    expect(storage.getProgress("movie-1", "part-1")?.positionSec).toBe(12)
+    expect(storage.getProgress("movie-1")?.fileId).toBe("part-2")
+    storage.removeProgress("movie-1")
+    expect(storage.getProgress("movie-1", "part-1")).toBeUndefined()
+  })
+
   it("parses fractional second route queries", () => {
     return importStorage().then(({ parseResumeSecondsFromQuery }) => {
       expect(parseResumeSecondsFromQuery("123.456")).toBe(123.456)

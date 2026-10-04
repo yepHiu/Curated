@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MoviePartSelect from "@/components/jav-library/MoviePartSelect.vue"
 import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import {
@@ -156,7 +157,7 @@ const javdbSearchUrl = computed(
 
 const movieEditOpen = ref(false)
 const emit = defineEmits<{
-  openPlayer: [movieId: string]
+  openPlayer: [movieId: string, fileId?: string]
   /** 用户评分：null 表示清除本地评分，恢复为站点评分 */
   updateUserRating: [payload: { movieId: string; value: number | null }]
   /** 整表替换用户标签（与元数据 tags 独立） */
@@ -277,6 +278,9 @@ function removeMetadataTag(tag: string) {
     tags: props.movie.tags.filter((x) => x !== tag),
   })
 }
+/** 详情只保存当前选择；未选择时由播放器恢复作品最后一次播放。 */
+const selectedPartId = ref<string>()
+watch(/* 作品变化时重置局部文件选择。 */ () => props.movie.id, /* 作品变化时重置局部文件选择。 */ () => { selectedPartId.value = undefined })
 </script>
 
 <template>
@@ -734,7 +738,8 @@ function removeMetadataTag(tag: string) {
         </div>
 
         <div v-if="props.showActions && !props.readOnly" class="flex flex-wrap items-center gap-3">
-          <Button class="rounded-full px-8" @click="emit('openPlayer', movie.id)">
+          <MoviePartSelect v-if="(movie.files?.length ?? 0) > 1" v-model="selectedPartId" :files="movie.files!" />
+          <Button class="rounded-full px-8" @click="emit('openPlayer', movie.id, selectedPartId)">
             <PlayCircle data-icon="inline-start" />
             {{ t("detailPanel.play") }}
           </Button>

@@ -20,10 +20,10 @@ var (
 	ErrMovieVideoNotFile = errors.New("video path is not a regular file")
 )
 
-// ResolvePrimaryVideoPath returns the absolute path to the movie's primary video after the same
+// ResolvePrimaryVideoPath returns the selected movie file (or legacy default) after the same
 // validation as OpenMovieVideoFile (library roots, regular file, exists).
 func (s *SQLiteStore) ResolvePrimaryVideoPath(ctx context.Context, movieID string) (string, error) {
-	detail, err := s.GetMovieDetail(ctx, movieID)
+	detail, err := s.GetMoviePlaybackDetail(ctx, movieID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrMovieVideoNotFound
 	}

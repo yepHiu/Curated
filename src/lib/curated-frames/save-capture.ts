@@ -57,6 +57,7 @@ export async function captureCuratedFrameCandidate(
   }
 }
 
+/** 保存采集结果及来源文件，可按偏好导出图片。 */
 export async function saveCuratedFrameCandidate(
   candidate: CuratedFrameCaptureCandidate,
   movie: Movie,
@@ -65,6 +66,7 @@ export async function saveCuratedFrameCandidate(
   const row = {
     id: candidate.id,
     movieId: movie.id,
+    fileId: movie.playbackFileId,
     title: movie.title,
     code: movie.code,
     actors: [...movie.actors],
@@ -80,6 +82,7 @@ export async function saveCuratedFrameCandidate(
       await api.createCuratedFrameUpload({
         id: row.id,
         movieId: row.movieId,
+        fileId: row.fileId,
         title: row.title,
         code: row.code,
         actors: row.actors,

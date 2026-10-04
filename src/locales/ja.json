@@ -1042,7 +1042,9 @@
     "comicImportPending": "コミックのアップロード取り込みは次の実装ステップで接続します。",
     "comicScanning": "コミックをインポート中",
     "comicCompleted": "コミックインポート完了",
-    "comicFinished": "コミックインポート終了"
+    "comicFinished": "コミックインポート終了",
+    "newPart": "既存作品の新しいパート",
+    "partExists": "登録済みのパート"
   },
   "scanTask": {
     "fetchFailed": "スキャンタスクの状態を取得できません"
@@ -1904,7 +1906,6 @@
     "revealFailGeneric": "ファイルマネージャーを開けませんでした"
   },
   "player": {
-    "historyCategory": "履歴のカテゴリー",
     "loadingTarget": "再生ターゲットを読み込み中…",
     "notFoundTitle": "再生ターゲットが見つかりません",
     "notFoundDesc": "このプレイヤールートが参照する動画 ID は現在のライブラリで利用できません。",
@@ -1995,7 +1996,11 @@
     "preparingSeek": "新しい再生区間へ切り替えています…",
     "buffering": "再生データをバッファしています…",
     "bufferingSeek": "シーク後のバッファを補充しています…",
-    "prewarmingStream": "HLS ストリームを先読みしています…"
+    "prewarmingStream": "HLS ストリームを先読みしています…",
+    "selectPart": "パートを選択",
+    "partLabel": "パート {number}",
+    "fileCount": "{count} ファイル",
+    "historyCategory": "履歴のカテゴリー"
   },
   "detailPage": {
     "curatedFramesEmpty": "この作品のキャプチャフレームはまだありません。",

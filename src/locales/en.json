@@ -1042,7 +1042,9 @@
     "comicImportPending": "Comic import upload will be connected in the next implementation step.",
     "comicScanning": "Importing comics",
     "comicCompleted": "Comic import complete",
-    "comicFinished": "Comic import finished"
+    "comicFinished": "Comic import finished",
+    "newPart": "New part of existing movie",
+    "partExists": "Part already indexed"
   },
   "scanTask": {
     "fetchFailed": "Failed to fetch scan task status"
@@ -1904,7 +1906,6 @@
     "revealFailGeneric": "Could not open file manager"
   },
   "player": {
-    "historyCategory": "History category",
     "loadingTarget": "Loading playback target…",
     "notFoundTitle": "Player target not found",
     "notFoundDesc": "This player route points to a movie id that is not available in the current library.",
@@ -1995,7 +1996,11 @@
     "preparingSeek": "Switching to a new playback window…",
     "buffering": "Buffering playback data…",
     "bufferingSeek": "Seeking and refilling the buffer…",
-    "prewarmingStream": "Prewarming the HLS stream…"
+    "prewarmingStream": "Prewarming the HLS stream…",
+    "selectPart": "Select part",
+    "partLabel": "Part {number}",
+    "fileCount": "{count} files",
+    "historyCategory": "History category"
   },
   "detailPage": {
     "curatedFramesEmpty": "No captured frames for this movie yet.",

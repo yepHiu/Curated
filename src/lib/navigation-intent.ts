@@ -7,7 +7,7 @@ import {
   mergeLibraryQuery,
   type DetailBrowseTargetKind,
 } from "@/lib/library-query"
-import { getResumeSecondsForOpenPlayer } from "@/lib/playback-progress-storage"
+import { getProgress, getResumeSecondsForOpenPlayer } from "@/lib/playback-progress-storage"
 
 const navigationBackTargets = ["home", "browse", "detail", "actor", "history", "curated-frames"] as const
 const detailBackTargets = ["home", "browse", "actor"] as const
@@ -69,11 +69,13 @@ function formatResumeSecondsForRoute(resumeSec: number): string {
   return String(Number(normalized.toFixed(3)))
 }
 
+/** 保留浏览来源并选择文件对应的续播时间。 */
 function buildPlayerQuery(
   movieId: string,
   currentQuery: LocationQuery,
   sourceMode: LibraryMode,
   back: Extract<NavigationBackTarget, "browse" | "detail">,
+  fileId?: string,
 ) {
   const query: LocationQuery = {
     ...buildMovieRouteQuery(currentQuery, sourceMode, movieId),
@@ -93,7 +95,9 @@ function buildPlayerQuery(
     }
   }
 
-  const resumeSec = getResumeSecondsForOpenPlayer(movieId)
+  const selectedFileId = fileId ?? getProgress(movieId)?.fileId
+  if (selectedFileId) query.fileId = selectedFileId
+  const resumeSec = getResumeSecondsForOpenPlayer(movieId, selectedFileId)
   if (resumeSec !== undefined) {
     query.t = String(resumeSec)
   }
@@ -128,7 +132,7 @@ export function buildActorDetailRoute(
   }
 }
 
-/** 返回演员作品页时保留来源类别。 */
+/** 从详情进入演员列表，保留当前作品与浏览条件。 */
 export function buildActorDetailRouteFromDetail(
   actorName: string,
   movieId: string,
@@ -240,16 +244,18 @@ export function buildFilteredBrowseRouteFromDetail({
   }
 }
 
+/** 构造保留浏览类别及可选文件的播放目标。 */
 export function buildPlayerRouteFromBrowseIntent(
   movieId: string,
   currentQuery: LocationQuery,
   sourceMode: LibraryMode,
   back: Extract<NavigationBackTarget, "browse" | "detail">,
+  fileId?: string,
 ): RouteLocationRaw {
   return {
     name: "player",
     params: { id: movieId },
-    query: buildPlayerQuery(movieId, currentQuery, sourceMode, back),
+    query: buildPlayerQuery(movieId, currentQuery, sourceMode, back, fileId),
   }
 }
 
@@ -267,7 +273,7 @@ export function buildDetailRouteFromActor(movieId: string, actorName: string, so
   }
 }
 
-/** 从演员作品范围构造播放目标。 */
+/** 从演员作品范围选择最后播放文件及其续播时间。 */
 export function buildPlayerRouteFromActorIntent(
   movieId: string,
   actorName: string,
@@ -281,7 +287,9 @@ export function buildPlayerRouteFromActorIntent(
     selected: movieId,
   }
 
-  const resumeSec = getResumeSecondsForOpenPlayer(movieId)
+  const selectedFileId = getProgress(movieId)?.fileId
+  if (selectedFileId) query.fileId = selectedFileId
+  const resumeSec = getResumeSecondsForOpenPlayer(movieId, selectedFileId)
   if (resumeSec !== undefined) {
     query.t = String(resumeSec)
   }
@@ -293,10 +301,11 @@ export function buildPlayerRouteFromActorIntent(
   }
 }
 
-/** 从当前类别历史构造续播目标。 */
+/** 恢复历史中的实际文件与时间并保留历史类别。 */
 export function buildPlayerRouteFromHistoryIntent(
   movieId: string,
   resumeSec: number,
+  fileId?: string,
   sourceMode: LibraryMode = "library",
 ): RouteLocationRaw {
   return {
@@ -306,14 +315,17 @@ export function buildPlayerRouteFromHistoryIntent(
       autoplay: "1",
       back: "history",
       ...(sourceMode === "fc2" ? { browse: "fc2" } : {}),
+      ...(fileId ? { fileId } : {}),
       t: String(Math.max(0, Math.floor(resumeSec))),
     },
   }
 }
 
+/** 从帧的实际文件与片内时间构造播放路由。 */
 export function buildPlayerRouteFromCuratedFrameIntent(
   movieId: string,
   resumeSec: number,
+  fileId?: string,
 ): RouteLocationRaw {
   return {
     name: "player",
@@ -321,6 +333,7 @@ export function buildPlayerRouteFromCuratedFrameIntent(
     query: {
       autoplay: "1",
       back: "curated-frames",
+      ...(fileId ? { fileId } : {}),
       t: formatResumeSecondsForRoute(resumeSec),
     },
   }
@@ -339,7 +352,7 @@ export function buildComicReaderRouteFromSource(
   }
 }
 
-/** 按来源恢复页面与浏览类别。 */
+/** 按导航来源恢复页面和类别，包括 FC2 历史。 */
 export function resolveNavigationBackLink(
   route: RouteLike,
   currentMovieId?: string,

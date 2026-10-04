@@ -422,12 +422,14 @@ export function isBackupRestorePreflightDTO(value: unknown): value is BackupRest
   )
 }
 
+/** 校验列表资料及可选文件数量，兼容旧服务端。 */
 export function isMovieListItemDTO(value: unknown): value is MovieListItemDTO {
   return (
     isRecord(value) &&
     isString(value.id) &&
     isString(value.title) &&
     isString(value.code) &&
+    (value.fileCount === undefined || isNonNegativeInteger(value.fileCount)) &&
     isString(value.studio) &&
     isStringArray(value.actors) &&
     isStringArray(value.tags) &&
@@ -447,11 +449,18 @@ export function isMovieListItemDTO(value: unknown): value is MovieListItemDTO {
   )
 }
 
+/** 校验分片详情的稳定标识、序号与路径，避免无效响应进入播放器。 */
+function isMovieFile(value: unknown): boolean {
+ return isRecord(value) && isString(value.id) && isString(value.fileName) && isString(value.location) && isNonNegativeInteger(value.partIndex)
+}
+
+/** 校验作品详情和有序文件列表。 */
 export function isMovieDetailDTO(value: unknown): value is MovieDetailDTO {
   if (!isMovieListItemDTO(value) || !isRecord(value)) {
     return false
   }
   return (
+    (value.files === undefined || (Array.isArray(value.files) && value.files.every(isMovieFile))) &&
     isString(value.summary) &&
     isFiniteNumber(value.metadataRating) &&
     isOptionalNullableNumber(value.userRating) &&

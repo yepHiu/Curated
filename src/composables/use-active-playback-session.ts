@@ -44,6 +44,7 @@ const ACTIVE_PLAYBACK_POSITION_EPSILON_SEC = 0.75
 
 let lastPublishedSnapshot: {
   movieId: string
+  fileId?: string
   status: ActivePlaybackStatus
   positionSec: number
   durationSec: number
@@ -115,6 +116,7 @@ export const activePlaybackSession = computed<ActivePlaybackSession | null>(() =
   }
 })
 
+/** 发布后台续播快照，文件身份参与快照去重。 */
 export function updateActivePlaybackSession(input: UpdateActivePlaybackSessionInput) {
   const movieId = input.movieId.trim()
   if (!movieId) return
@@ -125,6 +127,7 @@ export function updateActivePlaybackSession(input: UpdateActivePlaybackSessionIn
   if (
     last &&
     last.movieId === movieId &&
+    last.fileId === input.routeQuery?.fileId &&
     last.status === input.status &&
     last.durationSec === durationSec &&
     Math.abs(last.positionSec - positionSec) < ACTIVE_PLAYBACK_POSITION_EPSILON_SEC
@@ -133,6 +136,7 @@ export function updateActivePlaybackSession(input: UpdateActivePlaybackSessionIn
   }
   lastPublishedSnapshot = {
     movieId,
+    fileId: typeof input.routeQuery?.fileId === "string" ? input.routeQuery.fileId : undefined,
     status: input.status,
     positionSec,
     durationSec,

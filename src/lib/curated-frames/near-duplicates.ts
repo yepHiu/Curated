@@ -1,12 +1,13 @@
 import type { CuratedFrameRecord } from "@/domain/curated-frame/types"
 
-type CuratedFrameLike = Pick<CuratedFrameRecord, "id" | "movieId" | "positionSec" | "capturedAt">
+type CuratedFrameLike = Pick<CuratedFrameRecord, "id" | "movieId" | "fileId" | "positionSec" | "capturedAt">
 
 export type CuratedFrameNearDuplicateGroup<T extends CuratedFrameLike = CuratedFrameLike> = {
   movieId: string
   items: T[]
 }
 
+/** 按作品与源文件分组，再判断片内近重复时间。 */
 export function findCuratedFrameNearDuplicateGroups<T extends CuratedFrameLike>(
   rows: readonly T[],
   thresholdSec: number,
@@ -21,16 +22,18 @@ export function findCuratedFrameNearDuplicateGroups<T extends CuratedFrameLike>(
     if (!movieId) {
       continue
     }
-    const bucket = byMovie.get(movieId)
+    const key = JSON.stringify([movieId, row.fileId ?? ""])
+    const bucket = byMovie.get(key)
     if (bucket) {
       bucket.push(row)
     } else {
-      byMovie.set(movieId, [row])
+      byMovie.set(key, [row])
     }
   }
 
   const groups: CuratedFrameNearDuplicateGroup<T>[] = []
-  for (const [movieId, items] of byMovie) {
+  for (const items of byMovie.values()) {
+    const movieId = items[0]!.movieId
     const ordered = [...items].sort((a, b) => {
       if (a.positionSec !== b.positionSec) {
         return a.positionSec - b.positionSec

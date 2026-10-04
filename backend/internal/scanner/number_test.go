@@ -70,6 +70,7 @@ func TestExtractNumber(t *testing.T) {
 	}
 }
 
+// TestCleanFilename 验证本次浏览类别及文件归属的兼容行为。
 func TestCleanFilename(t *testing.T) {
 	t.Parallel()
 
@@ -96,5 +97,14 @@ func TestCleanFilename(t *testing.T) {
 				t.Fatalf("CleanFilename(%q) = %q, want %q", tc.input, actual, tc.expected)
 			}
 		})
+	}
+}
+
+// TestMultipartFilenameNumber keeps the catalog separate from underscore numeric part suffixes.
+func TestMultipartFilenameNumber(t *testing.T) {
+	for filename, code := range map[string]string{"FC2-1234567_1.mp4": "FC2-1234567", "FC2PPV-1234567-part10.mp4": "FC2-1234567", "ABC-123_2.mp4": "ABC-123"} {
+		if got := ExtractNumber(filename); got != code {
+			t.Errorf("%s: %s want %s", filename, got, code)
+		}
 	}
 }

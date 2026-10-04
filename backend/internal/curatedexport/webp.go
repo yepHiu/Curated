@@ -20,6 +20,7 @@ type FrameMetaJSON struct {
 	CapturedAt    string   `json:"capturedAt"`
 	FrameID       string   `json:"frameId"`
 	MovieID       string   `json:"movieId"`
+	FileID        string   `json:"fileId,omitempty"`
 	Tags          []string `json:"tags"`
 	SchemaVersion int      `json:"schemaVersion"`
 	ExportedAt    string   `json:"exportedAt"`

@@ -56,6 +56,7 @@ func contentDispositionAttachment(filename, asciiFallback string) string {
 	return fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, fb, url.PathEscape(filename))
 }
 
+// handlePostCuratedFramesExport 导出萃取图片，并嵌入作品、文件和片内时间元数据。
 func (h *Handler) handlePostCuratedFramesExport(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
@@ -137,6 +138,7 @@ func (h *Handler) handlePostCuratedFramesExport(w http.ResponseWriter, r *http.R
 			CapturedAt:    row.CapturedAt,
 			FrameID:       row.ID,
 			MovieID:       row.MovieID,
+			FileID:        row.FileID,
 			Tags:          row.Tags,
 			SchemaVersion: 1,
 			ExportedAt:    exportedAt,

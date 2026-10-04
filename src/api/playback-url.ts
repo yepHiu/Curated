@@ -89,6 +89,7 @@ export function resolveMoviePlaybackSourceUrl(
  * Absolute URL for GET /api/library/movies/{id}/stream.
  * In local Web API development it bypasses Vite's proxy for large media streams.
  */
-export function moviePlaybackAbsoluteUrl(movieId: string): string {
-  return buildMoviePlaybackUrl(movieId)
+export function moviePlaybackAbsoluteUrl(movieId: string, fileId?: string): string {
+  const url = buildMoviePlaybackUrl(movieId)
+  return fileId ? `${url}?fileId=${encodeURIComponent(fileId)}` : url
 }

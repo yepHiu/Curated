@@ -39,10 +39,12 @@ export interface CuratedFramePageResult {
   offset: number
 }
 
+/** 将萃取帧资料和来源文件转换为本地记录。 */
 function mapCuratedFrameItem(it: CuratedFrameRecord): CuratedFrameDbRow {
   return {
     id: it.id,
     movieId: it.movieId,
+    fileId: it.fileId,
     title: it.title,
     code: it.code,
     actors: [...it.actors],

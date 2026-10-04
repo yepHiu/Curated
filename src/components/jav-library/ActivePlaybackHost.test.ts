@@ -251,6 +251,23 @@ afterEach(() => {
 })
 
 describe("application-owned playback", () => {
+  // 同一作品换分片必须创建新媒体实例，旧小窗事件不得停止后继分片。
+  it("switches files within the same movie without reusing the previous HLS session", async () => {
+    // 验证 switches files within the same movie without reusing the previous HLS session。
+    const test = await mountHost("hls")
+    serviceMocks.getMoviePlayback.mockResolvedValue({ movieId: "movie-1", fileId: "part-2", mode: "hls", sessionId: "session-2", url: "/part2.m3u8", durationSec: 1200 })
+    await test.router.push("/player/movie-1?fileId=part-2&autoplay=1")
+    await flushPromises()
+    expect(test.wrapper.findAll("video")).toHaveLength(1)
+    expect(test.wrapper.get("video").element).not.toBe(test.video)
+    expect(test.host.target.value?.fileId).toBe("part-2")
+    expect(serviceMocks.getMoviePlayback).toHaveBeenLastCalledWith("movie-1", expect.objectContaining({ fileId: "part-2" }))
+    expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("session-1")
+    test.host.setPipActive("movie-1", false, "")
+    expect(test.host.target.value?.fileId).toBe("part-2")
+    test.wrapper.unmount()
+  })
+
   // direct 和 HLS 都必须保留同一 video、会话和当前位置，返回时不预热第二次。
   it.each(["direct", "hls"] as const)("keeps %s playback across browsing and reuses it on return", async (mode) => {
     const test = await mountHost(mode)

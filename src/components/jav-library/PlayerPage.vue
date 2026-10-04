@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
+import MoviePartSelect from "@/components/jav-library/MoviePartSelect.vue"
 import { useRoute, useRouter } from "vue-router"
 import {
   Camera,
@@ -171,12 +172,13 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  "pip-change": [movieId: string, active: boolean]
-  "playing-change": [movieId: string, playing: boolean]
+  "pip-change": [movieId: string, active: boolean, fileId?: string]
+  "playing-change": [movieId: string, playing: boolean, fileId?: string]
 }>()
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const hostedFileId = typeof route.query.fileId === "string" ? route.query.fileId : ""
 const libraryService = useLibraryService()
 const playlistMovieId = computed(() => props.movie.id)
 const {
@@ -203,6 +205,7 @@ watch(playlistPanelOpen, (open) => {
   }
 })
 
+/** 按当前来源与类别打开队列作品。 */
 async function openPlaylistMovie(movieId: string) {
   const id = movieId.trim()
   if (!id || id === props.movie.id) {
@@ -325,6 +328,16 @@ let lastAppliedPlaybackMode: SessionPlaybackMode | undefined
 
 const playbackSrc = ref<string | null>(null)
 const playbackDescriptor = ref<PlaybackDescriptorDTO | null>(null)
+/** descriptor 返回实际选中分片；未解析前使用路由明确指定的分片。 */
+const selectedFileId = computed(/* 限定当前分片，防止上一播放文件的数据影响当前目标。 */ () => playbackDescriptor.value?.fileId ?? (typeof route.query.fileId === "string" ? route.query.fileId : undefined))
+const captureMovie = computed(/* 限定当前分片，防止上一播放文件的数据影响当前目标。 */ () => ({ ...props.movie, playbackFileId: selectedFileId.value }))
+
+/** 切换同番号文件，清除旧时间参数，让新文件恢复自己的进度。 */
+async function openMoviePart(fileId: string) {
+ if (fileId === selectedFileId.value) return
+ flushPlaybackProgress()
+ await router.push({ name: "player", params: { id: props.movie.id }, query: { ...route.query, fileId, t: undefined, autoplay: "1" } })
+}
 const playbackError = ref("")
 const isResolvingPlayback = ref(false)
 const isSwitchingPlaybackSession = ref(false)
@@ -360,11 +373,11 @@ let suppressPlaybackPublication = false
 const isSurfaceFullscreen = ref(false)
 watch(isPipActive, (active) => {
   // 系统关闭小窗时通知宿主，后台实例不继续隐形播放。
-  emit("pip-change", props.movie.id, active)
+  emit("pip-change", props.movie.id, active, hostedFileId)
 }, { flush: "sync" })
 watch(isPlaying, (playing) => {
   // 后台控制入口显示真实媒体状态。
-  emit("playing-change", props.movie.id, playing)
+  emit("playing-change", props.movie.id, playing, hostedFileId)
 }, { flush: "sync" })
 watch(() => props.foreground, (foreground) => {
   // 隐藏播放面后收起局部菜单，取消采集手势，避免遮挡其它路由。
@@ -398,7 +411,7 @@ function publishActivePlaybackSession(statusOverride?: ActivePlaybackStatus) {
     positionSec: currentTime.value,
     durationSec: resolveTotalDurationSec(playbackDescriptor.value, duration.value),
     status: resolveActivePlaybackStatus(statusOverride),
-    routeQuery: route.query,
+    routeQuery: { ...route.query, ...(selectedFileId.value ? { fileId: selectedFileId.value } : {}) },
     routeHash: route.hash,
     posterUrl: props.movie.thumbUrl ?? props.movie.coverUrl,
   })
@@ -461,8 +474,8 @@ const clipCaptureElapsedSec = clipCapture.elapsedSec
 const clipCaptureProgress = clipCapture.progress
 const captureQueue = useCuratedCaptureQueue()
 let pendingCaptureJob: CaptureJob | undefined
-const receiptJob = computed(() => {
-  const jobs = captureQueue.jobs.value.filter(job => job.movie.id === props.movie.id && job.phase !== 'ready')
+const receiptJob = computed(/* 限定当前分片，防止上一播放文件的数据影响当前目标。 */ () => {
+  const jobs = captureQueue.jobs.value.filter(/* 限定当前分片，防止上一播放文件的数据影响当前目标。 */ job => job.movie.id === props.movie.id && job.movie.playbackFileId === selectedFileId.value && job.phase !== 'ready')
   return jobs.find(job => job.phase === 'error' || job.phase === 'export-error') ?? jobs[jobs.length - 1]
 })
 const capturePreviewOpen = ref(false)
@@ -494,20 +507,25 @@ function cancelCuratedPress() {
   if (pendingCaptureJob) captureQueue.dismiss(pendingCaptureJob)
   pendingCaptureJob = undefined
 }
+/** 重试保存当前分片采集，只把同来源结果加入时间轴。 */
 async function retryCapture(job: CaptureJob) {
   const result = await captureQueue.submit(job)
-  if (result.ok && props.movie.id === job.movie.id) appendCuratedFrameMarker(result)
+  if (result.ok && props.movie.id === job.movie.id && job.movie.playbackFileId === selectedFileId.value) appendCuratedFrameMarker(result)
 }
 
 /** 进度条萃取帧标记：进入播放器按片加载；播放中新萃取实时追加 */
 const frameMarkers = ref<FrameMarkerInput[]>([])
-watch(() => captureQueue.jobs.value.filter(job => job.committed).map(job => job.key).join(','), () => {
-  for (const job of captureQueue.jobs.value) if (job.committed && job.candidate && job.movie.id === props.movie.id) appendCuratedFrameMarker(job.candidate)
+watch(() => captureQueue.jobs.value.filter(job => job.committed).map(job => job.key).join(','), /* 限定当前分片，防止上一播放文件的数据影响当前目标。 */ () => {
+  for (const job of captureQueue.jobs.value) if (job.committed && job.candidate && job.movie.id === props.movie.id && job.movie.playbackFileId === selectedFileId.value) appendCuratedFrameMarker(job.candidate)
 })
 const FRAME_MARKERS_PAGE_SIZE = 200
 
+/** 播放源确定后按分片加载标记，丢弃切片或换片期间的迟到分页结果。 */
 async function loadCuratedFrameMarkers() {
   const movieId = props.movie.id
+  const fileId = selectedFileId.value
+  const loadSeq = playbackLoadSeq
+  const singleFile = (props.movie.fileCount ?? 1) <= 1
   try {
     const collected: FrameMarkerInput[] = []
     for (let offset = 0; ; offset += FRAME_MARKERS_PAGE_SIZE) {
@@ -516,11 +534,20 @@ async function loadCuratedFrameMarkers() {
         limit: FRAME_MARKERS_PAGE_SIZE,
         offset,
       })
-      collected.push(...page.items.map((row) => ({ id: row.id, positionSec: row.positionSec })))
-      if (page.items.length === 0 || collected.length >= page.total) break
+      collected.push(...page.items.filter((row) => {
+        // 旧单文件标记兼容空 fileId，多文件标记须精确匹配来源。
+        return row.fileId === fileId || (!row.fileId && singleFile)
+      }).map((row) => {
+        // 时间轴只接收帧标识与片内秒数。
+        return { id: row.id, positionSec: row.positionSec }
+      }))
+      if (page.items.length === 0 || offset + page.items.length >= page.total) break
     }
-    if (movieId === props.movie.id) {
-      frameMarkers.value = [...new Map([...collected, ...frameMarkers.value].map(marker => [marker.id, marker])).values()]
+    if (movieId === props.movie.id && fileId === selectedFileId.value && loadSeq === playbackLoadSeq) {
+      frameMarkers.value = [...new Map([...collected, ...frameMarkers.value].map((marker) => {
+        // 保留加载期间刚保存的标记，同时按 ID 去重。
+        return [marker.id, marker] as const
+      })).values()]
     }
   } catch {
     // 标记是增强展示，加载失败时静默降级为无标记
@@ -536,12 +563,13 @@ function onFrameMarkerSeek(sec: number) {
   void seekToAbsolutePlaybackTime(sec)
 }
 
+/** 锁定当前分片和时间准备截图或短片段采集。 */
 function beginCuratedPress() {
   if (clipCapture.phase.value !== "idle") return
   const video = videoRef.value
   if (!video || video.seeking || video.readyState < 2) return
   currentTime.value = getAbsolutePlaybackTime(video.currentTime)
-  pendingCaptureJob = captureQueue.prepare(video, props.movie, currentTime.value)
+  pendingCaptureJob = captureQueue.prepare(video, captureMovie.value, currentTime.value)
   if (!pendingCaptureJob) {
     curatedCaptureError.value = t('curated.captureQueueFull')
     curatedCaptureAnnouncement.value = curatedCaptureError.value
@@ -561,6 +589,7 @@ async function savePendingCuratedFrame() {
   return captureQueue.submit(job)
 }
 
+/** 冻结采集文件后发起片段导出并跟踪任务。 */
 async function submitClipExport(input: { startSec: number; endSec: number }) {
   const generation = ++clipPollGeneration
   clipPollFailures = 0
@@ -572,6 +601,7 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
     failClipExport(t("player.clipExportTimedOut"))
   }, CLIP_PROCESSING_TIMEOUT_MS)
   const movieId = pendingCaptureJob?.movie.id ?? props.movie.id
+  const clipFileId = pendingCaptureJob?.movie.playbackFileId ?? selectedFileId.value
   clipExportError.value = ""
   clipExportUrl.value = ""
   clipExportTask.value = null
@@ -587,6 +617,7 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
     if (generation !== clipPollGeneration || playbackDisposed) return
     if (movieId === props.movie.id) appendCuratedFrameMarker(frameResult)
     const task = await libraryService.createMovieClip(movieId, {
+      fileId: clipFileId,
       format: clipFormat.value,
       startSec: input.startSec,
       endSec: input.endSec,
@@ -670,10 +701,11 @@ function scheduleClipFeedbackDismiss(delayMs: number) {
     clipFeedbackDismissTimer = null
   }, delayMs)
 }
+/** 捕获文件身份和时间，异步提取该来源的高清帧。 */
 async function extractSourceFrame() {
-  const movie = { ...props.movie, actors: [...props.movie.actors] }
+  const movie = { ...captureMovie.value, actors: [...props.movie.actors] }
   const position = getAbsolutePlaybackTime(videoRef.value?.currentTime ?? currentTime.value)
-  const job = captureQueue.prepareSource(movie, position, () => libraryService.extractMovieFrame(movie.id, position))
+  const job = captureQueue.prepareSource(movie, position, /* 限定当前分片，防止上一播放文件的数据影响当前目标。 */ () => libraryService.extractMovieFrame(movie.id, position, movie.playbackFileId))
   if (!job) { curatedCaptureError.value = t('curated.captureQueueFull'); return }
   const result = await captureQueue.submit(job)
   if (result.ok && props.movie.id === movie.id) appendCuratedFrameMarker(result)
@@ -1091,6 +1123,7 @@ function syncSrc() {
   void loadPlayback()
 }
 
+/** 解析当前文件并恢复其进度，忽略被替换的播放请求。 */
 async function loadPlayback() {
   const { seq, signal } = beginPlaybackRequest()
   hlsWindowWaitGeneration += 1
@@ -1105,12 +1138,12 @@ async function loadPlayback() {
   }
   try {
     const requestedStartSec = parseResumeSecondsFromQuery(route.query.t)
-    let descriptor = await libraryService.getMoviePlayback(movieId, { startPositionSec: requestedStartSec, signal })
+    let descriptor = await libraryService.getMoviePlayback(movieId, { fileId: selectedFileId.value, startPositionSec: requestedStartSec, signal })
     if (playbackDisposed || seq !== playbackLoadSeq) {
       await releasePlaybackSession(descriptor?.sessionId)
       return
     }
-    const storedProgress = getProgress(movieId)
+    const storedProgress = getProgress(movieId, descriptor?.fileId ?? selectedFileId.value)
     const durationHint = descriptor?.durationSec ?? storedProgress?.durationSec ?? 0
     const preferredStartSec = resolvePreferredPlaybackTargetSec(
       requestedStartSec,
@@ -1131,6 +1164,7 @@ async function loadPlayback() {
           "hls",
           Math.max(0, wantsStartSec),
           signal,
+          descriptor?.fileId ?? selectedFileId.value,
         )
         if (descriptor.sessionId) {
           await releasePlaybackSession(descriptor.sessionId)
@@ -1145,6 +1179,7 @@ async function loadPlayback() {
       return
     }
     playbackDescriptor.value = descriptor
+    void loadCuratedFrameMarkers()
     playbackSrc.value = descriptor ? resolveMoviePlaybackSourceUrl(movieId, descriptor.url) : null
     duration.value = resolveTotalDurationSec(descriptor, 0)
     currentTime.value = playbackTimelineOffsetSec(descriptor)
@@ -1174,6 +1209,7 @@ async function loadPlayback() {
   }
 }
 
+/** 为相同文件回退直连，释放旧 HLS 资源。 */
 async function fallbackHlsToDirect(reason?: string) {
   if (hlsDirectFallbackInFlight) return
   const current = playbackDescriptor.value
@@ -1191,7 +1227,7 @@ async function fallbackHlsToDirect(reason?: string) {
     markPlaybackReady()
     const absolutePositionSec = getAbsolutePlaybackTime()
     const shouldResumePlayback = isPlaying.value && !videoRef.value?.paused
-    const fallbackUrl = moviePlaybackAbsoluteUrl(movieId)
+    const fallbackUrl = moviePlaybackAbsoluteUrl(movieId, selectedFileId.value)
     await destroyHlsInstance()
     schedulePlaybackSessionCleanup(current.sessionId)
     resumeAppliedForMovieId.value = null
@@ -1294,6 +1330,7 @@ async function recoverHlsPlayback(type: string) {
   }
 }
 
+/** 将实际播放位置保存到当前文件，并刷新作品历史。 */
 function flushPlaybackProgress() {
   const v = videoRef.value
   if (!v || !playbackSrc.value) return
@@ -1301,7 +1338,7 @@ function flushPlaybackProgress() {
   const dur = Number.isFinite(durRaw) && durRaw > 0 ? durRaw : 0
   const pos = getAbsolutePlaybackTime()
   if (!Number.isFinite(pos) || pos < 0) return
-  saveProgress(props.movie.id, pos, dur)
+  saveProgress(props.movie.id, pos, dur, selectedFileId.value)
   recordMoviePlayed(props.movie.id)
   void watchTimeTracker.flush(pos).catch(() => {
     // Best effort: progress save should not be blocked by analytics sync.
@@ -1341,7 +1378,6 @@ watch(
     moviePlaybackStartedAtMs = 0
     restartedFromNearEnd = false
     frameMarkers.value = []
-    void loadCuratedFrameMarkers()
     syncSrc()
     await nextTick()
     await syncVideoSource()
@@ -1489,6 +1525,7 @@ function onTimeUpdate() {
   flushPlaybackProgress()
 }
 
+/** 媒体就绪后按当前文件进度和显式目标定位。 */
 function onLoadedMetadata() {
   const v = videoRef.value
   if (!v) return
@@ -1508,7 +1545,7 @@ function onLoadedMetadata() {
   const targetSec = resolvePreferredPlaybackTargetSec(
     fromQuery,
     playbackDescriptor.value,
-    getProgress(props.movie.id)?.positionSec,
+    getProgress(props.movie.id, selectedFileId.value)?.positionSec,
     totalDurationSec.value,
   )
 
@@ -1758,6 +1795,7 @@ async function terminateActiveHlsPlaybackSession(reason?: string) {
   await releasePlaybackSession(sessionId)
 }
 
+/** 前台自动连播先进入同番号下一片，再继续作品队列。 */
 function onVideoEnded() {
   if (
     playbackDescriptor.value?.mode === "hls" &&
@@ -1786,6 +1824,13 @@ function onVideoEnded() {
       resumeAfterSwap: true,
     })
     return
+  }
+  // 自动连播优先同番号的下一分片，最后一片才进入下一作品。
+  if (props.foreground && playlistAutoAdvance.value) {
+    const files = props.movie.files ?? []
+    const index = files.findIndex(/* 限定当前分片，防止上一播放文件的数据影响当前目标。 */ file => file.id === selectedFileId.value)
+    const nextFile = index >= 0 ? files[index + 1] : undefined
+    if (nextFile) { void openMoviePart(nextFile.id); return }
   }
   // 后台结束保持当前浏览页面，不让播放列表自动导航打断浏览。
   if (props.foreground && playlistActive.value && playlistAutoAdvance.value && playlistNext.value) {
@@ -2023,6 +2068,7 @@ function adjustVolume(delta: number) {
   showVolumeFeedbackIfChromeHidden(next)
 }
 
+/** 在相同文件与时间目标上切换播放模式。 */
 async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
   const currentDescriptor = playbackDescriptor.value
   const movieId = props.movie.id.trim()
@@ -2047,6 +2093,7 @@ async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
       nextMode,
       targetSec,
       signal,
+      selectedFileId.value,
     )
     if (!nextDescriptor) return
 
@@ -2205,10 +2252,11 @@ async function runCuratedCapture() {
   curatedCaptureAnnouncement.value = t('player.captureFeedbackSuccess', { time: formatClock(result.positionSec) })
 }
 
+/** 为当前分片生成可重试的截图任务。 */
 function captureSingleFrame() {
   const video = videoRef.value
   if (!video || video.seeking || video.readyState < 2) return
-  const job = captureQueue.prepare(video, props.movie, getAbsolutePlaybackTime(video.currentTime))
+  const job = captureQueue.prepare(video, captureMovie.value, getAbsolutePlaybackTime(video.currentTime))
   if (!job) { curatedCaptureError.value = t('curated.captureQueueFull'); return }
   void playCuratedCaptureTriggerCue(curatedCaptureFeedbackSoundEnabled.value)
   void retryCapture(job)
@@ -2308,6 +2356,7 @@ function formatClientError(err: unknown, fallback: string): string {
   return fallback
 }
 
+/** 协议播放携带当前文件 URL、路径及时间。 */
 async function openNativePlayer() {
   if (!playbackSrc.value) return
   if (libraryService.playerSettings.value.nativePlayerEnabled === false) {
@@ -2327,8 +2376,11 @@ async function openNativePlayer() {
   }
 
   const launchTarget = buildNativePlayerLaunchUrl(template, {
-    url: moviePlaybackAbsoluteUrl(props.movie.id),
-    path: props.movie.location,
+    url: moviePlaybackAbsoluteUrl(props.movie.id, selectedFileId.value),
+    path: props.movie.files?.find((file) => {
+      // 本地协议模板使用当前分片路径，与流 URL 的 fileId 一致。
+      return file.id === selectedFileId.value
+    })?.location ?? props.movie.location,
     movieId: props.movie.id,
     code: props.movie.code,
     startSec: currentTime.value,
@@ -2635,6 +2687,7 @@ async function resumeHlsAfterWindowExhaustion() {
   void tryStartPlaybackIfRequested()
 }
 
+/** 在当前文件片内时间定位，HLS 重建仍使用同一来源。 */
 async function seekToAbsolutePlaybackTime(
   targetSec: number,
   options: {
@@ -2717,6 +2770,7 @@ async function seekToAbsolutePlaybackTime(
       "hls",
       clampedTarget,
       signal,
+      selectedFileId.value,
     )
     if (!nextDescriptor) return
     if (movieId !== props.movie.id.trim() || seq !== playbackLoadSeq) {
@@ -3013,6 +3067,7 @@ const videoPreloadMode = computed(() =>
             <span data-player-heading-title class="min-w-0 truncate" :title="movie.title">{{ movie.title }}</span>
           </p>
         </div>
+        <MoviePartSelect v-if="(movie.files?.length ?? 0) > 1" :files="movie.files!" :model-value="selectedFileId" :portal-to="surfaceRef ?? undefined" :disabled="isResolvingPlayback" @update:model-value="openMoviePart" />
         <div v-if="playbackSrc && chromeVisible" data-player-capture-toolbar class="flex max-w-full shrink-0 flex-wrap gap-1 rounded-lg bg-background/90 p-1 text-foreground max-sm:[&_button]:min-h-11" @click.stop @pointerdown.stop>
           <Button size="sm" variant="ghost" @click="stepFrame(-1)" :aria-label="t('curated.previousFrame')"><SkipBack /></Button>
           <Button size="sm" variant="ghost" @click="captureSingleFrame"><Camera />{{ t('curated.captureAction') }}</Button>

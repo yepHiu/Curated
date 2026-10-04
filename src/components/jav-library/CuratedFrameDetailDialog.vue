@@ -529,14 +529,15 @@ async function browseCuratedFramesByTag(tag: string) {
   })
 }
 
+/** 从帧来源文件及片内时间开始播放。 */
 async function playFromFrame() {
   if (!selected.value) return
   if (!(await persistDialogTags({ toastOnError: true }))) {
     return
   }
-  const { movieId, positionSec } = selected.value
+  const { movieId, positionSec, fileId } = selected.value
   resetDialogState()
-  await router.push(buildPlayerRouteFromCuratedFrame(movieId, positionSec))
+  await router.push(buildPlayerRouteFromCuratedFrame(movieId, positionSec, fileId))
 }
 
 async function exportSingleFromDialog() {

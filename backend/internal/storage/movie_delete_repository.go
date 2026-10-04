@@ -13,6 +13,7 @@ import (
 // ErrMovieNotFound is returned when deleting a non-existent movie id.
 var ErrMovieNotFound = errors.New("movie not found")
 
+// deleteMovieDatabaseTx 事务内删除作品索引并收集全部视频与资料资产路径。
 func deleteMovieDatabaseTx(ctx context.Context, tx *sql.Tx, movieID string) (diskCleanupPaths []string, err error) {
 	movieID = strings.TrimSpace(movieID)
 	if movieID == "" {
@@ -47,6 +48,24 @@ func deleteMovieDatabaseTx(ctx context.Context, tx *sql.Tx, movieID string) (dis
 	if err := rows.Close(); err != nil {
 		return nil, err
 	}
+
+	fileRows, err := tx.QueryContext(ctx, `SELECT location FROM movie_files WHERE movie_id=?`, movieID)
+	if err != nil {
+		return nil, err
+	}
+	for fileRows.Next() {
+		var filePath string
+		if err := fileRows.Scan(&filePath); err != nil {
+			fileRows.Close()
+			return nil, err
+		}
+		assetPaths = append(assetPaths, filePath)
+	}
+	if err := fileRows.Err(); err != nil {
+		fileRows.Close()
+		return nil, err
+	}
+	fileRows.Close()
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM movie_actors WHERE movie_id = ?`, movieID); err != nil {
 		return nil, err

@@ -14,7 +14,7 @@ const libraryTabs = ["all", "new", "top-rated"] as const
 const libraryPlayStates = ["all", "unwatched", "in-progress", "completed"] as const
 const libraryRuntimes = ["short", "standard", "long"] as const
 const libraryCatalogs = ["unscraped", "no-cover"] as const
-const libraryNavigationTransientKeys = ["from", "browse", "back", "autoplay", "t"] as const
+const libraryNavigationTransientKeys = ["from", "browse", "back", "autoplay", "t", "fileId"] as const
 
 const hasOwnKey = <T extends object>(value: T, key: PropertyKey) =>
   Object.prototype.hasOwnProperty.call(value, key)

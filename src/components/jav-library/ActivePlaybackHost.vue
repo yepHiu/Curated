@@ -19,7 +19,7 @@ const unregisterControls = props.host.registerMediaControls({
 onBeforeUnmount(unregisterControls)
 // 播放器及播放列表读取自己的来源快照，后台页面不会改变其导航上下文。
 provide(routeLocationKey, props.host.playerRoute)
-watch(() => [currentRoute.name, currentRoute.params.id, currentRoute.query.t], () => {
+watch(/* 比较作品与文件路由，保留同一播放目标的定位。 */ () => [currentRoute.name, currentRoute.params.id, currentRoute.query.fileId, currentRoute.query.t], () => {
   // 外部“从此帧播放”可定位同一实例；普通返回入口不携带旧 t。
   const seconds = parseResumeSecondsFromQuery(currentRoute.query.t)
   if (!visible.value || seconds === undefined || !player.value) return
@@ -39,7 +39,7 @@ watch(() => [currentRoute.name, currentRoute.params.id, currentRoute.query.t], (
   >
     <PlayerPage
       v-if="target"
-      :key="target.movie.id"
+      :key="`${target.movie.id}:${target.fileId}`"
       ref="player"
       :movie="target.movie"
       :autoplay="target.autoplay"

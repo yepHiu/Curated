@@ -547,6 +547,7 @@ type ScanSummaryDTO struct {
 
 // MovieListItemDTO is a compact movie row for library list views.
 type MovieListItemDTO struct {
+	FileCount      int      `json:"fileCount"`
 	ID             string   `json:"id"`
 	Title          string   `json:"title"`
 	Code           string   `json:"code"`
@@ -571,6 +572,8 @@ type MovieListItemDTO struct {
 
 // MovieDetailDTO extends MovieListItemDTO with full details for the detail page.
 type MovieDetailDTO struct {
+	Files          []MovieFileDTO `json:"files,omitempty"`
+	SelectedFileID string         `json:"-"`
 	MovieListItemDTO
 	Summary         string   `json:"summary"`
 	PreviewImages   []string `json:"previewImages,omitempty"`
@@ -1357,6 +1360,7 @@ type ImportMovieCodeMatchDTO struct {
 
 // ImportMovieCodeCheckItemDTO is the catalog-code check result for one filename.
 type ImportMovieCodeCheckItemDTO struct {
+	FileStatus    string                    `json:"fileStatus,omitempty"`
 	Name          string                    `json:"name"`
 	ExtractedCode string                    `json:"extractedCode,omitempty"`
 	Matches       []ImportMovieCodeMatchDTO `json:"matches"`
@@ -1437,6 +1441,7 @@ type PatchPlayerSettingsDTO struct {
 
 // PlaybackProgressItemDTO is one row in GET /api/playback/progress.
 type PlaybackProgressItemDTO struct {
+	FileID      string  `json:"fileId,omitempty"`
 	MovieID     string  `json:"movieId"`
 	PositionSec float64 `json:"positionSec"`
 	DurationSec float64 `json:"durationSec"`
@@ -1557,6 +1562,7 @@ type PlaybackSubtitleTrackDTO struct {
 
 // PlaybackDescriptorDTO tells the frontend how to play a movie (direct stream, HLS session, or native player).
 type PlaybackDescriptorDTO struct {
+	FileID            string                     `json:"fileId,omitempty"`
 	MovieID           string                     `json:"movieId"`
 	Mode              PlaybackMode               `json:"mode"`
 	SessionID         string                     `json:"sessionId,omitempty"`
@@ -1626,6 +1632,7 @@ type NativePlaybackLaunchDTO struct {
 
 // CuratedFrameItemDTO is list metadata (no image); use GET /api/curated-frames/{id}/image for bytes.
 type CuratedFrameItemDTO struct {
+	FileID      string                 `json:"fileId,omitempty"`
 	ID          string                 `json:"id"`
 	MovieID     string                 `json:"movieId"`
 	Title       string                 `json:"title"`
@@ -1663,6 +1670,7 @@ type CuratedFramesListDTO struct {
 
 // CreateCuratedFrameBody is the JSON body for POST /api/curated-frames (image as standard base64, no data: prefix).
 type CreateCuratedFrameBody struct {
+	FileID      string   `json:"fileId,omitempty"`
 	ID          string   `json:"id"`
 	MovieID     string   `json:"movieId"`
 	Title       string   `json:"title"`
