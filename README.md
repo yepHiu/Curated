@@ -19,7 +19,7 @@
 
 # Curated
 
-Movies and FC2 have separate browsing entries with shared storage and tags. Multiple files under one catalog code use one poster, a part selector and independent resume progress; see [FC2 and multipart movies](docs/guide.md#fc2-and-multipart-movies).
+Movies and FC2 have separate browsing entries with shared storage and tags, and a combined Watch History. Multiple files under one catalog code use one poster, a part selector and independent resume progress; see [FC2 and multipart movies](docs/guide.md#fc2-and-multipart-movies).
 
 Browse by subject with [AI user-tag organization](docs/guide.md#ai-user-tags-and-homepage-topics): explicit background tasks with resumable preparation progress, concise labels in your interface language, and NFO tags kept read-only.
 

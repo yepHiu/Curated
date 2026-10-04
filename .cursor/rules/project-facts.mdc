@@ -7,7 +7,7 @@ alwaysApply: true
 
 实际命名样本兼容：普通番号紧接一位 A-Z 字母表示分部（STAR-380A/B、STAR-684A-C/B-C 对应 1/2），带连接符的 -C/-UC 仍为版本标记。Go scanner / moviecode 和 TypeScript Mock 导入预览同步；A 与 CD1 统一为第 1 部，整理输出 CDn。用户 31 个视频样本在启用/关闭整理下均形成 27 部影片，重扫保持文件 ID；TXT 不参与影片扫描。实现与证据见下述同主题计划。
 
-用户已确认「同一番号的多个文件」。`/fc2` 与普通影片分开浏览，编号分类共用 `movie-category.ts`；首页/列表/相关作品/演员来源队列限定类别，历史提供类别选择，FC2 收藏通过 favorite=1。空 mode API 仍提供全库共享缓存，显式浏览 mode 在 COUNT/LIMIT 前应用类别。保存筛选支持 fc2 与 favoriteOnly。
+用户已确认「同一番号的多个文件」。`/fc2` 与普通影片分开浏览，编号分类共用 `movie-category.ts`；首页/列表/相关作品/演员来源队列限定类别，观看历史混合展示两类且不提供类别选择（旧 category 链接也不筛选）；历史续播恢复实际分部和时间，播放队列按记录作品类别构造，返回统一历史。FC2 收藏通过 favorite=1。空 mode API 仍提供全库共享缓存，显式浏览 mode 在 COUNT/LIMIT 前应用类别。保存筛选支持 fc2 与 favoriteOnly。
 
 迁移 0064 建立 movie_files 和 movie_file_progress，旧 location/进度/萃取绑定原实际文件。扫描追加同番号文件，兼容 FC2 PPV 别名、数字分片及同目录多文件；整理保留 CD 序号，冲突登记原路径。列表 fileCount、详情 files，播放 descriptor/progress/curated 带 fileId；选择通过可选 query fileId 进入 typed context（movie_files.go），保持旧播放 Provider 接口。播放、HLS、源帧、clip、协议播放器均保持选择，校验归属与资料库根。作品级历史保留最后一片，文件级进度独立；宿主按 movie+requested file remount。管理删除、根移除、健康、路径迁移覆盖子文件。无配置新字段。源码本地验证，未生产发布；以前覆盖的路径须重扫。见 docs/plan/2026-10-04-multipart-movies-and-fc2-library.md、API.md 与 guide。合规化继续暂缓。
 
