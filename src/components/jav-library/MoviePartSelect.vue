@@ -16,7 +16,8 @@ function selectPart(value: AcceptableValue) {
 
 <template>
  <Select :model-value="modelValue" :disabled="disabled" @update:model-value="selectPart">
-  <SelectTrigger class="w-full min-w-0 min-h-11 sm:min-h-9 sm:w-64" :aria-label="t('player.selectPart')" data-movie-part-select>
+  <!-- 详情页与播放器共用胶囊形选择条，窄屏保留 44px 触控高度。 -->
+  <SelectTrigger class="w-full min-w-0 min-h-11 rounded-full px-4 sm:min-h-9 sm:w-64" :aria-label="t('player.selectPart')" data-movie-part-select>
    <SelectValue class="min-w-0 truncate" :placeholder="t('player.selectPart')" />
   </SelectTrigger>
   <SelectContent :portal-to="portalTo" class="max-w-[calc(100vw-2rem)]">
