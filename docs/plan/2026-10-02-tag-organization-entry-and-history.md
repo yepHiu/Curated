@@ -62,3 +62,17 @@
 - 前端 `pnpm test`：308 文件、1,647 项全部通过；`pnpm typecheck`、`pnpm lint`、Web API 模式 `pnpm build` 通过。
 - 隔离 Mock Chromium 实测 180 部中的 1 部待处理：查看与“暂不处理”后任务数仍为 0，显式逐片重试后仅新增 1 部任务、成功 1 部且问题队列清空。1440×900 与 390×844 均无横向溢出，截图位于 `.workspace/topic-skip-desktop.png` 与 `.workspace/topic-skip-mobile.png`。未运行完整 display 套件。
 - 验证使用隔离 Mock 数据与测试数据库，未修改正式片库或调用付费模型。正式环境须更新前端及 Server 后生效。
+
+## 2026-10-05 整理对话框按钮对齐
+
+- 整理面板沿用现有维护面板的胶囊按钮：整理、更新、停止、查看问题、暂不处理、重试、重新加载、查看依据、加载更多与恢复隐藏题材均使用 `rounded-full`；主要操作继续使用默认主题色，次级操作保留 outline / ghost 层级。
+- 操作组和展开详情内的操作靠右、按内容宽度收缩，窄屏允许换行。隐藏题材恢复按钮补齐手机端 44px 触控高度；`lg` 起主动作 36px、次级动作 32px。
+- 对话框关闭按钮局部组合 `DialogClose` 与 ghost 图标 Button，使用圆形点击区、已有的多语言关闭名称与可见焦点；手机 44px、桌面 32px。标题为关闭控件留出空间。范围和任务的三点按钮同样使用圆形点击区，装饰图标隐藏于辅助技术。
+- 此次修复限于整理对话框，复用既有 Button / Dialog 基元和维护面板约定，不新增全局令牌或共享组件规则。
+
+### 验证记录
+
+- 相关 Vitest：`TagOrganizationDialog.test.ts`、`use-tag-organization.test.ts` 共 21 项通过；改动文件 ESLint、`pnpm build`（含类型检查）通过，体积检查 0 提醒/超限。
+- Windows Chrome 隔离 Mock 浏览器检查：1440×900 和 375×812、DPR 1、浏览器缩放 100%。整理/更新、待处理列表、历史详情分页和恢复题材按钮无横向溢出；手机端操作按钮及图标按钮均为 44px，桌面保持 32/36px 紧凑尺寸。
+- 历史依据从 25 条加载至 26 条后正确隐藏更多入口；关闭按钮与 Esc 可关闭弹窗，关闭后焦点返回整理入口。控制台检查无错误。
+- 截图保存在本地忽略目录 `.workspace/tag-buttons-qa/desktop.png` 与 `.workspace/tag-buttons-qa/mobile-issues.png`。未运行完整 `pnpm test:display` 或其它跨浏览器显示缩放套件。
