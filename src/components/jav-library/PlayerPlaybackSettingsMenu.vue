@@ -19,7 +19,8 @@ type PlaybackModeOption = "direct" | "hls"
 const props = defineProps<{
   disabled?: boolean
   playbackRate: number
-  playbackMode: PlaybackModeOption
+  playbackMode?: PlaybackModeOption
+  native?: boolean
   canSwitchToDirect?: boolean
   switchingMode?: boolean
 }>()
@@ -27,6 +28,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:playbackRate": [value: number]
   "update:playbackMode": [value: PlaybackModeOption]
+  "update:open": [value: boolean]
 }>()
 
 const { t } = useI18n()
@@ -58,7 +60,7 @@ function selectPlaybackMode(value: PlaybackModeOption) {
 </script>
 
 <template>
-  <DropdownMenu>
+  <DropdownMenu @update:open="emit('update:open', $event)">
     <DropdownMenuTrigger as-child>
       <Button
         type="button"
@@ -102,9 +104,9 @@ function selectPlaybackMode(value: PlaybackModeOption) {
         </DropdownMenuGroup>
       </div>
 
-      <DropdownMenuSeparator class="bg-white/10" />
+      <DropdownMenuSeparator v-if="!native" class="bg-white/10" />
 
-      <div class="px-2 pb-2 pt-1.5">
+      <div v-if="!native" class="px-2 pb-2 pt-1.5">
         <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/58">
           {{ t("player.playbackMode") }}
         </p>

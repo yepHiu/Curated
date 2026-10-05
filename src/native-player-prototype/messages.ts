@@ -8,7 +8,10 @@ const zh = {
   time: "进度", codec: "视频编码", hwdec: "硬件解码", dropped: "呈现掉帧", decoderDropped: "解码掉帧",
   idle: "待播放", starting: "正在启动", playing: "播放中", paused: "已暂停", ended: "播放结束", stopped: "已停止", error: "播放失败",
   failure: "操作失败", unavailable: "请通过 Desktop 原型命令打开此窗口", saveFailed: "进度保存失败，下次保存时会重试",
-  nativeWindow: "视频在独立原生窗口播放", busy: "处理中", engineRequired: "请先选择 mpv.exe", lockedHint: "请先连接并解锁 Server",
+  nativeWindow: "原生视频与 Curated 控件在同一窗口播放", busy: "处理中", engineRequired: "请先选择 mpv.exe", lockedHint: "请先连接并解锁 Server",
+  chooseMedia: "选择影片", idleHint: "连接媒体库，选择影片开始播放", settings: "播放设置", settingsAria: "打开播放设置",
+  seekBack: "后退 10 秒", seekForward: "快进 10 秒", mute: "静音", unmute: "取消静音", fullscreen: "进入全屏", exitFullscreen: "退出全屏",
+  replay: "重新播放", close: "关闭播放器", minimize: "最小化", partLabel: "第 {number} 部分", preparing: "正在准备影片",
 }
 export type NativeMessage = keyof typeof zh
 const en: Record<NativeMessage, string> = {
@@ -21,7 +24,10 @@ const en: Record<NativeMessage, string> = {
   time: "Progress", codec: "Video codec", hwdec: "Hardware decoding", dropped: "Presentation drops", decoderDropped: "Decoder drops",
   idle: "Idle", starting: "Starting", playing: "Playing", paused: "Paused", ended: "Ended", stopped: "Stopped", error: "Playback failed",
   failure: "Action failed", unavailable: "Open this window with the Desktop prototype command", saveFailed: "Progress save failed; the next save will retry",
-  nativeWindow: "Video plays in a separate native window", busy: "Working", engineRequired: "Select mpv.exe first", lockedHint: "Connect and unlock the Server first",
+  nativeWindow: "Native video and Curated controls share one window", busy: "Working", engineRequired: "Select mpv.exe first", lockedHint: "Connect and unlock the Server first",
+  chooseMedia: "Choose media", idleHint: "Connect your library and choose a movie to play", settings: "Playback settings", settingsAria: "Open playback settings",
+  seekBack: "Seek back 10 seconds", seekForward: "Seek forward 10 seconds", mute: "Mute", unmute: "Unmute", fullscreen: "Enter fullscreen", exitFullscreen: "Exit fullscreen",
+  replay: "Play again", close: "Close player", minimize: "Minimize", partLabel: "Part {number}", preparing: "Preparing media",
 }
 const ja: Record<NativeMessage, string> = {
   title: "Windows ネイティブ再生プロトタイプ", subtitle: "元のメディア · mpv", prepare: "接続とエンジン", engine: "mpv.exe を選択",
@@ -33,6 +39,9 @@ const ja: Record<NativeMessage, string> = {
   time: "進捗", codec: "映像コーデック", hwdec: "ハードウェアデコード", dropped: "表示ドロップ", decoderDropped: "デコードドロップ",
   idle: "待機中", starting: "起動中", playing: "再生中", paused: "一時停止中", ended: "再生終了", stopped: "停止済み", error: "再生失敗",
   failure: "操作失敗", unavailable: "Desktop のプロトタイプコマンドでこの画面を開いてください", saveFailed: "進捗の保存失敗。次回保存時に再試行します",
-  nativeWindow: "映像は別のネイティブウィンドウで再生されます", busy: "処理中", engineRequired: "mpv.exe を先に選択してください", lockedHint: "Server に接続して解除してください",
+  nativeWindow: "ネイティブ映像と Curated 操作を同じウィンドウで表示", busy: "処理中", engineRequired: "mpv.exe を先に選択してください", lockedHint: "Server に接続して解除してください",
+  chooseMedia: "作品を選択", idleHint: "ライブラリに接続し、再生する作品を選択", settings: "再生設定", settingsAria: "再生設定を開く",
+  seekBack: "10 秒戻る", seekForward: "10 秒進む", mute: "ミュート", unmute: "ミュート解除", fullscreen: "全画面にする", exitFullscreen: "全画面を終了",
+  replay: "もう一度再生", close: "プレイヤーを閉じる", minimize: "最小化", partLabel: "パート {number}", preparing: "作品を準備中",
 }
 export const nativeMessages = { "zh-CN": zh, en, ja }

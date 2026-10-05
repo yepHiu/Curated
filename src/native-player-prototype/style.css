@@ -1,2 +1,10 @@
 @import "../style.css";
 @source "../components/ui";
+@source "../components/jav-library/PlayerTransportControls.vue";
+@source "../components/jav-library/PlayerPlaybackSettingsMenu.vue";
+@source "../components/jav-library/MoviePartSelect.vue";
+
+/* 独立透明窗口的局部例外：正式页面仍沿用全局背景和布局。 */
+html, body, #app { background: transparent; }
+/* 一个 alpha 单位保留 Windows 透明窗口命中测试，画面由下方 mpv 绘制。 */
+.native-player-surface { background: rgba(0, 0, 0, 0.004); }
