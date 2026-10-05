@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SettingsHint from "./SettingsHint.vue"
+import SettingsDesktopPlayback from "./SettingsDesktopPlayback.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { watchDebounced } from "@vueuse/core"
@@ -349,6 +350,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <SettingsDesktopPlayback />
   <div class="flex w-full flex-col gap-6">
     <div class="break-inside-avoid">
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">

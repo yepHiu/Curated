@@ -2,6 +2,7 @@ import { createRouter, createWebHashHistory, type LocationQuery } from "vue-rout
 import { authLockService, isAuthLockEnabled } from "@/services/auth-lock-service"
 import { useComicLibraryService } from "@/services/comic-library-service"
 import { usePhotoLibraryService } from "@/services/photo-library-service"
+import { desktopPlaybackService } from "@/services/desktop-playback-service"
 
 const comicRouteNames = new Set(["comics", "comic-detail", "comic-reader"])
 const photoRouteNames = new Set(["photos", "photo-detail", "photo-viewer"])
@@ -216,9 +217,11 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach(async (to) => {
+desktopPlaybackService.initialize(target => router.push(target))
+router.beforeEach(async (to, from) => {
   if (!isAuthLockEnabled() || to.name === "lock") {
-    return await guardOptionalMediaRouteIfNeeded(to.name)
+    const optional = await guardOptionalMediaRouteIfNeeded(to.name)
+    return optional === true ? desktopPlaybackService.intercept(to, from) : optional
   }
   try {
     const status = await authLockService.refreshStatus()
@@ -233,7 +236,8 @@ router.beforeEach(async (to) => {
   } catch (error) {
     console.warn("[router] auth status check failed", error)
   }
-  return await guardOptionalMediaRouteIfNeeded(to.name)
+  const optional = await guardOptionalMediaRouteIfNeeded(to.name)
+  return optional === true ? desktopPlaybackService.intercept(to, from) : optional
 })
 
 export default router

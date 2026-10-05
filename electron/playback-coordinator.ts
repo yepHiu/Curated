@@ -22,6 +22,7 @@ interface Active {
   movie: NativeLabMovie
   fileId: string
   tracking: boolean
+  locked: boolean
   saved?: string
 }
 function id(value: unknown): asserts value is string {
@@ -34,19 +35,21 @@ export function validatePlaybackOpen(value: unknown): DesktopPlaybackOpen {
   if (input.fileId !== undefined) id(input.fileId)
   if (input.startSec !== undefined && (!Number.isFinite(input.startSec) || input.startSec < 0 || input.startSec > 1e7)) throw new Error("INVALID_START")
   if (typeof input.autoplay !== "boolean" || input.autoAdvance !== undefined && typeof input.autoAdvance !== "boolean") throw new Error("INVALID_PLAYBACK_REQUEST")
+  if (input.seekExisting !== undefined && typeof input.seekExisting !== "boolean") throw new Error("INVALID_PLAYBACK_REQUEST")
   if (input.locale !== undefined && !["zh-CN", "en-US", "ja-JP"].includes(input.locale)) throw new Error("INVALID_LOCALE")
   if (input.queue !== undefined) {
     if (!Array.isArray(input.queue) || input.queue.length > 5000) throw new Error("INVALID_QUEUE")
     input.queue.forEach(id)
   }
   return { movieId: input.movieId, fileId: input.fileId, startSec: input.startSec, autoplay: input.autoplay,
-    autoAdvance: input.autoAdvance === true, queue: [...new Set(input.queue ?? [])], locale: input.locale ?? "zh-CN" }
+    seekExisting: input.seekExisting === true, autoAdvance: input.autoAdvance === true, queue: [...new Set(input.queue ?? [])], locale: input.locale ?? "zh-CN" }
 }
 
 /** 正式本机播放的唯一所有者：身份、HTTP 写入和资源替换全部串行。 */
 export class NativePlaybackCoordinator extends EventEmitter {
   private tail: Promise<unknown> = Promise.resolve()
   private active?: Active
+  private lastContext?: PlaybackContext
   private surface?: PlaybackSurface
   private timer?: ReturnType<typeof setInterval>
   private periodicPending = false
@@ -74,7 +77,9 @@ export class NativePlaybackCoordinator extends EventEmitter {
       const active = this.active
       if (active && active.context.generation === context.generation && active.movie.id === input.movieId
         && (!input.fileId || input.fileId === active.fileId)) {
-        if (input.startSec !== undefined) {
+        const auth = await this.api<{ unlocked: boolean }>(context, "/api/auth/status")
+        if (!auth.unlocked) { await this.finish("SERVER_LOCKED"); throw new Error("SERVER_LOCKED") }
+        if (input.seekExisting && input.startSec !== undefined) {
           active.tracker.onSeeking(input.startSec)
           await active.player.control({ action: "seek", value: Math.min(input.startSec, active.player.state.durationSec || input.startSec) })
           if (input.autoplay) await active.player.control({ action: "resume" })
@@ -105,10 +110,11 @@ export class NativePlaybackCoordinator extends EventEmitter {
   }
   private async start(context: PlaybackContext, input: DesktopPlaybackOpen): Promise<void> {
     const auth = await this.api<{ unlocked: boolean }>(context, "/api/auth/status")
-    if (!auth.unlocked) throw new Error("SERVER_LOCKED")
+    if (!auth.unlocked) { await this.finish("SERVER_LOCKED"); throw new Error("SERVER_LOCKED") }
     const movie = await this.detail(context, input.movieId)
     if (input.fileId && !movie.files.some(file => file.id === input.fileId)) throw new Error("INVALID_MOVIE_FILE")
     await this.release()
+    try {
     const descriptor = await this.api<{ mode: string; fileId?: string; resumePositionSec?: number; durationSec?: number }>(
       context, `/api/library/movies/${encodeURIComponent(input.movieId)}/playback-session${input.fileId ? `?fileId=${encodeURIComponent(input.fileId)}` : ""}`,
       { method: "POST", body: JSON.stringify({ mode: "direct" }) })
@@ -119,14 +125,21 @@ export class NativePlaybackCoordinator extends EventEmitter {
     this.snapshotState = { ...this.snapshotState, sessionId: randomUUID(), state: { ...emptyNativePlayerState(), status: "starting",
       movieId: movie.id, fileId }, movie, windowOpen: true, queue: input.queue ?? [], autoAdvance: input.autoAdvance === true,
       locale: input.locale ?? "zh-CN" }
-    try {
+    this.lastContext = context
       this.surface ??= await this.createSurface()
-      const proxy = new NativeMediaProxy(`${context.origin}/api/library/movies/${encodeURIComponent(movie.id)}/stream?fileId=${encodeURIComponent(fileId)}`, context.fetch)
+      const proxy = new NativeMediaProxy(`${context.origin}/api/library/movies/${encodeURIComponent(movie.id)}/stream?fileId=${encodeURIComponent(fileId)}`, async (url, init) => {
+        const response = await context.fetch(url, init)
+        if (response.status === 401 || response.status === 403) {
+          active.locked = true
+          void this.run(async () => { if (this.active === active) await this.finish("SERVER_LOCKED") })
+        }
+        return response
+      })
       const player = this.surface.createPlayer()
       const tracker = createPlaybackWatchTimeTracker({ movieId: movie.id, addDelta: async (movieId, dayKey, watchedSec) => {
         await this.api(context, "/api/playback/watch-time/daily", { method: "POST", body: JSON.stringify({ movieId, dayKey, watchedSec }) })
       } })
-      const active: Active = { context, player, proxy, tracker, movie, fileId, tracking: false }
+      const active: Active = { context, player, proxy, tracker, movie, fileId, tracking: false, locked: false }
       this.active = active
       player.on("state", (state: NativePlayerState) => this.receive(active, state))
       this.publish()
@@ -149,12 +162,13 @@ export class NativePlaybackCoordinator extends EventEmitter {
         }).finally(() => { this.periodicPending = false })
       }, 5000)
     } catch (error) {
+      const locked = this.active?.locked
       await this.release()
       await this.closeSurface()
       this.snapshotState.state.status = "error"
-      this.snapshotState.state.error = error instanceof Error ? error.message : "NATIVE_START_FAILED"
+      this.snapshotState.state.error = locked ? "SERVER_LOCKED" : error instanceof Error ? error.message : "NATIVE_START_FAILED"
       this.publish()
-      throw error
+      throw new Error(this.snapshotState.state.error)
     }
   }
   private receive(active: Active, state: NativePlayerState): void {
@@ -201,22 +215,31 @@ export class NativePlaybackCoordinator extends EventEmitter {
         this.snapshotState.autoAdvance = input.enabled; this.publish(); return
       }
       const active = this.active
-      if (!active) throw new Error("NO_ACTIVE_PLAYER")
+      const context = active?.context ?? this.lastContext
+      if (input.action === "replay") {
+        if (!context || !this.snapshotState.movie) throw new Error("NO_ACTIVE_PLAYER")
+        await this.start(context, { movieId: this.snapshotState.movie.id, fileId: this.snapshotState.state.fileId,
+          startSec: 0, autoplay: true, queue: this.snapshotState.queue, autoAdvance: this.snapshotState.autoAdvance, locale: this.snapshotState.locale })
+        return
+      }
       if (input.action === "web") {
-        const fallback = { movieId: active.movie.id, fileId: active.fileId, startSec: active.player.state.positionSec }
+        if (!this.snapshotState.movie) throw new Error("NO_ACTIVE_PLAYER")
+        const fallback = { movieId: this.snapshotState.movie.id, fileId: this.snapshotState.state.fileId, startSec: this.snapshotState.state.positionSec }
         await this.finish()
         this.emit("web-fallback", fallback)
         return
       }
       if (input.action === "part" || input.action === "movie") {
-        const movieId = input.action === "part" ? active.movie.id : input.movieId
+        if (!context || !this.snapshotState.movie) throw new Error("NO_ACTIVE_PLAYER")
+        const movieId = input.action === "part" ? this.snapshotState.movie.id : input.movieId
         id(movieId)
         if (input.action === "part") id(input.fileId)
         if (input.action === "movie" && !this.snapshotState.queue.includes(movieId)) throw new Error("INVALID_QUEUE_TARGET")
-        await this.start(active.context, { movieId, fileId: input.action === "part" ? input.fileId : undefined, autoplay: true,
+        await this.start(context, { movieId, fileId: input.action === "part" ? input.fileId : undefined, autoplay: true,
           queue: this.snapshotState.queue, autoAdvance: this.snapshotState.autoAdvance, locale: this.snapshotState.locale })
         return
       }
+      if (!active) throw new Error("NO_ACTIVE_PLAYER")
       if (!["pause", "resume", "seek", "speed", "volume"].includes(input.action)) throw new Error("INVALID_CONTROL")
       if (input.action === "seek") active.tracker.onSeeking(input.value ?? active.player.state.positionSec)
       await active.player.control(input)
@@ -258,6 +281,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
     const surface = this.surface; this.surface = undefined
     await surface?.dispose()
     this.snapshotState.windowOpen = false
+    this.lastContext = undefined
   }
   private async finish(error?: string): Promise<void> {
     await this.release()

@@ -69,7 +69,7 @@ describe("production native coordinator", () => {
       expect(f.coordinator.snapshot().sessionId).toBe(original.sessionId)
       f.lock()
       await expect(f.coordinator.open(f.context, { movieId: "b", autoplay: true })).rejects.toThrow("SERVER_LOCKED")
-      expect(f.players[0]!.stopped).toBe(false)
+      expect(f.players[0]!.stopped).toBe(true)
     } finally { await f.coordinator.stop() }
   })
   it("advances parts only on natural EOF and keeps the frozen queue", async () => {

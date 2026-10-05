@@ -11,6 +11,7 @@ export interface DesktopPlaybackOpen {
   movieId: string
   fileId?: string
   startSec?: number
+  seekExisting?: boolean
   autoplay: boolean
   locale?: "zh-CN" | "en-US" | "ja-JP"
   queue?: string[]
@@ -30,7 +31,7 @@ export interface DesktopPlaybackSnapshot {
 }
 export type DesktopPlaybackCommand =
   | NativeLabControl
-  | { [Action in "focus" | "fullscreen" | "minimize" | "close" | "web"]: { action: Action } }["focus" | "fullscreen" | "minimize" | "close" | "web"]
+  | { [Action in "focus" | "fullscreen" | "minimize" | "close" | "web" | "replay"]: { action: Action } }["focus" | "fullscreen" | "minimize" | "close" | "web" | "replay"]
   | { action: "part"; fileId: string }
   | { action: "movie"; movieId: string }
   | { action: "autoAdvance"; enabled: boolean }
