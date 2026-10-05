@@ -15,6 +15,7 @@ from .build_steps import (build_frontend, build_backend, build_electron_main,
                          _bundle_ffmpeg_runtime, _find_iscc, _run, utc_build_stamp)
 from .components import artifact_name, component_plan
 from .git_utils import resolve_commit
+from .native_player import stage_native_player, validate_native_bundle
 
 FEED_ROOT = 'https://raw.githubusercontent.com/yepHiu/Curated/release-channels'
 IDENTITIES = {'server': 'Curated.Server', 'desktop': 'Curated.Desktop'}
@@ -29,8 +30,15 @@ def validate_payload(directory: Path, component: str) -> None:
     files = {p.relative_to(directory).as_posix().lower() for p in directory.rglob('*') if p.is_file()}
     if component == 'desktop':
         required = {'curated desktop.exe', 'resources/app/electron-dist/main.js', 'resources/app/package.json'}
-        if any('frontend-dist/' in p or 'third_party/' in p or p.endswith(('/curated.exe', '/ffmpeg.exe', '/ffprobe.exe')) for p in files):
+        if any(('frontend-dist/' in p or 'third_party/' in p) and not p.startswith('resources/app/native-player/')
+               or p.endswith(('/curated.exe', '/ffmpeg.exe', '/ffprobe.exe')) for p in files):
             raise ValueError('Desktop payload contains Server dependencies')
+        engine = directory / 'resources/app/native-player'
+        if engine.exists():
+            validate_native_bundle(engine)
+            required |= {'resources/app/electron-dist/native-player-host.exe',
+                         'resources/app/electron-dist/player/index.html',
+                         'resources/app/electron-dist/playback-preload.cjs'}
         metadata = json.loads((directory / 'resources/app/electron-dist/desktop-release.json').read_text())
         if metadata['distribution'] != 'desktop':
             raise ValueError('Desktop metadata must be standalone')
@@ -50,6 +58,7 @@ def stage_desktop(root: Path, destination: Path, version: str, stamp: str) -> No
     (destination / 'resources/default_app.asar').unlink(missing_ok=True)
     payload = destination / 'resources/app'
     shutil.copytree(root / 'electron-dist', payload / 'electron-dist')
+    stage_native_player(payload)
     (payload / 'package.json').write_text(json.dumps({'name': 'curated-desktop', 'productName': 'Curated Desktop',
         'version': version, 'main': 'electron-dist/main.js', 'type': 'module'}) + '\n')
     metadata = payload / 'electron-dist/desktop-release.json'

@@ -32,6 +32,7 @@ scripts/dev/*
 !scripts/dev/start-native-player-prototype.cjs
 !scripts/dev/copy-native-player-preload.cjs
 !scripts/dev/build-native-player-host.cjs
+!scripts/dev/prepare-native-engine.py
 !scripts/dev/generate-desktop-icon.py
 !scripts/dev/generate-brand-assets.py
 !scripts/dev/clean-brand-wordmark.py
@@ -66,6 +67,8 @@ scripts/prd/*
 !scripts/release/version.json
 !scripts/release/versions/
 !scripts/release/versions/*.json
+!scripts/release/native-player/
+!scripts/release/native-player/*.json
 !scripts/release/macos/
 !scripts/release/macos/**
 !scripts/release/windows/
