@@ -277,7 +277,8 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="native-player-surface relative h-full overflow-hidden text-white" @mousemove="immersive.onPageMouseMove" @contextmenu.prevent>
-    <button v-if="active" data-native-video-surface type="button" class="absolute inset-0 size-full focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary" :class="chromeShown ? '' : 'cursor-none'" :aria-label="playing ? t('pause') : t('resume')" @click="surfaceClick" @dblclick="surfaceDoubleClick" />
+    <!-- 画面层只提供点击命中，不占用重复的 Tab 停靠点；键盘焦点提示保留在播放控件上。 -->
+    <button v-if="active" data-native-video-surface type="button" tabindex="-1" class="absolute inset-0 size-full outline-none" :class="chromeShown ? '' : 'cursor-none'" :aria-label="playing ? t('pause') : t('resume')" @click="surfaceClick" @dblclick="surfaceDoubleClick" />
     <div v-if="!active" class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background px-6 text-center text-foreground">
       <MonitorPlay class="size-12 text-primary" aria-hidden="true" />
       <h1 class="text-xl font-semibold">{{ status.state.status === 'idle' ? t('title') : t(status.state.status) }}</h1>
