@@ -6,6 +6,22 @@ Public HTTP API remains in root [`API.md`](../API.md). Folder policy for new doc
 
 If this handbook and current code disagree, treat the code as the source of truth.
 
+## Windows native playback prototype
+
+The development branch `codex/windows-native-player-prototype` contains a separate Windows Electron control window and mpv video window. It reads original media from an existing Curated Server, avoiding automatic HLS transcoding. Production playback and installed Desktop packages keep their current behavior. The [implementation plan](plan/2026-10-05-windows-native-player-prototype.md) records the architecture, staged integration and test evidence.
+
+From this branch's repository root in PowerShell:
+
+```powershell
+pnpm dev:native-player
+```
+
+Choose an existing local `mpv.exe` in the control window, or set `$env:CURATED_NATIVE_MPV = 'C:/absolute/path/mpv.exe'` before launching. Start Server separately, enter its HTTP/HTTPS root address, connect and unlock with its PIN if required, then search for a movie and select its file. Its saved resume position can be changed before starting. Pause, seek, speed, volume and stop are available in the control window; video appears in a separate native window.
+
+The prototype **saves real progress for the selected file** on pause/stop and periodically during playback. Its authentication/profile is separate from installed Desktop at `%APPDATA%/Curated Native Playback Prototype`; QA can set an absolute temporary `CURATED_NATIVE_PROFILE`. Closing it stops its own mpv process. Build-only command: `pnpm build:native-player-prototype`; all output goes to ignored `.workspace/native-player-dist/`.
+
+Synthetic MP4 playback, authenticated Range requests, per-file resume/progress and actual Electron controls have been verified. Comparing known problematic MP4 files for at least five minutes, audio/video synchronization and real LAN/HTTPS performance remains pending. Embedded video, production PlayerPage integration, capture, native PiP, engine packaging and macOS are later stages. This prototype does not announce a production release or confirm that every previous stutter is fixed.
+
 ## FC2 and multipart movies
 
 Movies and FC2 are separate sidebar entries. Movies, its favorites/recent views and Home show ordinary titles; FC2 shows FC2 catalog codes, including FC2-PPV variants. Use FC2's Favorites button for FC2 favorites. Watch History combines ordinary movies and FC2 in viewing-time order with the same day grouping; it has no category selector, and old category links also show all records. Resuming a history record restores its file and position, then returns to the shared history page. Single and batch deletion work across both categories. Storage pools, actor records, metadata/user tags, ratings and notes remain shared. Files can stay together on disk.

@@ -3,6 +3,12 @@ description: Current implementation vs target desktop architecture boundaries
 alwaysApply: true
 ---
 
+## Windows native playback prototype — 2026-10-05
+
+The separate `native-player-prototype.ts` entry now implements mpv process control through Windows named-pipe JSON IPC. Its local Vue page uses only `window.nativePlayerLab`; Server business APIs remain HTTP. Main owns an origin-scoped authentication session and a streaming loopback proxy for one selected raw media file. The prototype uses separate build output/profile and never loads from production main/preload.
+
+This is a usable development prototype with a separate video window. Production native video embedding, PlayerPage integration, capture/PiP, engine distribution and macOS remain pending. Real problem-file comparison is also pending; synthetic playback checks do not establish that all stuttering is fixed. This qualifies the general future-mpv statements below. See `docs/plan/2026-10-05-windows-native-player-prototype.md` (REQ-0058).
+
 ## Release batches — 2026-10-01 (current)
 
 This supersedes older release policies below. New source supports one **Curated YYYYMMDD** Release, with **-2**, **-3**, etc. for later Beijing-date batches, containing Server, Desktop or both. `pnpm release:prepare` inspects each module against its published source; `--write` prepares independent versions, immutable batch metadata and Notes for review. No change means no release. `release:version:show` shows both source versions. CD consumes the batch and never creates Full; old all-in-one CLI/publication triggers are disabled. Shared/unknown delivery inputs conservatively affect both modules and need scope review. Same-source retries reuse versions and batch identity.

@@ -1,5 +1,18 @@
 # Agent 构建 / 编译 / 测试范式（Curated）
 
+## Windows 原生播放原型（2026-10-05）
+
+在专用原型分支的仓库根运行，生产 Desktop 构建入口不变：
+
+```powershell
+pnpm build:native-player-prototype
+pnpm dev:native-player
+```
+
+开发命令先构建再启动；产物为 `.workspace/native-player-dist/`，需自行运行 Server 并选择本机已有 mpv.exe。可用主进程环境 `CURATED_NATIVE_MPV` 指定引擎绝对路径，`CURATED_NATIVE_PROFILE` 指定绝对临时 profile。默认 profile 与正式 Desktop 隔离。详细操作与业务写入效果见 [原型指南](../guide.md#windows-native-playback-prototype)。
+
+相关检查：`pnpm typecheck`、`pnpm exec eslint src/native-player-prototype src/env.d.ts`、`pnpm build:native-player-prototype`。在 Windows 上设置 `CURATED_NATIVE_MPV` 后运行 `pnpm test:electron` 会执行真实 mpv 集成用例，覆盖认证原始 HTTP MP4、Range、控制、退出及坏媒体失败；无该变量时明确跳过这两项。测试用 FFmpeg 生成合成片源，本机须可执行 `ffmpeg`。设置 `NODE_OPTIONS=--no-experimental-webstorage` 与现有 Vitest 范式一致。合成验证不能替代问题片源对照，本轮未运行完整 display-scaling 或发布打包。
+
 ## Release batches — 2026-10-01 (current)
 
 This supersedes older release policies below. New source supports one **Curated YYYYMMDD** Release, with **-2**, **-3**, etc. for later Beijing-date batches, containing Server, Desktop or both. `pnpm release:prepare` inspects each module against its published source; `--write` prepares independent versions, immutable batch metadata and Notes for review. No change means no release. `release:version:show` shows both source versions. CD consumes the batch and never creates Full; old all-in-one CLI/publication triggers are disabled. Shared/unknown delivery inputs conservatively affect both modules and need scope review. Same-source retries reuse versions and batch identity.

@@ -2,7 +2,7 @@
 
 - 日期：2026-08-23
 - 状态：proposed
-- 状态范围：本文原生播放方向仍为提案；部分 Web/HLS 改善已实现，当前行为与验证以播放链路实施计划及审计复审为准。2026-10-05 补充 Desktop 解决 MP4 帧节奏问题的可行性，不表示已批准实施或已完成原型。
+- 状态范围：本文整体仍为历史方案；部分 Web/HLS 改善已实现。2026-10-05 用户已批准先做 Windows mpv 原型，对应独立的 [实施计划](2026-10-05-windows-native-player-prototype.md) 和 REQ-0058（in_progress）。原型首版已实现并通过合成链路验证，真实问题 MP4 对照仍待完成；本文其余原生整合方向不因此整体获批。
 - 对照源码：[videolan/vlc](https://github.com/videolan/vlc)（libVLCcore + `modules/`）
 - 对照本仓库：`backend/internal/playback/`、`backend/internal/app/playback_decision.go`、`src/components/jav-library/PlayerPage.vue`、`src/lib/player-hls-seek.ts`
 - 既有相关计划：`docs/plan/2026-08-16-playback-pipeline-capability-and-performance-audit.md`、`docs/plan/2026-08-22-direct-play-frame-stability.md`、`docs/plan/2026-08-23-hls-transcode-seek.md`

@@ -32,6 +32,10 @@
 
 用户确认「同一番号的多个文件」。[多文件影片与 FC2 独立展示](2026-10-04-multipart-movies-and-fc2-library.md) 与 REQ-0056 / REQ-0057 已为 `verified`：独立 FC2 浏览，共用资源；文件选择、数字排序、独立进度、萃取来源和旧库迁移已实现并通过本地验证。尚未生产发布；旧索引丢失路径通过升级后重扫补回。合规化仍暂缓。
 
+## Windows 原生播放原型（2026-10-05）
+
+用户已要求在专用分支先制作 Windows 原型。[`2026-10-05-windows-native-player-prototype.md`](2026-10-05-windows-native-player-prototype.md) 为当前实施计划，状态 `in-progress`，关联 REQ-0058。P0–P2 首版已实现：mpv 独立窗口、认证原始媒体、控制与逐文件进度；合成媒体和实际 Electron fixture 已通过。P3 真实问题 MP4 对照仍待完成，生产嵌入、分发和 macOS 为后续阶段。历史 VLC 对照研究不因此整体进入实施。
+
 ## 状态流转
 
 1. `research` / `proposed` 文档可以只记录问题、证据和备选方案。

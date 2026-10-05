@@ -19,6 +19,8 @@
 
 # Curated
 
+专用开发分支已有 Windows mpv 原生播放原型，支持独立窗口、播放控制和逐文件续播；见[运行说明](docs/guide.md#windows-native-playback-prototype)与[实施计划](docs/plan/2026-10-05-windows-native-player-prototype.md)。真实问题片源对照和正式播放器整合仍待完成。
+
 「影片」和「FC2」分别浏览，共用存储池与标签。同一番号多个文件共用一张海报，可选择分片播放并分别续播；见 [FC2 与多文件影片说明](docs/guide.md#fc2-and-multipart-movies)。
 
 AI 整理标签显示已整理、未整理和待更新数量，单片出错跳过并汇总供用户决定，默认仅整理未整理影片；支持更新已变更资料、单片、批量及显式全库重整，并自动处理常见题材冲突。详见[操作手册](docs/guide.md#ai-user-tags-and-homepage-topics)。

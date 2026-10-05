@@ -3,6 +3,12 @@ description: 日常开发速记（启动、联调、根目录政策）
 alwaysApply: true
 ---
 
+## Windows 原生播放原型 — 2026-10-05
+
+专用分支 `codex/windows-native-player-prototype`。在该分支仓库根运行 `pnpm dev:native-player`（先构建再启动），只构建用 `pnpm build:native-player-prototype`；输出 `.workspace/native-player-dist/`。原型不启动 Server，需填写已有 Server 的 HTTP/HTTPS 根地址并按需 PIN 解锁。本机选择已有 mpv.exe，或设置绝对路径 `CURATED_NATIVE_MPV`。视频为独立 mpv 窗口；原型会保存所选文件的真实进度。
+
+默认 profile `%APPDATA%/Curated Native Playback Prototype`，与正式 Desktop 隔离；验收可设置绝对临时 `CURATED_NATIVE_PROFILE`。生产入口不变，不发布引擎或安装包。带引擎环境运行 `pnpm test:electron` 才执行真实 mpv 用例，否则明确跳过。启动与当前边界见 `docs/guide.md` 的 Windows native playback prototype 节及 `docs/plan/2026-10-05-windows-native-player-prototype.md`。
+
 ## 合规化范围决定 — 2026-10-04（当前）
 
 用户已另开独立项目推进合规化，本仓库的合规化工作暂缓。此前合规方案中的普通影视/成人内容分区、启用向导、能力模块与公开核心中性化均保留为历史研究，不作为当前实施或排期依据；只有用户明确重新提出时再评估。当前 Curated 继续围绕现有功能维护与优化，既有刮削治理等需求按各自 PRD 状态推进。决策与历史材料见 `docs/plan/2026-07-18-curated-compliance-and-metadata-source-decoupling.md` 和 `docs/plan/README.md`。

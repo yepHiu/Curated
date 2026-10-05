@@ -3,6 +3,12 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-10-05 Windows 原生播放原型（独立开发入口）
+
+`codex/windows-native-player-prototype` 首版已实现 mpv.exe 独立进程、named pipe JSON IPC、受限 loopback 原始媒体代理及本地三语控制页。主进程使用当前 Server 的独立 HttpOnly session，转发 Range，不向 renderer/mpv 暴露 Cookie；支持 PIN、影片/文件选择、逐文件续播与进度保存、暂停/seek/倍速/音量/停止及解码/掉帧诊断。认证锁定、换源及退出回收自己启动的进程。
+
+运行 `pnpm dev:native-player`，独立构建写入 `.workspace/native-player-dist/`，profile 为 `%APPDATA%/Curated Native Playback Prototype`。本机提供 mpv.exe，可用 `CURATED_NATIVE_MPV` 预选。生产 main/preload/PlayerPage 与默认播放不变，无新公共 HTTP 端点或 library-config 字段。93 项 Electron 测试（含 2 项真实 mpv）和实际 Electron fixture 验证通过；真实问题 MP4 对照、嵌入视频、萃取/小窗、分发及 macOS 未验收。REQ-0058 保持 in_progress。详见 `docs/plan/2026-10-05-windows-native-player-prototype.md` 与 guide。
+
 ## 2026-10-04 FC2 与同番号多文件（已实现）
 
 实际命名样本兼容：普通番号紧接一位 A-Z 字母表示分部（STAR-380A/B、STAR-684A-C/B-C 对应 1/2），带连接符的 -C/-UC 仍为版本标记。Go scanner / moviecode 和 TypeScript Mock 导入预览同步；A 与 CD1 统一为第 1 部，整理输出 CDn。用户 31 个视频样本在启用/关闭整理下均形成 27 部影片，重扫保持文件 ID；TXT 不参与影片扫描。实现与证据见下述同主题计划。

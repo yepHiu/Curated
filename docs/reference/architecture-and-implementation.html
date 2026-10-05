@@ -122,6 +122,16 @@
   </style>
 </head>
 <body>
+<section id="windows-native-prototype">
+  <h2>2026-10-05：Windows 原生播放原型（独立开发入口）</h2>
+  <p>专用分支以本地 Vue 控制页 → 限定 preload IPC → Electron 主进程 → mpv 独立窗口读取 Server 原始媒体。主进程持有来源隔离的认证会话，通过临时 loopback 代理转发 Range 和流式响应，不向页面或 mpv 传入 Server Cookie。生产 main/preload/PlayerPage 保持原播放路径，无新增公共 HTTP 端点或配置字段。</p>
+  <table><thead><tr><th>能力</th><th>当前实现</th><th>验收边界</th></tr></thead><tbody>
+    <tr><td>播放与控制</td><td>Windows named pipe JSON IPC；暂停、seek、倍速、音量、停止；解码与掉帧诊断</td><td>真实 mpv 合成 MP4 与错误片源已测试；真实问题影片对照待执行</td></tr>
+    <tr><td>业务与认证</td><td>PIN、影片/文件选择、逐文件续播与进度保存；认证锁定和退出回收</td><td>实际 Electron fixture 已验证第二片与 12 秒续播；LAN/HTTPS 与长期音画同步待验收</td></tr>
+    <tr><td>交付</td><td>pnpm dev:native-player；独立 profile 与 .workspace/native-player-dist 构建</td><td>开发原型；应用内嵌入、萃取/小窗、引擎分发与 macOS 尚未实现</td></tr>
+  </tbody></table>
+  <p>详见 <a href="../plan/2026-10-05-windows-native-player-prototype.md">实施计划与证据（REQ-0058，in_progress）</a>、<a href="../guide.md#windows-native-playback-prototype">运行说明</a>。</p>
+</section>
 <section><h2>2026-10-01：统一 Release 批次（当前源码）</h2><p>发布标题为 Curated YYYYMMDD，同日后续使用 -2、-3。一条 Release 可包含 Server、Desktop 或两端；产品版本分别按交付变更递进。release:prepare 比较各组件已发布来源，生成版本、批次记录与说明；CD 按批次选择构建并统一验收后公开，不再创建 Full。旧出包入口已阻断。这里描述源码能力，不代表已公开新包。</p><table><thead><tr><th>能力</th><th>当前实现</th><th>验收边界</th></tr></thead><tbody><tr><td>独立检查更新</td><td>Desktop 读取 desktop.json，新 Server 读取 server-v2.json；比较组件 SemVer</td><td>按平台选包，保留远程管理权限限制</td></tr><tr><td>旧 Server 升级</td><td>首次日期批次使用兼容 server-v 标签；旧 server.json 永久保留桥接包</td><td>桥接包及 Windows/Mac 实装仍须正式 CD</td></tr><tr><td>发布与恢复</td><td>双端可共享一次 Release 和一次渠道提交；Latest 选择日期批次</td><td>公开后渠道失败只恢复清单，不覆盖资产</td></tr></tbody></table><p>详见 <a href="../guide.md#8-release-and-packaging">发布操作</a>；以下旧发布章节保留为历史记录，以本节为准。</p></section>
 
   <h1>Curated — 架构与实现逻辑</h1>
