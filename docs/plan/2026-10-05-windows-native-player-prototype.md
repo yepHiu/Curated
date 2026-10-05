@@ -572,6 +572,8 @@ REQ-0058 保留 in_progress 80（混合 DPI、更多真实场景等仍未通过�
 
 ### 14.12 原生播放器 UI 与窗口控制统一（2026-10-06）
 
+历史记录：本节自定义窗口标题栏及三个窗口按钮已按用户后续决定由 §14.13 取代；分部选择和底部按钮样式继续保留。下述验证与拖动限制只描述当时的自绘标题栏版本。
+
 按用户要求，正式 `DesktopPlayer` 的分部选择使用 `surface-muted` 实色背景；底部所有图标动作均为圆形，自动连播、诊断、静音、全屏开启及设置菜单展开时使用 `primary` 18% 弱填充。顶部将最小化、最大化/还原、关闭纳入 Curated UI；关闭为 `danger` 红色叉号和 15% 透明红底，悬停 25%，保留焦点与三语标签。独立原生页在 html 设置深色主题，确保 body portal 的分部菜单沿用相同背景。共享 Web 基元和全局 token 不改。
 
 正式 helper 使用可选 `--custom-chrome`，隐藏系统标题栏，同时保留原生缩放边缘与系统窗口操作。顶部 pointerdown 和双击发送受限 drag/maximize 动作到自己创建的 Win32 宿主；透明 Electron 仍不可独立移动/缩放。宿主报告 maximized；聚焦只恢复最小化窗口，不再无故取消最大化。窗口状态变化才额外发布快照，普通移动/尺寸报告不连续重复发布状态。独立旧原型继续使用原有系统标题栏。
@@ -581,3 +583,13 @@ REQ-0058 保留 in_progress 80（混合 DPI、更多真实场景等仍未通过�
 最后检查了 body portal：分部菜单在深色 html 下为语义深色表面，设置菜单展开时触发按钮为 primary 18% 圆形填充。合成片源 UI 截图保存为 ignored `output/playwright/desktop-player/native-chrome-preview.png`；此轮没有截取用户影片画面。临时合成 QA Desktop/宿主/mpv 已有序退出，用户日常测试 Desktop 保留运行并可加载新版播放器。
 
 实际鼠标拖动的自动验收未完成：Windows 窗口工具将视频宿主与不同进程的透明控件识别为两个输入目标，刷新后再次尝试仍报 `point ... is over electron.exe ... not target window native-player-host.exe`，未执行拖动。此项需在测试窗口手动确认；不能把此轮截图或宿主命令测试当成真实拖动验收。未运行完整 display-scaling、跨屏混合 DPI 或新增分发验收。
+
+### 14.13 恢复 Windows 系统标题栏，保留播放器 UI 样式（2026-10-06）
+
+按用户后续要求，正式播放器恢复 Windows 系统标题栏及原生最小化、最大化/还原、关闭按钮，移除播放器顶部的三个自定义按钮。取消 helper 的 `--custom-chrome` 分支与自定义非客户区绘制；renderer 不再提供 drag/maximize 命令和相关文案。标题栏拖动/双击、缩放和窗口按钮由原生宿主管理，透明 Electron 仍仅覆盖宿主客户区，不独立移动。保留此前的 maximized 状态通知与聚焦保持最大化行为。
+
+§14.12 的分部选择 `surface-muted` 实色背景、底部图标圆形样式、开启/菜单展开时的 `primary` 18% 弱填充，以及本地页面和 body portal 深色主题均继续保留。顶部恢复影片标题/番号与分部选择的紧凑布局。系统关闭按钮由 Windows 绘制，播放器内没有重复的红色关闭按钮。
+
+验证：`pnpm build:electron:main`、原型 helper 编译、`pnpm typecheck`、播放器和文案的局部 ESLint 通过；设置实际 mpv 后 `pnpm test:electron` 18 文件/117 项通过，含系统标题栏宿主的最大化、聚焦、最小化恢复和全屏恢复。正式 main 配合隔离 profile/认证合成片源，观察到系统标题栏的三个原生按钮，renderer 内对应按钮计数为 0。实际水平拖动系统标题栏后宿主位置改变，视频与透明控件仍同窗对齐；原生最大化、最小化及主窗口聚焦恢复后保持最大化通过。窗口工具对拖动终点落在 Electron 客户区的尝试拒绝输入，改为标题栏内水平拖动完成实际操作；此结果不覆盖跨屏混合 DPI。
+
+实测分部触发器背景为 `rgb(18, 24, 39)`，展开菜单为深色语义表面；自动连播开启和设置菜单展开时仍为圆形 `primary` 18% 弱底。点击系统关闭按钮后快照为 `windowOpen=false/status=stopped`，自己的 helper/mpv 已回收。新预览为 ignored `output/playwright/desktop-player/native-system-chrome-preview.jpg`，仅包含合成测试片源。临时 QA 实例已退出，日常隔离测试 Desktop 已重启到本轮构建，保持原生偏好/音量/倍速；没有重新播放真实影片。未运行 display-scaling、安装/发布或真实 LAN/HTTPS 验收。
