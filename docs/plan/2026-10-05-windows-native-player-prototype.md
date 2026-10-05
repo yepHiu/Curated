@@ -97,7 +97,7 @@ IPC 按 request_id 匹配响应；处理拆包/合包，限制单条消息大小
 
 ### P5 · 分发与跨平台（另行排期）
 
-Windows 引擎实际构建/许可/依赖核对、独立更新和安装验收；macOS 窗口/渲染/硬解单独实现验证。Server 托管 UI 若改动则属于 Server 交付；引擎属于 Desktop，按实际变化独立准备版本。失败保留 Web/HLS 能力。
+Windows 引擎实际构建/许可/依赖核对、版本管理和安装验收；2026-10-06 的建议是首版与 Desktop 一起更新，暂不引入引擎独立在线更新器，见 §13。macOS 窗口/渲染/硬解单独实现验证。Server 托管 UI 若改动则属于 Server 交付；引擎属于 Desktop，按实际变化独立准备版本。失败保留 Web/HLS 能力。
 
 ## 7. 验证矩阵
 
@@ -358,3 +358,36 @@ mpv 支持 `--wid`：Windows 下传入 HWND，mpv 创建自己的子窗口并使
 本轮实际验证：透明层初始及结束的八个边角均返回 HTCLIENT=1，且无 WS_THICKFRAME；视频宿主边角/标题栏仍返回 13、17、2。初始、连续四次移动/缩放、最小化恢复后的六组物理边界完全相等；透明层随宿主隐藏/恢复，正常关闭后本次 Electron 退出。完整 Electron 15 文件/98 项通过（已配置真实 mpv）；原型 C/TS/Vue 构建及生产 Electron tsc 通过，git diff --check 通过。本轮未修改共享前端控件，40 项前端回归为上轮记录。
 
 此前真实宿主测试和 UI 合成截图证明了正常播放，但没有覆盖透明层自身的系统边角命中，因而漏掉本次独立缩放问题。新增实际 Electron 窗口检查补足这个缺口。代码提交 `efe0a108`；继续保留原型分支，REQ-0058 的真实问题片源与混合 DPI 对照仍待完成。
+
+## 13. 2026-10-06 mpv 随 Desktop 分发建议（尚未实施）
+
+用户询问 mpv 能否与 Desktop 一起分发。结论是可以；安装包和便携 ZIP 都可包含引擎，安装后自动使用随包的绝对路径，用户无需预装 mpv 或选择 exe。当前独立 mpv 进程、标准 JSON IPC 和自有 Win32 宿主可继续沿用，随包分发不要求改为 libmpv。原型仍使用本机已有引擎，生产分发尚未接入，本节不代表已修改发布包或正式播放默认路径。
+
+### 13.1 建议的 Windows 交付方式
+
+首版按现有 Windows Desktop x64 交付，完整资源建议放在 `resources/app/native-player/`，包括自有 `native-player-host.exe`、`mpv/mpv.exe`、该构建所需的 DLL、许可/署名和 `engine.json`。主进程从 `process.resourcesPath` 解析固定的随包路径；开发态保留本地引擎选择。现有包没有 app.asar，该路径可直接执行；未来改为 asar 时可执行文件/DLL 必须保持解包状态。
+
+`engine.json` 应记录引擎版本、平台/架构、上游来源、锁定的构建与依赖提交、SHA-256、构建参数和对应源码位置。来源可以是可核对的 Windows 构建，或自建构建流水线；不从开发机 Chocolatey/PATH 自动抄一个未知版本作为发布输入。构建仅使用固定版本和校验值，禁止发布时取漂移的 latest。
+
+首版让引擎随 Desktop 批次一起安装、更新和回退，不另做播放时在线下载或自动更新器。Engine 版本单独记录，Desktop 测过再升级。引擎属于 Desktop，不放进 Server；更换引擎造成 Desktop 交付变化，按现有组件版本与发布批次政策处理。当前本机 mpv 0.41.0 的 exe 为 115,788,288 字节（110.4 MiB，未压缩）；正式包增量还取决于所选构建、DLL 和压缩方式，尚未测量安装包大小。
+
+现有 `scripts/release/release_lib/windows_components.py` 的 Desktop 验证会拒绝任何 `third_party/` 路径，视为 Server 依赖。接入时在 `stage_desktop` 增加上述明确的 native-player 资源，并验证引擎清单、宿主和必要依赖；继续拒绝 Server 的 Go、frontend-dist、ffmpeg.exe/ffprobe.exe。mpv 内含/链接 FFmpeg 播放库不等于需要再复制 Server 的 FFmpeg 命令行工具。`resources/app/` 也属于现有安装器的托管替换范围，升级需先关闭本次 mpv/helper，避免占用可执行文件和 DLL。
+
+### 13.2 许可结论和需要保存的材料
+
+mpv 官方 v0.41.0 的 [Copyright](https://github.com/mpv-player/mpv/blob/v0.41.0/Copyright) 明确默认 GPL-2.0-or-later；排除全部 GPL-only 文件才可能生成 LGPL-2.1-or-later 构建，`-Dgpl=false` 本身不能保证最终许可。其说明还指出 LGPL 模式主要面向 libmpv，目前不推荐据此构建 mpv CLI。所链接的 FFmpeg 等依赖也会影响实际二进制的许可，因此首版可采用许可材料完整的 GPL mpv CLI，不能只依据名字或 Chocolatey 的 licenseUrl 判定最终许可。
+
+GPL 允许重新分发。随二进制保留实际许可文本、版权声明、依赖材料，并提供与该份二进制完全对应的完整源码（包括适用的依赖、改动与构建脚本/参数）；建议在同一发行批次提供可下载的源码归档。只写 mpv 官网或 master 源码链接不等于提供对应源码。下载页/本地许可入口明确引擎及相关依赖各自的许可，不能将整个包统一标为 MIT。
+
+当前进程间标准命令/状态控制与独立引擎目录有利于保持组件边界。GNU [FAQ 的聚合与通信说明](https://www.gnu.org/licenses/gpl-faq.html#MereAggregation) 说明，同介质分发不同程序不自动使所有代码改为 GPL，但是否构成一个组合程序也看通信语义，不能将“独立进程/IPC”当作一律免除许可义务。保留 Curated 自有 MIT 代码的权利声明与 mpv 各自声明；未来若直接链接 libmpv，需重新核对所用构建和链接方式。GNU [安装器说明](https://www.gnu.org/licenses/gpl-faq.html#GPLCompatInstaller) 明确，单纯安装 GPL 程序的安装器不因此必须采用 GPL。
+
+核对来源：[mpv Windows 下载/构建入口](https://mpv.io/installation/)（多数是第三方构建，官方 CI 主要用于测试）、[mpv v0.41.0 Copyright](https://github.com/mpv-player/mpv/blob/v0.41.0/Copyright)、[FFmpeg 许可及源码说明](https://ffmpeg.org/legal.html)、GNU 上述 FAQ，以及仓库当前 Windows `stage_desktop` / `validate_payload` 和本机引擎版本/体积。尚未选择正式随包构建，也未完成其对应源码核对。
+
+### 13.3 实施与验收顺序
+
+1. 选定 Windows x64 引擎构建、依赖、固定校验值及完整对应源码；补充本地许可材料和 About 中的引擎条目。
+2. 增加受限的随包路径解析和版本清单；缺失/损坏引擎给出明确状态，原型本地选择仍可用于开发。
+3. 将宿主与引擎纳入 Desktop installer/ZIP staging 和 payload 校验，不自动改变正式 PlayerPage 引擎选择。正式播放接入继续按 P4 完成。
+4. 在未安装 mpv、未配置 PATH 的干净 Windows 上验收安装/便携包离线起播、空格/中文路径、H.264/HEVC 硬解、退出回收、升级替换与回退。核对安装包增量和许可/源码下载。
+
+本节为分发方案，未执行发布代码修改、引擎下载、版本递进、打包或发布。
