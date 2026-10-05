@@ -2,6 +2,7 @@
 
 /** Electron / 桌面壳注入：返回本机绝对路径 */
 interface Window {
+  nativePlayerLab?: import("../electron/native-player-contract").NativeLabBridge
   javLibrary?: {
     openServerConnections?: (serverId?: string) => Promise<void>
     addServer?: (input: { name: string; url: string }) => Promise<void>
