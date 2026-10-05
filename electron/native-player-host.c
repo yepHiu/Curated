@@ -67,6 +67,32 @@ static BOOL action_field(const char *json, char *action, size_t capacity) {
     return TRUE;
 }
 
+/* 只修改自有宿主标题；有界 UTF-16 十六进制字段不含 JSON 转义。 */
+static BOOL set_title(const char *json) {
+    const char *value = strstr(json, "\"titleHex\"");
+    if (!value || !(value = strchr(value + 10, ':'))) return FALSE;
+    value++;
+    while (*value == ' ' || *value == '\t') value++;
+    if (*value++ != '"') return FALSE;
+    WCHAR title[481];
+    size_t length = 0;
+    while (*value && *value != '"') {
+        if (length >= 480) return FALSE;
+        unsigned int unit = 0;
+        for (int i = 0; i < 4; i++) {
+            char digit = *value++;
+            if (digit >= '0' && digit <= '9') unit = unit * 16 + (unsigned int)(digit - '0');
+            else if (digit >= 'a' && digit <= 'f') unit = unit * 16 + (unsigned int)(digit - 'a' + 10);
+            else return FALSE;
+        }
+        if (unit < 32 || unit == 127) return FALSE;
+        title[length++] = (WCHAR)unit;
+    }
+    if (*value != '"' || !length) return FALSE;
+    title[length] = 0;
+    return SetWindowTextW(host_window, title);
+}
+
 /* 全屏切换保留原窗口位置及最大化状态，覆盖宿主所属显示器。 */
 static void toggle_fullscreen(void) {
     if (!fullscreen) {
@@ -114,6 +140,8 @@ static void apply_command(const char *json) {
     BOOL ok = action_field(json, action, sizeof(action));
     if (ok && strcmp(action, "attach") == 0) {
         ok = attach_overlay(number_field(json, "handle"));
+    } else if (ok && strcmp(action, "title") == 0) {
+        ok = set_title(json);
     } else if (ok && strcmp(action, "fullscreen") == 0) {
         toggle_fullscreen();
     } else if (ok && strcmp(action, "minimize") == 0) {

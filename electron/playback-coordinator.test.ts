@@ -35,7 +35,7 @@ function fixture() {
     return new Response(null, { status: 204 })
   } }
   const surface: PlaybackSurface = { createPlayer: () => { const player = new Player(); players.push(player); return player },
-    focus: async () => { focused++ }, action: async () => {}, fullscreen: () => false, dispose: async () => { disposed++ } }
+    setTitle: async () => {}, focus: async () => { focused++ }, action: async () => {}, fullscreen: () => false, dispose: async () => { disposed++ } }
   const coordinator = new NativePlaybackCoordinator("fixture", async () => surface, () => defaultPlaybackPreferences, () => {})
   return { coordinator, context, surface, requests, players, disposed: () => disposed, focused: () => focused,
     lock: (status = 200) => { unlocked = false; authStatus = status } }

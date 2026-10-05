@@ -63,6 +63,7 @@ export function installDesktopPlayback(options: DesktopPlaybackOptions) {
       await host.command("attach", { handle: (handle.length === 8 ? handle.readBigUInt64LE() : BigInt(handle.readUInt32LE())).toString() })
       window.webContents.setWindowOpenHandler(() => ({ action: "deny" }))
       window.webContents.on("will-navigate", event => event.preventDefault())
+      window.on("page-title-updated", event => event.preventDefault())
       window.webContents.on("will-attach-webview", event => event.preventDefault())
       window.webContents.on("render-process-gone", () => { if (!disposing) void coordinator.stop("PLAYER_UI_FAILED") })
       window.webContents.session.setPermissionCheckHandler(() => false)
@@ -74,6 +75,7 @@ export function installDesktopPlayback(options: DesktopPlaybackOptions) {
       await window.loadURL(page)
       return {
         createPlayer: () => new NativeMpvPlayer(host.state!.handle),
+        setTitle: async title => { await host.setTitle(title); if (!window!.isDestroyed()) window!.setTitle(title) },
         focus: async () => { await host.command("focus"); if (!window!.isDestroyed()) { window!.show(); window!.focus() } },
         action: action => host.command(action),
         fullscreen: () => host.state?.fullscreen === true,

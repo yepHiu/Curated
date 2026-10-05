@@ -12,7 +12,7 @@ export interface NativeWindowState {
   fullscreen: boolean
   maximized: boolean
 }
-type HostAction = "attach" | "fullscreen" | "minimize" | "maximize" | "focus" | "restore" | "resize" | "quit"
+type HostAction = "attach" | "title" | "fullscreen" | "minimize" | "maximize" | "focus" | "restore" | "resize" | "quit"
 interface Pending { resolve(): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
 
 /** 自有 Win32 宿主的内部协议；HWND 与测试用几何命令不进入 renderer。 */
@@ -52,8 +52,14 @@ export class NativePlayerWindow extends EventEmitter {
     } catch (error) { await this.dispose(); throw error }
   }
 
+  /** UTF-16 单元转十六进制，中文、引号和反斜线无需 helper 解析 JSON 转义。 */
+  setTitle(title: string): Promise<void> {
+    const caption = title.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 480).replace(/[\ud800-\udbff]$/, "") || "Curated"
+    return this.command("title", { titleHex: Buffer.from(caption, "utf16le").swap16().toString("hex") })
+  }
+
   /** 只向自己创建的 helper 发固定协议消息，每个请求独立计时。 */
-  command(action: HostAction, fields: { handle?: string; width?: number; height?: number } = {}): Promise<void> {
+  command(action: HostAction, fields: { handle?: string; width?: number; height?: number; titleHex?: string } = {}): Promise<void> {
     if (!this.child || this.child.stdin.destroyed) return Promise.reject(new Error("NATIVE_HOST_CLOSED"))
     const id = ++this.sequence
     return new Promise<void>((resolve, reject) => {

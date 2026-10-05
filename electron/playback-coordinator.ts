@@ -9,6 +9,7 @@ import type { DesktopPlaybackCommand, DesktopPlaybackOpen, DesktopPlaybackPrefer
 export interface PlaybackContext { origin: string; generation: string; fetch: MediaFetcher }
 export interface PlaybackSurface {
   createPlayer(): NativeMpvPlayer
+  setTitle(title: string): Promise<void>
   focus(): Promise<void>
   action(action: "fullscreen" | "minimize"): Promise<void>
   fullscreen(): boolean
@@ -167,6 +168,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       locale: input.locale ?? "zh-CN", sourceQuery: structuredClone(input.sourceQuery ?? {}) }
     this.lastContext = context
       this.surface ??= await this.createSurface()
+      await this.surface.setTitle(movie.title?.trim() || movie.code || "Curated")
       const proxy = new NativeMediaProxy(`${context.origin}/api/library/movies/${encodeURIComponent(movie.id)}/stream?fileId=${encodeURIComponent(fileId)}`, async (url, init) => {
         const response = await context.fetch(url, init)
         if (response.status === 401 || response.status === 403) {
