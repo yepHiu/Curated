@@ -237,3 +237,60 @@ mpv 支持 `--wid`：Windows 下传入 HWND，mpv 创建自己的子窗口并使
 5. 成功后提取共享控件并接入正式播放宿主，验证侧栏继续/暂停/停止、历史与连播。若独立原生宿主通过而主页面融合未通过，可先交付独立 Curated 播放窗口并使用同一套 UI；原生容器本身未通过时仍保留当前双窗口实验形态，记录原因再决定合成路线，不能把新建 Vue 页面当作嵌入成功。
 
 官方边界参考：[mpv --wid 文档](https://github.com/mpv-player/mpv/blob/master/DOCS/man/options.rst)、[libmpv Render API](https://github.com/mpv-player/mpv/blob/master/include/mpv/render.h)。后者也明确指出窗口嵌入可能受 GUI 框架和平台影响，推荐渲染 API；本项目先用 wid 验证，是为了复用已工作的独立进程链路，最终路线以实际嵌入/合成验收为准。
+
+## 11. 2026-10-05 开源参考项目核查
+
+用户要求寻找成熟开源项目作为页面融合参考。本次读取了 GitHub 仓库信息、发布记录、README 和相关源码；仅做研究，没有引入第三方代码/依赖，没有编译或运行这些客户端。维护日期是截至本次核查的快照，不代表任一具体功能已在 Curated/Electron 42 验证。
+
+### 11.1 优先级与维护情况
+
+| 优先级 | 项目 | 参考价值 | 核查到的维护/交付证据 | 应用源码许可证 |
+|---|---|---|---|---|
+| 1 | [Jellyfin Desktop](https://github.com/jellyfin/jellyfin-desktop)，旧名 Jellyfin Media Player | Web 业务界面接原生 libmpv；视频下层、透明 Web UI 上层；最接近 Server + Desktop 结构 | 2021 年建立；默认分支提交 2026-08-31；稳定 v1.12.0 有 Windows x64/x86 安装器，v2.0.0 为预发布，当前 README 另有开发构建 | GPL-2.0 |
+| 2 | [Stremio Shell](https://github.com/Stremio/stremio-shell) | Qt WebEngine + libmpv Render API 的成熟 Web UI 叠加实现；原生事件与 Web 命令桥 | 2017 年建立；默认分支 2026-03-27 更新到 4.4.183；有 Windows 构建/安装脚本。GitHub Releases 列表较旧，不能据此称最新版本有 GitHub 安装包 | GPL-3.0 |
+| 3 | [mpv.net](https://github.com/mpvnet-player/mpv.net) | Windows 原生宿主、wid、输入、全屏和窗口生命周期 | 2017 年建立；2026-01-09 发布 v7.1.2.0，含 Windows x64 安装器及 x64/ARM64 portable；默认分支提交 2026-02-09 | GPL-2.0 |
+| 补充 | [Harbor](https://github.com/harborstremio/harbor) | Tauri/React/Rust + libmpv；Windows 透明 WebView2、mpv 子窗口层级、坐标与 HDR 独立 UI 层，技术问题贴近本项目 | 2026-06-02 建立；V0.9.21 有 Windows 安装器，2026-10 另有 DLL 预发布；属于近期项目，不按长期成熟组件评价。源码快照默认分支提交 2026-08-21 | MIT |
+| 基础样例 | [mpv-examples](https://github.com/mpv-player/mpv-examples/tree/master/libmpv) | 官方最小 C#/Qt/QML/SDL 嵌入样例；用于理解渲染 API 与宿主，不作为完整客户端 | 默认分支提交 2024-06-07；无 Release，结构简单可定位。许可证以 libmpv/Copyright 为准，不能仅以 GitHub license=null 判断无许可 | 示例提供多种许可及 public-domain 选项；mpv 库单独核对 |
+
+### 11.2 已核对的源码落点
+
+**Jellyfin Desktop：优先学习如何让同一套 Web 界面切换到原生播放。**
+
+- [稳定 v1.12.0 的 webview.qml](https://github.com/jellyfin/jellyfin-desktop/blob/v1.12.0/src/ui/webview.qml)：MpvVideo 与 WebEngineView 的同一窗口布局。稳定交付与新架构研究分开，不能把最新 master 当稳定发行版。
+- [当前 webview.qml，206–238 行](https://github.com/jellyfin/jellyfin-desktop/blob/2cb4a4456fd29b5b62d825ef0e5df93ed6913328/src/ui/webview.qml#L206)：MpvVideoItem 在下层，WebEngineView 的 z=100、backgroundColor=transparent、layer.enabled=true；还记录了最小化恢复的黑屏处理。
+- [native/mpvVideoPlayer.js](https://github.com/jellyfin/jellyfin-desktop/blob/2cb4a4456fd29b5b62d825ef0e5df93ed6913328/native/mpvVideoPlayer.js)：把 Web 播放器的命令/状态接到原生 player，并使用 setVideoRectangle 等能力。可参考统一播放适配接口、状态与媒体区域，而不是复制整个客户端。
+- [MpvVideoItem.cpp](https://github.com/jellyfin/jellyfin-desktop/blob/2cb4a4456fd29b5b62d825ef0e5df93ed6913328/src/player/MpvVideoItem.cpp)：当前实现通过 mpvqt 集成 vo=libmpv，Windows 下配置 OpenGL。其合成由 Qt 承担，不能将 QML z 值等同于 Electron DOM z-index。
+
+**Stremio Shell：优先学习原生画面与透明 Web UI 的完整合成及通信。**
+
+- [main.qml，299 行起](https://github.com/Stremio/stremio-shell/blob/c3a8bcbf857d5569b6ae7444ead0dc0a0814888b/main.qml#L299)：MpvObject 充满窗口，后面的 WebEngineView 使用透明背景；webChannel/transport 转发命令与事件。
+- [mpv.cpp，44 行起](https://github.com/Stremio/stremio-shell/blob/c3a8bcbf857d5569b6ae7444ead0dc0a0814888b/mpv.cpp#L44)：QQuickFramebufferObject Renderer 通过 mpv_render_context_create/render 绘制 OpenGL FBO，再参与 Qt 合成。该案例支持原有浮层控件的目标可行，但它不是 Electron 插件。
+
+**mpv.net：优先学习 Windows 窗口与引擎的生命周期。**
+
+- [Player.cs，69 行起](https://github.com/mpvnet-player/mpv.net/blob/ef45baecbdd8e0a249eca9a621fe608143f75c4b/src/MpvNet/Player.cs#L69)：创建 libmpv 上下文，将 Form 的句柄设置为 wid，并设置输入与事件选项。
+- [MainForm.cs](https://github.com/mpvnet-player/mpv.net/blob/ef45baecbdd8e0a249eca9a621fe608143f75c4b/src/MpvNet.Windows/WinForms/MainForm.cs)：窗口、全屏、尺寸、Win32 消息与焦点管理。它的 WinForms/WPF/OSC 界面不作为 Curated UI 来源。
+
+**Harbor：作为现代 Web 技术栈的补充实验参考。**
+
+- [mpv.rs](https://github.com/harborstremio/harbor/blob/0117755855d3f43960bad3f9f62b69ef851d5991/src-tauri/src/mpv.rs)：CSS/native 媒体矩形映射、Windows wid、关闭默认输入/OSC、自有状态事件；mpv_force_below 枚举属于宿主的 mpv 子窗口并调整层级，退出时清理遗留画面。
+- [webview_helpers.rs](https://github.com/harborstremio/harbor/blob/0117755855d3f43960bad3f9f62b69ef851d5991/src-tauri/src/webview_helpers.rs)：用 WebView2 Controller 设置透明背景；[hdr_overlay.rs](https://github.com/harborstremio/harbor/blob/0117755855d3f43960bad3f9f62b69ef851d5991/src-tauri/src/hdr_overlay.rs) 单独管理透明 UI 窗口、位置、大小和激活状态。
+- Tauri/Windows 使用 WebView2，Electron 使用自身 Chromium；其 Controller API 不能直接调用于 Electron。该项目展示了实际问题和处理方式，不能证明 Curated 已有稳定透明叠加桥。
+
+### 11.3 Electron 搜索结果与不直接采用的项目
+
+- [Kagami/mpv.js](https://github.com/Kagami/mpv.js)：历史上可嵌入 Electron/NW.js，但 README 依赖 Pepper/PPAPI、register-pepper-plugins、NaCl SDK，并要求 no-sandbox；最后 GitHub 发布 v0.3.0 为 2018-07-28，源码推送日期为 2024-01-17。不据旧示例认定兼容当前 Electron 42，不作为直接依赖。
+- [stevevista/electron-mpv](https://github.com/stevevista/electron-mpv)：README 也基于 mpv.js/NaCl SDK，仓库推送停在 2021；属于历史实验参考。
+- [Node-MPV](https://github.com/j-holub/Node-MPV)：JSON IPC 进程控制包装；可以参考命令与观察状态，但不能单独解决画面嵌入和 DOM 叠加。
+
+在本次搜索范围内，没有核实到一个维护成熟、可直接安装并保证 Electron 42 + Windows 视频/DOM 合成的组件。成熟的完整产品主要证明 Qt 合成路径；现代 WebView2 案例也需要原生桥。因此后续仍需自己的小范围嵌入验收，不承诺安装一个 npm 包即可完成。
+
+### 11.4 对 Curated 下一阶段的具体调整建议
+
+1. 共享 UI 与播放适配接口优先参考 Jellyfin：保留现有 PlayerPage 的视觉与业务，把媒体引擎命令/事件解耦。
+2. 在 Windows 实验中同时验证「预留原生区域」与「原生视频下层 + 透明 Web UI 上层」，前者为基线，后者优先验证菜单、提示和渐变控件能否保留原布局。稳定合成可采用后者；未通过则按 §10 使用画面外控件。
+3. 用 mpv.net/官方示例检查 HWND、全屏、输入和回收；用 Harbor 的边界问题检查缩放、层级、背景透明度及遗留画面。继续复用当前认证媒体代理与受限控制契约。
+4. 保持 Electron/Vue 主架构；若考虑 Qt 原生播放器 helper，则另做范围明确的实验，评估额外运行时、UI 桥接和打包，不因案例使用 Qt 就直接迁移全部 Desktop。
+5. 先参考架构和接口，自行实现小型适配。Jellyfin/Stremio/mpv.net 的 GPL 应用代码不直接混入当前 MIT 业务代码；若实际采用其源码需按对应许可处理。Harbor 的 MIT 外壳和官方示例的许可不覆盖实际分发的 libmpv/FFmpeg 构建，分发核对仍属 P5。
+
+本节为调研与实施建议，未把第三方代码运行效果计入本项目的嵌入验收。公开源码快照保存在本地忽略的 `.workspace/native-player-research/`，本文永久记录源码链接与版本，不依赖该缓存存在。
