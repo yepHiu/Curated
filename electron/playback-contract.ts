@@ -40,7 +40,7 @@ export type DesktopPlaybackCommand =
   | { action: "autoAdvance"; enabled: boolean }
 export interface DesktopPlaybackBridge {
   capabilities(): Promise<DesktopPlaybackCapabilities>
-  setPreferences(input: DesktopPlaybackPreferences): Promise<DesktopPlaybackCapabilities>
+  setPreferences(input: Pick<DesktopPlaybackPreferences, "preferNative">): Promise<DesktopPlaybackCapabilities>
   open(input: DesktopPlaybackOpen): Promise<DesktopPlaybackSnapshot>
   snapshot(): Promise<DesktopPlaybackSnapshot>
   command(sessionId: string, input: DesktopPlaybackCommand): Promise<void>

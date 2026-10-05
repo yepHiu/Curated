@@ -15,7 +15,7 @@ onMounted(async () => { if (bridge) capability.value = await bridge.capabilities
 async function change(preferNative: boolean) {
   if (!bridge || !capability.value || saving.value) return
   saving.value = true; error.value = ""
-  try { capability.value = await bridge.setPreferences({ ...capability.value.preferences, preferNative }) }
+  try { capability.value = await bridge.setPreferences({ preferNative }) }
   catch { error.value = t("desktopPlayback.saveFailed") }
   finally { saving.value = false }
 }

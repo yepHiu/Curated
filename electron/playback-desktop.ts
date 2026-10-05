@@ -104,7 +104,9 @@ export function installDesktopPlayback(options: DesktopPlaybackOptions) {
   ipcMain.handle("curated:playback-capabilities", event => { assertMain(event); return capabilities() })
   ipcMain.handle("curated:playback-preferences", (event, input: unknown) => {
     assertMain(event)
-    const value = validatePlaybackPreferences(input)
+    if (!input || typeof input !== "object") throw new Error("INVALID_PLAYBACK_PREFERENCES")
+    // 偏好开关不能用设置页较早的快照覆盖播放中保存的音量/倍速。
+    const value = validatePlaybackPreferences({ ...preferences, preferNative: (input as { preferNative?: unknown }).preferNative })
     store.write(value); preferences = value
     return capabilities()
   })
