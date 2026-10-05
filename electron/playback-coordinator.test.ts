@@ -6,8 +6,8 @@ import { defaultPlaybackPreferences } from "./playback-preferences"
 
 class Player extends NativeMpvPlayer {
   stopped = false
-  override async start(_exe: string, _url: string, start: number) {
-    this.state = { ...this.state, status: "playing", positionSec: start, durationSec: 100 }
+  override async start(_exe: string, _url: string, start: number, _headless = false, initiallyPaused = false) {
+    this.state = { ...this.state, status: initiallyPaused ? "paused" : "playing", positionSec: start, durationSec: 100 }
     this.emit("state", this.state)
   }
   override async control(input: NativeLabControl) {

@@ -48,7 +48,12 @@ describe.skipIf(process.platform !== "win32" || !executable)("real Windows mpv",
     })
     const player = new NativeMpvPlayer()
     try {
-      await player.start(executable!, await proxy.start(), 1, true)
+      await player.start(executable!, await proxy.start(), 1, true, true)
+      await until(() => player.state.status === "paused" && player.state.positionSec >= 1 && player.state.durationSec > 14)
+      const loadedPosition = player.state.positionSec
+      await new Promise<void>(resolve => { setTimeout(resolve, 250) })
+      expect(player.state.positionSec).toBeCloseTo(loadedPosition, 1)
+      await player.control({ action: "resume" })
       await until(() => { return player.state.positionSec > 1.2 && player.state.durationSec > 14 })
       await player.control({ action: "pause" })
       await until(() => { return player.state.status === "paused" })

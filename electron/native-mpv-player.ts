@@ -27,13 +27,14 @@ export class NativeMpvPlayer extends EventEmitter {
   }
 
   /** 通过观察状态即可验证播放效果；headless 仅供合成媒体集成测试。 */
-  async start(executable: string, url: string, startSec: number, headless = false): Promise<void> {
+  async start(executable: string, url: string, startSec: number, headless = false, initiallyPaused = false): Promise<void> {
     if (this.child || this.closed) throw new Error("PLAYER_ALREADY_STARTED")
     if (process.platform !== "win32") throw new Error("WINDOWS_REQUIRED")
     const pipe = `\\\\.\\pipe\\curated-native-${randomUUID()}`
     this.state.status = "starting"
     const args = ["--no-config", "--idle=yes", "--keep-open=no", "--terminal=no", "--ytdl=no",
       "--hwdec=auto-safe", `--input-ipc-server=${pipe}`, `--start=${startSec}`,
+      ...(initiallyPaused ? ["--pause=yes"] : []),
       ...(this.windowId && !headless ? [`--wid=${this.windowId}`, "--osc=no", "--input-default-bindings=no", "--input-vo-keyboard=no", "--input-cursor=no"] : []),
       ...(headless ? ["--vo=null", "--ao=null"] : ["--force-window=yes", "--title=Curated · Windows 原生播放原型"])]
     const child = spawn(executable, args, { shell: false, windowsHide: true, stdio: "ignore" })

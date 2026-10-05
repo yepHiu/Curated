@@ -174,11 +174,12 @@ export class NativePlaybackCoordinator extends EventEmitter {
       this.active = active
       player.on("state", (state: NativePlayerState) => this.receive(active, state))
       this.publish()
-      await player.start(this.executable, await proxy.start(), Math.max(0, startSec))
+      // 媒体先暂停加载，在音量/倍速偏好应用完成前不能短暂发声或推进。
+      await player.start(this.executable, await proxy.start(), Math.max(0, startSec), false, true)
       const prefs = this.preferences()
       await player.control({ action: "volume", value: prefs.volume })
       await player.control({ action: "speed", value: prefs.speed })
-      if (!input.autoplay) await player.control({ action: "pause" })
+      await player.control({ action: input.autoplay ? "resume" : "pause" })
       await this.api(context, `/api/library/played-movies/${encodeURIComponent(movie.id)}`, { method: "POST" })
       this.receive(active, player.state)
       await this.surface.focus()
