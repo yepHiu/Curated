@@ -6,6 +6,8 @@
 分支：`codex/windows-native-player-prototype`
 基线：`408b8c10`，独立工作目录；本计划与原型不改主工作区。
 
+最新进展：§12 的 Windows 同窗原型已实现并验证。mpv 绘制自有 Win32 宿主，透明 Electron owned window 叠加复用的 Curated 控件。下方第一版范围与 §9—§11 保留阶段记录；当前实现、启动要求与剩余边界以 §12 和 guide 为准。生产 PlayerPage 只提取共享控制栏，默认播放引擎未切换。
+
 ## 1. 目标与决策
 
 用户已明确要求先形成详细实施计划，然后在专用分支制作 Windows 原型。原型要证明：Desktop 能通过原生引擎读取 Server 的原始媒体，处理之前 Chromium 直放不友好的 MP4，并具备可控、可回收、可诊断的播放链路。前期研究见 [播放链路方案 §11](2026-08-23-vlc-playback-pipeline-optimization.md#11-2026-10-05--在-desktop-解决部分-mp4-播放不稳)。
@@ -294,3 +296,51 @@ mpv 支持 `--wid`：Windows 下传入 HWND，mpv 创建自己的子窗口并使
 5. 先参考架构和接口，自行实现小型适配。Jellyfin/Stremio/mpv.net 的 GPL 应用代码不直接混入当前 MIT 业务代码；若实际采用其源码需按对应许可处理。Harbor 的 MIT 外壳和官方示例的许可不覆盖实际分发的 libmpv/FFmpeg 构建，分发核对仍属 P5。
 
 本节为调研与实施建议，未把第三方代码运行效果计入本项目的嵌入验收。公开源码快照保存在本地忽略的 `.workspace/native-player-research/`，本文永久记录源码链接与版本，不依赖该缓存存在。
+
+## 12. 2026-10-05 页面融合实施（用户已授权）
+
+用户要求按上述参考开始实施。本轮首先在独立原型入口实现 Windows 原生宿主 + 透明 Electron UI 的同窗播放，保留当前 mpv 进程/认证代理；不将 Qt/GPL 客户端源码加入项目。受控 Win32 helper 创建视频 HWND，mpv 以 wid 绘制；Electron 窗口作为宿主的透明 owned window，仅承载 Curated 控件。宿主与 UI 同步客户端区域、DPI、移动、最小化、全屏与退出。
+
+| 设计项 | 本轮决定 |
+|---|---|
+| 产品面与主任务 | Desktop 播放；选择媒体后以原生引擎观看 |
+| 既有参考 | PlayerPage 的标题、进度条、圆形控制按钮、音量、设置；Jellyfin/Stremio 的视频/Web UI 分层；Windows 宿主参考 mpv.net |
+| 层级与密度 | 画面优先；播放时隐藏准备卡片，配置和诊断为次级入口；沿用当前黑色渐变播放浮层 |
+| 状态 | 未连接/锁定、缺引擎、未选片、启动/缓冲、播放/暂停/结束/错误、保存失败；窄窗口控件换行 |
+| 系统影响 | 提取可复用的播放控件，不改全局 token；正常 Web/生产 Desktop 默认播放保持原路径；独立桥接不提供任意 HWND/命令 |
+
+验收先覆盖真实 Win32/mpv/Electron 合成、窗口移动/缩放/最小化恢复、暂停/seek/倍速/音量、菜单与文件切换、退出与认证锁定。共享控件回归当前 Web 播放页。每个可独立说明的实现与文档分别提交；进度和正式业务接入以本轮实际完成记录为准。
+
+### 12.1 已落地的架构和 UI
+
+- `electron/native-player-host.c` 是独立编写的 Win32 helper，只链接系统库。以父 PID 启动，创建黑色视频宿主，mpv 通过 `--wid` 绘制；不引入 Qt/GPL 应用实现。helper 只接受内部有限动作，叠加窗口必须属于启动它的 Electron PID。父进程死亡或 stdin EOF 自动退出。
+- `NativePlayerWindow` 管理有界 NDJSON、请求关联、超时和清理。helper 报告物理客户端矩形/DPI，并在本地移动消息中同步 owned UI 位置；Electron 主进程转换为 DIP，同步可见性。全屏保留原位置与最大化状态，关闭按保存进度 → 停止 mpv/代理 → 销毁 UI/helper 顺序执行。
+- 透明无框 Electron 窗口仅承载 Web 控件，使用原生 owner 关系保持窗口层级，无全局置顶。主进程禁用此入口的后台节流，避免透明窗口遮挡时控件动画/轮询停顿。helper 的初始/最小尺寸使用 DIP，适配本机高 DPI；跨显示器混合 DPI 仍需专项验收。
+- renderer 继续只接受有限业务桥，新增 `windowAction(fullscreen|minimize|close)`，不暴露 HWND、任意窗口几何、通用 mpv/shell 调用。已有身份/PIN/媒体代理和逐文件进度合约保留；原生模式禁用 mpv 默认 OSC/输入，Curated 负责鼠标、键盘和控件。
+- `PlayerTransportControls` 从既有 PlayerPage 提取，直接共享圆形播放/快进后退按钮、音量和静音；动作插槽保留原 Web 队列、设置、外部播放器、PiP、全屏。原型共享分段选择和设置菜单，native 菜单仅显示倍速；准备弹窗负责连接/解锁/搜索/起播。播放时标题、进度条、底栏和信息面板叠在视频上。
+- 分段切换读取该文件续播，保留倍速/音量/静音；单击播放暂停，双击全屏，沿用 Space/J/K/L、方向键、M/F/Escape/D。控件 5 秒隐藏，鼠标和键盘焦点可恢复，菜单/弹窗保持交互。未连接、锁定、缺引擎、空结果、忙碌、结束重播、播放失败和保存失败均有状态。三语设置消息采用函数，保持本地 CSP，不启用 unsafe-eval。
+
+### 12.2 本轮验证证据
+
+| 检查 | 结果 |
+|---|---|
+| Windows helper 编译 | MinGW gcc 15.2；C11、Wall/Wextra/Werror 通过；仅生成忽略目录内 exe |
+| Electron 测试 | 14 文件 / 97 项通过；包括认证 Range、逐文件/锁定/并发/回收、真实 mpv 坏媒体与控制，以及 4 项真实宿主生命周期/嵌入测试 |
+| 真实 Win32 宿主 | ready、尺寸、非法尺寸/外部 PID HWND 拒绝、全屏/恢复、最小化/恢复、EOF、父 PID 退出、mpv wid 绘制与 seek/恢复通过 |
+| Web 共享控件回归 | 6 文件 / 40 项通过：PlayerPage progress-hover/loading/i18n/frame-markers、PlayerPlaybackSettingsMenu、PlayerView；native 菜单只显示倍速 |
+| 类型、静态与独立构建 | pnpm typecheck、相关 src ESLint、native tsc/Vite 构建通过；Electron 文件未匹配仓库 ESLint 配置，以 tsc/测试验证 |
+| 正式入口构建隔离 | VITE_USE_WEB_API=true 的 pnpm build 与生产 electron/tsconfig.json 编译通过，原型不进入生产 main/preload |
+| 实际 Electron UI | CLI 操作连接/PIN/搜索/选片/第二片续播；暂停、1.5x、静音、进度条约 45 秒寻址、切回第一片、快捷键、全屏恢复通过；设置菜单无 Direct/HLS 虚假选项，浏览器控制台 0 错误/警告 |
+| 原生/Web 合成 | 桌面客户端截图同时包含真实彩色 H.264 合成视频和 Vue 标题/分段/圆形底栏；本机 150% DPI 客户端 1478×1144，最小化/恢复后两层仍显示。页面截图仅用于 UI 辅助检查 |
+| 进度身份 | fixture 的第二片从 12 秒起播，暂停 62.466667 秒/后续 seek 保存到 part-2；切换后 part-1 独立保存 44.9 秒；最终退出仍回收自己的进程 |
+| 引擎观测 | 合成 H.264 使用 d3d11va；观察会话呈现/解码掉帧计数均为 0，不外推为所有问题影片已修复 |
+
+本地 QA 证据在忽略目录 `output/playwright/native-player/`：`native-composition.png`、`native-restored.png`、`native-controls-web.png`、`fixture-controls-results.json` 与最近一轮 `fixture-results.json`。截图只用于开发检查，不能替代真实问题片源的五分钟以上对照。REQ-0058 维持 in_progress，当前 progress 80。
+
+### 12.3 启动与剩余边界
+
+在本分支根目录运行 `pnpm dev:native-player`。构建需本机 MinGW gcc；可通过绝对 `CURATED_NATIVE_CC` 指定编译器。`CURATED_NATIVE_MPV` 预选现有 mpv.exe，或在准备弹窗选择；Server 仍需独立运行。build-only 为 `pnpm build:native-player-prototype`，产物/profile 继续隔离，详细业务写入效果见 guide。
+
+本轮已完成开发原型中的原生视频/Web UI 合成。正式 Desktop 路由/业务入口与播放引擎适配、萃取帧/录制/原生 PiP、音轨/字幕/HDR、混合 DPI 跨屏、长期 A/V 同步、真实 LAN/HTTPS 和问题 MP4 对照、引擎许可证/分发/安装包、macOS 仍未交付。完整 display-scaling 套件未运行；生产打包、push、合并、发布均未执行。不能将现阶段开发窗口认作正式主页面已切换原生引擎。
+
+本轮实现提交：`014de668`（宿主/透明窗口）、`45113d70`（共享控制栏）、`73d406ed`（高 DPI/后台节流）、`d231d1e1`（Curated 原生播放 UI）。

@@ -5,7 +5,7 @@ alwaysApply: true
 
 ## Windows 原生播放原型 — 2026-10-05
 
-专用分支 `codex/windows-native-player-prototype`。在该分支仓库根运行 `pnpm dev:native-player`（先构建再启动），只构建用 `pnpm build:native-player-prototype`；输出 `.workspace/native-player-dist/`。原型不启动 Server，需填写已有 Server 的 HTTP/HTTPS 根地址并按需 PIN 解锁。本机选择已有 mpv.exe，或设置绝对路径 `CURATED_NATIVE_MPV`。视频为独立 mpv 窗口；原型会保存所选文件的真实进度。
+专用分支 `codex/windows-native-player-prototype`。在该分支仓库根运行 `pnpm dev:native-player`（先构建再启动），只构建用 `pnpm build:native-player-prototype`；输出 `.workspace/native-player-dist/`。Windows 构建需 MinGW gcc 在 PATH，或绝对编译器路径 `CURATED_NATIVE_CC`。原型不启动 Server，需在准备弹窗填写已有 Server 的 HTTP/HTTPS 根地址并按需 PIN 解锁。本机选择已有 mpv.exe，或设置绝对路径 `CURATED_NATIVE_MPV`。视频已由 Win32 helper 承载并与透明 Electron 的 Curated 控件同窗显示；原型会保存所选文件的真实进度。
 
 默认 profile `%APPDATA%/Curated Native Playback Prototype`，与正式 Desktop 隔离；验收可设置绝对临时 `CURATED_NATIVE_PROFILE`。生产入口不变，不发布引擎或安装包。带引擎环境运行 `pnpm test:electron` 才执行真实 mpv 用例，否则明确跳过。启动与当前边界见 `docs/guide.md` 的 Windows native playback prototype 节及 `docs/plan/2026-10-05-windows-native-player-prototype.md`。
 

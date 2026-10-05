@@ -9,9 +9,11 @@ pnpm build:native-player-prototype
 pnpm dev:native-player
 ```
 
-开发命令先构建再启动；产物为 `.workspace/native-player-dist/`，需自行运行 Server 并选择本机已有 mpv.exe。可用主进程环境 `CURATED_NATIVE_MPV` 指定引擎绝对路径，`CURATED_NATIVE_PROFILE` 指定绝对临时 profile。默认 profile 与正式 Desktop 隔离。详细操作与业务写入效果见 [原型指南](../guide.md#windows-native-playback-prototype)。
+开发命令先以 Windows MinGW gcc 编译 `electron/native-player-host.c`，再编译独立 Electron/Vue 入口并启动。gcc 需在 PATH，或设置绝对编译器路径 `CURATED_NATIVE_CC`；构建脚本会将编译器目录加入其子进程 PATH，避免 MSYS2 编译器 DLL 不可见。helper 只链接 Win32 系统库，无 Qt/Node native addon；产物为 `.workspace/native-player-dist/`。需自行运行 Server 并选择本机已有 mpv.exe。可用主进程环境 `CURATED_NATIVE_MPV` 指定引擎绝对路径，`CURATED_NATIVE_PROFILE` 指定绝对临时 profile。默认 profile 与正式 Desktop 隔离。详细操作与业务写入效果见 [原型指南](../guide.md#windows-native-playback-prototype)。
 
-相关检查：`pnpm typecheck`、`pnpm exec eslint src/native-player-prototype src/env.d.ts`、`pnpm build:native-player-prototype`。在 Windows 上设置 `CURATED_NATIVE_MPV` 后运行 `pnpm test:electron` 会执行真实 mpv 集成用例，覆盖认证原始 HTTP MP4、Range、控制、退出及坏媒体失败；无该变量时明确跳过这两项。测试用 FFmpeg 生成合成片源，本机须可执行 `ffmpeg`。设置 `NODE_OPTIONS=--no-experimental-webstorage` 与现有 Vitest 范式一致。合成验证不能替代问题片源对照，本轮未运行完整 display-scaling 或发布打包。
+相关检查：`pnpm typecheck`、`pnpm exec eslint src/native-player-prototype src/env.d.ts src/components/jav-library/PlayerTransportControls.vue src/components/jav-library/PlayerPlaybackSettingsMenu.vue src/components/jav-library/MoviePartSelect.vue src/components/jav-library/PlayerPage.vue`、`pnpm build:native-player-prototype`。仓库 ESLint 配置只匹配 src；Electron TS 用两份 tsconfig 编译和 Electron 测试验证，不能将 ignored-file 提示当成 lint 通过。
+
+先构建 helper，再在 Windows 设置 `CURATED_NATIVE_MPV` 后运行 `pnpm test:electron`。当前 97 项通过，包含认证原始 HTTP MP4/Range/控制/坏媒体、真实 HWND 播放、宿主缩放/全屏/最小化恢复、外部 HWND 拒绝、EOF/父 PID 退出回收。无 mpv 时跳过真实引擎用例，无 Windows 或未编译 helper 时跳过宿主用例；这些跳过不能视作嵌入验收。测试用 FFmpeg 生成合成片源，本机须可执行 `ffmpeg`。共享 UI 回归为 PlayerPage 的 progress-hover/loading/i18n/frame-markers、PlayerPlaybackSettingsMenu 和 PlayerView 六个测试文件，40 项通过。设置 `NODE_OPTIONS=--no-experimental-webstorage` 与现有 Vitest 范式一致。实际原生/Web 合成需桌面客户端截图；单独 Chromium 页面截图不能证明视频层显示。合成验证不能替代问题片源对照，本轮未运行完整 display-scaling 或发布打包。
 
 ## Release batches — 2026-10-01 (current)
 
