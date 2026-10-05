@@ -569,3 +569,15 @@ REQ-0058 保留 in_progress 80（混合 DPI、更多真实场景等仍未通过�
 旧本机启动入口转到新脚本，旧 Vite 启动入口停用。源码修改后先停止原生播放并完全退出测试 Desktop，再构建/启动；Windows 无法覆盖运行中的宿主 EXE。关闭窗口仍是隐藏到托盘。监听冲突明确报错。20 项定向测试覆盖真实静态响应、SPA 深链接、缓存/MIME、缺失资源、认证/上传/Range 流代理、跨来源/路径越界、上游失败与退出释放，以及原有前端选择和主窗口生命周期；前端类型检查、生产构建和 Electron 构建通过。
 
 实际测试窗口加载 `/assets/index-*.js`，没有 Vite 客户端或 `/src/main.ts`；首页和影片页刷新后挂载正常，`/api/auth/status` 和 `/api/health` 返回 200，原生 capability available，既有 preferNative/volume/speed 保留。本轮没有开始真实影片或改写播放进度。旧 Vite PID 31044 已结束；5183 由测试 Electron 自身持有。新主进程物理内存约 150 MB，5.04 秒采样使用 0.078 秒 CPU；此前独立 Vite 约 680 MB 物理内存、5 秒约 12.4 秒 CPU。这是短时诊断，不是整套 Desktop 内存/播放基准。
+
+### 14.12 原生播放器 UI 与窗口控制统一（2026-10-06）
+
+按用户要求，正式 `DesktopPlayer` 的分部选择使用 `surface-muted` 实色背景；底部所有图标动作均为圆形，自动连播、诊断、静音、全屏开启及设置菜单展开时使用 `primary` 18% 弱填充。顶部将最小化、最大化/还原、关闭纳入 Curated UI；关闭为 `danger` 红色叉号和 15% 透明红底，悬停 25%，保留焦点与三语标签。独立原生页在 html 设置深色主题，确保 body portal 的分部菜单沿用相同背景。共享 Web 基元和全局 token 不改。
+
+正式 helper 使用可选 `--custom-chrome`，隐藏系统标题栏，同时保留原生缩放边缘与系统窗口操作。顶部 pointerdown 和双击发送受限 drag/maximize 动作到自己创建的 Win32 宿主；透明 Electron 仍不可独立移动/缩放。宿主报告 maximized；聚焦只恢复最小化窗口，不再无故取消最大化。窗口状态变化才额外发布快照，普通移动/尺寸报告不连续重复发布状态。独立旧原型继续使用原有系统标题栏。
+
+验证：Electron 18 文件/117 测试通过（含此轮新增的真实 custom-chrome 最大化、最小化恢复、重新聚焦保持最大化、全屏恢复及受限动作/状态通知测试）；相关前端 4 文件/24 测试、前端类型检查、局部 ESLint 与 Electron/播放页构建通过。使用正式 main、隔离认证合成片源观察到实色分部选择、圆形按钮/选中底色、红色关闭按钮以及唯一自绘顶部栏；实际 UI 最大化/还原/最小化/侧栏聚焦流程通过。原始本机结果在 ignored `output/playwright/desktop-player/native-chrome-results.json`。
+
+最后检查了 body portal：分部菜单在深色 html 下为语义深色表面，设置菜单展开时触发按钮为 primary 18% 圆形填充。合成片源 UI 截图保存为 ignored `output/playwright/desktop-player/native-chrome-preview.png`；此轮没有截取用户影片画面。临时合成 QA Desktop/宿主/mpv 已有序退出，用户日常测试 Desktop 保留运行并可加载新版播放器。
+
+实际鼠标拖动的自动验收未完成：Windows 窗口工具将视频宿主与不同进程的透明控件识别为两个输入目标，刷新后再次尝试仍报 `point ... is over electron.exe ... not target window native-player-host.exe`，未执行拖动。此项需在测试窗口手动确认；不能把此轮截图或宿主命令测试当成真实拖动验收。未运行完整 display-scaling、跨屏混合 DPI 或新增分发验收。

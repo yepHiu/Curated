@@ -8,6 +8,8 @@ alwaysApply: false
 
 播放页与 Windows 独立原型共用 PlayerTransportControls（状态/文案/业务事件，动作插槽）、MoviePartSelect 和 PlayerPlaybackSettingsMenu。原生设置隐藏 Web 播放模式，只显示倍速；原型透明根背景只在独立入口覆盖，不改变全局 token。依据见 docs/plan/2026-10-05-windows-native-player-prototype.md §12。
 
+正式 Windows 原生播放窗口的分部选择使用 `surface-muted` 实色表面；底部图标动作保持圆形，已开启/菜单展开时用 `primary` 弱填充。顶部整合最小化、最大化/还原、关闭三个圆形动作，关闭用 `danger` 图标与 15% 弱底色、悬停 25%。隐藏系统标题栏，顶部拖动/双击、缩放及窗口状态仍由 Win32 宿主管理，透明 Electron 不独立移动。独立页面及 body portal 都使用深色主题，不改共享 Web 默认。见原生播放计划 §14.12。
+
 Desktop 连接页 Debug 复用右下角入口与 Dialog/Tabs，限高内部滚动、关闭恢复焦点；仅提供本地诊断与无会话服务器探测，不依赖业务服务。发布版隐藏入口，主进程按真实开发状态限制 IPC。
 
 萃取帧反馈采用局部 `CaptureReceipt`，成功后显示准确媒体时间与缩略图，失败提供受限重试，不连续堆 Toast；`FrameImageViewer` 自适应展示当前图片，保留加载/重试提示，加载完成后不显示分辨率和 100% 切换浮层。播放器中的 Dialog / DropdownMenu 通过 `portalTo` 放入全屏 surface，避免全屏时被遮挡；不改变其它页面默认 portal。
