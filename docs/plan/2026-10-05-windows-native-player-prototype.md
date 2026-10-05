@@ -359,6 +359,16 @@ mpv 支持 `--wid`：Windows 下传入 HWND，mpv 创建自己的子窗口并使
 
 此前真实宿主测试和 UI 合成截图证明了正常播放，但没有覆盖透明层自身的系统边角命中，因而漏掉本次独立缩放问题。新增实际 Electron 窗口检查补足这个缺口。代码提交 `efe0a108`；继续保留原型分支，REQ-0058 的真实问题片源与混合 DPI 对照仍待完成。
 
+### 12.5 2026-10-06 左右键触发整屏主题色焦点边框修复
+
+用户发现左右键寻址后，透明显示层出现主题色整圈边框。旧版本实际 Electron fixture 复现：铺满画面的 `data-native-video-surface` 是默认进入 Tab 顺序的 button，包含 `focus-visible:ring-2/ring-inset/ring-primary`。点击使画面层获得焦点，方向键使其匹配 focus-visible，实际 box-shadow 出现主题色 2px inset，浏览器还显示原生 outline；该边框来自 Web 控件焦点样式。
+
+本次局部修复只修改 `NativePlayerPrototype.vue` 的画面点击层：移除整屏 ring 类，设置 outline-none 与 tabindex=-1，避免重复的 Tab 停靠点。保留 button 的语义、名称、单击/双击和现有全局快捷键；底部共享播放、音量和设置控件继续保留正常焦点样式和键盘操作，不修改全局 token 或 Button 基元。
+
+验证记录：pnpm typecheck、该组件 ESLint、独立原型 C/TS/Vue 构建和 git diff --check 通过。修复后的真实 Electron 页面读取到画面层 tabindex=-1、box-shadow=none、outline-style=none。独立 Chromium 页面使用受限 fixture 播放桥验证右键从 40 到 50 秒、左键回 40 秒；Space 与单击切换播放/暂停；Tab 跳过画面层并到达带可见局部焦点 ring 的播放按钮，Enter 可操作该按钮；双击发送进入/退出全屏动作。独立页面验证不等同于重新完成真实引擎/DPI 验收，本次未修改原生协议或引擎代码，也未新增镜像式样式单元测试。
+
+本地忽略目录 `output/playwright/native-player/focus-before.png` 与 `focus-after.png` 记录页面层对照；后者为独立 UI 桥验证，截图不包含原生视频，不作为同窗视频合成证据。代码提交 `0f3ae84d`。当前启动的原型已加载修复后产物。
+
 ## 13. 2026-10-06 mpv 随 Desktop 分发建议（尚未实施）
 
 用户询问 mpv 能否与 Desktop 一起分发。结论是可以；安装包和便携 ZIP 都可包含引擎，安装后自动使用随包的绝对路径，用户无需预装 mpv 或选择 exe。当前独立 mpv 进程、标准 JSON IPC 和自有 Win32 宿主可继续沿用，随包分发不要求改为 libmpv。原型仍使用本机已有引擎，生产分发尚未接入，本节不代表已修改发布包或正式播放默认路径。
