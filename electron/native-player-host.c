@@ -209,7 +209,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
     window_class.hInstance = instance;
     window_class.lpszClassName = L"CuratedNativeVideoHost";
     window_class.hCursor = LoadCursorW(NULL, IDC_ARROW);
-    window_class.hIcon = LoadIconW(NULL, IDI_APPLICATION);
+    window_class.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(100));
+    if (!window_class.hIcon) window_class.hIcon = LoadIconW(NULL, IDI_APPLICATION);
     window_class.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
     if (!RegisterClassW(&window_class)) return 4;
     /* 初始尺寸与最小尺寸都用 DIP，避免高 DPI 屏幕启动时只留下狭窄控件区。 */
