@@ -74,7 +74,13 @@ function volume(values?: number[]) {
   const value = values?.[0]
   if (value === undefined) return
   clearTimeout(volumeTimer)
-  volumeTimer = setTimeout(() => { void command({ action: "volume", value }) }, 120)
+  volumeTimer = setTimeout(() => {
+    const current = snapshot.value
+    if (!bridge || !current) return
+    // 尾端值必须入 main 的串行队列，不能因另一个 UI 动作 busy 而丢弃。
+    void bridge.command(current.sessionId, { action: "volume", value }).then(async () => receive(await bridge.snapshot()))
+      .catch(() => { error.value = t("failure") })
+  }, 120)
 }
 async function mute() {
   const value = state.value?.volume ?? 100
@@ -123,6 +129,7 @@ onBeforeUnmount(() => {
       </div>
     </header>
     <div v-if="state?.status === 'starting'" class="pointer-events-none absolute inset-0 flex items-center justify-center">{{ t('starting') }}</div>
+    <div v-if="immersive.feedback.value && !chromeShown" class="pointer-events-none absolute inset-0 flex items-center justify-center"><span class="rounded-2xl bg-black/60 px-6 py-4 text-xl">{{ immersive.feedback.value.label }}</span></div>
     <div v-if="state && ['ended', 'stopped', 'error'].includes(state.status)" class="absolute inset-0 flex items-center justify-center">
       <Button variant="secondary" @click="toggle">{{ t('replay') }}</Button>
     </div>
