@@ -22,7 +22,7 @@ static DWORD saved_style;
 #define HOST_COMMAND (WM_APP + 1)
 #define HOST_INPUT_END (WM_APP + 2)
 
-/* 只报告本窗口的客户端物理坐标，主进程负责转换为 Electron DIP。 */
+/* 宿主独占客户端物理几何；主进程仅根据报告同步透明层可见性。 */
 static void report_state(const char *event) {
     RECT rect;
     POINT point = {0, 0};
@@ -101,6 +101,8 @@ static BOOL attach_overlay(unsigned long long handle) {
     overlay_window = candidate;
     SetWindowPos(overlay_window, HWND_TOP, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    /* 首次展示前也按宿主客户端物理区域对齐，Electron 不再重复设置 DIP 边界。 */
+    report_state("bounds");
     return TRUE;
 }
 

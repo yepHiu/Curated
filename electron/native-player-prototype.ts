@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, screen, session } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, session } from "electron"
 import path from "node:path"
 import { existsSync } from "node:fs"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -17,6 +17,7 @@ if (profile && !path.isAbsolute(profile)) throw new Error("INVALID_PROTOTYPE_PRO
 app.setPath("userData", profile ?? path.join(app.getPath("appData"), "Curated Native Playback Prototype"))
 let window: BrowserWindow | undefined
 let disposed = false
+let overlayReady = false
 const host = new NativePlayerWindow()
 const lab = new NativePlayerLab((origin) => {
   // 认证 session 独立于正式 Desktop，只在当前来源请求中发送 Cookie。
@@ -31,12 +32,11 @@ const lab = new NativePlayerLab((origin) => {
   return new NativeMpvPlayer(host.state.handle)
 })
 
-/** helper 使用物理像素，Electron 边界使用 DIP；最小化不应用空矩形。 */
+/** 物理几何只由 helper 设置；Electron 只同步可见性，避免 DIP 往返舍入漂移。 */
 function syncWindow(state: NativeWindowState): void {
-  if (!window || window.isDestroyed()) return
+  if (!window || window.isDestroyed() || !overlayReady) return
   if (!state.visible) { window.hide(); return }
   if (state.width <= 0 || state.height <= 0) return
-  window.setBounds(screen.screenToDipRect(window, { x: state.x, y: state.y, width: state.width, height: state.height }))
   if (!window.isVisible()) window.showInactive()
 }
 
@@ -126,6 +126,9 @@ app.whenReady().then(async () => {
   window = new BrowserWindow({ width: 1000, height: 800,
     title: "Curated · Windows 原生播放原型", show: false, frame: false, transparent: true,
     backgroundColor: "#00000000", thickFrame: false, skipTaskbar: true, autoHideMenuBar: true,
+    // owned window 仍是独立顶层窗口，必须撤销它的原生移动/缩放能力。
+    // 几何只由视频宿主的 SetWindowPos 控制。
+    resizable: false, movable: false, maximizable: false, minimizable: false, fullscreenable: false,
     webPreferences: { preload: path.join(directory, "native-player-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false,
       backgroundThrottling: false } })
   const handle = window.getNativeWindowHandle()
@@ -144,12 +147,15 @@ app.whenReady().then(async () => {
     callback(false)
   })
   window.once("ready-to-show", () => { // 先完成页面首帧再展示。
+    overlayReady = true
     syncWindow(host.state ?? bounds)
     window?.focus()
   })
   window.on("close", (event) => { /* 浏览器关闭先保存进度，再关闭宿主和播放器。 */
     if (!disposed) { event.preventDefault(); app.quit() }
   })
+  window.on("will-move", (event) => { /* 拦截透明层自身的系统移动，宿主同步不触发此事件。 */ event.preventDefault() })
+  window.on("will-resize", (event) => { /* 拦截透明层自身的系统缩放，外框操作由视频宿主接收。 */ event.preventDefault() })
   await window.loadURL(page)
 }).catch(() => { // 启动失败不输出媒体或认证上下文。
   console.error("Native playback prototype startup failed")
