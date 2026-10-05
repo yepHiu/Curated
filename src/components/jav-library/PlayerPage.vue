@@ -13,19 +13,16 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
-  FastForward,
   Pause,
   PictureInPicture2,
   Play,
-  Rewind,
   SkipBack,
   SkipForward,
-  Volume2,
-  VolumeX,
 } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { HttpClientError } from "@/api/http-client"
 import { moviePlaybackAbsoluteUrl, resolveMoviePlaybackSourceUrl } from "@/api/playback-url"
+import PlayerTransportControls from "@/components/jav-library/PlayerTransportControls.vue"
 import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
 import PlayerPlaylistPanel from "@/components/jav-library/PlayerPlaylistPanel.vue"
 import PlayerPlaylistRevealTab from "@/components/jav-library/PlayerPlaylistRevealTab.vue"
@@ -3398,11 +3395,25 @@ const videoPreloadMode = computed(() =>
             {{ curatedCaptureError }}
           </p>
 
-          <!-- 底栏：播放控制 | 音量 + 全屏 -->
-          <div
-            class="grid w-full items-center gap-x-3 gap-y-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:gap-x-4"
+          <PlayerTransportControls
+            :disabled="!playbackSrc"
+            :playing="isPlaying"
+            :volume-values="volumeSliderDisplay"
+            :volume-percent="volumePercentLabel"
+            :muted="volumeIconIsMuted"
+            :labels="{
+              play: t('player.ariaPlay'), pause: t('player.ariaPause'),
+              seekBack: t('player.seekBackAria', { seconds: playbackSeekBackwardStep }),
+              seekForward: t('player.seekForwardAria', { seconds: playbackSeekForwardStep }),
+              volume: t('player.volumeAria'), mute: t('player.ariaMute'), unmute: t('player.ariaUnmute'),
+            }"
+            @toggle="togglePlayPause"
+            @seek-back="seekDelta(-playbackSeekBackwardStep)"
+            @seek-forward="seekDelta(playbackSeekForwardStep)"
+            @mute="toggleMute"
+            @volume="onVolumeSlider"
           >
-            <div class="flex items-center justify-center gap-2 sm:justify-start">
+            <template #previous>
               <Button
                 v-if="playlistActive"
                 variant="secondary"
@@ -3415,35 +3426,8 @@ const videoPreloadMode = computed(() =>
               >
                 <SkipBack />
               </Button>
-              <Button
-                variant="secondary"
-                size="icon"
-                class="rounded-full bg-white/10 text-white hover:bg-white/20"
-                :disabled="!playbackSrc"
-                :aria-label="t('player.seekBackAria', { seconds: playbackSeekBackwardStep })"
-                @click="seekDelta(-playbackSeekBackwardStep)"
-              >
-                <Rewind />
-              </Button>
-              <Button
-                size="icon-lg"
-                class="rounded-full"
-                :disabled="!playbackSrc"
-                @click="togglePlayPause"
-              >
-                <Pause v-if="isPlaying" />
-                <Play v-else />
-              </Button>
-              <Button
-                variant="secondary"
-                size="icon"
-                class="rounded-full bg-white/10 text-white hover:bg-white/20"
-                :disabled="!playbackSrc"
-                :aria-label="t('player.seekForwardAria', { seconds: playbackSeekForwardStep })"
-                @click="seekDelta(playbackSeekForwardStep)"
-              >
-                <FastForward />
-              </Button>
+            </template>
+            <template #next>
               <Button
                 v-if="playlistActive"
                 variant="secondary"
@@ -3456,95 +3440,61 @@ const videoPreloadMode = computed(() =>
               >
                 <SkipForward />
               </Button>
-            </div>
+            </template>
+            <PlayerPlaybackSettingsMenu
+              :disabled="!playbackSrc"
+              :playback-rate="playbackRate"
+              :playback-mode="currentPlaybackMode"
+              :can-switch-to-direct="canSwitchToDirectPlayback"
+              :switching-mode="isSwitchingPlaybackSession"
+              @update:playback-rate="playbackRate = $event"
+              @update:playback-mode="switchPlaybackMode"
+            />
 
-            <div
-              class="flex flex-wrap items-center justify-center gap-3 sm:col-start-2 sm:justify-end"
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
+              :disabled="!playbackSrc"
+              :aria-label="nativePlayerLabel"
+              @click="openNativePlayer"
             >
-              <div
-                class="flex h-9 min-w-[min(100%,14rem)] max-w-full flex-1 items-center gap-2 rounded-full bg-white/8 px-3 text-white/80 backdrop-blur sm:min-w-[14rem] sm:flex-initial sm:gap-3 sm:px-4"
-                role="group"
-                :aria-label="t('player.volumeAria')"
-              >
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  class="size-9 shrink-0 rounded-full text-white hover:bg-white/15"
-                  :disabled="!playbackSrc"
-                  :aria-pressed="volumeIconIsMuted"
-                  :aria-label="volumeIconIsMuted ? t('player.ariaUnmute') : t('player.ariaMute')"
-                  @click="toggleMute"
-                >
-                  <VolumeX v-if="volumeIconIsMuted" class="size-5 shrink-0" aria-hidden="true" />
-                  <Volume2 v-else class="size-5 shrink-0" aria-hidden="true" />
-                </Button>
-                <Slider
-                  :model-value="volumeSliderDisplay"
-                  :max="100"
-                  :step="1"
-                  class="flex-1"
-                  :disabled="!playbackSrc"
-                  @update:model-value="onVolumeSlider"
-                />
-                <span class="w-10 shrink-0 text-right text-sm leading-none tabular-nums">{{ volumePercentLabel }}%</span>
-              </div>
+              <ExternalLink class="size-4 shrink-0" aria-hidden="true" />
+            </Button>
 
-              <PlayerPlaybackSettingsMenu
-                :disabled="!playbackSrc"
-                :playback-rate="playbackRate"
-                :playback-mode="currentPlaybackMode"
-                :can-switch-to-direct="canSwitchToDirectPlayback"
-                :switching-mode="isSwitchingPlaybackSession"
-                @update:playback-rate="playbackRate = $event"
-                @update:playback-mode="switchPlaybackMode"
-              />
+            <Button
+              v-if="pipSupported"
+              type="button"
+              variant="secondary"
+              size="icon"
+              class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
+              :disabled="!canTogglePip"
+              :aria-busy="pipPending"
+              :aria-pressed="isPipActive"
+              :aria-label="isPipActive ? t('player.ariaPipExit') : t('player.ariaPipEnter')"
+              @click="togglePictureInPicture"
+            >
+              <Loader2 v-if="pipPending" class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              <PictureInPicture2 v-else class="size-4 shrink-0" aria-hidden="true" />
+            </Button>
 
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
-                :disabled="!playbackSrc"
-                :aria-label="nativePlayerLabel"
-                @click="openNativePlayer"
-              >
-                <ExternalLink class="size-4 shrink-0" aria-hidden="true" />
-              </Button>
-
-              <Button
-                v-if="pipSupported"
-                type="button"
-                variant="secondary"
-                size="icon"
-                class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
-                :disabled="!canTogglePip"
-                :aria-busy="pipPending"
-                :aria-pressed="isPipActive"
-                :aria-label="isPipActive ? t('player.ariaPipExit') : t('player.ariaPipEnter')"
-                @click="togglePictureInPicture"
-              >
-                <Loader2 v-if="pipPending" class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-                <PictureInPicture2 v-else class="size-4 shrink-0" aria-hidden="true" />
-              </Button>
-
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
-                :disabled="!playbackSrc"
-                :aria-pressed="isSurfaceFullscreen"
-                :aria-label="
-                  isSurfaceFullscreen ? t('player.ariaFullscreenExit') : t('player.ariaFullscreenEnter')
-                "
-                @click="toggleFullscreen"
-              >
-                <Minimize2 v-if="isSurfaceFullscreen" class="size-4 shrink-0" aria-hidden="true" />
-                <Maximize2 v-else class="size-4 shrink-0" aria-hidden="true" />
-              </Button>
-            </div>
-          </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
+              :disabled="!playbackSrc"
+              :aria-pressed="isSurfaceFullscreen"
+              :aria-label="
+                isSurfaceFullscreen ? t('player.ariaFullscreenExit') : t('player.ariaFullscreenEnter')
+              "
+              @click="toggleFullscreen"
+            >
+              <Minimize2 v-if="isSurfaceFullscreen" class="size-4 shrink-0" aria-hidden="true" />
+              <Maximize2 v-else class="size-4 shrink-0" aria-hidden="true" />
+            </Button>
+          </PlayerTransportControls>
         </div>
       </div>
     </div>
