@@ -15,6 +15,8 @@ router 在 PlayerView/HLS prefetch 前选择可选 native，专用 `electron-dis
 
 正式原生窗口现已支持静态萃取帧：圆形相机按钮/现有可配置快捷键（默认 C），mpv 临时冻结取得源分辨率 PNG 与实际 time-pos，再恢复原播放状态；main 用当前 Session multipart 写现有 `POST /api/curated-frames`。冻结 movieId/fileId/标题/演员/时间/ID，失败缓存一张原图供同 ID 重试，换会话清理；401/403 关闭原生播放。新增仅本地控制页的 `capture(sessionId,retryId?)`、`capturePreferences()` 受限 IPC；后者固定读取主页面快捷键/音效偏好。复用 CaptureReceipt/FrameImageViewer，保存后 captureRevision 驱动主页面帧库刷新。12 MiB/既有像素上限、临时文件清理、中文/英文/日文反馈；片段/GIF、额外本机导出与逐帧尚未接入。详见计划 §14.15。
 
+正式原生窗口的 Info / D 现为 `NativePlaybackInfo` 两列分组面板：mpv 版本、MIME/容器/状态/倍速、视频分辨率/源帧率/解码像素/码率估算/硬解/输出/显示 Hz/两类掉帧/预计帧数、音频参数/码率估算/有符号 A/V、真实 Server host 和媒体接收速率/累计字节/请求/Range/缓存。引擎诊断每秒采样；代理 Transform 按背压计数，速率用单调时钟，历史限 30 点，旧会话回收计时器。原始流音视频共享，不能视作 DASH 分段/双独立下载速度；未测得值为 null。仅本地 bridge 新增 `copyDiagnostics(sessionId)` / `saveDiagnostics(sessionId)`，main 构造指标白名单 JSON，经 clipboard/native save dialog 输出；不包含完整源地址、凭据、业务身份、文件路径或 HWND。窄窗内部滚动、标题行圆形导出/关闭、Esc/D 关闭与焦点恢复；Web 与独立旧原型面板布局不改。无新 HTTP API/config。详见计划 §14.16。
+
 运行 `pnpm native-player:prepare`（7-Zip）后 `pnpm dev:electron`，Windows helper 构建需 gcc 或 `CURATED_NATIVE_CC`；连接新 Server UI，在 Settings → Playback 开启本机原生偏好。`build:electron:main` 包含本地播放页/helper，非 Windows 跳过 Win32 编译。可选 `CURATED_NATIVE_BUNDLE` 验证并 stage 清单资料到 app/native-player；QA 固定二进制不具有完整分发资料，M4 安装/许可/源码验收仍未完成。109 Electron 测试、前端/Electron 构建、21 打包测试及正式 main 合成认证播放/日时长/锁定清理通过；指定 CD1 两引擎各五分钟：native 零观察掉帧、Chromium 2498/9037 掉帧（27.64%），seek/隔离时长正常；更多片源、整片同步、混合 DPI、LAN/HTTPS 与安装验收待执行。原型历史仍保留，REQ-0058/0059 均 in_progress；无版本/push/发布。详见计划 §14.9 和 guide。
 
 ## 2026-10-05 Windows 原生播放原型（独立开发入口）

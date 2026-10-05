@@ -617,3 +617,21 @@ UI 复用 `CaptureReceipt` 与 `FrameImageViewer`：显示保存中、成功、�
 正式 Electron main + 隔离 profile + 认证合成 Server 验证：选 part-2、暂停于 12 秒，相机按钮及 C 产生 640×360 PNG，上传带当前 HttpOnly Cookie、正确 fileId/时间/演员；模拟 500 后回执显示原图和重试，重试上传同 ID/同图片 SHA，成功回执出现；配置 V 后按 V 同样采集，原图预览加载为 640×360，原生窗口截图确认回执背景与控制栏间距。验收中修复了重试 computed 未跟踪候选结果与共享组件缺少本地 Tailwind source 两处实际 UI 问题。本机证据保存在 ignored `output/playwright/desktop-player/qa-results.json` 与 `captured-frame.png`，仅为合成测试片源；没有萃取或保存用户真实影片画面。
 
 本次范围为静态帧入 Server 萃取帧库。长按片段/GIF、自动额外下载/目录导出、逐帧、原生 PiP/轨道/HDR/主页面内嵌仍未实现；可切 Web 使用对应已有功能。没有新增分发/安装/真实 LAN 或 HTTPS 验收，不改变 M4 与总体 REQ-0058/0059 的未完成边界。无版本递进、push、合并或发布。
+
+### 14.16 丰富原生播放诊断（2026-10-06）
+
+设计框架：沿用 Web PlayerPage 的两列播放信息布局和原生 Info / D 入口，在视频上按需打开紧凑实色语义面板。标题/关闭为首层，播放、视频、音频、网络缓存按组浏览，标题行复制/保存为圆形次要动作。窄窗限高内部滚动，保留底部控制栏；加载、无音轨、属性不可用显示 `—`，暂停与缓存闲置保留真实零值，负 A/V 偏差保留符号。Esc 先关闭面板，操作不触发画面暂停。仅新增原生业务组件，不改全局 tokens 或 Web 诊断布局。
+
+数据口径：mpv 的视频/音频码率为 bits/s 估算，源帧率与显示刷新率区分；预计文件帧数不能当实际呈现帧数或掉帧率分母。当前原始 HTTP/Range 媒体为一条音视频共享流，代理按背压计数实际接收字节、总媒体请求/Range 请求，1 秒采样真实传输速度与有界历史。避免伪造 DASH 分段或独立音视频下载速度。仅公开来源 host:port、协议及 MIME，复制/保存由 main 构建允许字段报告，不包含完整 URL、能力 token、Cookie、PIN、路径或 HWND。切片、失败、关闭清理旧会话统计与定时器。
+
+实现：增加 optional 强类型诊断 DTO，main 每秒并行读取允许的 mpv 属性，零/缺失/非法值与 signed avsync 分别投影；每个事件深拷贝，停止/失败/退出清采样任务。代理使用 Transform 流式计数，不缓存整片，单调时钟 1 秒速率与最多 30 点曲线；HEAD 不计 body，seek 重读计入本次流量。协调器合并引擎/当前代理，active 检查阻止旧会话污染。仅本地播放 bridge 提供 copyDiagnostics / saveDiagnostics，main 生成白名单 JSON 并经系统剪贴板/native save dialog 输出；取消正常返回，重复保存有界拒绝，对话框期间源变化拒绝旧报告。
+
+UI：四组两列字段和轻量速度曲线，源 FPS 与显示 Hz 分开；两种掉帧并列，预计文件帧数明确估计，解码像素格式可能为 NV12/D3D11。中文/英文/日文标签，缺失值 `—`，0 B/s/0 掉帧/负 ms 保留。初版底部导出按钮在 640×480 检查中裁剪，改为标题行圆形复制/保存/关闭，数据区内部滚动，避让实际底栏；客户区高度 ≤560px 时面板上边距缩至 16px，以保留可读信息区。640×480 和 626×444 renderer 检查中，数据区分别为134/98px，全部操作可见且无横向溢出。Esc/D 恢复 Info 焦点，拦截面板按键与点击的播放冒泡；无变更系统标题栏三个原生窗口按钮。UI 范式同步 ui-spec 与 ui-component-spec；最终合成样本预览位于 ignored `output/playwright/desktop-player/native-playback-info-preview.png`。
+
+验证：`pnpm desktop:test:build`、更新后的 `pnpm build:desktop-player`、`pnpm typecheck` 与定向 ESLint 通过。19 文件/129 项 Electron 测试通过（真实 mpv 合成无音轨视频参数/关键帧码率、允许字段投影、HEAD/重复 Range 的字节、1 秒速率/闲置归零/有界 history/停止回收/重新起播清零、旧会话隔离与报告白名单）；4 文件/11 项前端定向测试通过（信息格式单位、missing/zero/负 A/V、三语、曲线、面板动作/反馈/Esc、已有萃取/主页面服务）。
+
+正式 production main + 隔离 profile + 认证 640×360/30fps H.264/AAC 合成 Server 实测：mpv d3d11va/gpu-next、48 kHz 单声道、视频约 2.03 Mbps 与音频约 67.56 Kbps 估算、显示 160 Hz、两类掉帧 0、预计 3600 帧、约 107.8 秒前向缓存、实际代理接收 35.03 MiB/2 Range 请求、预读结束后0 B/s。真实剪贴板复制后粘贴并解析白名单报告通过；切至 part-1 生成新 session/清 history，旧 session 导出拒绝。面板实色背景 `rgb(13,15,26)`、底栏 12px 间隔及 native/Web 合成截图检查通过。narrow renderer 640×480 与最小宿主客户区近似下内部滚动/操作完整/无横向溢出及 Esc/D 焦点验证，不等同跨屏混合 DPI。
+
+native JSON 保存对话框已实际显示；Windows 窗口工具将其识别为另一进程 owned modal，按恢复流程刷新/重试仍拒绝操作（point is over electron.exe, not native-player-host.exe），未声称完成真实对话框输入。另起隔离 fixture 仅注入 dialog 的 cancelled/已选 QA 路径结果，其余沿用正式 main handler；取消不显示错误/成功反馈，真实磁盘白名单 JSON 写入与 UI 成功反馈通过。本机诊断文件 `.workspace/diagnostics-qa-saved.json` 与 ignored QA 记录均为合成数据。
+
+本轮没有真实影片截图/萃取、共享 Server 写入或正式应用退出；原生/Web 标题栏和萃取能力保留。日常测试 Desktop 重启到本轮产物；重启前没有活动播放（resume=null），因此不自动起播。未运行 test:display、混合 DPI、真实 LAN/HTTPS、安装/发布验收；无版本、push、合并或发布。
