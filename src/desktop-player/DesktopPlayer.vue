@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref } from "vue"
+import { computed, nextTick, onMounted, onBeforeUnmount, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { useElementSize } from "@vueuse/core"
 import { Camera, Info, Loader2, Maximize2, Minimize2, Monitor, Repeat2, SkipBack, SkipForward, X } from "lucide-vue-next"
@@ -12,6 +12,8 @@ import FrameImageViewer from "@/components/jav-library/FrameImageViewer.vue"
 import PlayerTransportControls from "@/components/jav-library/PlayerTransportControls.vue"
 import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
 import MoviePartSelect from "@/components/jav-library/MoviePartSelect.vue"
+import NativePlaybackInfo from "@/components/jav-library/NativePlaybackInfo.vue"
+import { nativePlaybackInfoMessages } from "@/lib/native-playback-info"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
 import { formatCuratedCaptureKeyLabel, shouldIgnoreGlobalPlaybackHotkeysForTarget } from "@/lib/player-shortcuts"
 import { useNativeFrameCapture } from "./use-native-frame-capture"
@@ -23,6 +25,8 @@ const snapshot = ref<DesktopPlaybackSnapshot>()
 const busy = ref(false)
 const error = ref("")
 const diagnostics = ref(false)
+const infoBusy = ref(false)
+const infoFeedback = ref("")
 const settings = ref(false)
 const focusedControl = ref(false)
 const draft = ref<number>()
@@ -58,7 +62,23 @@ function receive(next: DesktopPlaybackSnapshot) {
   snapshot.value = next
   locale.value = lang.value
   document.documentElement.lang = lang.value
-  if (previous?.sessionId !== next.sessionId) { error.value = ""; immersive.revealChrome() }
+  if (previous?.sessionId !== next.sessionId) { error.value = ""; infoFeedback.value = ""; immersive.revealChrome() }
+}
+function closeDiagnostics() {
+  diagnostics.value = false
+  void nextTick(() => surface.value?.querySelector<HTMLButtonElement>("[data-native-info-trigger]")?.focus())
+}
+async function exportDiagnostics(action: "copy" | "save") {
+  const sessionId = snapshot.value?.sessionId
+  if (!bridge || !sessionId || infoBusy.value) return
+  infoBusy.value = true; infoFeedback.value = ""
+  const labels = nativePlaybackInfoMessages[lang.value]
+  try {
+    const result = action === "copy" ? await bridge.copyDiagnostics(sessionId) : await bridge.saveDiagnostics(sessionId)
+    if (snapshot.value?.sessionId === sessionId && result !== "cancelled") infoFeedback.value = action === "copy" ? labels.copied : labels.saved
+  } catch {
+    if (snapshot.value?.sessionId === sessionId) infoFeedback.value = labels.failed
+  } finally { infoBusy.value = false }
 }
 async function command(input: DesktopPlaybackCommand) {
   if (!bridge || !snapshot.value || busy.value) return
@@ -106,6 +126,7 @@ function doubleClick() { clearTimeout(clickTimer); void command({ action: "fulls
 function focusIn(event: FocusEvent) { focusedControl.value = event.target instanceof HTMLElement && event.target.tabIndex >= 0; immersive.revealChrome() }
 function focusOut(event: FocusEvent) { focusedControl.value = event.relatedTarget instanceof HTMLElement && event.relatedTarget.tabIndex >= 0 }
 function keydown(event: KeyboardEvent) {
+  if (event.key === "Escape" && diagnostics.value && !capture.previewOpen.value) { event.preventDefault(); closeDiagnostics(); return }
   if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || capture.previewOpen.value || shouldIgnoreGlobalPlaybackHotkeysForTarget(event.target)) return
   if (event.code === capture.keyCode.value) {
     event.preventDefault()
@@ -152,12 +173,8 @@ onBeforeUnmount(() => {
     <div v-if="state && ['ended', 'stopped', 'error'].includes(state.status)" class="absolute inset-0 flex items-center justify-center">
       <Button variant="secondary" @click="toggle">{{ t('replay') }}</Button>
     </div>
-    <aside v-if="diagnostics" class="absolute left-5 top-24 rounded-2xl border border-white/15 bg-black/85 p-4 text-sm">
-      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-        <dt>{{ t('codec') }}</dt><dd>{{ state?.codec || '—' }}</dd><dt>{{ t('hwdec') }}</dt><dd>{{ state?.hwdec || '—' }}</dd>
-        <dt>{{ t('dropped') }}</dt><dd>{{ state?.droppedFrames }}</dd><dt>{{ t('decoderDropped') }}</dt><dd>{{ state?.decoderDroppedFrames }}</dd>
-      </dl>
-    </aside>
+    <NativePlaybackInfo v-if="diagnostics" :state="state" :lang="lang" :busy="infoBusy" :feedback="infoFeedback"
+      :style="{ bottom: `${footerHeight + 12}px` }" @close="closeDiagnostics" @copy="exportDiagnostics('copy')" @save="exportDiagnostics('save')" />
     <CaptureReceipt v-if="capture.receipt.value" :job="capture.receipt.value" :pending="capture.busy.value ? 1 : 0" :retryable="capture.retryable.value"
       :style="{ bottom: `${footerHeight + 12}px` }"
       @retry="capture.capture(true)" @view="capture.previewOpen.value = true" @dismiss="capture.dismiss" />
@@ -180,7 +197,7 @@ onBeforeUnmount(() => {
         <Button variant="ghost" size="icon" class="rounded-full" :aria-label="extra.auto" :aria-pressed="snapshot?.autoAdvance" @click="command({ action: 'autoAdvance', enabled: !snapshot?.autoAdvance })"><Repeat2 /></Button>
         <PlayerPlaybackSettingsMenu native :disabled="!active || busy" :playback-rate="state?.speed ?? 1" @update:playback-rate="command({ action: 'speed', value: $event })" @update:open="settings = $event" />
         <Button variant="ghost" size="icon" class="rounded-full" :aria-label="extra.web" :title="extra.web" @click="command({ action: 'web' })"><Monitor /></Button>
-        <Button variant="ghost" size="icon" class="rounded-full" :aria-label="t('diagnostics')" :aria-pressed="diagnostics" @click="diagnostics = !diagnostics"><Info /></Button>
+        <Button data-native-info-trigger variant="ghost" size="icon" class="rounded-full" :aria-label="nativePlaybackInfoMessages[lang].title" :aria-pressed="diagnostics" @click="diagnostics = !diagnostics"><Info /></Button>
         <Button variant="ghost" size="icon" class="rounded-full" :aria-label="snapshot?.fullscreen ? t('exitFullscreen') : t('fullscreen')" :aria-pressed="snapshot?.fullscreen" @click="command({ action: 'fullscreen' })"><Minimize2 v-if="snapshot?.fullscreen" /><Maximize2 v-else /></Button>
       </PlayerTransportControls>
     </footer>

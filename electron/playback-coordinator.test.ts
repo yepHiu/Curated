@@ -54,6 +54,23 @@ function fixture() {
     lock: (status = 200) => { unlocked = false; authStatus = status } }
 }
 describe("production native coordinator", () => {
+  it("merges the real source, isolates replaced sessions and rejects stale information exports", async () => {
+    const f = fixture()
+    try {
+      const first = await f.coordinator.open(f.context, { movieId: "a", autoplay: false })
+      expect(first.state.diagnostics?.network).toMatchObject({ sourceHost: "127.0.0.1:12345", receivedBytes: 0, requests: 0 })
+      const report = JSON.parse(f.coordinator.diagnosticsReport(first.sessionId))
+      expect(report.network.sourceHost).toBe("127.0.0.1:12345")
+      expect(report.movieId).toBeUndefined()
+      await f.coordinator.command(first.sessionId, { action: "part", fileId: "p2" })
+      await expect(Promise.resolve().then(() => f.coordinator.diagnosticsReport(first.sessionId))).rejects.toThrow("STALE")
+      f.players[0]!.emit("state", { ...f.players[0]!.state, codec: "old codec", diagnostics: { width: 9999 } })
+      expect(f.coordinator.snapshot().state.diagnostics?.width).toBeNull()
+      expect(f.coordinator.snapshot().state.codec).not.toBe("old codec")
+      await f.coordinator.stop()
+      expect(() => f.coordinator.diagnosticsReport(f.coordinator.snapshot().sessionId)).toThrow("NO_ACTIVE_PLAYER")
+    } finally { await f.coordinator.stop() }
+  })
   it("saves the selected part and actual frame time as multipart and publishes the gallery revision", async () => {
     const f = fixture()
     try {

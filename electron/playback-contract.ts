@@ -46,6 +46,8 @@ export interface DesktopPlaybackCapture {
   error?: string
 }
 export interface DesktopPlayerBridge extends Pick<DesktopPlaybackBridge, "snapshot" | "command" | "subscribe"> {
+  copyDiagnostics(sessionId: string): Promise<void>
+  saveDiagnostics(sessionId: string): Promise<"saved" | "cancelled">
   capture(sessionId: string, retryId?: string): Promise<DesktopPlaybackCapture>
   capturePreferences(): Promise<{ keyCode: string; feedbackSoundEnabled: boolean }>
 }

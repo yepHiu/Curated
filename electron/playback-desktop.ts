@@ -1,5 +1,6 @@
-import { BrowserWindow, ipcMain } from "electron"
+import { BrowserWindow, ipcMain, clipboard, dialog } from "electron"
 import { existsSync } from "node:fs"
+import { writeFile } from "node:fs/promises"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 import { NativePlaybackCoordinator, type PlaybackContext, type PlaybackSurface } from "./playback-coordinator.js"
@@ -125,6 +126,28 @@ export function installDesktopPlayback(options: DesktopPlaybackOptions) {
     return coordinator.open(context, input)
   })
   ipcMain.handle("curated:playback-snapshot", event => { assertController(event); return coordinator.snapshot() })
+  ipcMain.handle("curated:playback-copy-diagnostics", (event, sessionId: string) => {
+    assertController(event)
+    clipboard.writeText(coordinator.diagnosticsReport(sessionId))
+  })
+  let savingDiagnostics = false
+  ipcMain.handle("curated:playback-save-diagnostics", async (event, sessionId: string) => {
+    assertController(event)
+    if (savingDiagnostics) throw new Error("DIAGNOSTICS_BUSY")
+    const report = coordinator.diagnosticsReport(sessionId)
+    const owner = overlay
+    if (!owner || owner.isDestroyed()) throw new Error("NO_ACTIVE_PLAYER")
+    savingDiagnostics = true
+    try {
+      const result = await dialog.showSaveDialog(owner, { defaultPath: `curated-playback-${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
+        filters: [{ name: "JSON", extensions: ["json"] }] })
+      if (result.canceled || !result.filePath) return "cancelled"
+      // 对话框期间切片/关闭时拒绝写入过期报告。
+      coordinator.diagnosticsReport(sessionId)
+      await writeFile(result.filePath, report, "utf8")
+      return "saved"
+    } finally { savingDiagnostics = false }
+  })
   ipcMain.handle("curated:playback-capture", (event, sessionId: string, retryId?: string) => {
     assertController(event)
     if (retryId !== undefined && (typeof retryId !== "string" || retryId.length > 100)) throw new Error("INVALID_CAPTURE")

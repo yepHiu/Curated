@@ -1,3 +1,36 @@
+export interface NativeNetworkDiagnostics {
+  sourceHost: string
+  protocol: "http" | "https"
+  mime: string | null
+  bytesPerSec: number
+  receivedBytes: number
+  requests: number
+  rangeRequests: number
+  /** 最近最多 30 秒的接收速率，单位 bytes/s。 */
+  history: number[]
+}
+export interface NativePlaybackDiagnostics {
+  engineVersion: string | null
+  container: string | null
+  width: number | null
+  height: number | null
+  sourceFps: number | null
+  displayFps: number | null
+  pixelFormat: string | null
+  videoBitrate: number | null
+  audioCodec: string | null
+  audioSampleRate: number | null
+  audioChannels: string | null
+  audioBitrate: number | null
+  videoOutput: string | null
+  avSyncSec: number | null
+  estimatedFrames: number | null
+  cacheDurationSec: number | null
+  cacheBytes: number | null
+  bufferingPercent: number | null
+  pausedForCache: boolean | null
+  network?: NativeNetworkDiagnostics
+}
 /** 原型状态不包含凭据、媒体能力地址或可执行参数。 */
 export interface NativePlayerState {
   status: "idle" | "starting" | "playing" | "paused" | "ended" | "stopped" | "error"
@@ -9,6 +42,7 @@ export interface NativePlayerState {
   decoderDroppedFrames: number
   codec: string
   hwdec: string
+  diagnostics?: NativePlaybackDiagnostics
   error?: string
   progressError?: string
   movieId?: string

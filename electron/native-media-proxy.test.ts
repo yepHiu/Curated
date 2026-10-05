@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { NativeMediaProxy } from "./native-media-proxy"
 
 /** 在临时端口提供可验证的受保护媒体，绝不访问用户 Server。 */
@@ -17,6 +17,40 @@ async function close(server: Server): Promise<void> {
 }
 
 describe("native media proxy", () => {
+  it("counts actual media bytes including repeated ranges, excludes HEAD and resets on restart", async () => {
+    const proxy = new NativeMediaProxy("https://user:password@server.test:8443/private?token=secret", async (_url, init) =>
+      new Response(init?.method === "HEAD" ? null : "data", { status: 206, headers: { "Content-Type": "video/mp4; codecs=avc1" } }))
+    try {
+      const url = await proxy.start()
+      await fetch(url, { method: "HEAD" })
+      for (let i = 0; i < 2; i++) await (await fetch(url, { headers: { Range: "bytes=0-3" } })).arrayBuffer()
+      expect(proxy.diagnostics()).toMatchObject({ sourceHost: "server.test:8443", protocol: "https", mime: "video/mp4", receivedBytes: 8, requests: 3, rangeRequests: 2 })
+      expect(JSON.stringify(proxy.diagnostics())).not.toMatch(/password|private|secret|token/)
+      await proxy.stop()
+      await proxy.start()
+      expect(proxy.diagnostics()).toMatchObject({ receivedBytes: 0, requests: 0, rangeRequests: 0, mime: null, history: [] })
+    } finally { await proxy.stop() }
+  })
+  it("samples one-second rates, reaches zero when idle, bounds history and stops emitting", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "performance"] })
+    const proxy = new NativeMediaProxy("http://server.test/media", async () => new Response("1234"))
+    const events = vi.fn()
+    proxy.on("diagnostics", events)
+    try {
+      const url = await proxy.start()
+      await (await fetch(url)).arrayBuffer()
+      vi.advanceTimersByTime(1000)
+      expect(proxy.diagnostics().bytesPerSec).toBe(4)
+      const snapshot = proxy.diagnostics()
+      snapshot.history[0] = 999
+      vi.advanceTimersByTime(31000)
+      expect(proxy.diagnostics()).toMatchObject({ bytesPerSec: 0, receivedBytes: 4, history: Array(30).fill(0) })
+      await proxy.stop()
+      const count = events.mock.calls.length
+      vi.advanceTimersByTime(5000)
+      expect(events).toHaveBeenCalledTimes(count)
+    } finally { await proxy.stop(); vi.useRealTimers() }
+  })
   // Range 数据、认证和能力边界必须在真实 HTTP 传输中保留。
   it("streams exact ranges without exposing Server cookies and rejects other routes", async () => {
     let requestedPath = ""

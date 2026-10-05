@@ -6,6 +6,7 @@ import { mkdtemp, readFile, stat, unlink, rmdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { emptyNativePlayerState, type NativeLabControl, type NativePlayerState } from "./native-player-contract.js"
+import { diagnosticProperties, projectPlaybackDiagnostics } from "./native-playback-diagnostics.js"
 
 interface PendingCommand { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
 const properties = ["time-pos", "duration", "pause", "speed", "volume", "frame-drop-count",
@@ -20,6 +21,8 @@ export class NativeMpvPlayer extends EventEmitter {
   private closed = false
   private loaded = false
   private paused = false
+  private diagnosticTimer?: ReturnType<typeof setInterval>
+  private diagnosticPending = false
   private readonly pending = new Map<number, PendingCommand>()
   state: NativePlayerState = emptyNativePlayerState()
 
@@ -46,6 +49,7 @@ export class NativeMpvPlayer extends EventEmitter {
       this.fail("MPV_START_FAILED")
     })
     child.on("exit", (code) => { // 手动关闭视频窗口与异常退出都释放管道和待响应请求。
+      clearInterval(this.diagnosticTimer)
       this.child = undefined
       this.socket?.destroy()
       this.rejectPending("MPV_EXITED")
@@ -169,13 +173,29 @@ export class NativeMpvPlayer extends EventEmitter {
         this.loaded = true
         this.state.status = this.paused ? "paused" : "playing"
         this.publish()
+        void this.sampleDiagnostics()
+        this.diagnosticTimer ??= setInterval(() => { void this.sampleDiagnostics() }, 1000)
       }
       if (event.event === "end-file") {
+        clearInterval(this.diagnosticTimer); this.diagnosticTimer = undefined
         this.state.status = event.reason === "eof" ? "ended" : event.reason === "error" ? "error" : "stopped"
         if (event.reason === "error") this.state.error = "MEDIA_PLAYBACK_FAILED"
         this.publish()
       }
     }
+  }
+
+  /** 次要诊断每秒采样一次；不随每个视频帧发送 IPC，也不阻塞播放控制。 */
+  private async sampleDiagnostics(): Promise<void> {
+    if (this.closed || this.diagnosticPending || !["playing", "paused"].includes(this.state.status)) return
+    this.diagnosticPending = true
+    try {
+      const values = await Promise.all(diagnosticProperties.map(async property => [property,
+        await this.command(["get_property", property]).catch(() => undefined)] as const))
+      if (this.closed || !["playing", "paused"].includes(this.state.status)) return
+      this.state.diagnostics = projectPlaybackDiagnostics(Object.fromEntries(values))
+      this.publish()
+    } finally { this.diagnosticPending = false }
   }
 
   /** 从引擎属性投影允许公开的状态，不泄露 mpv 的源地址。 */
@@ -219,7 +239,7 @@ export class NativeMpvPlayer extends EventEmitter {
   }
 
   /** 通知状态订阅者时复制快照，避免外部修改引擎状态。 */
-  private publish(): void { this.emit("state", { ...this.state }) }
+  private publish(): void { this.emit("state", structuredClone(this.state)) }
 
   /** 冻结视频帧后取得准确时间；只输出视频，不包含 HUD、标题栏或字幕。 */
   async captureFrame(): Promise<{ image: Buffer; positionSec: number; capturedAt: string }> {
@@ -258,6 +278,7 @@ export class NativeMpvPlayer extends EventEmitter {
 
   /** 失败使待响应请求全部结束，业务层负责关闭对应代理。 */
   private fail(code: string): void {
+    clearInterval(this.diagnosticTimer)
     this.state.status = "error"
     this.state.error = code
     this.rejectPending(code)
@@ -274,6 +295,7 @@ export class NativeMpvPlayer extends EventEmitter {
   async stop(): Promise<void> {
     if (this.closed) return
     this.closed = true
+    clearInterval(this.diagnosticTimer)
     const child = this.child
     if (child) {
       const exited = new Promise<void>((resolve) => { // 安装退出监听再发送 quit，避免竞争。

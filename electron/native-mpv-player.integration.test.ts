@@ -25,7 +25,7 @@ describe.skipIf(process.platform !== "win32" || !executable)("real Windows mpv",
     const temp = mkdtempSync(path.join(tmpdir(), "curated-native-mpv-"))
     const video = path.join(temp, "fixture.mp4")
     execFileSync(process.env.CURATED_NATIVE_FFMPEG ?? "ffmpeg", ["-hide_banner", "-loglevel", "error", "-f", "lavfi",
-      "-i", "testsrc2=size=320x180:rate=30", "-t", "15", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-movflags", "+faststart", video])
+      "-i", "testsrc2=size=320x180:rate=30", "-t", "15", "-c:v", "libx264", "-preset", "ultrafast", "-g", "30", "-pix_fmt", "yuv420p", "-movflags", "+faststart", video])
     const bytes = readFileSync(video)
     let rangeRequests = 0
     const server = createServer((request, response) => {
@@ -70,6 +70,16 @@ describe.skipIf(process.platform !== "win32" || !executable)("real Windows mpv",
       await expect(player.control({ action: "speed", value: 100 })).rejects.toThrow("INVALID_CONTROL")
       expect(rangeRequests).toBeGreaterThan(0)
       expect(player.state.codec).toMatch(/h\.?264/i)
+      await until(() => player.state.diagnostics?.width === 320)
+      expect(player.state.diagnostics).toMatchObject({ width: 320, height: 180, sourceFps: 30, container: "mov,mp4,m4a,3gp,3g2,mj2",
+        videoOutput: "null", audioCodec: null, audioSampleRate: null })
+      // 硬解可以将片源 yuv420p 转成 nv12；此字段是解码后的像素格式。
+      expect(player.state.diagnostics!.pixelFormat).toMatch(/^(nv12|yuv420p)$/)
+      expect(player.state.diagnostics!.engineVersion).toMatch(/mpv/i)
+      await until(() => (player.state.diagnostics?.videoBitrate ?? 0) > 0)
+      expect(player.state.diagnostics!.videoBitrate).toBeGreaterThan(0)
+      expect(proxy.diagnostics()).toMatchObject({ mime: "video/mp4" })
+      expect(proxy.diagnostics().receivedBytes).toBeGreaterThan(0)
       await player.stop()
       expect(player.state.status).toBe("stopped")
     } finally {

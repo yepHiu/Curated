@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events"
 import { NativeMediaProxy, type MediaFetcher } from "./native-media-proxy.js"
 import { NativeMpvPlayer } from "./native-mpv-player.js"
 import { emptyNativePlayerState, type NativeLabMovie, type NativePlayerState } from "./native-player-contract.js"
+import { projectPlaybackDiagnostics, playbackDiagnosticsReport } from "./native-playback-diagnostics.js"
 import { createPlaybackWatchTimeTracker, type PlaybackWatchTimeTracker } from "./playback-watch-time-core.js"
 import type { DesktopPlaybackCapture, DesktopPlaybackCommand, DesktopPlaybackOpen, DesktopPlaybackPreferences, DesktopPlaybackSnapshot, DesktopPlaybackSourceQuery } from "./playback-contract.js"
 
@@ -186,6 +187,11 @@ export class NativePlaybackCoordinator extends EventEmitter {
       const active: Active = { context, player, proxy, tracker, movie, fileId, tracking: false, locked: false }
       this.active = active
       player.on("state", (state: NativePlayerState) => this.receive(active, state))
+      proxy.on("diagnostics", () => {
+        if (this.active !== active) return
+        this.snapshotState.state.diagnostics = { ...(this.snapshotState.state.diagnostics ?? projectPlaybackDiagnostics({})), network: proxy.diagnostics() }
+        this.publish()
+      })
       this.publish()
       // 媒体先暂停加载，在音量/倍速偏好应用完成前不能短暂发声或推进。
       await player.start(this.executable, await proxy.start(), Math.max(0, startSec), false, true)
@@ -224,6 +230,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       active.tracking = true
     } else if (active.tracking) { active.tracker.onPause(state.positionSec); active.tracking = false }
     this.snapshotState.state = { ...state, movieId: active.movie.id, fileId: active.fileId,
+      diagnostics: { ...(state.diagnostics ?? projectPlaybackDiagnostics({})), network: active.proxy.diagnostics() },
       progressError: this.snapshotState.state.progressError }
     this.publish()
     if (["ended", "error", "stopped"].includes(state.status)) {
@@ -248,6 +255,12 @@ export class NativePlaybackCoordinator extends EventEmitter {
         this.publish()
       })
     }
+  }
+  /** 只读取当前播放信息；旧会话不能导出新影片的快照。 */
+  diagnosticsReport(sessionId: string): string {
+    if (!sessionId || sessionId !== this.snapshotState.sessionId) throw new Error("STALE_PLAYBACK_SESSION")
+    if (!this.snapshotState.windowOpen) throw new Error("NO_ACTIVE_PLAYER")
+    return playbackDiagnosticsReport(this.snapshotState.state)
   }
   command(sessionId: string, input: DesktopPlaybackCommand): Promise<void> {
     return this.run(async () => {
@@ -357,10 +370,12 @@ export class NativePlaybackCoordinator extends EventEmitter {
     this.active = undefined
     if (!active) return
     active.player.removeAllListeners("state")
+    active.proxy.removeAllListeners("diagnostics")
     active.tracker.onPause(active.player.state.positionSec)
     await active.player.stop()
-    this.snapshotState.state = { ...active.player.state, movieId: active.movie.id, fileId: active.fileId }
     await active.proxy.stop()
+    this.snapshotState.state = { ...active.player.state, movieId: active.movie.id, fileId: active.fileId,
+      diagnostics: { ...(active.player.state.diagnostics ?? projectPlaybackDiagnostics({})), network: active.proxy.diagnostics() } }
     await this.save(active)
   }
   private async closeSurface(): Promise<void> {
