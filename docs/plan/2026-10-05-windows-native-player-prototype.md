@@ -643,3 +643,19 @@ native JSON 保存对话框已实际显示；Windows 窗口工具将其识别为
 验证：定向前端 2 文件/5 测试、`pnpm typecheck`、定向 ESLint、`pnpm desktop:test:build` 和最终 `pnpm build:desktop-player` 通过。使用正式 production main、隔离 profile、认证合成片源，在 986×763、640×480、626×444 renderer 尺寸各连续采样 8 秒；所有数字槽、单位槽、分隔符、面板边界和滚动值保持不变，实际视频/音频码率、A/V、缓存值仍持续更新。窄窗滚动位置 650px 保持；数据区高度 134px/98px，无横向溢出。另在同一 QA DOM 同步临时替换文本，检查 `—`/空单位、`0.00 B/s`、`1023.99 KiB/s`、`1.00 MiB/s`、`-1234.56 ms`、`+0.00 ms`，全部槽位与分隔符坐标不变；压力检查后恢复文本，未改产品数据。证据在 ignored `output/playwright/desktop-player/info-jitter-{normal,640,626}.log`。此为布局验证，不等同跨屏混合 DPI 或新性能基准；此次未改 Electron/Server 逻辑，未重复完整引擎测试。
 
 测试 Desktop 已退出、重建并重新启动；重启前保存当前影片/分部/队列及进度，恢复 `fc2-4985807:primary` 于 2932.663067 秒（48:52）为暂停，重新打开播放信息供检查。没有截取或萃取用户影片画面。未改版本、push、合并或发布。
+
+### 14.17 原生 GIF 截取实施（2026-10-06）
+
+按用户要求补齐 GIF。设计范围为现有原生播放面：短按相机/已配置萃取键保持静态帧，长按沿用 Web 400ms 阈值与 0.4–6 秒媒体时长；增加圆形 GIF 开始/停止入口便于发现。反馈复用 Web 播放面的实色语义面板，录制时间优先，处理进度与取消次之，成功/失败就地显示；窄窗避让实际底栏。暂停/缓冲不按墙钟虚增片长，跳转、换源、失焦取消未提交录制。仅为原生局部组合，不改全局颜色或系统标题栏。
+
+主进程冻结会话/分部与实际起始帧，释放时读取 mpv 真实结束位置；先保存静态帧，再通过当前 Electron Session 请求已有 Server clips/task/cancel HTTP 合约，以 GIF、10fps、640px 和同一 curatedFrameId 导出。Server 负责生成及入帧库，Desktop 不另装 FFmpeg、不下载整片。任务轮询有期限与失败上限，取消/切片/关闭清理旧任务，完成后刷新主页面帧库。Renderer 不接收 Cookie、Server 地址、路径或任意任务访问能力。验收使用合成片源，保留用户测试播放位置。
+
+实现：仅本地 bridge 新增 prepareCapture/commitCapture/discardCapture/cancelClip/retryClip；prepare 冻结一张未上传 PNG 与真实 time-pos、60 秒未提交回收，短按 commit 保存静态帧，GIF commit 以真实结束位置约束范围，再调用既有 clips?fileId。失败上传保留同图/同 ID 及 GIF 范围，失败生成重试已保存帧/冻结范围；不再次采集。main 管理一个任务监视器，后台轮询不占用整段任务的串行播放队列，150 秒期限/连续 5 次状态失败后停止，换源/关闭取消自己的任务；401/403 停止原生播放。取消请求失败不宣称已取消，保留监视与重试取消入口。GIF 就绪路径须匹配当前 frameId 的 motion 端点，完成增加 captureRevision。6 秒上限减去 1 微秒，避免 JSON 浮点相减略大于 6 被 Server 拒绝。
+
+UI：复用 usePlayerClipCapture 的媒体时钟状态机，起点以主进程冻结帧时间修正；短按相机/键释放提交一帧，长按释放或媒体达到上限提交 GIF，自动完成后的再次释放不额外采集。GIF 按钮在播放中开始、录制中停止，暂停时独立入口禁用；长按萃取键但媒体未前进足够时仅静态帧。实色 NativeClipCaptureFeedback 以三语显示录制时长、生成进度/取消、成功/失败/重试，依实际底栏高度保持 12px 间隔，与图片回执不重叠。用户原有系统标题栏、萃取图片预览、诊断面板保持可用。
+
+验证：`pnpm desktop:test:build`、最终 Electron 编译、typecheck 与定向 ESLint 通过。完整 Electron 19 文件/140 项通过（含真实 mpv 暂停/播放结束时间读取），最后同文件显式 seekExisting 也清理录制候选的补充定向 27 项通过；前端 4 文件/23 项通过（短/长按、实际起点、媒体六秒自动提交/松键抑制、暂停、取消/迟到结果、准备失败恢复、GIF 状态/重试、Web/i18n 与主页面刷新）；既有 Go Server clips/文件归属/格式/范围/取消定向测试通过。未运行 test:display 或重新做混合 DPI、真实 LAN/HTTPS/安装测试。
+
+正式 production main + 隔离 profile + 认证合成 Server fixture 通过当前 Session 调用真实 HTTP/Range；fixture 按现有 Server 合约真实执行 FFmpeg GIF 生成（并非共享开发 Server 业务入库）。GIF 按钮录制区间 73.7–76.333333 秒，输出 640×360、10fps、26 帧/2.6 秒、GIF89a，UI 显示已入帧库，captureRevision 增加两次（静态/动图）。实际短按只上传一帧且无 clips 请求；实际 C 长按在 109.833333–115.833333 自动完成，按键抬起后累计仅一张新帧/一个 GIF 任务；6 秒 GIF 为 60 帧。保留静态帧的生成中任务按取消后 fixture 为 cancelled；640×480/626×444 面板均距底栏约 12px、取消按钮完整可见、无横向溢出。末尾 1 微秒上限与取消失败/认证分支修正由定向用例覆盖，最终产物已重建。证据在 ignored `output/playwright/desktop-player/native-gif-ui.log`、`native-gif-inputs.log`、`native-gif-qa-results.json`、`native-gif-qa.gif`。
+
+测试 Desktop 已重建/启动；保留 `fc2-4985807:primary`、队列/来源于 2932.663067 秒（48:52），恢复为暂停，读取 UI 确认 GIF 按钮可见且暂停时禁用。没有截图/萃取用户影片或向共享 Server 生成 GIF。当前原生只支持 GIF 片段格式，MP4/WebM/额外本机导出/逐帧等范围继续待做；REQ-0058/0059 状态、分发资料/安装边界不变。无版本、push、合并或发布。
