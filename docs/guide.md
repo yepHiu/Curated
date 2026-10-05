@@ -10,6 +10,8 @@ If this handbook and current code disagree, treat the code as the source of trut
 
 The development branch `codex/windows-native-player-prototype` now presents native video and Curated controls in one Windows player. A small Win32 helper hosts mpv using `wid`; a transparent owned Electron window displays the Vue controls over its client area. The prototype reads original media from an existing Curated Server, avoiding automatic HLS transcoding. Production playback and installed Desktop packages keep their current behavior. The [implementation plan](plan/2026-10-05-windows-native-player-prototype.md#12-2026-10-05-页面融合实施用户已授权) records the implementation and evidence.
 
+The same plan's [section 14](plan/2026-10-05-windows-native-player-prototype.md#14-2026-10-06-正式-desktop-接入实施计划尚未实施) proposes formal integration through a Desktop-managed player window, current login session, existing play entry points, progress/history, queue and sidebar controls. Engine selection would happen before Web/HLS prefetch. [Section 13](plan/2026-10-05-windows-native-player-prototype.md#13-2026-10-06-mpv-随-desktop-分发建议尚未实施) covers bundled engine distribution. Both remain proposals; production integration, main-page embedding and release packaging are not implemented by these documentation updates.
+
 From this branch's repository root in PowerShell:
 
 ```powershell

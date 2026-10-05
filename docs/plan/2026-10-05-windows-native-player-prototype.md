@@ -6,7 +6,7 @@
 分支：`codex/windows-native-player-prototype`
 基线：`408b8c10`，独立工作目录；本计划与原型不改主工作区。
 
-最新进展：§12 的 Windows 同窗原型已实现并验证。mpv 绘制自有 Win32 宿主，透明 Electron owned window 叠加复用的 Curated 控件。下方第一版范围与 §9—§11 保留阶段记录；当前实现、启动要求与剩余边界以 §12 和 guide 为准。生产 PlayerPage 只提取共享控制栏，默认播放引擎未切换。
+最新进展：§12 的 Windows 同窗原型已实现并验证。mpv 绘制自有 Win32 宿主，透明 Electron owned window 叠加复用的 Curated 控件。下方第一版范围与 §9—§11 保留阶段记录；当前实现、启动要求与剩余边界以 §12 和 guide 为准。生产 PlayerPage 只提取共享控制栏，默认播放引擎未切换。后续正式 Desktop 接入建议见 §14，随包分发建议见 §13，均尚未实施。
 
 ## 1. 目标与决策
 
@@ -401,3 +401,98 @@ GPL 允许重新分发。随二进制保留实际许可文本、版权声明、�
 4. 在未安装 mpv、未配置 PATH 的干净 Windows 上验收安装/便携包离线起播、空格/中文路径、H.264/HEVC 硬解、退出回收、升级替换与回退。核对安装包增量和许可/源码下载。
 
 本节为分发方案，未执行发布代码修改、引擎下载、版本递进、打包或发布。
+
+## 14. 2026-10-06 正式 Desktop 接入实施计划（尚未实施）
+
+本节状态：proposed。REQ-0058 的既有原型继续为 in-progress；本节尚未进入正式接入实现。
+
+用户询问原型后续如何集成进入 Desktop。本节给出基于当前源码的实施建议，细化 P4/P5，并作为后续顺序的依据；§10/§11 保留早期研究记录。不会在本次问答中直接切换生产引擎、合并分支或准备发布。
+
+### 14.1 首个产品形态与用户流程
+
+建议首版以 **Desktop 管理的专用 Curated 播放窗口** 接入现有产品：用户在现有列表、详情、历史、分部选择或萃取帧入口点击播放后，直接打开已经验证的原生视频 + Curated 控件窗口。准备弹窗里的 Server 地址、PIN、搜索和选择 mpv.exe 不再属于正式观看流程；Desktop 使用当前连接、当前登录会话和随包引擎，直接传入所选 movieId/fileId/续播位置。
+
+主窗口继续承担浏览、管理和来源导航。常规点击原生播放后保留来源业务页；播放器窗口关闭时保存并停止播放，恢复/聚焦来源主窗口。重复打开同一目标聚焦已有播放器；换作品或分部先按当前身份保存/停止，再复用播放窗口启动新目标。直接访问 /player 深链也必须经同一选择/启动逻辑；不存在来源业务页时，主窗口可落在所选影片详情，保留历史/萃取等返回上下文。
+
+第一阶段保留当前原生标题栏和已修复的两层几何关系。原生宿主独占物理位置与尺寸，透明层只承载页面控件，不能独立拖动/缩放。取消“原型”产品文案，统一 Desktop 的图标、语言、主题、音量与倍速偏好；继续复用圆形控件、进度条和文件选择。原型准备 UI 可留在开发入口用于诊断，不带入正式普通播放流程。
+
+原生播放器以独立窗口存在时，允许主窗口继续浏览；它不是浏览器 HTMLVideoElement PiP。主窗口关闭到托盘与退出整个 Desktop 继续区分：关闭主窗口不自动误杀仍打开的播放窗口，托盘“退出”、系统会话结束、认证锁定和成功切换 Server 要停止本次播放并回收自己的 mpv/helper。最小化播放窗口保留普通播放器语义，恢复后两层同步；跨路由是否保留实例由实际原生窗口状态决定，不能假装 pipActive=true。
+
+### 14.2 当前代码接入点与待改内容
+
+| 当前接入点 | 当前行为 | 接入时的修改与验收 |
+|---|---|---|
+| electron/main.ts、preload.cjs | 正式 Desktop 加载当前 Server 的页面，维护 Server 身份/partition、主窗口和托盘；尚无原生播放桥 | 新增受限的原生播放能力、打开/控制/聚焦/关闭和状态订阅；正式 main 管理 native 生命周期，不导入原型的全局 app 初始化与 quit handler |
+| native-mpv-player.ts、native-media-proxy.ts、native-player-window.ts | 原型已验证的 mpv/代理/宿主实现 | 提取或复用为生产服务模块，统一资源路径、受控会话和退出顺序；保留独立原型入口以便开发对照 |
+| native-player-lab.ts | 拥有独立原型 session、连接/检索/起播与定期进度写入 | 生产适配移除第二套连接/PIN和 exe 选择流程；注入正式当前 Session/Server 上下文，明确唯一写入方，避免复制出另一套播放记录逻辑 |
+| src/lib/navigation-intent.ts、PlayerView.vue | 播放意图含 fileId/t/autoplay 和来源；PlayerView 在挂载时 prefetch，可能预先启动 HLS | 在意图/路由入口先完成引擎选择，选择 native 时不挂载 Web 播放器、不运行 Web/HLS 预热；深链、直接访问、同片 seek 与普通点击均走同一规则 |
+| use-playback-host.ts、ActivePlaybackHost.vue | 壳层拥有一个 PlayerPage；仅浏览器 PiP 时允许离页保留；控制依赖 PlayerPage 实例 | 增加引擎/展示形态和异步生命周期，native 绑定远程会话 facade，Web 仍绑定现有播放器；窗口实例与浏览器 PiP 分开建模，停止/换片必须等待当前实例回收 |
+| use-active-playback-session.ts、SidebarPlaybackEntry.vue | 快照在当前 Vue 运行时；侧栏实时控制依赖 pipActive | 接收 native 状态快照，显示实际文件、进度、暂停/继续/停止及“返回播放器”；聚焦已有窗口不重新 seek 到旧 t，不新建第二个引擎 |
+| PlayerPage 与 NativePlayerPrototype.vue | 已共享 transport/分部/倍速菜单；布局和其余业务仍各自实现 | 按需继续提取标题、进度/帧标记、播放列表和通用状态；正式 native 页面接受会话，不承担连接/全库检索；避免复制整份 PlayerPage |
+| Windows stage_desktop / payload 检查 | 尚未包含 native 宿主/mpv；将 third_party 全部视为 Server 依赖 | 按 §13 的明确 native-player 路径纳入 Desktop staging/installer/ZIP，固定版本与来源；Mac 构建不调用 Win32 gcc、也不打入 Windows exe |
+
+这些修改属于计划，不表示对应 adapter/coordinator 已实现。建议新增 `NativePlaybackCoordinator`、`PlaybackEngine`/`PlaybackCapabilities` 等职责；名称可在实施时调整，先固定契约和生命周期。
+
+### 14.3 引擎选择和兼容策略
+
+首版在 Windows Desktop 提供本机偏好“优先使用桌面原生播放器”，先以试用开关接入。该偏好保存在 Desktop 本机 profile，不写 library-config.cfg，也不改变其它设备的播放偏好。能力探测至少包含平台、引擎/宿主就绪、协议版本和功能能力。浏览器、尚未适配的 macOS、旧 Desktop、旧 Server UI 或缺少引擎时继续使用现有 Web direct/HLS 流程。
+
+选择 native 必须发生在请求可能启动 HLS 的 descriptor 之前；HTTP 续播请求显式使用 direct 语义，保留每片进度和“从此帧播放”的绝对时间。普通 native 起播失败时允许在当前有效时间切换到 Web，先停止当前 native 会话再启动 Web，防止两路音视频和重复写入；不在错误恢复中循环切换引擎。401/403 或锁定状态回到现有解锁流程，不把认证失败当作绕过锁定的回退触发条件。
+
+当真实问题 MP4、常用格式/硬解、长时间 A/V 同步、混合 DPI 和完整业务通过验收后，再评估 Windows 新安装默认优先 native；不在原型阶段自动修改已有用户设置。测试/开发可以显式选引擎做对照。
+
+### 14.4 正式认证、IPC 和会话边界
+
+正式播放复用 **当前主窗口实际使用的 Electron Session**（或经过明确绑定的同一 partition），不继续用原型 `-native-prototype` 分区。main.ts 的 connectServer 会因服务器身份改变使用不同 partition，因此不能只重新根据 URL 计算一个 session 然后假设已登录。HTTP 媒体继续通过认证代理转发 Range；Cookie/PIN 不进入 mpv argv 或 renderer。
+
+Server UI 的播放请求只传影片/文件身份、起点、autoplay 和必要的受限来源上下文；Server URL、Session、exe 路径、HWND 和引擎参数由 main 决定。沿用正式可信主 frame 的 sender 校验，候选连接窗口在尚未提交为当前 Server 时不能启动播放。本地 native 控制页使用独立限定 preload，只接受本次 sessionId 的枚举动作；不把原型 connect/search/任意源切换接口整体暴露给远程 Server 页面。
+
+会话身份包含实际 Server 身份/连接代次、movieId、fileId、engine 和独立 sessionId。状态订阅、命令、进度保存、切片和结束回调均检查该身份，拒绝旧窗口/旧 Server 的迟到事件。首次启动创建一个播放窗口与一个引擎会话，重复点击同片聚焦；换片串行，始终只有一个本机活动播放目标。控制 UI 崩溃、helper/mpv 退出都反馈到主窗口并回收本次资源。
+
+切换 Server 时保持现有“先探测/加载候选、成功后替换当前连接”的规则：取消或探测失败不误停原播放；在成功提交切换前按旧身份保存/停止 native，随后清除旧状态、关闭窗口并替换主页面。锁定/媒体 401/403 停止播放，保留既有登录与解锁 UX。退出清理有期限，网络保存失败仍完成本次引擎/代理/宿主回收。
+
+### 14.5 进度、历史、观看时长和播放列表
+
+native 模式由 Desktop 播放协调服务负责持久化进度/观看时长，主窗口和播放窗口只接收同一状态；Web 模式继续由现有播放器写入。停止旧引擎、确认写入责任释放后才启动另一引擎；不能把原型周期写入与 PlayerPage 保存同时打开。保留 Server 现有 fileId/绝对时间合约，不新增每种播放器各一套历史记录。
+
+观看时长复用现有“实际播放墙钟时间”的计算语义，抽离纯计算并注入 HTTP sink，不直接从 Electron main 导入包含浏览器存储依赖的 src 模块。暂停、缓冲/停止、seek、倍速、跨日及窗口最小化分别处理；seek 跳过的媒体秒数不计观看时长，倍速不简单按媒体推进量累计。main 持有的原生会话在主页面不显示时仍能记录实际播放。
+
+分部切换继续读取该片续播并保留音量/静音/倍速；“从萃取帧播放”恢复同一 fileId 与绝对时间。播放队列携带来源快照和普通影片/FC2 类别，不被主窗口后来浏览的页面改写。自然结束按既有连播策略处理；手动停止、错误、锁定和关闭不触发自动播放下一片。
+
+### 14.6 UI 复用与功能能力
+
+| 功能 | 首个正式 native 接入目标 | 后续处理 |
+|---|---|---|
+| 标题、文件选择、圆形控件、进度、倍速、音量/静音、快捷键、窗口全屏 | 保留当前已共享/验证的 UI，去除准备弹窗 | 继续统一通用布局，局部焦点提示保留在真实控件上 |
+| 历史、逐文件续播、观看时长、队列/连播、侧栏控制 | 首个正式业务闭环必需 | 验证多来源/切片、窗口后台、页面重载后的状态恢复 |
+| 源帧/片段萃取 | 使用现有 Server 合约及 fileId/绝对时间，可分增量交付 | 将现有萃取 UI 接到引擎能力；即时当前画面截图/逐帧要单独适配 native |
+| 桌面小窗 | 专用普通播放窗口先可用 | 紧凑置顶/PiP、窗口恢复与焦点另行实现；不调用浏览器 video PiP 冒充 native 小窗 |
+| 音轨/字幕/HDR/画面设置 | 按实际引擎能力显示 | 增加 mpv 属性与控制适配，分别验收，不保留无效按钮 |
+| 主窗口内容区域内直接显示 native 画面 | 保留为后续嵌入实验 | 通过局部透明/合成、裁切、侧栏/菜单遮挡、页面滚动、DPI 和焦点验收后再接同一会话 |
+
+原生首版可以在有限功能下明确提供 Web 切换，但生产功能入口不能外观存在、点击无效果。业务能力通过 `PlaybackCapabilities` 显示，与 engine 选择分离，避免当前 native 菜单出现无效 Direct/HLS 或 HTML PiP 动作。
+
+### 14.7 实施里程碑与完成条件
+
+| 顺序 | 可 review/提交的实现单元 | 完成条件 |
+|---|---|---|
+| M1 | 生产会话协调、限定 bridge、正式 Session 复用、资源路径与生命周期 | 从正式 Desktop 主窗口发受限请求可起播；无需第二次 PIN；旧会话事件不会串入新片；停止/退出可等待并回收 |
+| M2 | 统一播放意图、偏好/能力选择、PlayerView/host 接入和原型准备 UI 移除 | 列表/详情/历史/分部/帧入口直接打开原生窗口；native 不额外预热 HLS；重复打开聚焦已有窗口；Web/旧客户端仍可播 |
+| M3 | 单一进度写入、观看时长、主窗口/侧栏同步、队列与切片 | fileId/时间/统计正确；主窗口继续浏览时可暂停/停止/返回；换片/连播、锁定/切源/崩溃/关闭均不残留画面或音频 |
+| M4 | 随包 mpv/helper、许可/源码、Windows installer/ZIP 与兼容批次 | 无 mpv/PATH 的干净 Windows 安装即播；中文/空格路径、升级/回退/卸载通过；Server/旧 Desktop 兼容有实际检查 |
+| M5 | 功能增量与主页面嵌入实验 | 源帧/片段、小窗、轨道/HDR 逐项独立验收；主页面合成通过前持续提供专用播放窗口 |
+
+Windows 问题片源对照和混合 DPI 的 P3 验收可与 M1–M3 开发并行，但在正式默认优先 native 或发布前必须完成。M1–M4 与核心播放/业务/安装验收构成首个可交付闭环；每个最小单元提交并记录证据，当前原型分支继续隔离。不靠“exe 已复制进安装器”判定接入完成。
+
+### 14.8 Desktop / Server 发布兼容矩阵
+
+正式 Desktop 当前加载 Server 提供的 Web UI。让原有播放按钮调用新增 Desktop bridge，通常也需要发布 Server 内的前端入口/能力检测更新；mpv/helper 和本地播放 UI 属于 Desktop，媒体/进度/统计仍通过 Server 现有 HTTP 合约。本阶段不以增加公共业务 API 或 library-config 字段为前提。
+
+| 组合 | 预期行为 |
+|---|---|
+| 新 Windows Desktop + 支持 native 入口的新 Server UI | 可选原生专用窗口，复用当前登录/资料库；Web 回退可用 |
+| 新 Desktop + 旧 Server UI | 原有 Web 播放仍工作；不能假设旧页面会自动调用新 bridge |
+| 旧 Desktop/浏览器 + 新 Server UI | 可选桥检测失败后继续 Web 播放，不访问不存在的 IPC |
+| macOS Desktop + 新 Server UI | Windows native 能力明确不可用，使用当前 Web 路径，打包不执行 Windows 宿主构建 |
+
+Server 前端与 Desktop 交付若都实际改变，按现有 Curated 日期批次独立准备两个组件版本并可同批发布；不把 mpv 纳入 Server 包。本次仅更新实施计划，无正式代码/默认路径、版本、打包、push、合并或发布动作。
