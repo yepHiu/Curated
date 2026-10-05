@@ -4,7 +4,7 @@ import { NativeMediaProxy, type MediaFetcher } from "./native-media-proxy.js"
 import { NativeMpvPlayer } from "./native-mpv-player.js"
 import { emptyNativePlayerState, type NativeLabMovie, type NativePlayerState } from "./native-player-contract.js"
 import { createPlaybackWatchTimeTracker, type PlaybackWatchTimeTracker } from "./playback-watch-time-core.js"
-import type { DesktopPlaybackCommand, DesktopPlaybackOpen, DesktopPlaybackPreferences, DesktopPlaybackSnapshot, DesktopPlaybackSourceQuery } from "./playback-contract.js"
+import type { DesktopPlaybackCapture, DesktopPlaybackCommand, DesktopPlaybackOpen, DesktopPlaybackPreferences, DesktopPlaybackSnapshot, DesktopPlaybackSourceQuery } from "./playback-contract.js"
 
 export interface PlaybackContext { origin: string; generation: string; fetch: MediaFetcher }
 export interface PlaybackSurface {
@@ -76,6 +76,8 @@ export class NativePlaybackCoordinator extends EventEmitter {
   private surface?: PlaybackSurface
   private timer?: ReturnType<typeof setInterval>
   private periodicPending = false
+  private capturing = false
+  private captureCandidate?: { sessionId: string; image: Buffer; result: DesktopPlaybackCapture; actors: string[]; title: string }
   private snapshotState: DesktopPlaybackSnapshot = { sessionId: "", revision: 0, engine: "native", windowOpen: false,
     state: emptyNativePlayerState(), fullscreen: false, queue: [], autoAdvance: false, locale: "zh-CN" }
 
@@ -123,7 +125,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
   }
 
   private async api<T>(context: PlaybackContext, route: string, init: RequestInit = {}): Promise<T> {
-    const response = await context.fetch(`${context.origin}${route}`, { ...init, headers: { "Content-Type": "application/json" },
+    const response = await context.fetch(`${context.origin}${route}`, { ...init, headers: init.body instanceof FormData ? undefined : { "Content-Type": "application/json" },
       redirect: "error", signal: AbortSignal.timeout(5000) })
     if (!response.ok) {
       await response.body?.cancel()
@@ -132,9 +134,9 @@ export class NativePlaybackCoordinator extends EventEmitter {
     return response.status === 204 ? undefined as T : await response.json() as T
   }
   private async detail(context: PlaybackContext, movieId: string): Promise<NativeLabMovie> {
-    const detail = await this.api<{ id: string; code: string; title: string; files: { id: string; fileName: string }[] }>(
+    const detail = await this.api<{ id: string; code: string; title: string; actors?: string[]; files: { id: string; fileName: string }[] }>(
       context, `/api/library/movies/${encodeURIComponent(movieId)}`)
-    return { id: movieId, code: detail.code, title: detail.title, files: (detail.files ?? []).map(file => ({
+    return { id: movieId, code: detail.code, title: detail.title, actors: (detail.actors ?? []).filter(actor => typeof actor === "string"), files: (detail.files ?? []).map(file => ({
       id: file.id, fileName: file.fileName, resumePositionSec: 0,
     })) }
   }
@@ -296,6 +298,43 @@ export class NativePlaybackCoordinator extends EventEmitter {
       if (input.action === "pause") await this.save(active)
     })
   }
+  /** 采集和重试均绑定原会话/分部；重试上传原图和同一 ID，避免重复入库。 */
+  capture(sessionId: string, retryId?: string): Promise<DesktopPlaybackCapture> {
+    if (this.capturing) return Promise.reject(new Error("CAPTURE_BUSY"))
+    this.capturing = true
+    return this.run(async () => {
+      if (!sessionId || sessionId !== this.snapshotState.sessionId) throw new Error("STALE_PLAYBACK_SESSION")
+      const active = this.active
+      if (!active) throw new Error("NO_ACTIVE_PLAYER")
+      await this.ensureUnlocked(active.context)
+      let candidate = this.captureCandidate
+      if (retryId !== undefined) {
+        if (!candidate || candidate.sessionId !== sessionId || candidate.result.id !== retryId || candidate.result.phase !== "error") throw new Error("STALE_CAPTURE")
+      } else {
+        const frame = await active.player.captureFrame()
+        candidate = { sessionId, image: frame.image, actors: [...(active.movie.actors ?? [])], title: active.movie.title,
+          result: { id: randomUUID(), movieId: active.movie.id, fileId: active.fileId, code: active.movie.code,
+            positionSec: frame.positionSec, capturedAt: frame.capturedAt, preview: "", phase: "error" } }
+        this.captureCandidate = candidate
+      }
+      const { image, result } = candidate!
+      try {
+        const form = new FormData()
+        form.append("metadata", JSON.stringify({ id: result.id, movieId: result.movieId, fileId: result.fileId, code: result.code,
+          title: candidate!.title, actors: candidate!.actors, positionSec: result.positionSec, capturedAt: result.capturedAt, tags: [] }))
+        form.append("image", new Blob([new Uint8Array(image)], { type: "image/png" }), "frame.png")
+        await this.api(active.context, "/api/curated-frames", { method: "POST", body: form })
+        result.phase = "saved"; result.error = undefined
+        this.snapshotState.captureRevision = (this.snapshotState.captureRevision ?? 0) + 1
+        this.publish()
+      } catch (error) {
+        if (error instanceof Error && error.message === "SERVER_LOCKED") { await this.finish("SERVER_LOCKED"); throw error }
+        result.phase = "error"; result.error = "CAPTURE_SAVE_FAILED"
+      }
+      if (result.phase === "saved") this.captureCandidate = undefined
+      return { ...result, preview: `data:image/png;base64,${image.toString("base64")}` }
+    }).finally(() => { this.capturing = false })
+  }
   private async save(active: Active): Promise<void> {
     const state = active.player.state
     try {
@@ -312,6 +351,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
     this.publish()
   }
   private async release(): Promise<void> {
+    this.captureCandidate = undefined
     clearInterval(this.timer); this.timer = undefined
     const active = this.active
     this.active = undefined

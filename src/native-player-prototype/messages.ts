@@ -12,6 +12,9 @@ const zh = {
   chooseMedia: "选择影片", idleHint: "连接媒体库，选择影片开始播放", settings: "播放设置", settingsAria: "打开播放设置",
   seekBack: "后退 10 秒", seekForward: "快进 10 秒", mute: "静音", unmute: "取消静音", fullscreen: "进入全屏", exitFullscreen: "退出全屏",
   replay: "重新播放", close: "关闭播放器", minimize: "最小化", partLabel: "第 {number} 部分", preparing: "正在准备影片",
+  capture: "萃取帧", captureView: "查看萃取帧", captureSaving: "正在保存", captureSaved: "已保存到萃取帧库", captureFailed: "萃取帧失败，请重试",
+  captureSaveFailed: "保存到 Server 失败，可重试保存这张帧", captureTooLarge: "这张帧超过保存大小限制，请选择其他画面", captureNotReady: "画面尚未就绪，请稍后再试",
+  captureRetry: "重试保存", retryLoad: "重新加载", dismiss: "关闭", loading: "加载中",
 }
 export type NativeMessage = keyof typeof zh
 const en: Record<NativeMessage, string> = {
@@ -28,6 +31,9 @@ const en: Record<NativeMessage, string> = {
   chooseMedia: "Choose media", idleHint: "Connect your library and choose a movie to play", settings: "Playback settings", settingsAria: "Open playback settings",
   seekBack: "Seek back 10 seconds", seekForward: "Seek forward 10 seconds", mute: "Mute", unmute: "Unmute", fullscreen: "Enter fullscreen", exitFullscreen: "Exit fullscreen",
   replay: "Play again", close: "Close player", minimize: "Minimize", partLabel: "Part {number}", preparing: "Preparing media",
+  capture: "Capture frame", captureView: "View captured frame", captureSaving: "Saving", captureSaved: "Saved to captured frames", captureFailed: "Frame capture failed; try again",
+  captureSaveFailed: "Could not save to the Server. Retry saving this frame", captureTooLarge: "This frame exceeds the save limit. Choose another scene", captureNotReady: "The frame is not ready. Try again shortly",
+  captureRetry: "Retry save", retryLoad: "Reload", dismiss: "Close", loading: "Loading",
 }
 const ja: Record<NativeMessage, string> = {
   title: "Windows ネイティブ再生プロトタイプ", subtitle: "元のメディア · mpv", prepare: "接続とエンジン", engine: "mpv.exe を選択",
@@ -43,5 +49,8 @@ const ja: Record<NativeMessage, string> = {
   chooseMedia: "作品を選択", idleHint: "ライブラリに接続し、再生する作品を選択", settings: "再生設定", settingsAria: "再生設定を開く",
   seekBack: "10 秒戻る", seekForward: "10 秒進む", mute: "ミュート", unmute: "ミュート解除", fullscreen: "全画面にする", exitFullscreen: "全画面を終了",
   replay: "もう一度再生", close: "プレイヤーを閉じる", minimize: "最小化", partLabel: "パート {number}", preparing: "作品を準備中",
+  capture: "フレームを抽出", captureView: "抽出フレームを表示", captureSaving: "保存中", captureSaved: "抽出フレームに保存しました", captureFailed: "フレーム抽出に失敗しました。再試行してください",
+  captureSaveFailed: "Server に保存できませんでした。このフレームを再保存できます", captureTooLarge: "保存サイズの上限を超えています。別の場面を選択してください", captureNotReady: "映像の準備中です。しばらくしてから再試行してください",
+  captureRetry: "保存を再試行", retryLoad: "再読み込み", dismiss: "閉じる", loading: "読み込み中",
 }
 export const nativeMessages = { "zh-CN": zh, en, ja }

@@ -8,6 +8,7 @@ import { resolveInitialLocale } from "@/lib/locale-storage"
 import { resolveNavigationBackLink } from "@/lib/navigation-intent"
 import { updateActivePlaybackSession } from "@/composables/use-active-playback-session"
 import { useLibraryService } from "@/services/library-service"
+import { bumpCuratedFramesRevision } from "@/lib/curated-frames/revision"
 
 const snapshot = ref<DesktopPlaybackSnapshot>()
 let query: LocationQuery = {}
@@ -27,6 +28,7 @@ export const desktopPlaybackService = {
       if (snapshot.value && next.revision < snapshot.value.revision) return
       const previous = snapshot.value
       snapshot.value = next
+      if ((next.captureRevision ?? 0) > (previous?.captureRevision ?? 0)) bumpCuratedFramesRevision()
       if (next.sourceQuery) query = { ...next.sourceQuery }
       const movie = next.movie
       if (movie && next.state.durationSec > 0) updateActivePlaybackSession({

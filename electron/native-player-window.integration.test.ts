@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from "node:child_process"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -104,6 +104,7 @@ describe.skipIf(process.platform !== "win32" || !existsSync(hostExe))("real Wind
     const video = path.join(temp, "fixture.mp4")
     const host = new NativePlayerWindow()
     let player: NativeMpvPlayer | undefined
+    const captureDirectories = new Set(readdirSync(tmpdir()).filter(name => name.startsWith("curated-native-frame-")))
     try {
       execFileSync(process.env.CURATED_NATIVE_FFMPEG ?? "ffmpeg", ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
         "testsrc2=size=320x180:rate=30", "-t", "15", "-c:v", "libx264", "-preset", "ultrafast", video])
@@ -115,10 +116,27 @@ describe.skipIf(process.platform !== "win32" || !existsSync(hostExe))("real Wind
       await player.control({ action: "pause" })
       await player.control({ action: "seek", value: 7 })
       await until(() => { return Math.abs(player!.state.positionSec - 7) < 0.2 })
+      // 视频 PNG 保持源尺寸；宿主/标题栏/HUD 的尺寸不进入萃取帧。
+      let pausedFrame: Awaited<ReturnType<NativeMpvPlayer["captureFrame"]>> | undefined
+      // seek 完成的属性事件与截图就绪可能错开，允许有界的就绪重试。
+      for (let attempt = 0; attempt < 20 && !pausedFrame; attempt++) {
+        try { pausedFrame = await player.captureFrame() }
+        catch (error) { if (!(error instanceof Error) || error.message !== "CAPTURE_NOT_READY") throw error }
+        if (!pausedFrame) await new Promise<void>(resolve => setTimeout(resolve, 30))
+      }
+      expect(pausedFrame).toBeDefined()
+      expect(pausedFrame!.image.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+      expect([pausedFrame!.image.readUInt32BE(16), pausedFrame!.image.readUInt32BE(20)]).toEqual([320, 180])
+      expect(pausedFrame!.positionSec).toBeCloseTo(7, 1)
+      expect(player.state.status).toBe("paused")
       await host.command("fullscreen")
       await host.command("resize", { width: 700, height: 540 })
       await player.control({ action: "resume" })
       await until(() => { return player!.state.positionSec > 7.3 })
+      const playingFrame = await player.captureFrame()
+      expect(playingFrame.positionSec).toBeGreaterThan(7.3)
+      await until(() => player!.state.status === "playing" && player!.state.positionSec > playingFrame.positionSec + 0.1)
+      expect(readdirSync(tmpdir()).filter(name => name.startsWith("curated-native-frame-") && !captureDirectories.has(name))).toEqual([])
       expect(player.state.codec).toMatch(/h\.?264/i)
     } finally {
       await player?.stop(); await host.dispose()

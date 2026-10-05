@@ -2,7 +2,7 @@
 
 /** Electron / 桌面壳注入：返回本机绝对路径 */
 interface Window {
-  curatedPlayer?: Pick<import("../electron/playback-contract").DesktopPlaybackBridge, "snapshot" | "command" | "subscribe">
+  curatedPlayer?: import("../electron/playback-contract").DesktopPlayerBridge
   nativePlayerLab?: import("../electron/native-player-contract").NativeLabBridge
   javLibrary?: {
     playback?: import("../electron/playback-contract").DesktopPlaybackBridge

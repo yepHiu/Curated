@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require("electron")
 contextBridge.exposeInMainWorld("curatedPlayer", {
   snapshot: () => ipcRenderer.invoke("curated:playback-snapshot"),
   command: (sessionId, input) => ipcRenderer.invoke("curated:playback-command", sessionId, input),
+  capture: (sessionId, retryId) => ipcRenderer.invoke("curated:playback-capture", sessionId, retryId),
+  capturePreferences: () => ipcRenderer.invoke("curated:playback-capture-preferences"),
   subscribe: callback => {
     const listener = (_event, state) => callback(state)
     ipcRenderer.on("curated:playback-state", listener)

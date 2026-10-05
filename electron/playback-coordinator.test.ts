@@ -6,6 +6,11 @@ import { defaultPlaybackPreferences } from "./playback-preferences"
 
 class Player extends NativeMpvPlayer {
   stopped = false
+  captures = 0
+  override async captureFrame() {
+    this.captures++
+    return { image: Buffer.from("fixture png"), positionSec: this.state.positionSec + 0.125, capturedAt: "2026-10-06T01:02:03.000Z" }
+  }
   override async start(_exe: string, _url: string, start: number, _headless = false, initiallyPaused = false) {
     this.state = { ...this.state, status: initiallyPaused ? "paused" : "playing", positionSec: start, durationSec: 100 }
     this.emit("state", this.state)
@@ -25,22 +30,99 @@ function fixture() {
   let focused = 0
   let unlocked = true
   let authStatus = 200
+  let captureStatus = 204
+  const uploads: { metadata: Record<string, unknown>; image: Buffer; headers: Headers }[] = []
   const context: PlaybackContext = { origin: "http://127.0.0.1:12345", generation: "one", fetch: async (url, init) => {
     const path = new URL(url).pathname + new URL(url).search
     requests.push({ path, body: init?.body as string | undefined })
     if (path === "/api/auth/status") return Response.json({ unlocked }, { status: authStatus })
+    if (path === "/api/curated-frames") {
+      const form = init!.body as FormData
+      const image = form.get("image") as Blob
+      uploads.push({ metadata: JSON.parse(form.get("metadata") as string), image: Buffer.from(await image.arrayBuffer()), headers: new Headers(init?.headers) })
+      return new Response(null, { status: captureStatus })
+    }
     if (path.includes("/playback-session")) return Response.json({ mode: "direct", fileId: "p1", resumePositionSec: 30, durationSec: 100 })
-    if (path.startsWith("/api/library/movies/")) return Response.json({ code: "TEST", title: "Fixture",
+    if (path.startsWith("/api/library/movies/")) return Response.json({ code: "TEST", title: "Fixture", actors: ["Fixture actor"],
       files: [{ id: "p1", fileName: "1.mp4" }, { id: "p2", fileName: "2.mp4" }] })
     return new Response(null, { status: 204 })
   } }
   const surface: PlaybackSurface = { createPlayer: () => { const player = new Player(); players.push(player); return player },
     setTitle: async () => {}, focus: async () => { focused++ }, action: async () => {}, fullscreen: () => false, dispose: async () => { disposed++ } }
   const coordinator = new NativePlaybackCoordinator("fixture", async () => surface, () => defaultPlaybackPreferences, () => {})
-  return { coordinator, context, surface, requests, players, disposed: () => disposed, focused: () => focused,
+  return { coordinator, context, surface, requests, players, uploads, captureStatus: (status: number) => { captureStatus = status }, disposed: () => disposed, focused: () => focused,
     lock: (status = 200) => { unlocked = false; authStatus = status } }
 }
 describe("production native coordinator", () => {
+  it("saves the selected part and actual frame time as multipart and publishes the gallery revision", async () => {
+    const f = fixture()
+    try {
+      const session = await f.coordinator.open(f.context, { movieId: "a", fileId: "p2", startSec: 12, autoplay: false })
+      const frame = await f.coordinator.capture(session.sessionId)
+      expect(frame).toMatchObject({ movieId: "a", fileId: "p2", positionSec: 12.125, phase: "saved", preview: "data:image/png;base64," + Buffer.from("fixture png").toString("base64") })
+      expect(f.uploads[0]!.metadata).toEqual({ id: frame.id, movieId: "a", fileId: "p2", title: "Fixture", code: "TEST", actors: ["Fixture actor"],
+        positionSec: 12.125, capturedAt: "2026-10-06T01:02:03.000Z", tags: [] })
+      // fetch 必须自行生成 multipart boundary，不能手工覆盖为 JSON。
+      expect(f.uploads[0]!.headers.has("Content-Type")).toBe(false)
+      expect(f.coordinator.snapshot()).toMatchObject({ captureRevision: 1, state: { status: "paused", positionSec: 12 } })
+      await expect(f.coordinator.capture(session.sessionId, frame.id)).rejects.toThrow("STALE_CAPTURE")
+    } finally { await f.coordinator.stop() }
+  })
+  it("retries identical metadata, image and ID without recapturing or incrementing a failed save", async () => {
+    const f = fixture()
+    try {
+      const session = await f.coordinator.open(f.context, { movieId: "a", autoplay: true })
+      f.captureStatus(500)
+      const failed = await f.coordinator.capture(session.sessionId)
+      expect(failed).toMatchObject({ phase: "error", error: "CAPTURE_SAVE_FAILED" })
+      expect(f.coordinator.snapshot().captureRevision ?? 0).toBe(0)
+      f.players[0]!.state.positionSec = 47
+      f.captureStatus(204)
+      const saved = await f.coordinator.capture(session.sessionId, failed.id)
+      expect(saved).toMatchObject({ id: failed.id, positionSec: failed.positionSec, phase: "saved" })
+      expect(f.uploads[1]).toEqual(f.uploads[0])
+      expect(f.players[0]!.captures).toBe(1)
+      expect(f.coordinator.snapshot().state.status).toBe("playing")
+      expect(f.coordinator.snapshot().captureRevision).toBe(1)
+    } finally { await f.coordinator.stop() }
+  })
+  it("rejects simultaneous captures and stale retries after replacing the part", async () => {
+    const f = fixture()
+    try {
+      const session = await f.coordinator.open(f.context, { movieId: "a", autoplay: false })
+      f.captureStatus(500)
+      const first = f.coordinator.capture(session.sessionId)
+      await expect(f.coordinator.capture(session.sessionId)).rejects.toThrow("CAPTURE_BUSY")
+      const failed = await first
+      await f.coordinator.command(session.sessionId, { action: "part", fileId: "p2" })
+      await expect(f.coordinator.capture(session.sessionId, failed.id)).rejects.toThrow("STALE_PLAYBACK_SESSION")
+      await expect(f.coordinator.capture(f.coordinator.snapshot().sessionId, failed.id)).rejects.toThrow("STALE_CAPTURE")
+      expect(f.players[1]!.captures).toBe(0)
+      expect(f.uploads).toHaveLength(1)
+    } finally { await f.coordinator.stop() }
+  })
+  it.each([401, 403])("closes playback when the frame upload returns HTTP %i", async status => {
+    const f = fixture()
+    try {
+      const session = await f.coordinator.open(f.context, { movieId: "a", autoplay: true })
+      f.captureStatus(status)
+      await expect(f.coordinator.capture(session.sessionId)).rejects.toThrow("SERVER_LOCKED")
+      expect(f.players[0]!.stopped).toBe(true)
+      expect(f.disposed()).toBe(1)
+      expect(f.coordinator.snapshot()).toMatchObject({ windowOpen: false, state: { status: "error", error: "SERVER_LOCKED" } })
+      expect(f.coordinator.snapshot().captureRevision ?? 0).toBe(0)
+    } finally { await f.coordinator.stop() }
+  })
+  it("does not upload an unavailable frame and allows a later capture", async () => {
+    const f = fixture()
+    try {
+      const session = await f.coordinator.open(f.context, { movieId: "a", autoplay: false })
+      vi.spyOn(f.players[0]!, "captureFrame").mockRejectedValueOnce(new Error("CAPTURE_NOT_READY"))
+      await expect(f.coordinator.capture(session.sessionId)).rejects.toThrow("CAPTURE_NOT_READY")
+      expect(f.uploads).toHaveLength(0)
+      expect((await f.coordinator.capture(session.sessionId)).phase).toBe("saved")
+    } finally { await f.coordinator.stop() }
+  })
   it("routes window actions to the owned surface and publishes only changed window state", async () => {
     const f = fixture()
     let maximized = false

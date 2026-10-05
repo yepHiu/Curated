@@ -17,7 +17,7 @@ export interface NativePlayerState {
 
 export interface NativeLabConnection { origin: string; unlocked: boolean; requiresPin: boolean }
 export interface NativeLabFile { id: string; fileName: string; resumePositionSec: number }
-export interface NativeLabMovie { id: string; code: string; title: string; files: NativeLabFile[] }
+export interface NativeLabMovie { id: string; code: string; title: string; actors?: string[]; files: NativeLabFile[] }
 export interface NativeLabStatus {
   engineReady: boolean
   connection?: NativeLabConnection

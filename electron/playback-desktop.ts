@@ -125,6 +125,19 @@ export function installDesktopPlayback(options: DesktopPlaybackOptions) {
     return coordinator.open(context, input)
   })
   ipcMain.handle("curated:playback-snapshot", event => { assertController(event); return coordinator.snapshot() })
+  ipcMain.handle("curated:playback-capture", (event, sessionId: string, retryId?: string) => {
+    assertController(event)
+    if (retryId !== undefined && (typeof retryId !== "string" || retryId.length > 100)) throw new Error("INVALID_CAPTURE")
+    return coordinator.capture(sessionId, retryId)
+  })
+  ipcMain.handle("curated:playback-capture-preferences", async event => {
+    assertController(event)
+    const main = options.current()?.window
+    if (!main || main.isDestroyed()) return { keyCode: "KeyC", feedbackSoundEnabled: true }
+    // 固定脚本仅读取主页面已有的本机偏好，不接收 renderer 脚本或存储键。
+    const value = await main.webContents.executeJavaScript("({keyCode:localStorage.getItem('jav-curated-capture-key-code'),feedbackSoundEnabled:localStorage.getItem('jav-curated-capture-feedback-sound-v1')!=='off'})")
+    return { keyCode: typeof value?.keyCode === "string" ? value.keyCode.slice(0, 20) : "KeyC", feedbackSoundEnabled: value?.feedbackSoundEnabled !== false }
+  })
   ipcMain.handle("curated:playback-command", async (event, sessionId: string, input: DesktopPlaybackCommand) => {
     assertController(event)
     await coordinator.command(sessionId, input)

@@ -2,6 +2,9 @@ import { spawn, type ChildProcess } from "node:child_process"
 import { createConnection, type Socket } from "node:net"
 import { randomUUID } from "node:crypto"
 import { EventEmitter } from "node:events"
+import { mkdtemp, readFile, stat, unlink, rmdir } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { emptyNativePlayerState, type NativeLabControl, type NativePlayerState } from "./native-player-contract.js"
 
 interface PendingCommand { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
@@ -33,7 +36,7 @@ export class NativeMpvPlayer extends EventEmitter {
     const pipe = `\\\\.\\pipe\\curated-native-${randomUUID()}`
     this.state.status = "starting"
     const args = ["--no-config", "--idle=yes", "--keep-open=no", "--terminal=no", "--ytdl=no",
-      "--hwdec=auto-safe", `--input-ipc-server=${pipe}`, `--start=${startSec}`,
+      "--hwdec=auto-safe", "--screenshot-format=png", `--input-ipc-server=${pipe}`, `--start=${startSec}`,
       ...(initiallyPaused ? ["--pause=yes"] : []),
       ...(this.windowId && !headless ? [`--wid=${this.windowId}`, "--osc=no", "--input-default-bindings=no", "--input-vo-keyboard=no", "--input-cursor=no"] : []),
       ...(headless ? ["--vo=null", "--ao=null"] : ["--force-window=yes", "--title=Curated · Windows 原生播放原型"])]
@@ -128,7 +131,7 @@ export class NativeMpvPlayer extends EventEmitter {
   }
 
   /** 命令以独立 request_id 匹配；错误和超时释放对应槽位。 */
-  private command(command: unknown[]): Promise<unknown> {
+  private command(command: unknown[], timeoutMs = 2000): Promise<unknown> {
     if (!this.socket || this.socket.destroyed) return Promise.reject(new Error("MPV_NOT_CONNECTED"))
     const id = ++this.sequence
     return new Promise((resolve, reject) => {
@@ -136,7 +139,7 @@ export class NativeMpvPlayer extends EventEmitter {
       const timer = setTimeout(() => {
         this.pending.delete(id)
         reject(new Error("MPV_COMMAND_TIMEOUT"))
-      }, 2000)
+      }, timeoutMs)
       this.pending.set(id, { resolve, reject, timer })
       this.socket!.write(JSON.stringify({ command, request_id: id }) + "\n")
     })
@@ -217,6 +220,41 @@ export class NativeMpvPlayer extends EventEmitter {
 
   /** 通知状态订阅者时复制快照，避免外部修改引擎状态。 */
   private publish(): void { this.emit("state", { ...this.state }) }
+
+  /** 冻结视频帧后取得准确时间；只输出视频，不包含 HUD、标题栏或字幕。 */
+  async captureFrame(): Promise<{ image: Buffer; positionSec: number; capturedAt: string }> {
+    if (!["playing", "paused"].includes(this.state.status) || await this.command(["get_property", "seeking"])) throw new Error("CAPTURE_NOT_READY")
+    const paused = await this.command(["get_property", "pause"])
+    const directory = await mkdtemp(path.join(tmpdir(), "curated-native-frame-"))
+    const filename = path.join(directory, "frame.png")
+    try {
+      if (!paused) await this.command(["set_property", "pause", true])
+      const positionSec = await this.command(["get_property", "time-pos"])
+      if (typeof positionSec !== "number" || !Number.isFinite(positionSec) || positionSec < 0) throw new Error("CAPTURE_NOT_READY")
+      const capturedAt = new Date().toISOString()
+      try {
+        // 高分辨率 PNG 编码比播放控制慢，独立给出有界期限。
+        await this.command(["screenshot-to-file", filename, "video"], 10000)
+      } catch (error) {
+        // 超时必须先结束本引擎的写入，避免清理后又出现迟到的临时文件。
+        if (error instanceof Error && error.message === "MPV_COMMAND_TIMEOUT") {
+          await this.stop()
+          throw new Error("CAPTURE_ENGINE_TIMEOUT")
+        }
+        throw error
+      }
+      const info = await stat(filename)
+      if (!info.size || info.size > 12 * 1024 * 1024) throw new Error("CAPTURE_TOO_LARGE")
+      const image = await readFile(filename)
+      if (image.length < 24 || !image.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error("CAPTURE_INVALID_IMAGE")
+      if (image.readUInt32BE(16) * image.readUInt32BE(20) > 3840 * 2160 * 4) throw new Error("CAPTURE_TOO_LARGE")
+      return { image, positionSec, capturedAt }
+    } finally {
+      if (!paused && !this.closed) await this.command(["set_property", "pause", false]).catch(() => {})
+      await unlink(filename).catch(() => {})
+      await rmdir(directory).catch(() => {})
+    }
+  }
 
   /** 失败使待响应请求全部结束，业务层负责关闭对应代理。 */
   private fail(code: string): void {

@@ -20,6 +20,7 @@ export interface DesktopPlaybackOpen {
   sourceQuery?: DesktopPlaybackSourceQuery
 }
 export interface DesktopPlaybackSnapshot {
+  captureRevision?: number
   sessionId: string
   revision: number
   engine: "native"
@@ -32,6 +33,21 @@ export interface DesktopPlaybackSnapshot {
   autoAdvance: boolean
   locale: "zh-CN" | "en-US" | "ja-JP"
   sourceQuery?: DesktopPlaybackSourceQuery
+}
+export interface DesktopPlaybackCapture {
+  id: string
+  movieId: string
+  fileId: string
+  code: string
+  positionSec: number
+  capturedAt: string
+  preview: string
+  phase: "saved" | "error"
+  error?: string
+}
+export interface DesktopPlayerBridge extends Pick<DesktopPlaybackBridge, "snapshot" | "command" | "subscribe"> {
+  capture(sessionId: string, retryId?: string): Promise<DesktopPlaybackCapture>
+  capturePreferences(): Promise<{ keyCode: string; feedbackSoundEnabled: boolean }>
 }
 export type DesktopPlaybackCommand =
   | NativeLabControl

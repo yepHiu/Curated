@@ -3,6 +3,8 @@
 @source "../components/jav-library/PlayerTransportControls.vue";
 @source "../components/jav-library/PlayerPlaybackSettingsMenu.vue";
 @source "../components/jav-library/MoviePartSelect.vue";
+@source "../components/jav-library/CaptureReceipt.vue";
+@source "../components/jav-library/FrameImageViewer.vue";
 
 /* 独立透明窗口的局部例外：正式页面仍沿用全局背景和布局。 */
 html, body, #app { background: transparent; }

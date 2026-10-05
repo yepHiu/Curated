@@ -13,6 +13,7 @@ vi.mock("@/lib/player-playlist", () => ({ listPlayerPlaylistMovies: () => [{ id:
   resolvePlayerPlaylistSource: () => "browse", readPlaylistAutoAdvance: () => true }))
 vi.mock("@/lib/locale-storage", () => ({ resolveInitialLocale: () => "zh-CN" }))
 vi.mock("@/composables/use-active-playback-session", () => ({ updateActivePlaybackSession: vi.fn() }))
+vi.mock("@/lib/curated-frames/revision", () => ({ bumpCuratedFramesRevision: vi.fn() }))
 const router = createRouter({ history: createMemoryHistory(), routes: [
   { path: "/library", name: "library", component: {} }, { path: "/player/:id", name: "player", component: {} },
 ] })
@@ -70,6 +71,12 @@ describe("Desktop playback routing", () => {
     expect(command.mock.calls).toEqual([["restored", { action: "pause" }], ["restored", { action: "focus" }]])
     receive?.({ ...restored, revision: 11, state: { ...restored.state, positionSec: 1 } })
     expect(service.snapshot.value?.state.positionSec).toBe(36)
+    const { bumpCuratedFramesRevision } = await import("@/lib/curated-frames/revision")
+    receive?.({ ...restored, revision: 13, captureRevision: 1 })
+    expect(bumpCuratedFramesRevision).toHaveBeenCalledOnce()
+    receive?.({ ...restored, revision: 14, captureRevision: 1 })
+    receive?.({ ...restored, revision: 12, captureRevision: 2 })
+    expect(bumpCuratedFramesRevision).toHaveBeenCalledOnce()
     fallback?.({ movieId: "a", fileId: "p2", startSec: 37 })
     expect(navigate).toHaveBeenLastCalledWith({ name: "player", params: { id: "a" }, query: { back: "browse", browse: "fc2", q: "original", engine: "web", fileId: "p2", t: "37", autoplay: "1" } })
   })
