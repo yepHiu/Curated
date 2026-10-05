@@ -593,3 +593,11 @@ REQ-0058 保留 in_progress 80（混合 DPI、更多真实场景等仍未通过�
 验证：`pnpm build:electron:main`、原型 helper 编译、`pnpm typecheck`、播放器和文案的局部 ESLint 通过；设置实际 mpv 后 `pnpm test:electron` 18 文件/117 项通过，含系统标题栏宿主的最大化、聚焦、最小化恢复和全屏恢复。正式 main 配合隔离 profile/认证合成片源，观察到系统标题栏的三个原生按钮，renderer 内对应按钮计数为 0。实际水平拖动系统标题栏后宿主位置改变，视频与透明控件仍同窗对齐；原生最大化、最小化及主窗口聚焦恢复后保持最大化通过。窗口工具对拖动终点落在 Electron 客户区的尝试拒绝输入，改为标题栏内水平拖动完成实际操作；此结果不覆盖跨屏混合 DPI。
 
 实测分部触发器背景为 `rgb(18, 24, 39)`，展开菜单为深色语义表面；自动连播开启和设置菜单展开时仍为圆形 `primary` 18% 弱底。点击系统关闭按钮后快照为 `windowOpen=false/status=stopped`，自己的 helper/mpv 已回收。新预览为 ignored `output/playwright/desktop-player/native-system-chrome-preview.jpg`，仅包含合成测试片源。临时 QA 实例已退出，日常隔离测试 Desktop 已重启到本轮构建，保持原生偏好/音量/倍速；没有重新播放真实影片。未运行 display-scaling、安装/发布或真实 LAN/HTTPS 验收。
+
+### 14.14 窗口标题使用当前影片名称（2026-10-06）
+
+按用户要求，正式原生播放窗口标题直接使用当前影片名称，缺少名称时依次回退到番号、Curated，不附加固定产品前后缀。协调器在每次起播、切片及队列切换时设置原生宿主与透明控件窗口标题；HTML 的固定页面标题不能覆盖窗口标题。名称来自已获取的影片详情，不新增 renderer 原生动作或 HTTP API。
+
+helper 通过内部 `title` 命令调用 `SetWindowTextW`。标题以 UTF-16 单元的十六进制字段传递，避免中文/日文、引号及反斜线受 JSON 转义影响；去除控制字符并限制为 480 个 UTF-16 单元，使消息保持在现有 2048 字节管道上限内。
+
+验证：Electron/播放器/helper 构建及 18 文件/117 项 Electron 测试通过。测试 Desktop 已重启；此前打开的 STAR-684 在保存的位置约 3:16 恢复为暂停，读取真实 Win32 窗口列表确认宿主标题与影片详情中的日文名称完全一致。此轮未截取真实影片画面。
