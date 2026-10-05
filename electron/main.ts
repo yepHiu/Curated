@@ -13,6 +13,7 @@ import {
 } from "electron"
 import { probeServer as probeIdentity, localServerSuggestion, connectionPartition, hasServerIdentityChanged } from "./connections.js"
 import { discoverServers } from "./discovery.js"
+import { installDesktopPlayback } from "./playback-desktop.js"
 import { DesktopPreferencesStore, proxyConfiguration, validatePreferences, type DesktopPreferences } from "./settings.js"
 import path from "node:path"
 import { existsSync, readFileSync } from "node:fs"
@@ -85,6 +86,8 @@ let runningPreferences: DesktopPreferences
 let networkSession: Electron.Session
 let connectionAttempt: AbortController | undefined
 let discoveryScan: AbortController | undefined
+let nativePlayback: ReturnType<typeof installDesktopPlayback> | undefined
+let connectionGeneration = 0
 const desktopFetch: typeof fetch = (input, init) => networkSession.fetch(input instanceof URL ? input.href : input, { ...init, credentials: "omit" })
 
 const singleInstanceLock = app.requestSingleInstanceLock()
@@ -114,6 +117,10 @@ if (!singleInstanceLock) {
       runningPreferences = preferencesStore.read()
       networkSession = session.fromPartition("curated-connection-probes")
       await networkSession.setProxy(proxyConfiguration(runningPreferences))
+      nativePlayback = installDesktopPlayback({ directory: __dirname, appPath: app.getAppPath(),
+        userData: app.getPath("userData"), packaged: app.isPackaged, focusMain: () => { if (!isQuitting) showMainWindow() },
+        current: () => mainWindow && !mainWindow.isDestroyed() && currentServerUrl && rendererBaseUrl
+          ? { window: mainWindow, origin: currentServerUrl, renderer: rendererBaseUrl, generation: String(connectionGeneration) } : undefined })
       registerDesktopIpc()
       createAppTray()
       installApplicationMenu()
@@ -186,10 +193,13 @@ app.on("before-quit", () => {
 })
 
 app.on("will-quit", async (event) => {
-  if (!managedBackend && !managedFrontend) {
+  if (!managedBackend && !managedFrontend && !nativePlayback) {
     return
   }
   event.preventDefault()
+  const playback = nativePlayback
+  nativePlayback = undefined
+  await playback?.stop()
   const backend = managedBackend
   const frontend = managedFrontend
   managedBackend = undefined
@@ -704,10 +714,13 @@ async function connectServer(target: SavedServer, confirm: boolean): Promise<voi
     if (pageStatus >= 400) throw new Error(`服务器页面返回 ${pageStatus}，请检查 Server 的 Web 界面是否已部署。`)
     if (!isAllowedAppUrl(candidate.webContents.getURL(), renderer)) throw new Error("服务器页面跳转到了其他地址。")
     controller.signal.throwIfAborted()
+    await nativePlayback?.stop()
+    controller.signal.throwIfAborted()
     if (!target.id) target = serverStore!.save({ name: info.name.slice(0, 80) || "Curated Server", url: target.url })
     serverStore!.bindIdentity(target.id, info.serverId, selectedPartition)
     serverStore!.remember(target.id)
     const previous = mainWindow
+    connectionGeneration++
     mainWindow = candidate
     currentServerUrl = target.url
     rendererBaseUrl = renderer

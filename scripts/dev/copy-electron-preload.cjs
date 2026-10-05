@@ -8,6 +8,7 @@ const target = path.join(targetDir, "preload.cjs")
 
 fs.mkdirSync(targetDir, { recursive: true })
 fs.copyFileSync(source, target)
+fs.copyFileSync(path.join(repoRoot, "electron", "playback-preload.cjs"), path.join(targetDir, "playback-preload.cjs"))
 
 const versionState = JSON.parse(fs.readFileSync(path.join(repoRoot, "scripts/release/versions/desktop.json"), "utf8"))
 const parts = [versionState.current?.major, versionState.current?.minor, versionState.current?.patch]
