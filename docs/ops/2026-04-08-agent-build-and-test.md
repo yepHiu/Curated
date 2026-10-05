@@ -1,5 +1,9 @@
 # Agent 构建 / 编译 / 测试范式（Curated）
 
+## Desktop 日常测试：构建一次，直接运行
+
+先停止该分支的原生播放并完全退出测试 Desktop，再于根目录运行 `pnpm desktop:test:build`，构建 Web API 页面到 `.workspace/desktop-test-ui` 并构建 Electron 壳和本地播放器，避免 Windows 正在运行的宿主 EXE 锁定输出。后续 `pnpm desktop:test` 只启动已有产物，不自动编译，不需要 `pnpm dev`。需保持开发 Server `127.0.0.1:8080` 在线。源码变化后先退出、重建再启动。Electron 内托管复用 `5183`；首次切换应结束旧测试 Vite，保留其它开发服务。详见 guide。
+
 ## Windows 原生播放原型（2026-10-05）
 
 在专用原型分支的仓库根运行，生产 Desktop 构建入口不变：

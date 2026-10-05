@@ -3,6 +3,10 @@ description: 日常开发速记（启动、联调、根目录政策）
 alwaysApply: true
 ---
 
+## Desktop 日常测试启动 — 2026-10-06
+
+日常试用使用已编译页面：根目录 `pnpm desktop:test:build` 更新一次前端/Electron 产物，随后 `pnpm desktop:test` 启动独立测试 profile。需既有开发 Server `127.0.0.1:8080`；页面由 Electron 在 `127.0.0.1:5183` 托管，不启动或复用 Vite。不要再运行 `.workspace/start-desktop-test-vite.ps1`。源码更新后重建；`pnpm dev` / `pnpm dev:electron` 继续用于热更新开发。详见 guide。
+
 ## 正式 Windows 原生播放器联调 — 2026-10-06
 
 在 `codex/windows-native-player-prototype` 根运行 `pnpm native-player:prepare`（需 7-Zip，固定 SHA 的开发 mpv 写 ignored .workspace/native-player），随后 `pnpm dev:electron`。正式构建已含本地播放页/Win32 helper，需 MinGW gcc（同目录 windres）或绝对 CURATED_NATIVE_CC；也可用绝对 CURATED_NATIVE_MPV 指定开发引擎。Server 单独启动并加载此分支的新前端，Desktop 连接它；设置 → 播放开启「优先使用桌面原生播放器」（默认关闭，本机 profile）。从现有播放入口直接打开专用窗口，不再需要原型准备弹窗或二次 PIN；主页/侧栏保持可用。

@@ -122,6 +122,7 @@
   </style>
 </head>
 <body>
+  <section><h2>Desktop 预编译测试运行 · 2026-10-06</h2><p><code>pnpm desktop:test:build</code> 构建一次测试页面与 Electron；<code>pnpm desktop:test</code> 直接复用构建。Electron 主进程在 127.0.0.1:5183 提供静态 SPA，并流式转发 /api 到既有开发 Server 8080。独立测试配置、登录与原生播放入口保留；运行时无独立 Vite/编译器/文件监听，不替换 Server 页面。显式 FRONTEND_DIR 只用于未打包本机测试；正式包与远端保持原页面来源。源码更新后重建，退出回收监听。无新增公共 API 或库配置。</p></section>
 <section id="windows-desktop-native-integration">
   <h2>2026-10-06：正式 Windows Desktop 可选原生播放器（分支源码）</h2>
   <p>用户授权后，正式 main/preload 已接入受限 playback bridge 与 NativePlaybackCoordinator，复用当前主窗口实际 Session 和 HttpOnly Cookie。router 在 PlayerView/HLS prefetch 前选引擎；本地 Curated 专用窗口共享圆形控件、分部、倍速，主页面继续浏览并通过侧栏控制。helper 独占透明层与视频宿主的物理几何。默认 Web，本机偏好可开启 native，无新增公共 HTTP 端点或 library-config 字段。</p>

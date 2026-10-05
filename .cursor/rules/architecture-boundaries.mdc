@@ -3,6 +3,10 @@ description: Current implementation vs target desktop architecture boundaries
 alwaysApply: true
 ---
 
+## Desktop test page hosting — 2026-10-06
+
+Explicit unpackaged local test runs use prebuilt pages through `CURATED_ELECTRON_FRONTEND_DIR`. Electron serves only the selected build directory on loopback and streams same-origin API traffic to the development Server; no compiler or watcher runs. This preserves the separate worktree UI/profile without replacing the shared Server frontend. Packaged/remote page selection and business HTTP contracts remain unchanged. Commands and rebuild requirements are in guide “Desktop test runs with prebuilt pages”.
+
 ## Windows Desktop native integration — 2026-10-06 (branch source)
 
 Production main/preload now provide an optional narrow playback bridge, owned by NativePlaybackCoordinator and bound to the committed main window's actual Electron Session. Server remains the HTTP/media/business-data owner; Desktop owns mpv/proxy/host, the local Vue player page and per-machine preferences. Native progress/history/watch-time has one main-process writer; browser playback retains its existing writer. Renderer requests carry IDs, time, enums and bounded internal source-query fields; executable/origin/cookie/HWND are main-only. State uses independent session IDs, connection generations and monotonic revisions. Candidate Server windows cannot start native playback.

@@ -19,6 +19,8 @@
 
 # Curated
 
+Desktop テストは `pnpm desktop:test:build` で一度ビルドし、`pnpm desktop:test` で起動します。Electron がビルド済みページを配信するため、実行中に Vite は不要です。[実行ガイド](docs/guide.md#desktop-test-runs-with-prebuilt-pages)を参照してください。
+
 専用の開発ブランチに Windows mpv 再生プロトタイプを実装しました。別ウィンドウでの再生・操作・ファイル別の再開に対応します。[実行ガイド](docs/guide.md#windows-native-playback-prototype)と[実装計画](docs/plan/2026-10-05-windows-native-player-prototype.md)を参照してください。問題のある実ファイルでの比較と製品版への統合は未完了です。
 
 「作品」と「FC2」は別々に閲覧でき、ストレージとタグを共有します。同じ品番の複数ファイルは一枚のポスターにまとまり、パート選択と個別の再生位置に対応します。[FC2 と複数ファイルの案内](docs/guide.md#fc2-and-multipart-movies)をご覧ください。

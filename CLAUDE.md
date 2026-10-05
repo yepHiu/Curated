@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## Desktop test runs — 2026-10-06
+
+`pnpm desktop:test:build` builds Web API pages into `.workspace/desktop-test-ui` and the Electron shell once. `pnpm desktop:test` reuses those artifacts and `.workspace/desktop-native-test-profile`, connecting to the running development Server at `127.0.0.1:8080`. Electron itself serves pages on `127.0.0.1:5183` and streams same-origin `/api`; no separate Vite/compiler/watcher runs. `CURATED_ELECTRON_FRONTEND_DIR` explicitly enables local, unpackaged test mode; packaged/remote connections keep their page source. No public API or library-config key was added. See guide “Desktop test runs with prebuilt pages”.
+
 ## FC2 / multipart API — 2026-10-04
 
 `GET /api/library/movies?mode=fc2` selects FC2; ordinary explicit modes exclude it, empty mode is shared full-library data. List fileCount and detail files expose same-code video files. Playback/stream/session/native-play/frame/clips and progress PUT accept query fileId; descriptors, progress and captures return source identity. Capture metadata carries fileId; clip frame attachments enforce it. Migration 0064 preserves original file identity and adds per-file progress. Storage/tag resources stay shared. Source is locally verified, not published. See API.md “FC2 and movie file selection” and guide “FC2 and multipart movies”; compliance remains paused.

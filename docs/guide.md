@@ -1,5 +1,15 @@
 # Curated Handbook
 
+## Desktop test runs with prebuilt pages
+
+日常测试 Desktop 使用已编译页面。先停止该分支的原生播放并完全退出测试 Desktop，再在当前测试分支根目录运行 `pnpm desktop:test:build`，一次构建 Web API 前端到 `.workspace/desktop-test-ui`，并构建 Electron 壳、连接页和本地播放器。随后 `pnpm desktop:test` 只读取这些产物；缺失产物会提示先构建。源码更新后同样先退出、重新构建再启动；Windows 无法覆盖正在运行的原生宿主 EXE。
+
+测试端连接既有开发 Server `http://127.0.0.1:8080`，继续使用 `.workspace/desktop-native-test-profile` 的登录、连接和播放偏好。Electron 主进程直接在 `http://127.0.0.1:5183` 托管静态页面，并流式转发同源 `/api`，保留 Cookie、上传、Range 与 SSE。运行期间没有独立 Vite/编译器/文件监听进程，不替换共享 Server 的静态前端目录。关闭窗口仍隐藏到托盘；真正退出后托管监听随 Desktop 回收。
+
+首次切换时，结束仅属于该测试分支的 `5183` Vite，再启动测试 Desktop；端口冲突会明确失败，不会复用旧 Vite。本机旧 `.workspace/start-desktop-test.cjs` 入口转到仓库脚本，旧 Vite 启动入口停用。`pnpm dev` / `pnpm dev:electron` 保留用于需要热更新的开发。
+
+该模式通过 `CURATED_ELECTRON_FRONTEND_DIR` 显式启用，仅未打包 Desktop 的本机开发 Server 连接生效；正式包和远端 Server 页面选择保持原行为。没有新增公共业务端点或 `library-config.cfg` 字段。
+
 This is the detailed project handbook. Root `README.md` stays a short GitHub entry; this file holds the operational detail that used to live in the README, and it is the index for deeper articles under `docs/`.
 
 Public HTTP API remains in root [`API.md`](../API.md). Folder policy for new documents remains in [`docs/README.md`](README.md).

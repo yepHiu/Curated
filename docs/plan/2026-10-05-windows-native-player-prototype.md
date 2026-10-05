@@ -561,3 +561,11 @@ Server 前端与 Desktop 交付若都实际改变，按现有 Curated 日期批�
 该样本在当前机器上复现 Chromium 直放掉帧，native 同片连续播放没有观察到掉帧，支持目前专用窗口方案对这一问题片的改善；不能泛化为所有 MP4/电脑/网络已修复，也不能只据计数判定是 codec、硬解还是合成器的具体缺陷。采样结果摘要保存为 `docs/ops/2026-10-06-windows-native-playback-qa.json`；本机原始日志在 ignored `output/playwright/desktop-player/problem-file-results.json` 和 `problem-file-avsync.json`。本轮没有生成媒体截图/图像。
 
 REQ-0058 保留 in_progress 80（混合 DPI、更多真实场景等仍未通过）；REQ-0059 保留 in_progress 70（M4 分发资料/安装验收未完成）。其它格式/HEVC、真实 LAN/HTTPS、混合 DPI、50 分钟整片主观同步与成功/失败 Server 切换/崩溃仍待验收。
+
+### 14.11 测试运行改用已编译页面（2026-10-06）
+
+用户确认日常测试不需要热更新。`pnpm desktop:test:build` 一次构建 Web API 页面到 `.workspace/desktop-test-ui` 和 Electron；`pnpm desktop:test` 直接运行产物，继续使用独立测试 profile。Electron 内轻量 HTTP 托管复用 `5183`，静态资源不实时编译、不监听源码；同源 `/api` 以流转发到既有开发 Server `8080`，保留 Cookie/上传/Range/SSE。不替换共享 Server 的页面、不另起 Vite/Node 编译进程。正式包及远端页面来源保留。
+
+旧本机启动入口转到新脚本，旧 Vite 启动入口停用。源码修改后先停止原生播放并完全退出测试 Desktop，再构建/启动；Windows 无法覆盖运行中的宿主 EXE。关闭窗口仍是隐藏到托盘。监听冲突明确报错。20 项定向测试覆盖真实静态响应、SPA 深链接、缓存/MIME、缺失资源、认证/上传/Range 流代理、跨来源/路径越界、上游失败与退出释放，以及原有前端选择和主窗口生命周期；前端类型检查、生产构建和 Electron 构建通过。
+
+实际测试窗口加载 `/assets/index-*.js`，没有 Vite 客户端或 `/src/main.ts`；首页和影片页刷新后挂载正常，`/api/auth/status` 和 `/api/health` 返回 200，原生 capability available，既有 preferNative/volume/speed 保留。本轮没有开始真实影片或改写播放进度。旧 Vite PID 31044 已结束；5183 由测试 Electron 自身持有。新主进程物理内存约 150 MB，5.04 秒采样使用 0.078 秒 CPU；此前独立 Vite 约 680 MB 物理内存、5 秒约 12.4 秒 CPU。这是短时诊断，不是整套 Desktop 内存/播放基准。

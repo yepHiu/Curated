@@ -19,6 +19,8 @@
 
 # Curated
 
+日常 Desktop 测试先运行 `pnpm desktop:test:build` 构建一次，再用 `pnpm desktop:test` 启动。Electron 直接托管已编译页面，运行期间无需 Vite；见[测试运行说明](docs/guide.md#desktop-test-runs-with-prebuilt-pages)。
+
 专用开发分支已有 Windows mpv 原生播放原型，支持独立窗口、播放控制和逐文件续播；见[运行说明](docs/guide.md#windows-native-playback-prototype)与[实施计划](docs/plan/2026-10-05-windows-native-player-prototype.md)。真实问题片源对照和正式播放器整合仍待完成。
 
 「影片」和「FC2」分别浏览，共用存储池与标签。同一番号多个文件共用一张海报，可选择分片播放并分别续播；见 [FC2 与多文件影片说明](docs/guide.md#fc2-and-multipart-movies)。
