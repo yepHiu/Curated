@@ -44,9 +44,10 @@ describe("production native coordinator", () => {
   it("uses direct resume, focuses existing playback, serializes replacement and rejects stale commands", async () => {
     const f = fixture()
     try {
-      const first = await f.coordinator.open(f.context, { movieId: "a", autoplay: true })
+      const first = await f.coordinator.open(f.context, { movieId: "a", autoplay: true, sourceQuery: { back: "browse", browse: "fc2", q: "original" } })
       expect(first.state).toMatchObject({ fileId: "p1", positionSec: 30 })
-      await f.coordinator.open(f.context, { movieId: "a", autoplay: true })
+      await f.coordinator.open(f.context, { movieId: "a", autoplay: true, startSec: 7, sourceQuery: { q: "changed" } })
+      expect(f.coordinator.snapshot()).toMatchObject({ state: { positionSec: 30 }, sourceQuery: { q: "original", browse: "fc2" } })
       expect(f.players).toHaveLength(1)
       expect(f.focused()).toBe(2)
       const second = await f.coordinator.open(f.context, { movieId: "a", fileId: "p2", startSec: 12, autoplay: false })
@@ -77,11 +78,12 @@ describe("production native coordinator", () => {
   it("advances parts only on natural EOF and keeps the frozen queue", async () => {
     const f = fixture()
     try {
-      await f.coordinator.open(f.context, { movieId: "a", autoplay: true, queue: ["a", "b"], autoAdvance: true })
+      await f.coordinator.open(f.context, { movieId: "a", autoplay: true, queue: ["a", "b"], autoAdvance: true, sourceQuery: { back: "actor", actor: "Fixture" } })
       f.players[0]!.state.status = "ended"
       f.players[0]!.emit("state", f.players[0]!.state)
       await f.coordinator.run(async () => {})
       expect(f.coordinator.snapshot().state.fileId).toBe("p2")
+      expect(f.coordinator.snapshot().sourceQuery).toEqual({ back: "actor", actor: "Fixture" })
       const current = f.coordinator.snapshot()
       await f.coordinator.command(current.sessionId, { action: "stop" })
       expect(f.players).toHaveLength(2)
@@ -130,5 +132,8 @@ describe("production native coordinator", () => {
     expect(() => validatePlaybackOpen({ movieId: "a", autoplay: true, startSec: NaN })).toThrow()
     expect(() => validatePlaybackOpen({ movieId: "a", autoplay: true, queue: [""] })).toThrow()
     expect(() => validatePlaybackOpen({ movieId: "a", autoplay: true, locale: "unknown" })).toThrow()
+    expect(() => validatePlaybackOpen({ movieId: "a", autoplay: true, sourceQuery: { q: { invalid: true } } })).toThrow()
+    expect(() => validatePlaybackOpen({ movieId: "a", autoplay: true, sourceQuery: { q: "x".repeat(2049) } })).toThrow()
+    expect(validatePlaybackOpen({ movieId: "a", autoplay: true, sourceQuery: { back: "browse", url: "https://untrusted", engine: "web" } }).sourceQuery).toEqual({ back: "browse" })
   })
 })

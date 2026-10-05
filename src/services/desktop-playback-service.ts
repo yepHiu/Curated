@@ -27,6 +27,7 @@ export const desktopPlaybackService = {
       if (snapshot.value && next.revision < snapshot.value.revision) return
       const previous = snapshot.value
       snapshot.value = next
+      if (next.sourceQuery) query = { ...next.sourceQuery }
       const movie = next.movie
       if (movie && next.state.durationSec > 0) updateActivePlaybackSession({
         movieId: movie.id, title: movie.title || movie.code, positionSec: next.state.positionSec, durationSec: next.state.durationSec,
@@ -72,8 +73,9 @@ export const desktopPlaybackService = {
       const next = await bridge.open({ movieId: to.params.id, fileId: typeof to.query.fileId === "string" ? to.query.fileId : undefined,
         seekExisting: to.query.back === "curated-frames" || to.query.from === "curated-frames" || from.name === "player",
         startSec: parseResumeSecondsFromQuery(to.query.t), autoplay: to.query.autoplay === "1", queue,
-        autoAdvance: readPlaylistAutoAdvance(), locale: locale === "en" ? "en-US" : locale === "ja" ? "ja-JP" : "zh-CN" })
+        autoAdvance: readPlaylistAutoAdvance(), locale: locale === "en" ? "en-US" : locale === "ja" ? "ja-JP" : "zh-CN", sourceQuery: to.query })
       snapshot.value = next
+      if (next.sourceQuery) query = { ...next.sourceQuery }
       if (from.name && from.name !== "player" && from.name !== "lock") return from.fullPath
       return resolveNavigationBackLink({ name: "player", query: to.query }, to.params.id).to
     } catch (error) {

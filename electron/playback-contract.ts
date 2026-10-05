@@ -7,6 +7,7 @@ export interface DesktopPlaybackCapabilities {
   reason?: "platform" | "engine" | "host" | "page"
   preferences: DesktopPlaybackPreferences
 }
+export type DesktopPlaybackSourceQuery = Record<string, string | null | (string | null)[]>
 export interface DesktopPlaybackOpen {
   movieId: string
   fileId?: string
@@ -16,6 +17,7 @@ export interface DesktopPlaybackOpen {
   locale?: "zh-CN" | "en-US" | "ja-JP"
   queue?: string[]
   autoAdvance?: boolean
+  sourceQuery?: DesktopPlaybackSourceQuery
 }
 export interface DesktopPlaybackSnapshot {
   sessionId: string
@@ -28,6 +30,7 @@ export interface DesktopPlaybackSnapshot {
   queue: string[]
   autoAdvance: boolean
   locale: "zh-CN" | "en-US" | "ja-JP"
+  sourceQuery?: DesktopPlaybackSourceQuery
 }
 export type DesktopPlaybackCommand =
   | NativeLabControl

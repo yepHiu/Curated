@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createRouter, createMemoryHistory } from "vue-router"
+import { updateActivePlaybackSession } from "@/composables/use-active-playback-session"
+import type { DesktopPlaybackBridge, DesktopPlaybackSnapshot } from "../../electron/playback-contract"
+import { emptyNativePlayerState } from "../../electron/native-player-contract"
 vi.mock("@/services/library-service", () => ({ useLibraryService: () => ({ movies: { value: [] }, trashedMovies: { value: [] } }) }))
 vi.mock("@/lib/playback-progress-storage", () => ({
   parseResumeSecondsFromQuery: (value: unknown) => typeof value === "string" ? Number(value) : undefined,
@@ -43,5 +46,31 @@ describe("Desktop playback routing", () => {
     expect(await service.intercept(to, router.resolve("/library"))).toMatchObject({ name: "player", query: { engine: "web" } })
     open.mockRejectedValue(new Error("SERVER_LOCKED"))
     expect(await service.intercept(to, router.resolve("/library"))).toMatchObject({ name: "lock" })
+  })
+  it("restores native sidebar commands and the original Web handoff context after a page reload", async () => {
+    const restored: DesktopPlaybackSnapshot = { sessionId: "restored", revision: 12, windowOpen: true,
+      engine: "native", fullscreen: false, queue: ["a"], autoAdvance: false, locale: "zh-CN",
+      movie: { id: "a", code: "TEST", title: "Fixture", files: [] },
+      state: { ...emptyNativePlayerState(), fileId: "p2", status: "playing", durationSec: 100, positionSec: 36 },
+      sourceQuery: { back: "browse", browse: "fc2", q: "original" } }
+    let receive: ((next: DesktopPlaybackSnapshot) => void) | undefined
+    let fallback: Parameters<DesktopPlaybackBridge["onWebFallback"]>[0] | undefined
+    const command = vi.fn().mockResolvedValue(undefined)
+    const bridge: Pick<DesktopPlaybackBridge, "command" | "snapshot" | "subscribe" | "onWebFallback"> = { command, snapshot: async () => restored,
+      subscribe: callback => { receive = callback; return () => {} }, onWebFallback: callback => { fallback = callback; return () => {} },
+    }
+    window.javLibrary = { playback: bridge as DesktopPlaybackBridge }
+    const { desktopPlaybackService: service } = await import("./desktop-playback-service")
+    const navigate = vi.fn().mockResolvedValue(undefined)
+    service.initialize(navigate)
+    await Promise.resolve()
+    expect(updateActivePlaybackSession).toHaveBeenLastCalledWith(expect.objectContaining({ routeQuery: { back: "browse", browse: "fc2", q: "original", fileId: "p2" } }))
+    await service.command("pause")
+    await service.command("focus")
+    expect(command.mock.calls).toEqual([["restored", { action: "pause" }], ["restored", { action: "focus" }]])
+    receive?.({ ...restored, revision: 11, state: { ...restored.state, positionSec: 1 } })
+    expect(service.snapshot.value?.state.positionSec).toBe(36)
+    fallback?.({ movieId: "a", fileId: "p2", startSec: 37 })
+    expect(navigate).toHaveBeenLastCalledWith({ name: "player", params: { id: "a" }, query: { back: "browse", browse: "fc2", q: "original", engine: "web", fileId: "p2", t: "37", autoplay: "1" } })
   })
 })

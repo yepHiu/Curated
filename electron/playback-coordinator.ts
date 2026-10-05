@@ -4,7 +4,7 @@ import { NativeMediaProxy, type MediaFetcher } from "./native-media-proxy.js"
 import { NativeMpvPlayer } from "./native-mpv-player.js"
 import { emptyNativePlayerState, type NativeLabMovie, type NativePlayerState } from "./native-player-contract.js"
 import { createPlaybackWatchTimeTracker, type PlaybackWatchTimeTracker } from "./playback-watch-time-core.js"
-import type { DesktopPlaybackCommand, DesktopPlaybackOpen, DesktopPlaybackPreferences, DesktopPlaybackSnapshot } from "./playback-contract.js"
+import type { DesktopPlaybackCommand, DesktopPlaybackOpen, DesktopPlaybackPreferences, DesktopPlaybackSnapshot, DesktopPlaybackSourceQuery } from "./playback-contract.js"
 
 export interface PlaybackContext { origin: string; generation: string; fetch: MediaFetcher }
 export interface PlaybackSurface {
@@ -28,6 +28,26 @@ interface Active {
 function id(value: unknown): asserts value is string {
   if (typeof value !== "string" || !value.trim() || value.length > 200) throw new Error("INVALID_MEDIA_ID")
 }
+// 只保留现有 Curated 内部导航上下文；起点/引擎/文件由独立字段决定。
+const sourceQueryKeys = new Set(["from", "browse", "back", "detailBack", "q", "tag", "actor", "studio", "tab", "playState",
+  "userRating", "resolution", "addedWithinDays", "unrated", "year", "runtime", "catalog", "sort", "favorite", "selected", "cfq", "cft"])
+function validateSourceQuery(value: unknown): DesktopPlaybackSourceQuery {
+  if (value === undefined) return {}
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("INVALID_SOURCE_QUERY")
+  const entries = Object.entries(value)
+  if (entries.length > 32) throw new Error("INVALID_SOURCE_QUERY")
+  const query: DesktopPlaybackSourceQuery = {}
+  let size = 0
+  for (const [key, raw] of entries) {
+    if (!sourceQueryKeys.has(key)) continue
+    const values = Array.isArray(raw) ? raw : [raw]
+    if (values.length > 16 || values.some(item => item !== null && (typeof item !== "string" || item.length > 2048))) throw new Error("INVALID_SOURCE_QUERY")
+    size += values.reduce((sum, item) => sum + (item?.length ?? 0), 0)
+    if (size > 16384) throw new Error("INVALID_SOURCE_QUERY")
+    query[key] = Array.isArray(raw) ? [...raw] : raw
+  }
+  return query
+}
 export function validatePlaybackOpen(value: unknown): DesktopPlaybackOpen {
   if (!value || typeof value !== "object") throw new Error("INVALID_PLAYBACK_REQUEST")
   const input = value as DesktopPlaybackOpen
@@ -42,7 +62,8 @@ export function validatePlaybackOpen(value: unknown): DesktopPlaybackOpen {
     input.queue.forEach(id)
   }
   return { movieId: input.movieId, fileId: input.fileId, startSec: input.startSec, autoplay: input.autoplay,
-    seekExisting: input.seekExisting === true, autoAdvance: input.autoAdvance === true, queue: [...new Set(input.queue ?? [])], locale: input.locale ?? "zh-CN" }
+    seekExisting: input.seekExisting === true, autoAdvance: input.autoAdvance === true, queue: [...new Set(input.queue ?? [])], locale: input.locale ?? "zh-CN",
+    sourceQuery: validateSourceQuery(input.sourceQuery) }
 }
 
 /** 正式本机播放的唯一所有者：身份、HTTP 写入和资源替换全部串行。 */
@@ -134,7 +155,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
     const startSec = input.startSec ?? (resume > 0 && !(descriptor.durationSec && resume >= descriptor.durationSec * 0.95) ? resume : 0)
     this.snapshotState = { ...this.snapshotState, sessionId: randomUUID(), state: { ...emptyNativePlayerState(), status: "starting",
       movieId: movie.id, fileId }, movie, windowOpen: true, queue: input.queue ?? [], autoAdvance: input.autoAdvance === true,
-      locale: input.locale ?? "zh-CN" }
+      locale: input.locale ?? "zh-CN", sourceQuery: structuredClone(input.sourceQuery ?? {}) }
     this.lastContext = context
       this.surface ??= await this.createSurface()
       const proxy = new NativeMediaProxy(`${context.origin}/api/library/movies/${encodeURIComponent(movie.id)}/stream?fileId=${encodeURIComponent(fileId)}`, async (url, init) => {
@@ -201,7 +222,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
           const nextMovie = index < 0 ? undefined : this.snapshotState.queue[index + 1]
           if (nextFile || nextMovie) {
             try { await this.start(active.context, { movieId: nextFile ? active.movie.id : nextMovie!, fileId: nextFile,
-              autoplay: true, queue: this.snapshotState.queue, autoAdvance: true, locale: this.snapshotState.locale }) }
+              autoplay: true, queue: this.snapshotState.queue, autoAdvance: true, locale: this.snapshotState.locale, sourceQuery: this.snapshotState.sourceQuery }) }
             catch (error) {
               // 详情预检失败发生在 start 替换资源之前，EOF 仍须释放旧资源。
               if (this.active === active) await this.finish(error instanceof Error ? error.message : "NATIVE_START_FAILED")
@@ -232,7 +253,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       if (input.action === "replay") {
         if (!context || !this.snapshotState.movie) throw new Error("NO_ACTIVE_PLAYER")
         await this.start(context, { movieId: this.snapshotState.movie.id, fileId: this.snapshotState.state.fileId,
-          startSec: 0, autoplay: true, queue: this.snapshotState.queue, autoAdvance: this.snapshotState.autoAdvance, locale: this.snapshotState.locale })
+          startSec: 0, autoplay: true, queue: this.snapshotState.queue, autoAdvance: this.snapshotState.autoAdvance, locale: this.snapshotState.locale, sourceQuery: this.snapshotState.sourceQuery })
         return
       }
       if (input.action === "web") {
@@ -249,7 +270,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
         if (input.action === "part") id(input.fileId)
         if (input.action === "movie" && !this.snapshotState.queue.includes(movieId)) throw new Error("INVALID_QUEUE_TARGET")
         await this.start(context, { movieId, fileId: input.action === "part" ? input.fileId : undefined, autoplay: true,
-          queue: this.snapshotState.queue, autoAdvance: this.snapshotState.autoAdvance, locale: this.snapshotState.locale })
+          queue: this.snapshotState.queue, autoAdvance: this.snapshotState.autoAdvance, locale: this.snapshotState.locale, sourceQuery: this.snapshotState.sourceQuery })
         return
       }
       if (!active) throw new Error("NO_ACTIVE_PLAYER")
