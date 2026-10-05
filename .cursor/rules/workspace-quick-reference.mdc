@@ -3,6 +3,12 @@ description: 日常开发速记（启动、联调、根目录政策）
 alwaysApply: true
 ---
 
+## 正式 Windows 原生播放器联调 — 2026-10-06
+
+在 `codex/windows-native-player-prototype` 根运行 `pnpm native-player:prepare`（需 7-Zip，固定 SHA 的开发 mpv 写 ignored .workspace/native-player），随后 `pnpm dev:electron`。正式构建已含本地播放页/Win32 helper，需 MinGW gcc（同目录 windres）或绝对 CURATED_NATIVE_CC；也可用绝对 CURATED_NATIVE_MPV 指定开发引擎。Server 单独启动并加载此分支的新前端，Desktop 连接它；设置 → 播放开启「优先使用桌面原生播放器」（默认关闭，本机 profile）。从现有播放入口直接打开专用窗口，不再需要原型准备弹窗或二次 PIN；主页/侧栏保持可用。
+
+无桥/无资源/旧 UI/非 Windows 继续 Web；native 可显式切 Web，认证失败回解锁。正式资源未来经绝对 CURATED_NATIVE_BUNDLE 的完整 SHA 清单 stage 到 resources/app/native-player；当前 QA pin 不能直接分发，原生安装包/对应源码/许可及更多片源/DPI 验收待完成；指定 CD1 五分钟对照已记录计划 §14.10。原型入口仍独立；下节“生产入口不变”为原型阶段历史，以本节及 guide 为准。
+
 ## Windows 原生播放原型 — 2026-10-05
 
 专用分支 `codex/windows-native-player-prototype`。在该分支仓库根运行 `pnpm dev:native-player`（先构建再启动），只构建用 `pnpm build:native-player-prototype`；输出 `.workspace/native-player-dist/`。Windows 构建需 MinGW gcc 在 PATH，或绝对编译器路径 `CURATED_NATIVE_CC`。原型不启动 Server，需在准备弹窗填写已有 Server 的 HTTP/HTTPS 根地址并按需 PIN 解锁。本机选择已有 mpv.exe，或设置绝对路径 `CURATED_NATIVE_MPV`。视频已由 Win32 helper 承载并与透明 Electron 的 Curated 控件同窗显示；原型会保存所选文件的真实进度。

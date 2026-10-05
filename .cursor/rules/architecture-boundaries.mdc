@@ -3,6 +3,14 @@ description: Current implementation vs target desktop architecture boundaries
 alwaysApply: true
 ---
 
+## Windows Desktop native integration — 2026-10-06 (branch source)
+
+Production main/preload now provide an optional narrow playback bridge, owned by NativePlaybackCoordinator and bound to the committed main window's actual Electron Session. Server remains the HTTP/media/business-data owner; Desktop owns mpv/proxy/host, the local Vue player page and per-machine preferences. Native progress/history/watch-time has one main-process writer; browser playback retains its existing writer. Renderer requests carry IDs, time, enums and bounded internal source-query fields; executable/origin/cookie/HWND are main-only. State uses independent session IDs, connection generations and monotonic revisions. Candidate Server windows cannot start native playback.
+
+Native engine selection occurs before PlayerView mounts or HLS prefetch; enabled Windows users open a managed dedicated player while the main page/side-panel remain available. The main host models native window lifetime separately from HTML video PiP. Main close-to-tray preserves native; successful Server commit, auth lock and quit stop it. The native helper remains the sole physical geometry authority for the transparent owned UI. Default preference is Web; missing bridge/resources/other platforms use Web. Native startup failure has one explicit Web fallback; authentication failure stops and returns to unlock.
+
+M1–M3 source and local synthetic verification exist. The user-supplied CD1 also completed five minutes per engine: native zero observed display/decoder drops, Chromium direct 2498/9037 dropped (27.64%), native seek/watch accounting passed; broader files/full-film sync and mixed DPI remain pending. Optional Windows staging validates a prepared native engine/source/build/license manifest; M4 complete materials and installer acceptance remain pending, so QA download is not distribution-ready. M5 capture/native PiP/tracks/HDR/main-page embedding and macOS adaptation remain later phases. No new public HTTP API, library-config setting or release. Prototype-only statements below are historical; see plan §14.9 and guide.
+
 ## Windows native playback prototype — 2026-10-05
 
 The separate `native-player-prototype.ts` entry now implements mpv process control through Windows named-pipe JSON IPC. Its local Vue page uses only `window.nativePlayerLab`; Server business APIs remain HTTP. Main owns an origin-scoped authentication session and a streaming loopback proxy for one selected raw media file. The prototype uses separate build output/profile and never loads from production main/preload.

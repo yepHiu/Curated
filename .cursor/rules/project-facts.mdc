@@ -3,6 +3,14 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-10-06 正式 Windows Desktop 原生播放接入（分支源码）
+
+专用分支 `codex/windows-native-player-prototype` 已按用户授权实施 M1–M3。正式 `main.ts` 安装 `playback-desktop.ts`/`NativePlaybackCoordinator`；受限 `window.javLibrary.playback` 供已提交主窗口 frame 查询能力、本机偏好、打开/控制/快照/订阅，本地 `window.curatedPlayer` 仅控制当前会话。使用主窗口实际 Session/HttpOnly Cookie、原始媒体代理和 direct descriptor；renderer 只传业务 ID/时间/枚举动作及受限导航上下文，不传 URL/exe/HWND。
+
+router 在 PlayerView/HLS prefetch 前选择可选 native，专用 `electron-dist/player/index.html` 共享圆形控件/分部/倍速；主窗口仍浏览，侧栏可暂停/停止/返回。main 唯一写逐文件进度、历史与日时长，保存冻结队列/来源；页面刷新恢复快照。成功切 Server/锁定/退出回收，失败切换保留；关闭主窗口到托盘保留播放器。`userData/playback-settings.json` 默认 preferNative=false，volume/speed 本机持久，不增加 HTTP API/library-config 字段。
+
+运行 `pnpm native-player:prepare`（7-Zip）后 `pnpm dev:electron`，Windows helper 构建需 gcc 或 `CURATED_NATIVE_CC`；连接新 Server UI，在 Settings → Playback 开启本机原生偏好。`build:electron:main` 包含本地播放页/helper，非 Windows 跳过 Win32 编译。可选 `CURATED_NATIVE_BUNDLE` 验证并 stage 清单资料到 app/native-player；QA 固定二进制不具有完整分发资料，M4 安装/许可/源码验收仍未完成。109 Electron 测试、前端/Electron 构建、21 打包测试及正式 main 合成认证播放/日时长/锁定清理通过；指定 CD1 两引擎各五分钟：native 零观察掉帧、Chromium 2498/9037 掉帧（27.64%），seek/隔离时长正常；更多片源、整片同步、混合 DPI、LAN/HTTPS 与安装验收待执行。原型历史仍保留，REQ-0058/0059 均 in_progress；无版本/push/发布。详见计划 §14.9 和 guide。
+
 ## 2026-10-05 Windows 原生播放原型（独立开发入口）
 
 `codex/windows-native-player-prototype` 首版已实现 mpv.exe 独立进程、named pipe JSON IPC、受限 loopback 原始媒体代理及本地三语控制页。主进程使用当前 Server 的独立 HttpOnly session，转发 Range，不向 renderer/mpv 暴露 Cookie；支持 PIN、影片/文件选择、逐文件续播与进度保存、暂停/seek/倍速/音量/停止及解码/掉帧诊断。认证锁定、换源及退出回收自己启动的进程。

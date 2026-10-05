@@ -19,7 +19,7 @@
 
 # Curated
 
-An isolated Windows mpv prototype combines native video with the existing Curated player controls in one window, with the native frame controlling both layers' position and size; see the [prototype guide](docs/guide.md#windows-native-playback-prototype) for MinGW/mpv prerequisites and [implementation plan](docs/plan/2026-10-05-windows-native-player-prototype.md) for validation. Problem-file comparison and production integration remain pending.
+The Windows native-player branch now connects existing playback entries to a Desktop-managed mpv window with shared Curated controls, current login, file progress and sidebar control. It is opt-in in local Desktop settings. See the [integration guide](docs/guide.md#windows-desktop-native-playback-integration) and [implementation record](docs/plan/2026-10-05-windows-native-player-prototype.md). A user-supplied MP4 completed a five-minute comparison per engine with zero observed native drops and substantial Chromium direct drops; complete engine distribution materials, installer acceptance and broader playback validation remain pending.
 
 Movies and FC2 have separate browsing entries with shared storage and tags, and a combined Watch History. Multiple files under one catalog code use one poster, a part selector and independent resume progress; see [FC2 and multipart movies](docs/guide.md#fc2-and-multipart-movies).
 

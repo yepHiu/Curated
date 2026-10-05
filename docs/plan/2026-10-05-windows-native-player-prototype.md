@@ -2,11 +2,11 @@
 
 日期：2026-10-05（北京时间）
 状态：in-progress
-关联需求：REQ-0058
+关联需求：REQ-0058（原型验收）、REQ-0059（正式 Desktop 接入）
 分支：`codex/windows-native-player-prototype`
 基线：`408b8c10`，独立工作目录；本计划与原型不改主工作区。
 
-最新进展：§12 的 Windows 同窗原型已实现并验证。mpv 绘制自有 Win32 宿主，透明 Electron owned window 叠加复用的 Curated 控件。下方第一版范围与 §9—§11 保留阶段记录；当前实现、启动要求与剩余边界以 §12 和 guide 为准。生产 PlayerPage 只提取共享控制栏，默认播放引擎未切换。后续正式 Desktop 接入建议见 §14，随包分发建议见 §13，均尚未实施。
+最新进展：§12 的同窗原型已验证；2026-10-06 用户授权后，§14 的 M1–M3 正式入口、会话协调、专用窗口、逐文件记录和侧栏控制已有源码及本地验证，详见 §14.9。用户指定 CD1 已完成 native/Chromium 各五分钟对照（§14.10）：原生零观察掉帧、Chromium 持续掉帧。Windows 通过本机试用开关选择 native，默认仍 Web。M4 已实现固定开发引擎准备和可选打包校验，但完整对应源码/许可及原生安装包验收尚未完成；M5 主页面内嵌与能力增量保留后续阶段。下方早期阶段记录与已发布包行为不因此被改写。
 
 ## 1. 目标与决策
 
@@ -400,13 +400,17 @@ GPL 允许重新分发。随二进制保留实际许可文本、版权声明、�
 3. 将宿主与引擎纳入 Desktop installer/ZIP staging 和 payload 校验，不自动改变正式 PlayerPage 引擎选择。正式播放接入继续按 P4 完成。
 4. 在未安装 mpv、未配置 PATH 的干净 Windows 上验收安装/便携包离线起播、空格/中文路径、H.264/HEVC 硬解、退出回收、升级替换与回退。核对安装包增量和许可/源码下载。
 
-本节为分发方案，未执行发布代码修改、引擎下载、版本递进、打包或发布。
+本节记录初始分发方案。2026-10-06 后续已下载并校验固定开发引擎、实现可选 staging 与资料清单校验，见 §14.9；没有准备完整可分发引擎资料、原生安装包或发布。
 
-## 14. 2026-10-06 正式 Desktop 接入实施计划（尚未实施）
+## 14. 2026-10-06 正式 Desktop 接入实施计划（用户已授权）
 
-本节状态：proposed。REQ-0058 的既有原型继续为 in-progress；本节尚未进入正式接入实现。
+本节状态：in-progress。2026-10-06 用户授权按本节实施，继续使用专用分支。REQ-0058 保留原型验收；正式接入跟踪为 REQ-0059。
 
-用户询问原型后续如何集成进入 Desktop。本节给出基于当前源码的实施建议，细化 P4/P5，并作为后续顺序的依据；§10/§11 保留早期研究记录。不会在本次问答中直接切换生产引擎、合并分支或准备发布。
+本节最初回应后续集成问题，细化 P4/P5；随后用户明确要求按计划实施。当前已在专用分支改动正式 Desktop 和对应 Server 前端入口，默认偏好仍 Web，实际完成情况以 §14.9 为准。§10/§11 保留早期研究记录。
+
+实施设计框架：播放窗口保持画面优先与低干扰，共享圆形控制栏、分部与倍速；设置沿用现有纵向卡片，增加本机原生偏好；侧栏沿用当前后台播放卡片。加载、锁定、引擎不可用、播放错误与 Web 切换均有明确路径；不会添加另一套全库搜索或连接准备 UI。主页面内嵌为 M5，首版使用专用窗口，不新增全局主题规则。
+
+以下 14.1–14.8 保留设计与完成条件；其中“接入时/建议”等描述为设计目标，逐项源码与证据见 14.9。M1–M3 已接入，M4 只有准备/校验支持，不能将源码接入等同于首个正式包验收完成。
 
 ### 14.1 首个产品形态与用户流程
 
@@ -431,7 +435,7 @@ GPL 允许重新分发。随二进制保留实际许可文本、版权声明、�
 | PlayerPage 与 NativePlayerPrototype.vue | 已共享 transport/分部/倍速菜单；布局和其余业务仍各自实现 | 按需继续提取标题、进度/帧标记、播放列表和通用状态；正式 native 页面接受会话，不承担连接/全库检索；避免复制整份 PlayerPage |
 | Windows stage_desktop / payload 检查 | 尚未包含 native 宿主/mpv；将 third_party 全部视为 Server 依赖 | 按 §13 的明确 native-player 路径纳入 Desktop staging/installer/ZIP，固定版本与来源；Mac 构建不调用 Win32 gcc、也不打入 Windows exe |
 
-这些修改属于计划，不表示对应 adapter/coordinator 已实现。建议新增 `NativePlaybackCoordinator`、`PlaybackEngine`/`PlaybackCapabilities` 等职责；名称可在实施时调整，先固定契约和生命周期。
+本表为实施前接入点。当前已新增 `NativePlaybackCoordinator`、Desktop playback contract、正式 main bridge 与 Server UI 可选适配，复用底层 mpv/代理/窗口模块；实现映射见 §14.9。
 
 ### 14.3 引擎选择和兼容策略
 
@@ -495,4 +499,65 @@ Windows 问题片源对照和混合 DPI 的 P3 验收可与 M1–M3 开发并行
 | 旧 Desktop/浏览器 + 新 Server UI | 可选桥检测失败后继续 Web 播放，不访问不存在的 IPC |
 | macOS Desktop + 新 Server UI | Windows native 能力明确不可用，使用当前 Web 路径，打包不执行 Windows 宿主构建 |
 
-Server 前端与 Desktop 交付若都实际改变，按现有 Curated 日期批次独立准备两个组件版本并可同批发布；不把 mpv 纳入 Server 包。本次仅更新实施计划，无正式代码/默认路径、版本、打包、push、合并或发布动作。
+Server 前端与 Desktop 交付若都实际改变，按现有 Curated 日期批次独立准备两个组件版本并可同批发布；不把 mpv 纳入 Server 包。当前已在隔离分支实施正式可选入口与打包准备代码；没有版本递进、push、合并或发布。新旧组合中的实际网络/安装验收仍需完成。
+
+
+### 14.9 2026-10-06 实施记录与验收边界
+
+本轮正式接入需求 REQ-0059 保持 `in_progress`（70），原型 REQ-0058 保持 `in_progress`（80）。M1–M3 有本地源码和自动/合成样本证据；M4 尚无完整可分发引擎资料和安装验收，整项需求不标 verified/released。专用分支保持隔离，未修改主工作区、library-config.cfg、版本或发布渠道。
+
+| 单元 | 已实现源码/行为 | 验证与剩余条件 |
+|---|---|---|
+| M1 会话与窗口 | `playback-coordinator.ts` 为唯一原生会话/写入所有者；`playback-desktop.ts` 复用当前主窗口实际 Session，限定主 frame 和本地控制页；独立 sessionId/连接代次，串行替换、停止/退出；复用原生 helper 几何权威 | 实际正式 Electron main 用 HttpOnly Cookie 播放受保护第二片，无二次 PIN；旧命令拒绝、替换/EOF/锁定/回收自动测试通过；真实切 Server/崩溃/网络验收待完成 |
+| M2 入口与 UI | router 在 PlayerView/HLS prefetch 前检测 bridge/本机偏好；列表/详情/历史/分部/帧意图走同一入口，主窗口保留来源；本地 `DesktopPlayer.vue` 共享圆形 transport、分部/倍速菜单；Web 显式回退 | 深链与入口适配、无能力/Web 回退/锁定路由自动测试通过；同目标重新打开在实际 40 秒位置保持同一会话、不回退至旧 12 秒；实际透明画面层 CSS 为 outline none/boxShadow none |
+| M3 业务同步 | direct descriptor、逐文件进度/历史/每日观看时长；冻结队列与受限来源上下文，刷新可恢复；分部/下一作品连播；侧栏暂停/继续/停止/聚焦；volume/speed 本机保存 | 实际 PUT query/body 均为 part-2；d3d11va 合成 H.264 观察到零掉帧；四次实际日时长上报为 4.902/5.040/4.990/4.011 秒；main 刷新/侧栏命令/Web 来源恢复测试通过 |
+| M4 分发准备 | `native-player:prepare` 固定 URL/archive/exe SHA，开发资源放 ignored `.workspace/native-player/`；Windows staging 可读取绝对 `CURATED_NATIVE_BUNDLE`，校验 runtime/完整对应源码/构建材料/许可/组件清单和 SHA，按清单复制；未配置则原包继续 Web | 21 项打包测试通过；上游 20261005 Release 仅有运行时/开发二进制资产，所下载包未包含完整对应源码与许可集合；固定 QA pin `distributionReady=false`，不能直接用于正式分发；未制作或验收原生 installer/ZIP |
+
+正式窗口提供标题、进度、分部、圆形播放/快进退、倍速、音量/静音、前后作品、连播、全屏、诊断、关闭和 Web 切换；准备地址/PIN/搜索/exe 选择留在独立原型入口。即时截图/逐帧、源帧/片段 UI、原生 PiP、音轨/字幕/HDR 和主页面内嵌尚未接入本地原生页，相关功能可切回现有 Web 使用。当前前后作品为冻结 ID 队列按钮，尚无完整标题列表面板。
+
+原生窗口继续采用 helper 的物理 SetWindowPos，透明层不可独立拖动/缩放。主窗口关闭到托盘不会关闭正在播放的专用窗口；播放器关闭停止并保存，恢复主窗口。锁定（状态 unlocked=false、媒体或认证 HTTP 401/403）停止并关闭原生资源，不触发 Web 绕过锁定。实际合成 Server 锁定后发布 SERVER_LOCKED/windowOpen=false，自己的 mpv/helper 已回收。
+
+共享观看时长纯计算已修复本地午夜拆分和失败批次重试，重试不会再次累计已确认日块。mpv 逐帧 time-pos 的 30/60fps 推进不能用原 0.05 秒阈值过滤，现计入任何有效正向推进，仍忽略 seek、暂停及不推进样本。相关 Web 回归通过，实际原生每 5 秒批次有正常秒数。
+
+#### 本轮验证
+
+- `CURATED_NATIVE_MPV=<已校验 QA mpv> pnpm test:electron`：17 文件、109 测试通过，包含真实 mpv/Win32 host/实际透明叠层及新增正式 coordinator/bridge/统计测试。
+- `pnpm build`（含 vue-tsc 与 bundle 监管）、`pnpm build:electron:main`、生产 Electron tsc 和改动前端局部 ESLint 通过；入口服务测试新增页面刷新/侧栏命令/旧快照/Web 来源恢复验证通过。
+- 相关前端播放器、auth guard、设置、locale、watch tracker 和 Desktop 入口定向回归均通过；这些批次重叠，不累加成独立总数。
+- 最新独立前端回归批次（PlayerView、Desktop service、locale、ActivePlaybackHost、watch tracker、Playback settings）共 6 文件、52 测试通过。
+- `python -m unittest scripts.release.tests.test_native_player scripts.release.tests.test_component_cd`：21 测试通过。
+- 真实正式 main 采用隔离临时 profile 与本机合成 HTTP fixture；实际硬解/第二片/进度/时长/重复聚焦/锁定清理已观察。该 fixture 没有替代真实问题 MP4、实际资料库、LAN/HTTPS 或安装环境验收。
+- 用户随后提供的问题 CD1 五分钟对照见 §14.10；未运行 `test:display`、混合 DPI 跨屏、整片长播、历史安装器/升级/卸载或 macOS 构建。
+
+#### 继续完成首个交付闭环
+
+1. 为选择的 Windows 引擎构建获得精确依赖版本、补丁、构建输入、完整对应源码和许可集合，形成能通过 `engine-manifest.json` 校验的分发目录；若上游无法证明该二进制的完整对应资料，改用能保留这些材料的自有固定构建。
+2. 通过 `CURATED_NATIVE_BUNDLE` 组装原生 Desktop installer/ZIP，在未装 mpv/PATH 的干净 Windows 验证安装即播、中文/空格路径、退出、升级/回退/卸载及旧 Server UI 兼容。
+3. 在 CD1 对照基础上，对更多 MP4、常用 HEVC、长时 A/V 同步、真实 LAN/HTTPS、成功/失败 Server 切换、渲染器/引擎崩溃及混合 DPI 做实际验收并记录证据，然后决定 Windows 默认偏好与发布批次。
+4. M5 的萃取/PiP/轨道/HDR/主页面嵌入按能力独立增量；嵌入实验通过前专用窗口持续可用。
+
+正式启动与可选分发目录格式见 guide 的 Windows Desktop native playback integration。源码入口与 Server 前端需要配套更新；已安装旧包不会因本分支代码自动获得能力。
+
+分发来源复核：已读取所选 [上游构建](https://github.com/shinchiro/mpv-winbuild-cmake/actions/runs/37245752254) 的 x86_64 日志 artifact，以及固定 builder commit `05a60b3cfd04e3e3b89918f4a27f3dde2935dff2` 的 mpv/FFmpeg recipe 和 GCC workflow。FFmpeg 配置日志明确为 GPL v3 or later；recipe 依赖许多静态库，工作流用 latest 容器及仓库/工具链缓存。日志和顶层两个源码仓库不能代替所有精确依赖、补丁、构建材料与完整对应源码；未据此把 QA 二进制标成 distributionReady。
+
+其它完成细节：媒体先以暂停加载，在 main 应用本机 volume/speed 后按 autoplay 恢复，避免起播瞬间使用默认声音/速度；设置页仅修改 preferNative，不能用旧快照覆盖播放中保存的音量/倍速；成功提交 Server 切换的停止阶段与退出阶段拒绝新的主窗口起播请求。Win32 helper 嵌入现有 Curated Desktop 图标，构建还需 gcc 同目录的 MinGW windres；产物不依赖运行时资源编译器。
+
+
+### 14.10 用户指定 FC2-4985807-CD1 的实际对照（2026-10-06）
+
+用户提供 `fc2-4985807-cd1` 后，已在当前开发 Server 查到作品 `fc2-4985807`、文件 `fc2-4985807:primary`（CD1）。源文件约 2.32 GB、50 分 31 秒：H.264 High 1920×1080、yuv420p、30000/1001 fps，AAC-LC 音频。使用正式 Electron main、隔离临时 profile、受限 native bridge，实际原始媒体经测试 HTTP relay 和生产认证媒体代理流式读取；没有整片下载/读入内存，业务记录写入隔离 sink，正式历史/进度没有改动。
+
+先 native 后 Chromium HTMLVideoElement direct，各从 60 秒开始连续观察 300 秒；浏览器页可见、readyState=4，测试都静音。没有使用正式 PlayerPage/HLS；这是同机顺序诊断，不是严格受控性能基准。两套引擎的掉帧计数口径不同，不能将其当作完全相同的指标或直接推导具体 Chromium 内部原因。
+
+| 检查 | 结果 |
+|---|---|
+| native 连续播放 | 300.010 秒，时间到 359.792767；mpv d3d11va；frame-drop-count=0，decoder-frame-drop-count=0 |
+| native 暂停与远 seek | seek 至 1200 秒，结果 1199.9988，保持 paused，1 秒内验证到目标 |
+| native 日观看时长 | 隔离 sink 合计 299.927 秒，seek 跳过的时间未计入 |
+| native A/V 诊断 | 最后约 110 秒间隔抽样 11 次，avsync 最大绝对值 0.000008 秒；这仅为引擎属性，不代替主观听辨或整片长期同步验收 |
+| Chromium direct | 300.0007 秒，时间到 359.926428；totalVideoFrames=9037，droppedVideoFrames=2498（27.6419%）；首个样本仅掉 6 帧，之后持续累计，结束时仍 readyState=4 |
+| 生命周期 | native 转 Web 前关闭原生资源；比较完成后暂停 Web 并关闭本次临时 QA 实例；正式 Desktop/Server 未退出 |
+
+该样本在当前机器上复现 Chromium 直放掉帧，native 同片连续播放没有观察到掉帧，支持目前专用窗口方案对这一问题片的改善；不能泛化为所有 MP4/电脑/网络已修复，也不能只据计数判定是 codec、硬解还是合成器的具体缺陷。采样结果摘要保存为 `docs/ops/2026-10-06-windows-native-playback-qa.json`；本机原始日志在 ignored `output/playwright/desktop-player/problem-file-results.json` 和 `problem-file-avsync.json`。本轮没有生成媒体截图/图像。
+
+REQ-0058 保留 in_progress 80（混合 DPI、更多真实场景等仍未通过）；REQ-0059 保留 in_progress 70（M4 分发资料/安装验收未完成）。其它格式/HEVC、真实 LAN/HTTPS、混合 DPI、50 分钟整片主观同步与成功/失败 Server 切换/崩溃仍待验收。

@@ -122,15 +122,27 @@
   </style>
 </head>
 <body>
+<section id="windows-desktop-native-integration">
+  <h2>2026-10-06：正式 Windows Desktop 可选原生播放器（分支源码）</h2>
+  <p>用户授权后，正式 main/preload 已接入受限 playback bridge 与 NativePlaybackCoordinator，复用当前主窗口实际 Session 和 HttpOnly Cookie。router 在 PlayerView/HLS prefetch 前选引擎；本地 Curated 专用窗口共享圆形控件、分部、倍速，主页面继续浏览并通过侧栏控制。helper 独占透明层与视频宿主的物理几何。默认 Web，本机偏好可开启 native，无新增公共 HTTP 端点或 library-config 字段。</p>
+  <table><thead><tr><th>能力</th><th>当前实现</th><th>验收边界</th></tr></thead><tbody>
+    <tr><td>M1 会话与认证</td><td>单一 main 所有者、串行替换、sessionId/连接代次、当前 Session；Cookie/URL/exe/HWND 留在 main</td><td>正式 main 合成认证播放、旧命令隔离、锁定回收通过；真实切源/崩溃/LAN/HTTPS 待验收</td></tr>
+    <tr><td>M2 入口与 UI</td><td>现有播放入口/深链、能力/偏好选择、共享控件专用窗口、单次 Web 回退</td><td>同目标聚焦实际 40 秒不倒回旧 12 秒；圆形控制和画面焦点 CSS 已检查；主页面内嵌属 M5</td></tr>
+    <tr><td>M3 业务与侧栏</td><td>逐文件进度、历史、日时长、冻结队列/来源，页面刷新恢复，暂停/停止/返回</td><td>109 Electron 测试及前端构建/定向回归通过；实际 part-2、d3d11va/零观察掉帧、正常日时长批次通过；指定 CD1 各五分钟 native 零观察掉帧、Chromium 2498/9037（27.64%），详见计划 §14.10；更多片源/DPI/整片同步待完成</td></tr>
+    <tr><td>M4 分发准备</td><td>固定 QA mpv 下载/SHA；可选完整 runtime/source/build/license 清单校验与 Windows staging；21 打包测试通过</td><td>QA pin distributionReady=false；完整对应资料和原生 installer/ZIP 安装/升级/卸载尚未验收</td></tr>
+    <tr><td>M5 能力增量</td><td>当前明确提供 Web 切换</td><td>萃取/截图/逐帧、原生 PiP、轨道/HDR、主页面内嵌和 macOS 后续适配</td></tr>
+  </tbody></table>
+  <p>REQ-0058/0059 保持 in_progress；没有版本递进、push、合并或发布。详见 <a href="../plan/2026-10-05-windows-native-player-prototype.md">计划 §14.9</a> 和 <a href="../guide.md#windows-desktop-native-playback-integration">正式联调操作</a>。下方原型章节记录此前阶段。</p>
+</section>
 <section id="windows-native-prototype">
   <h2>2026-10-05：Windows 原生播放原型（独立开发入口）</h2>
-  <p>专用分支以本地 Vue 控制页 → 限定 preload IPC → Electron 主进程 → mpv 原生播放读取 Server 原始媒体。自有 Win32 helper 的 HWND 承载 mpv wid，透明 Electron owned window 叠加 Curated 控件；2026-10-06 修复该层独立拖动/缩放，由 helper 的 SetWindowPos 独占两层物理几何，主进程仅同步可见性，避免重复转换 DIP 的像素偏差。宿主联动最小化、全屏与退出。主进程持有来源隔离的认证会话，通过临时 loopback 代理转发 Range，不向页面或 mpv 传入 Server Cookie；renderer 不接触 HWND/原生命令。生产 main/preload 保持原路径，PlayerPage 只提取共享控件，无新增公共 HTTP 端点或配置字段。</p>
+  <p>专用分支以本地 Vue 控制页 → 限定 preload IPC → Electron 主进程 → mpv 原生播放读取 Server 原始媒体。自有 Win32 helper 的 HWND 承载 mpv wid，透明 Electron owned window 叠加 Curated 控件；2026-10-06 修复该层独立拖动/缩放，由 helper 的 SetWindowPos 独占两层物理几何，主进程仅同步可见性，避免重复转换 DIP 的像素偏差。宿主联动最小化、全屏与退出。主进程持有来源隔离的认证会话，通过临时 loopback 代理转发 Range，不向页面或 mpv 传入 Server Cookie；renderer 不接触 HWND/原生命令。原型阶段生产 main/preload 保持原路径；当前可选正式接入以上节为准，无新增公共 HTTP 端点或配置字段。</p>
   <table><thead><tr><th>能力</th><th>当前实现</th><th>验收边界</th></tr></thead><tbody>
     <tr><td>播放与控制</td><td>Windows named pipe JSON IPC；暂停、seek、倍速、音量、停止；解码与掉帧诊断</td><td>真实 mpv 合成 MP4 与错误片源已测试；真实问题影片对照待执行</td></tr>
     <tr><td>业务与认证</td><td>PIN、影片/文件选择、逐文件续播与进度保存；认证锁定和退出回收</td><td>实际 Electron fixture 已验证第二片与 12 秒续播；LAN/HTTPS 与长期音画同步待验收</td></tr>
     <tr><td>页面与窗口</td><td>复用圆形播放控制栏、音量、分段选择和播放设置；准备弹窗、诊断与快捷键；native helper 与透明 Web UI 合成</td><td>实际桌面合成、全屏/最小化恢复及 Win32 生命周期已验证；混合 DPI 跨屏、HDR/轨道待验收</td></tr>
     <tr><td>窗口绑定</td><td>透明层禁止独立移动/缩放；原生宿主统一物理位置与尺寸，Electron 仅同步可见性</td><td>实际 Electron 入口的八个边角命中、六组移动/缩放/恢复边界、最小化和关闭回收通过；混合 DPI 跨屏待验收</td></tr>
-    <tr><td>交付</td><td>pnpm dev:native-player；MinGW gcc/本机 mpv；独立 profile 与 .workspace/native-player-dist 构建</td><td>98 项 Electron 通过，此前 40 项相关前端测试通过；正式路由/引擎接入、萃取/小窗、引擎分发与 macOS 待实现</td></tr>
+    <tr><td>交付</td><td>pnpm dev:native-player；MinGW gcc/本机 mpv；独立 profile 与 .workspace/native-player-dist 构建</td><td>98 项 Electron 通过，此前 40 项相关前端测试通过；该数为原型阶段；当前正式路由/引擎接入见上节，萃取/小窗、完整引擎分发与 macOS 仍待实现</td></tr>
   </tbody></table>
   <p>详见 <a href="../plan/2026-10-05-windows-native-player-prototype.md">实施计划与证据（REQ-0058，in_progress）</a>、<a href="../guide.md#windows-native-playback-prototype">运行说明</a>。</p>
 </section>

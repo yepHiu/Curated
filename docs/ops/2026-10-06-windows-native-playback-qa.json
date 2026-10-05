@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-06",
+  "branch": "codex/windows-native-player-prototype",
+  "sample": {
+    "movieId": "fc2-4985807",
+    "fileId": "fc2-4985807:primary",
+    "fileName": "FC2-4985807-CD1.mp4",
+    "bytes": 2324403093,
+    "durationSec": 3031.361,
+    "video": "H.264 High 1920x1080 yuv420p 30000/1001 fps",
+    "audio": "AAC-LC"
+  },
+  "method": "Sequential same-machine 300 seconds per engine from 60 seconds. Production Electron main with isolated profile/business sink, real Server raw-media relay. Visible Chromium HTMLVideoElement direct, no HLS. Muted audio. Engine drop counters differ; diagnostic comparison, not controlled benchmark.",
+  "native": {
+    "hwdec": "d3d11va",
+    "elapsedSec": 300.01,
+    "finalPositionSec": 359.792767,
+    "displayDroppedFrames": 0,
+    "decoderDroppedFrames": 0,
+    "seekTargetSec": 1200,
+    "seekResultSec": 1199.9988,
+    "watchedSec": 299.927,
+    "avSyncSamples": 11,
+    "avSyncMaxAbsoluteSec": 8e-06,
+    "avSyncScope": "Last roughly 110 seconds only; engine diagnostic, no subjective listening acceptance"
+  },
+  "chromiumDirect": {
+    "elapsedSec": 300.000700000003,
+    "finalPositionSec": 359.926428,
+    "totalVideoFrames": 9037,
+    "droppedVideoFrames": 2498,
+    "dropRatio": 0.2764191656523182,
+    "readyState": 4,
+    "visibility": "visible"
+  },
+  "limits": [
+    "Not a full-film or subjective A/V acceptance",
+    "No claim for all MP4 or machines",
+    "Other formats/HEVC, mixed DPI, real LAN/HTTPS, Server switching/crash and native installer gates remain",
+    "No production history or progress changes",
+    "No media image capture"
+  ],
+  "enginePin": "scripts/release/native-player/windows-x64.json"
+}
