@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { Info, Maximize2, Minimize2, Monitor, Repeat2, SkipBack, SkipForward, X } from "lucide-vue-next"
+import { Copy, Info, Maximize2, Minus, Minimize2, Monitor, Repeat2, SkipBack, SkipForward, Square, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Alert, AlertTitle } from "@/components/ui/alert"
@@ -94,6 +94,14 @@ function click() {
 function doubleClick() { clearTimeout(clickTimer); void command({ action: "fullscreen" }) }
 function focusIn(event: FocusEvent) { focusedControl.value = event.target instanceof HTMLElement && event.target.tabIndex >= 0; immersive.revealChrome() }
 function focusOut(event: FocusEvent) { focusedControl.value = event.relatedTarget instanceof HTMLElement && event.relatedTarget.tabIndex >= 0 }
+function dragWindow(event: PointerEvent) {
+  if (event.button !== 0 || snapshot.value?.fullscreen || (event.target instanceof Element && event.target.closest('button, [role="combobox"]'))) return
+  void command({ action: "drag" })
+}
+function maximizeWindow(event: MouseEvent) {
+  if (event.target instanceof Element && event.target.closest('button, [role="combobox"]')) return
+  void command({ action: "maximize" })
+}
 function keydown(event: KeyboardEvent) {
   if (shouldIgnoreGlobalPlaybackHotkeysForTarget(event.target)) return
   const key = event.key.toLowerCase()
@@ -121,11 +129,17 @@ onBeforeUnmount(() => {
 <template>
   <main class="native-player-surface dark relative h-screen overflow-hidden text-white" @pointermove="immersive.revealChrome" @focusin="focusIn" @focusout="focusOut">
     <button type="button" tabindex="-1" class="absolute inset-0 outline-none" :aria-label="playing ? t('pause') : t('resume')" @click="click" @dblclick="doubleClick" />
-    <header class="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between gap-4 bg-gradient-to-b from-black/80 to-transparent p-5 pb-12 transition-opacity" :class="chromeShown ? 'opacity-100' : 'opacity-0'">
-      <div class="min-w-0"><p class="truncate text-lg font-medium">{{ snapshot?.movie?.title || snapshot?.movie?.code || 'Curated' }}</p><p class="text-sm text-white/60">{{ snapshot?.movie?.code }}</p></div>
-      <div class="pointer-events-auto flex items-center gap-2">
+    <header class="absolute inset-x-0 top-0 flex flex-col gap-3 bg-gradient-to-b from-black/80 to-transparent p-4 pb-12 transition-opacity sm:p-5 sm:pb-12" :class="chromeShown ? 'opacity-100' : 'pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100'">
+      <div class="flex min-h-9 items-center justify-between gap-3 select-none" data-player-window-bar @pointerdown="dragWindow" @dblclick="maximizeWindow">
+        <div class="min-w-0 flex-1"><p class="truncate text-lg font-medium">{{ snapshot?.movie?.title || snapshot?.movie?.code || 'Curated' }}</p><p class="truncate text-sm text-white/60">{{ snapshot?.movie?.code }}</p></div>
+        <div class="flex shrink-0 items-center gap-2" role="group" :aria-label="t('windowControls')">
+          <Button variant="ghost" size="icon" class="rounded-full" :disabled="busy" :aria-label="t('minimize')" :title="t('minimize')" @click="command({ action: 'minimize' })"><Minus /></Button>
+          <Button variant="ghost" size="icon" class="rounded-full" :disabled="busy" :aria-label="snapshot?.maximized || snapshot?.fullscreen ? t('restoreWindow') : t('maximize')" :title="snapshot?.maximized || snapshot?.fullscreen ? t('restoreWindow') : t('maximize')" @click="command({ action: 'maximize' })"><Copy v-if="snapshot?.maximized || snapshot?.fullscreen" /><Square v-else /></Button>
+          <Button variant="secondary" size="icon" class="rounded-full bg-danger/15 text-danger hover:bg-danger/25 hover:text-danger focus-visible:ring-danger/40" :disabled="busy" :aria-label="t('close')" :title="t('close')" @click="command({ action: 'close' })"><X /></Button>
+        </div>
+      </div>
+      <div class="flex justify-end">
         <MoviePartSelect v-if="files.length > 1" :files="files" :model-value="state?.fileId" :disabled="busy" @update:model-value="command({ action: 'part', fileId: $event })" />
-        <Button variant="ghost" size="icon" :aria-label="t('close')" @click="command({ action: 'close' })"><X /></Button>
       </div>
     </header>
     <div v-if="state?.status === 'starting'" class="pointer-events-none absolute inset-0 flex items-center justify-center">{{ t('starting') }}</div>
@@ -144,14 +158,29 @@ onBeforeUnmount(() => {
       <div class="flex items-center justify-between gap-3 text-sm text-white/80 tabular-nums"><span>{{ time(draft ?? state?.positionSec ?? 0) }} / {{ time(state?.durationSec ?? 0) }}</span><span class="max-w-[55%] truncate">{{ currentFile?.fileName }}</span></div>
       <Slider :model-value="[draft ?? state?.positionSec ?? 0]" :max="Math.max(1, state?.durationSec ?? 0)" :step="0.1" :disabled="!active || busy" :aria-label="t('time')" @update:model-value="draft = $event?.[0]" @value-commit="command({ action: 'seek', value: $event?.[0] }); draft = undefined" />
       <PlayerTransportControls :playing="playing" :disabled="!active || busy" :volume-values="[state?.volume ?? 100]" :volume-percent="state?.volume ?? 100" :muted="state?.volume === 0" :labels="labels" @toggle="toggle" @seek-back="seek(-10)" @seek-forward="seek(10)" @mute="mute" @volume="volume">
-        <Button variant="ghost" size="icon" :disabled="queueIndex <= 0 || busy" :aria-label="extra.previous" @click="command({ action: 'movie', movieId: snapshot!.queue[queueIndex - 1]! })"><SkipBack /></Button>
-        <Button variant="ghost" size="icon" :disabled="queueIndex < 0 || queueIndex >= (snapshot?.queue.length ?? 0) - 1 || busy" :aria-label="extra.next" @click="command({ action: 'movie', movieId: snapshot!.queue[queueIndex + 1]! })"><SkipForward /></Button>
-        <Button variant="ghost" size="icon" :aria-label="extra.auto" :aria-pressed="snapshot?.autoAdvance" :class="snapshot?.autoAdvance ? 'text-primary' : ''" @click="command({ action: 'autoAdvance', enabled: !snapshot?.autoAdvance })"><Repeat2 /></Button>
+        <Button variant="ghost" size="icon" class="rounded-full" :disabled="queueIndex <= 0 || busy" :aria-label="extra.previous" @click="command({ action: 'movie', movieId: snapshot!.queue[queueIndex - 1]! })"><SkipBack /></Button>
+        <Button variant="ghost" size="icon" class="rounded-full" :disabled="queueIndex < 0 || queueIndex >= (snapshot?.queue.length ?? 0) - 1 || busy" :aria-label="extra.next" @click="command({ action: 'movie', movieId: snapshot!.queue[queueIndex + 1]! })"><SkipForward /></Button>
+        <Button variant="ghost" size="icon" class="rounded-full" :aria-label="extra.auto" :aria-pressed="snapshot?.autoAdvance" @click="command({ action: 'autoAdvance', enabled: !snapshot?.autoAdvance })"><Repeat2 /></Button>
         <PlayerPlaybackSettingsMenu native :disabled="!active || busy" :playback-rate="state?.speed ?? 1" @update:playback-rate="command({ action: 'speed', value: $event })" @update:open="settings = $event" />
-        <Button variant="ghost" size="icon" :aria-label="extra.web" :title="extra.web" @click="command({ action: 'web' })"><Monitor /></Button>
-        <Button variant="ghost" size="icon" :aria-label="t('diagnostics')" :aria-pressed="diagnostics" @click="diagnostics = !diagnostics"><Info /></Button>
-        <Button variant="ghost" size="icon" :aria-label="snapshot?.fullscreen ? t('exitFullscreen') : t('fullscreen')" @click="command({ action: 'fullscreen' })"><Minimize2 v-if="snapshot?.fullscreen" /><Maximize2 v-else /></Button>
+        <Button variant="ghost" size="icon" class="rounded-full" :aria-label="extra.web" :title="extra.web" @click="command({ action: 'web' })"><Monitor /></Button>
+        <Button variant="ghost" size="icon" class="rounded-full" :aria-label="t('diagnostics')" :aria-pressed="diagnostics" @click="diagnostics = !diagnostics"><Info /></Button>
+        <Button variant="ghost" size="icon" class="rounded-full" :aria-label="snapshot?.fullscreen ? t('exitFullscreen') : t('fullscreen')" :aria-pressed="snapshot?.fullscreen" @click="command({ action: 'fullscreen' })"><Minimize2 v-if="snapshot?.fullscreen" /><Maximize2 v-else /></Button>
       </PlayerTransportControls>
     </footer>
   </main>
 </template>
+
+<style scoped>
+/* 原生 HUD 局部表面：沿用应用语义色，不改变共享 Web 控件。 */
+:deep([data-movie-part-select]) {
+  background-color: var(--surface-muted);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+:deep([data-movie-part-select]:hover) { background-color: var(--accent); }
+footer :deep(button[aria-pressed="true"]),
+footer :deep(button[data-state="open"]) {
+  background-color: color-mix(in srgb, var(--primary) 18%, transparent);
+  color: var(--primary);
+}
+</style>

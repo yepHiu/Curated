@@ -11,7 +11,7 @@ const zh = {
   nativeWindow: "原生视频与 Curated 控件在同一窗口播放", busy: "处理中", engineRequired: "请先选择 mpv.exe", lockedHint: "请先连接并解锁 Server",
   chooseMedia: "选择影片", idleHint: "连接媒体库，选择影片开始播放", settings: "播放设置", settingsAria: "打开播放设置",
   seekBack: "后退 10 秒", seekForward: "快进 10 秒", mute: "静音", unmute: "取消静音", fullscreen: "进入全屏", exitFullscreen: "退出全屏",
-  replay: "重新播放", close: "关闭播放器", minimize: "最小化", partLabel: "第 {number} 部分", preparing: "正在准备影片",
+  replay: "重新播放", close: "关闭播放器", minimize: "最小化", maximize: "最大化", restoreWindow: "还原窗口", windowControls: "播放器窗口控制", partLabel: "第 {number} 部分", preparing: "正在准备影片",
 }
 export type NativeMessage = keyof typeof zh
 const en: Record<NativeMessage, string> = {
@@ -27,7 +27,7 @@ const en: Record<NativeMessage, string> = {
   nativeWindow: "Native video and Curated controls share one window", busy: "Working", engineRequired: "Select mpv.exe first", lockedHint: "Connect and unlock the Server first",
   chooseMedia: "Choose media", idleHint: "Connect your library and choose a movie to play", settings: "Playback settings", settingsAria: "Open playback settings",
   seekBack: "Seek back 10 seconds", seekForward: "Seek forward 10 seconds", mute: "Mute", unmute: "Unmute", fullscreen: "Enter fullscreen", exitFullscreen: "Exit fullscreen",
-  replay: "Play again", close: "Close player", minimize: "Minimize", partLabel: "Part {number}", preparing: "Preparing media",
+  replay: "Play again", close: "Close player", minimize: "Minimize", maximize: "Maximize", restoreWindow: "Restore window", windowControls: "Player window controls", partLabel: "Part {number}", preparing: "Preparing media",
 }
 const ja: Record<NativeMessage, string> = {
   title: "Windows ネイティブ再生プロトタイプ", subtitle: "元のメディア · mpv", prepare: "接続とエンジン", engine: "mpv.exe を選択",
@@ -42,6 +42,6 @@ const ja: Record<NativeMessage, string> = {
   nativeWindow: "ネイティブ映像と Curated 操作を同じウィンドウで表示", busy: "処理中", engineRequired: "mpv.exe を先に選択してください", lockedHint: "Server に接続して解除してください",
   chooseMedia: "作品を選択", idleHint: "ライブラリに接続し、再生する作品を選択", settings: "再生設定", settingsAria: "再生設定を開く",
   seekBack: "10 秒戻る", seekForward: "10 秒進む", mute: "ミュート", unmute: "ミュート解除", fullscreen: "全画面にする", exitFullscreen: "全画面を終了",
-  replay: "もう一度再生", close: "プレイヤーを閉じる", minimize: "最小化", partLabel: "パート {number}", preparing: "作品を準備中",
+  replay: "もう一度再生", close: "プレイヤーを閉じる", minimize: "最小化", maximize: "最大化", restoreWindow: "ウィンドウを元に戻す", windowControls: "プレイヤーウィンドウ操作", partLabel: "パート {number}", preparing: "作品を準備中",
 }
 export const nativeMessages = { "zh-CN": zh, en, ja }

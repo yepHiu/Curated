@@ -45,6 +45,30 @@ describe.skipIf(process.platform !== "win32" || !existsSync(hostExe))("real Wind
     await expect(host.command("restore")).rejects.toThrow("NATIVE_HOST_CLOSED")
   }, 20000)
 
+  it("keeps custom-chrome maximize, focus, minimize and fullscreen on the native host", async () => {
+    const host = new NativePlayerWindow()
+    try {
+      const normal = await host.start(hostExe, true)
+      expect(normal.maximized).toBe(false)
+      await host.command("maximize")
+      expect(host.state!.maximized).toBe(true)
+      expect(host.state!.width).toBeGreaterThan(normal.width)
+      await host.command("focus")
+      expect(host.state!.maximized).toBe(true)
+      await host.command("minimize")
+      await until(() => !host.state!.visible)
+      await host.command("focus")
+      expect(host.state!).toMatchObject({ visible: true, maximized: true })
+      await host.command("fullscreen")
+      expect(host.state!).toMatchObject({ fullscreen: true, maximized: false })
+      await host.command("maximize")
+      expect(host.state!).toMatchObject({ fullscreen: false, maximized: true })
+      await host.command("maximize")
+      expect(host.state!.maximized).toBe(false)
+      expect(host.state!.width).toBe(normal.width)
+    } finally { await host.dispose() }
+  }, 20000)
+
   it("exits on control-pipe EOF without orphaning a native window", async () => {
     const child = spawn(hostExe, [String(process.pid)], { windowsHide: true, stdio: "pipe" })
     const ended = new Promise<number | null>((resolve) => { /* 只等待当前 helper。 */ child.once("exit", resolve) })

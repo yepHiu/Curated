@@ -11,4 +11,6 @@ const messages = Object.fromEntries(Object.entries(nativeMessages).map(([locale,
   playbackSpeed: () => text.speed, selectPart: () => text.file,
   partLabel: (context: { named(key: string): unknown }) => text.partLabel.replace("{number}", String(context.named("number"))),
 } }]))
+// 独立视频窗口始终使用深色 HUD，包含 portal 到 body 的分部菜单。
+document.documentElement.classList.add("dark")
 createApp(DesktopPlayer).use(createI18n({ legacy: false, locale: "zh-CN", messages })).mount("#app")

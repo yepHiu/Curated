@@ -41,12 +41,13 @@ export function installDesktopPlayback(options: DesktopPlaybackOptions) {
     let ready = false
     let disposing = false
     const sync = (state: NativeWindowState) => {
+      coordinator.windowStateChanged()
       if (!ready || !window || window.isDestroyed()) return
       if (!state.visible) window.hide()
       else if (state.width > 0 && state.height > 0 && !window.isVisible()) window.showInactive()
     }
     try {
-      const bounds = await host.start(helper)
+      const bounds = await host.start(helper, true)
       host.on("bounds", sync)
       host.on("close-request", () => { void coordinator.stop().then(options.focusMain) })
       host.on("fault", () => { if (!disposing) void coordinator.stop("NATIVE_HOST_FAILED") })
@@ -73,9 +74,10 @@ export function installDesktopPlayback(options: DesktopPlaybackOptions) {
       await window.loadURL(page)
       return {
         createPlayer: () => new NativeMpvPlayer(host.state!.handle),
-        focus: async () => { await host.command("restore"); if (!window!.isDestroyed()) { window!.show(); window!.focus() } },
+        focus: async () => { await host.command("focus"); if (!window!.isDestroyed()) { window!.show(); window!.focus() } },
         action: action => host.command(action),
         fullscreen: () => host.state?.fullscreen === true,
+        maximized: () => host.state?.maximized === true,
         dispose: async () => {
           disposing = true
           if (overlay === window) overlay = undefined

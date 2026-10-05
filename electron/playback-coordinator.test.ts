@@ -37,10 +37,31 @@ function fixture() {
   const surface: PlaybackSurface = { createPlayer: () => { const player = new Player(); players.push(player); return player },
     focus: async () => { focused++ }, action: async () => {}, fullscreen: () => false, dispose: async () => { disposed++ } }
   const coordinator = new NativePlaybackCoordinator("fixture", async () => surface, () => defaultPlaybackPreferences, () => {})
-  return { coordinator, context, requests, players, disposed: () => disposed, focused: () => focused,
+  return { coordinator, context, surface, requests, players, disposed: () => disposed, focused: () => focused,
     lock: (status = 200) => { unlocked = false; authStatus = status } }
 }
 describe("production native coordinator", () => {
+  it("routes window actions to the owned surface and publishes only changed window state", async () => {
+    const f = fixture()
+    let maximized = false
+    f.surface.maximized = () => maximized
+    const action = vi.spyOn(f.surface, "action")
+    try {
+      const session = await f.coordinator.open(f.context, { movieId: "a", autoplay: false })
+      await f.coordinator.command(session.sessionId, { action: "maximize" })
+      await f.coordinator.command(session.sessionId, { action: "drag" })
+      expect(action.mock.calls).toEqual([["maximize"], ["drag"]])
+      await expect(f.coordinator.command("old-session", { action: "maximize" })).rejects.toThrow("STALE")
+      f.coordinator.windowStateChanged()
+      const revision = f.coordinator.snapshot().revision
+      maximized = true
+      f.coordinator.windowStateChanged()
+      expect(f.coordinator.snapshot()).toMatchObject({ maximized: true, revision: revision + 1 })
+      f.coordinator.windowStateChanged()
+      expect(f.coordinator.snapshot().revision).toBe(revision + 1)
+    } finally { await f.coordinator.stop() }
+  })
+
   it("uses direct resume, focuses existing playback, serializes replacement and rejects stale commands", async () => {
     const f = fixture()
     try {

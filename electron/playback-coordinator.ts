@@ -10,8 +10,9 @@ export interface PlaybackContext { origin: string; generation: string; fetch: Me
 export interface PlaybackSurface {
   createPlayer(): NativeMpvPlayer
   focus(): Promise<void>
-  action(action: "fullscreen" | "minimize"): Promise<void>
+  action(action: "fullscreen" | "minimize" | "maximize" | "drag"): Promise<void>
   fullscreen(): boolean
+  maximized?(): boolean
   dispose(): Promise<void>
 }
 interface Active {
@@ -88,7 +89,15 @@ export class NativePlaybackCoordinator extends EventEmitter {
     return result
   }
   snapshot(): DesktopPlaybackSnapshot {
-    return structuredClone({ ...this.snapshotState, fullscreen: this.surface?.fullscreen() ?? false })
+    return structuredClone({ ...this.snapshotState, fullscreen: this.surface?.fullscreen() ?? false, maximized: this.surface?.maximized?.() ?? false })
+  }
+  /** 原生拖动/Snap 也可改变窗口状态，只在状态变化时刷新 UI。 */
+  windowStateChanged(): void {
+    const next = this.snapshot()
+    if (this.snapshotState.fullscreen === next.fullscreen && this.snapshotState.maximized === next.maximized) return
+    this.snapshotState.fullscreen = next.fullscreen
+    this.snapshotState.maximized = next.maximized
+    this.publish()
   }
   private publish(): void { this.snapshotState.revision++; this.emit("snapshot", this.snapshot()) }
 
@@ -242,7 +251,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       if (!input || typeof input !== "object") throw new Error("INVALID_CONTROL")
       if (input.action === "stop" || input.action === "close") { await this.finish(); return }
       if (input.action === "focus") { await this.surface?.focus(); return }
-      if (input.action === "fullscreen" || input.action === "minimize") {
+      if (input.action === "fullscreen" || input.action === "minimize" || input.action === "maximize" || input.action === "drag") {
         await this.surface?.action(input.action); this.publish(); return
       }
       if (input.action === "autoAdvance") {
