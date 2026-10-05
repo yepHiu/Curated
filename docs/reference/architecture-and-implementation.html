@@ -131,7 +131,7 @@
     <tr><td>M2 入口与 UI</td><td>现有播放入口/深链、能力/偏好选择、共享控件专用窗口、单次 Web 回退</td><td>同目标聚焦实际 40 秒不倒回旧 12 秒；圆形控制和画面焦点 CSS 已检查；主页面内嵌属 M5</td></tr>
     <tr><td>M3 业务与侧栏</td><td>逐文件进度、历史、日时长、冻结队列/来源，页面刷新恢复，暂停/停止/返回</td><td>109 Electron 测试及前端构建/定向回归通过；实际 part-2、d3d11va/零观察掉帧、正常日时长批次通过；指定 CD1 各五分钟 native 零观察掉帧、Chromium 2498/9037（27.64%），详见计划 §14.10；更多片源/DPI/整片同步待完成</td></tr>
     <tr><td>M4 分发准备</td><td>固定 QA mpv 下载/SHA；可选完整 runtime/source/build/license 清单校验与 Windows staging；21 打包测试通过</td><td>QA pin distributionReady=false；完整对应资料和原生 installer/ZIP 安装/升级/卸载尚未验收</td></tr>
-    <tr><td>M5 能力增量</td><td>当前明确提供 Web 切换</td><td>萃取/截图/逐帧、原生 PiP、轨道/HDR、主页面内嵌和 macOS 后续适配</td></tr>
+    <tr><td>M5 静态萃取帧</td><td>相机按钮/可配置快捷键；mpv 视频原图与准确分部/时间；当前登录 Session multipart 入帧库；同图同 ID 重试；共享回执/原图预览；主页面刷新</td><td>123 Electron 与 13 定向前端测试通过，真实 HWND 源尺寸 PNG/暂停保持/播放恢复/临时文件清理；正式 main 合成认证上传及按钮/快捷键/失败重试/预览验证。片段/GIF、额外本机导出、逐帧、原生 PiP、轨道/HDR、主页面内嵌和 macOS 后续适配，见计划 §14.15</td></tr>
   </tbody></table>
   <p>REQ-0058/0059 保持 in_progress；没有版本递进、push、合并或发布。详见 <a href="../plan/2026-10-05-windows-native-player-prototype.md">计划 §14.9</a> 和 <a href="../guide.md#windows-desktop-native-playback-integration">正式联调操作</a>。下方原型章节记录此前阶段。</p>
 </section>

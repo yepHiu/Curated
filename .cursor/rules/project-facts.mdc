@@ -13,6 +13,8 @@ alwaysApply: true
 
 router 在 PlayerView/HLS prefetch 前选择可选 native，专用 `electron-dist/player/index.html` 共享圆形控件/分部/倍速；主窗口仍浏览，侧栏可暂停/停止/返回。main 唯一写逐文件进度、历史与日时长，保存冻结队列/来源；页面刷新恢复快照。成功切 Server/锁定/退出回收，失败切换保留；关闭主窗口到托盘保留播放器。`userData/playback-settings.json` 默认 preferNative=false，volume/speed 本机持久，不增加 HTTP API/library-config 字段。
 
+正式原生窗口现已支持静态萃取帧：圆形相机按钮/现有可配置快捷键（默认 C），mpv 临时冻结取得源分辨率 PNG 与实际 time-pos，再恢复原播放状态；main 用当前 Session multipart 写现有 `POST /api/curated-frames`。冻结 movieId/fileId/标题/演员/时间/ID，失败缓存一张原图供同 ID 重试，换会话清理；401/403 关闭原生播放。新增仅本地控制页的 `capture(sessionId,retryId?)`、`capturePreferences()` 受限 IPC；后者固定读取主页面快捷键/音效偏好。复用 CaptureReceipt/FrameImageViewer，保存后 captureRevision 驱动主页面帧库刷新。12 MiB/既有像素上限、临时文件清理、中文/英文/日文反馈；片段/GIF、额外本机导出与逐帧尚未接入。详见计划 §14.15。
+
 运行 `pnpm native-player:prepare`（7-Zip）后 `pnpm dev:electron`，Windows helper 构建需 gcc 或 `CURATED_NATIVE_CC`；连接新 Server UI，在 Settings → Playback 开启本机原生偏好。`build:electron:main` 包含本地播放页/helper，非 Windows 跳过 Win32 编译。可选 `CURATED_NATIVE_BUNDLE` 验证并 stage 清单资料到 app/native-player；QA 固定二进制不具有完整分发资料，M4 安装/许可/源码验收仍未完成。109 Electron 测试、前端/Electron 构建、21 打包测试及正式 main 合成认证播放/日时长/锁定清理通过；指定 CD1 两引擎各五分钟：native 零观察掉帧、Chromium 2498/9037 掉帧（27.64%），seek/隔离时长正常；更多片源、整片同步、混合 DPI、LAN/HTTPS 与安装验收待执行。原型历史仍保留，REQ-0058/0059 均 in_progress；无版本/push/发布。详见计划 §14.9 和 guide。
 
 ## 2026-10-05 Windows 原生播放原型（独立开发入口）

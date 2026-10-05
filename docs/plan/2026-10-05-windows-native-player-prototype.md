@@ -601,3 +601,19 @@ REQ-0058 保留 in_progress 80（混合 DPI、更多真实场景等仍未通过�
 helper 通过内部 `title` 命令调用 `SetWindowTextW`。标题以 UTF-16 单元的十六进制字段传递，避免中文/日文、引号及反斜线受 JSON 转义影响；去除控制字符并限制为 480 个 UTF-16 单元，使消息保持在现有 2048 字节管道上限内。
 
 验证：Electron/播放器/helper 构建及 18 文件/117 项 Electron 测试通过。测试 Desktop 已重启；此前打开的 STAR-684 在保存的位置约 3:16 恢复为暂停，读取真实 Win32 窗口列表确认宿主标题与影片详情中的日文名称完全一致。此轮未截取真实影片画面。
+
+### 14.15 正式原生窗口补齐静态萃取帧（2026-10-06）
+
+用户指出原生播放器缺少萃取帧后，本次补齐静态图片入库。底部增加符合既有圆形控件样式的相机按钮，默认快捷键 C；打开/聚焦播放器时从可信主页面读取已配置的萃取键与快门音效偏好。忽略修饰键、重复 keydown、输入框/滑条及原图预览中的快捷键，不引入长按片段行为。沿用中文/英文/日文反馈。
+
+主进程串行验证当前 session 和认证，再由 mpv 临时暂停画面，读取准确 `time-pos`，执行 `screenshot-to-file <本次临时 PNG> video`，恢复原来的暂停/播放状态。截图只包含视频，无系统标题栏、Curated 控件或字幕，保持源视频尺寸。临时目录由 mkdtemp 生成，不接受 renderer 路径；PNG 验证 12 MiB 与既有像素上限，读取后删除自己的文件/空目录。截图编码有独立 10 秒期限，超时先结束本次引擎，防止迟到写入留存文件。
+
+`DesktopPlayerBridge` 新增受限 `capture(sessionId,retryId?)`、`capturePreferences()`，主窗口播放 bridge 不增加任意截图/文件能力。`NativePlaybackCoordinator` 冻结影片、fileId、标题、演员、真实帧时间、采集时间和 UUID，通过当前主窗口真实 Session 以 multipart 写既有 `POST /api/curated-frames`。不新增 Server HTTP 端点或 library-config 字段。最多一个采集/上传任务和一张失败缓存；重复请求拒绝为 CAPTURE_BUSY。上传失败保留原图，同 ID/同 metadata/同图重试以兼容 Server 幂等回执；成功后释放主进程缓存并递增 captureRevision。401/403 停止播放，切片/换片/退出清理旧缓存，旧会话完成结果不显示到新影片。
+
+UI 复用 `CaptureReceipt` 与 `FrameImageViewer`：显示保存中、成功、失败、时间和缩略图；失败可重试保存，缩略图可打开本窗口内的原图 Dialog，成功回执 8 秒后收起。预览期间不收起回执；切换会话清理预览/回执。回执采用实色语义背景，位置随底部控制栏实际高度调整，窄窗控件换行也保持间距。独立页面显式生成这两个共享组件的 Tailwind 样式。主页面 `desktop-playback-service` 仅在 captureRevision 增加时刷新帧库，不因普通时间事件或旧快照重复刷新。
+
+验证：`pnpm desktop:test:build`、`pnpm build:desktop-player`、`pnpm typecheck` 与定向 ESLint 通过；`pnpm test:electron` 18 文件/123 项通过，包含真实 mpv/Win32 宿主截图为 320×180 源尺寸、7 秒帧、暂停保持、播放恢复和临时目录清理，以及 multipart 身份/时间/演员、失败同图重试、并发拒绝、旧分部拒绝、401/403 关闭。定向前端 4 文件/13 项通过，包含回执生命周期、首次失败的响应式重试按钮、晚到会话结果隔离、偏好与主页面刷新，以及 Web 保存/i18n 回归。
+
+正式 Electron main + 隔离 profile + 认证合成 Server 验证：选 part-2、暂停于 12 秒，相机按钮及 C 产生 640×360 PNG，上传带当前 HttpOnly Cookie、正确 fileId/时间/演员；模拟 500 后回执显示原图和重试，重试上传同 ID/同图片 SHA，成功回执出现；配置 V 后按 V 同样采集，原图预览加载为 640×360，原生窗口截图确认回执背景与控制栏间距。验收中修复了重试 computed 未跟踪候选结果与共享组件缺少本地 Tailwind source 两处实际 UI 问题。本机证据保存在 ignored `output/playwright/desktop-player/qa-results.json` 与 `captured-frame.png`，仅为合成测试片源；没有萃取或保存用户真实影片画面。
+
+本次范围为静态帧入 Server 萃取帧库。长按片段/GIF、自动额外下载/目录导出、逐帧、原生 PiP/轨道/HDR/主页面内嵌仍未实现；可切 Web 使用对应已有功能。没有新增分发/安装/真实 LAN 或 HTTPS 验收，不改变 M4 与总体 REQ-0058/0059 的未完成边界。无版本递进、push、合并或发布。
