@@ -78,10 +78,14 @@ export function createPlaybackWatchTimeTracker(
       mediaDeltaSec > MIN_MEDIA_ADVANCE_SEC &&
       mediaDeltaSec <= MAX_MEDIA_ADVANCE_SEC
     ) {
-      addPending(
-        getLocalDayKey(new Date(wallNowMs)),
-        roundSeconds(Math.min(wallDeltaSec, MAX_SINGLE_SAMPLE_SEC)),
-      )
+      let start = Math.max(lastWallMs, wallNowMs - MAX_SINGLE_SAMPLE_SEC * 1000)
+      while (start < wallNowMs) {
+        const date = new Date(start)
+        const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime()
+        const end = Math.min(midnight, wallNowMs)
+        addPending(getLocalDayKey(date), roundSeconds((end - start) / 1000))
+        start = end
+      }
     }
     lastWallMs = wallNowMs
     lastMediaSec = mediaNowSec
@@ -91,20 +95,21 @@ export function createPlaybackWatchTimeTracker(
     if (!movieId || pendingByDay.size === 0) return
     const entries = Array.from(pendingByDay.entries())
     pendingByDay.clear()
-    try {
-      for (const [dayKey, watchedSec] of entries) {
+    for (let index = 0; index < entries.length; index++) {
+      const [dayKey, watchedSec] = entries[index]!
         let remaining = roundSeconds(watchedSec)
+      try {
         while (remaining > 0) {
           const chunk = roundSeconds(Math.min(remaining, MAX_API_DELTA_SEC))
           await sink(movieId, dayKey, chunk)
           remaining = roundSeconds(remaining - chunk)
         }
+      } catch (error) {
+        // 已确认成功的日期/分块不再次补回，失败与尚未发送的增量才重试。
+        addPending(dayKey, remaining)
+        for (const [pendingDay, pendingSeconds] of entries.slice(index + 1)) addPending(pendingDay, pendingSeconds)
+        throw error
       }
-    } catch (error) {
-      for (const [dayKey, watchedSec] of entries) {
-        addPending(dayKey, watchedSec)
-      }
-      throw error
     }
   }
 
