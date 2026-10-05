@@ -424,7 +424,7 @@ Desktop/Full 版本源位于 `scripts/release/versions/`，Server 位于 `backen
 - App 独立持久 worker，Metatube 实际番号精确校验，后台补全与受控图片下载；数据库父目录 `assets/wishlist` 保存哈希原件/缩略图，不属于 cache。自动导入前复用、周期对账/复制，自动关联重建保留人工确认/排除。
 - `/wishlist`、`/wishlist/:id` 和网络设置插件联动开关；WishlistService Web/Mock 实现，Mock 独立 localStorage。UI 使用前台轮询，尚无任务中心/SSE 投影、人工关联选择弹窗或逐图状态 UI。
 - 备份 v2 包含 wishlist-assets，v1 可读。恢复先增量不可变图片再交换 DB/配置；跨进程维护锁保护备份与回收。非愿望资产和视频仍不打包。
-- Curated Plugin 仓库外目录 `C:/Users/wujiahui/code/curated-plugin` 已实现 JAVDB/Jable/MissAV 按钮及 popup 手动番号，无需凭证。按钮按服务端成员状态显示绿色「已加入」或灰色「加入愿望单」，加载/重扫/返回可见页面与可见时每 15 秒同步，添加成功立即更新，失败保留未知状态提示。关闭联动提示到 Curated 网络设置开启。真实扩展全链路尚待验收；见 `docs/plan/2026-09-22-wishlist.md` §21。
+- Curated Plugin 仓库外目录 `C:/Users/wujiahui/code/curated-plugin` 已实现 JAVDB/Jable/MissAV 按钮及 popup 手动番号，无需凭证。按钮按服务端成员状态显示绿色「已加入」或粉色「加入愿望单」（2026-10-05 恢复操作颜色；仅「未入库」标签保留灰色），加载/重扫/返回可见页面与可见时每 15 秒同步，添加成功立即更新，失败保留未知状态提示。关闭联动提示到 Curated 网络设置开启。真实扩展全链路尚待验收；见 `docs/plan/2026-09-22-wishlist.md` §21。
 
 ## 2026-09-23 插件开发者选项
 
