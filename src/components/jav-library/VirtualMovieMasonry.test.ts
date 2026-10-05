@@ -185,9 +185,14 @@ describe("VirtualMovieMasonry", () => {
     )
   })
 
-  it("returns home only after upward overscroll at the top", async () => {
+  it.each([
+    { name: "movie list", movies: [makeMovie("m1")], slots: undefined },
+    { name: "empty list with header", movies: [], slots: { header: "<h2>Movies</h2>" } },
+    { name: "empty list", movies: [], slots: undefined },
+  ])("keeps wheel and touch scrolling within the $name", async ({ movies, slots }) => {
     const wrapper = mount(VirtualMovieMasonry, {
-      props: { movies: [makeMovie("m1")], returnHomeOnOverscroll: true },
+      props: { movies },
+      slots,
     })
     const scroller = wrapper.get("[data-movie-scroll-region]").element as HTMLElement
     await wrapper.vm.$nextTick()
@@ -199,67 +204,14 @@ describe("VirtualMovieMasonry", () => {
     scroller.dispatchEvent(new WheelEvent("wheel", { deltaY: -50 }))
     expect(wrapper.emitted("returnHome")).toBeUndefined()
     scroller.dispatchEvent(new WheelEvent("wheel", { deltaY: -35 }))
-    expect(wrapper.emitted("returnHome")).toHaveLength(1)
-    wrapper.unmount()
-  })
-
-  it("ignores zoom, horizontal gestures and separated small wheel movements", async () => {
-    const wrapper = mount(VirtualMovieMasonry, {
-      props: { movies: [makeMovie("m1")], returnHomeOnOverscroll: true },
-    })
-    await wrapper.vm.$nextTick()
-    const scroller = wrapper.get("[data-movie-scroll-region]").element
-    scroller.dispatchEvent(new WheelEvent("wheel", { deltaY: -120, ctrlKey: true }))
-    scroller.dispatchEvent(new WheelEvent("wheel", { deltaY: -120, deltaX: 200 }))
-    let currentTime = 1000
-    const now = vi.spyOn(Date, "now").mockImplementation(() => currentTime)
-    scroller.dispatchEvent(new WheelEvent("wheel", { deltaY: -50 }))
-    currentTime = 1500
-    scroller.dispatchEvent(new WheelEvent("wheel", { deltaY: -50 }))
-    expect(wrapper.emitted("returnHome")).toBeUndefined()
-    now.mockRestore()
-    wrapper.unmount()
-  })
-
-  it.each([false, true])("requires an enabled return gesture, including an empty list (empty: %s)", async (empty) => {
-    const wrapper = mount(VirtualMovieMasonry, {
-      props: { movies: empty ? [] : [makeMovie("m1")] },
-    })
-    await wrapper.vm.$nextTick()
-    const scroller = wrapper.get("[data-movie-scroll-region]").element
     scroller.dispatchEvent(new WheelEvent("wheel", { deltaY: -120 }))
+    scroller.dispatchEvent(new TouchEvent("touchstart", {
+      touches: [{ clientX: 100, clientY: 100 } as Touch],
+    }))
+    scroller.dispatchEvent(new TouchEvent("touchmove", {
+      touches: [{ clientX: 100, clientY: 220 } as Touch],
+    }))
     expect(wrapper.emitted("returnHome")).toBeUndefined()
-    await wrapper.setProps({ returnHomeOnOverscroll: true })
-    scroller.dispatchEvent(new WheelEvent("wheel", { deltaY: -120 }))
-    expect(wrapper.emitted("returnHome")).toHaveLength(1)
-    wrapper.unmount()
-  })
-
-  it("returns home on a downward finger swipe starting at the top, once per gesture", async () => {
-    const wrapper = mount(VirtualMovieMasonry, {
-      props: { movies: [makeMovie("m1")], returnHomeOnOverscroll: true },
-    })
-    await wrapper.vm.$nextTick()
-    const scroller = wrapper.get("[data-movie-scroll-region]").element as HTMLElement
-    function touch(type: string, x: number, y: number) {
-      scroller.dispatchEvent(new TouchEvent(type, {
-        touches: [{ clientX: x, clientY: y } as Touch],
-      }))
-    }
-    scroller.scrollTop = 200
-    touch("touchstart", 100, 100)
-    scroller.scrollTop = 0
-    touch("touchmove", 100, 210)
-    expect(wrapper.emitted("returnHome")).toBeUndefined()
-    touch("touchstart", 100, 100)
-    touch("touchmove", 250, 190)
-    expect(wrapper.emitted("returnHome")).toBeUndefined()
-    touch("touchstart", 100, 100)
-    touch("touchmove", 100, 150)
-    expect(wrapper.emitted("returnHome")).toBeUndefined()
-    touch("touchmove", 100, 185)
-    touch("touchmove", 100, 220)
-    expect(wrapper.emitted("returnHome")).toHaveLength(1)
     wrapper.unmount()
   })
 

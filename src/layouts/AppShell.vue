@@ -48,8 +48,7 @@ import { useLibraryService } from "@/services/library-service"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { useAgentWindow } from "@/composables/use-agent-window"
 import { useAIGovernanceSync } from "@/composables/use-ai-governance-sync"
-import { openHomeFromLibraryKey, openLibraryFromHomeKey } from "@/lib/home-library-navigation"
-import { armHomeScrollRestore } from "@/composables/use-home-scroll-preserve"
+import { openLibraryFromHomeKey } from "@/lib/home-library-navigation"
 import { providePlaybackHost } from "@/composables/use-playback-host"
 import { clearLibraryScrollSnapshot } from "@/composables/use-library-scroll-preserve"
 
@@ -80,7 +79,7 @@ const ActivePlaybackHost = defineAsyncComponent(
 )
 useAIGovernanceSync()
 
-const homeLibraryDrawerTransition = ref<"home-library-drawer" | "library-home-drawer">()
+const homeLibraryDrawerTransition = ref<"home-library-drawer">()
 const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)")
 provide(openLibraryFromHomeKey, () => {
   if (route.name !== "home" || homeLibraryDrawerTransition.value) return
@@ -88,18 +87,6 @@ provide(openLibraryFromHomeKey, () => {
   homeLibraryDrawerTransition.value = "home-library-drawer"
   clearLibraryScrollSnapshot("library")
   void router.push({ name: "library" }).then((failure) => {
-    if (failure) homeLibraryDrawerTransition.value = undefined
-  }).catch(() => {
-    homeLibraryDrawerTransition.value = undefined
-  })
-})
-
-provide(openHomeFromLibraryKey, () => {
-  if (route.name !== "library" || homeLibraryDrawerTransition.value) return
-
-  homeLibraryDrawerTransition.value = "library-home-drawer"
-  armHomeScrollRestore()
-  void router.push({ name: "home" }).then((failure) => {
     if (failure) homeLibraryDrawerTransition.value = undefined
   }).catch(() => {
     homeLibraryDrawerTransition.value = undefined
@@ -1116,9 +1103,7 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
 
 <style>
 .home-library-drawer-enter-active,
-.home-library-drawer-leave-active,
-.library-home-drawer-enter-active,
-.library-home-drawer-leave-active {
+.home-library-drawer-leave-active {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1142,23 +1127,9 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
   pointer-events: none;
 }
 
-.library-home-drawer-leave-active {
-  z-index: 1;
-  pointer-events: none;
-  will-change: transform;
-  box-shadow: 0 -1.5rem 3rem rgb(0 0 0 / 20%);
-  transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.library-home-drawer-leave-to {
-  transform: translateY(100%);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .home-library-drawer-enter-active,
-  .home-library-drawer-leave-active,
-  .library-home-drawer-enter-active,
-  .library-home-drawer-leave-active {
+  .home-library-drawer-leave-active {
     transition-duration: 0.01ms;
   }
 }

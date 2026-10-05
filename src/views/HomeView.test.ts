@@ -198,7 +198,7 @@ describe("HomeView", () => {
     expect(wrapper.getComponent({ name: "HomeContinueRow" }).findAll(".movie-card-stub")).toHaveLength(2)
   })
 
-  it("opens the library only after scrolling beyond the bottom or using the footer action", async () => {
+  it("stays on home during wheel and touch scrolling and opens the library with the footer action", async () => {
     const wrapper = mount(HomeView)
     const scrollRegion = wrapper.get("[data-home-scroll-region]").element as HTMLElement
     Object.defineProperties(scrollRegion, {
@@ -214,11 +214,20 @@ describe("HomeView", () => {
     expect(routerPushMock).not.toHaveBeenCalledWith({ name: "library" })
 
     scrollRegion.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 35 }))
-    expect(routerPushMock).toHaveBeenCalledWith({ name: "library" })
+    scrollRegion.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 120 }))
+    scrollRegion.dispatchEvent(new TouchEvent("touchstart", {
+      bubbles: true,
+      touches: [{ clientY: 200 } as Touch],
+    }))
+    scrollRegion.dispatchEvent(new TouchEvent("touchmove", {
+      bubbles: true,
+      touches: [{ clientY: 80 } as Touch],
+    }))
+    expect(routerPushMock).not.toHaveBeenCalled()
 
-    routerPushMock.mockClear()
     await wrapper.get("[data-home-browse-library]").trigger("click")
     expect(routerPushMock).toHaveBeenCalledWith({ name: "library" })
+    wrapper.unmount()
   })
 
   it("renders dedicated empty state after movies finish loading with no results", () => {

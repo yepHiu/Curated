@@ -48,9 +48,6 @@ const homeScrollRegionRef = ref<HTMLElement | null>(null)
 const showRecommendationFeedback = false
 const feedbackDialogOpen = ref(false)
 const { persist } = useHomeScrollPreserve({ scrollElRef: homeScrollRegionRef })
-let overscrollDistance = 0
-let touchStartY = 0
-let touchStartedAtBottom = false
 
 const recommendationsRefreshLabel = computed(() =>
   props.recommendationsRefreshing
@@ -70,47 +67,6 @@ function feedbackActionLabel(item: RecommendationFeedbackDTO) {
     value: item.targetValue,
   })
 }
-
-function onHomeScroll() {
-  persist()
-  if (!isAtBottom()) overscrollDistance = 0
-}
-
-function isAtBottom(): boolean {
-  const el = homeScrollRegionRef.value
-  return Boolean(el && el.scrollTop + el.clientHeight >= el.scrollHeight - 2)
-}
-
-function onHomeWheel(event: WheelEvent) {
-  if (event.deltaY <= 0 || event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
-    overscrollDistance = 0
-    return
-  }
-  if (!isAtBottom()) {
-    overscrollDistance = 0
-    return
-  }
-
-  overscrollDistance += event.deltaY
-  if (overscrollDistance < 80) return
-
-  overscrollDistance = 0
-  emit("browseLibrary")
-}
-
-function onHomeTouchStart(event: TouchEvent) {
-  touchStartedAtBottom = isAtBottom()
-  touchStartY = event.touches[0]?.clientY ?? 0
-}
-
-function onHomeTouchMove(event: TouchEvent) {
-  if (!touchStartedAtBottom) return
-  const currentY = event.touches[0]?.clientY
-  if (currentY === undefined || touchStartY - currentY < 80) return
-
-  touchStartedAtBottom = false
-  emit("browseLibrary")
-}
 </script>
 
 <template>
@@ -118,10 +74,7 @@ function onHomeTouchMove(event: TouchEvent) {
     ref="homeScrollRegionRef"
     data-home-scroll-region
     class="h-full min-h-0 overflow-y-auto bg-background text-foreground"
-    @scroll.passive="onHomeScroll"
-    @wheel.passive="onHomeWheel"
-    @touchstart.passive="onHomeTouchStart"
-    @touchmove.passive="onHomeTouchMove"
+    @scroll.passive="persist"
   >
     <HomeHeroCarousel
       :movies="model.heroMovies"

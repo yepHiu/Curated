@@ -163,16 +163,24 @@ test("375px library controls remain touchable without clipping or horizontal ove
   }
 })
 
-test("home and movie library support continuous scrolling in both directions", async ({ page }) => {
+test("home and movie library stay on their pages during boundary scrolling", async ({ page }) => {
   await hideDevPerformanceBar(page)
   await page.goto(`${MOCK_BASE_URL}/#/`, { waitUntil: "domcontentloaded" })
   const home = page.locator("[data-home-scroll-region]")
   await expect(home).toBeVisible()
   await home.evaluate((el) => { el.scrollTop = el.scrollHeight })
   await expect.poll(() => home.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
-  const homeTop = await home.evaluate((el) => el.scrollTop)
   await home.hover()
   await page.mouse.wheel(0, 120)
+  await home.evaluate((el) => {
+    el.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 120 }))
+    el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: [new Touch({ identifier: 1, target: el, clientX: 100, clientY: 200 })] }))
+    el.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: [new Touch({ identifier: 1, target: el, clientX: 100, clientY: 80 })] }))
+  })
+  await expect(page).toHaveURL(/#\/$/)
+  await expect(home).toBeVisible()
+
+  await page.locator("[data-home-browse-library]").click()
   await expect(page).toHaveURL(/#\/library$/)
   await expect(home).toHaveCount(0)
 
@@ -181,20 +189,18 @@ test("home and movie library support continuous scrolling in both directions", a
   await movies.evaluate((el) => { el.scrollTop = 0 })
   await movies.hover()
   await page.mouse.wheel(0, -120)
-  await expect(page).toHaveURL(/#\/$/)
-  await expect(page.locator(".library-home-drawer-leave-active")).toHaveCount(1)
-  await expect(movies).toHaveCount(0)
-  await expect.poll(() => home.evaluate((el) => el.scrollTop)).toBeCloseTo(homeTop, 0)
-  await expect(page.locator(".library-home-drawer-leave-active")).toHaveCount(0)
-
-  await home.hover()
-  await page.mouse.wheel(0, 120)
+  await movies.evaluate((el) => {
+    el.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -120 }))
+    el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: [new Touch({ identifier: 1, target: el, clientX: 100, clientY: 100 })] }))
+    el.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: [new Touch({ identifier: 1, target: el, clientX: 100, clientY: 220 })] }))
+  })
   await expect(page).toHaveURL(/#\/library$/)
-  await expect(home).toHaveCount(0)
-  await movies.hover()
-  await page.mouse.wheel(0, -120)
+  await expect(movies).toBeVisible()
+
+  await page.locator('[data-sidebar-nav-link][href="#/"]').click()
   await expect(page).toHaveURL(/#\/$/)
   await expect(movies).toHaveCount(0)
+  await expect(home).toBeVisible()
 })
 
 test("locked startup defers protected hydration until a successful unlock", async ({ page }) => {
