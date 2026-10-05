@@ -6,6 +6,7 @@
 @source "../components/jav-library/CaptureReceipt.vue";
 @source "../components/jav-library/FrameImageViewer.vue";
 @source "../components/jav-library/NativePlaybackInfo.vue";
+@source "../components/jav-library/NativeClipCaptureFeedback.vue";
 
 /* 独立透明窗口的局部例外：正式页面仍沿用全局背景和布局。 */
 html, body, #app { background: transparent; }

@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onBeforeUnmount, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { useElementSize } from "@vueuse/core"
-import { Camera, Info, Loader2, Maximize2, Minimize2, Monitor, Repeat2, SkipBack, SkipForward, X } from "lucide-vue-next"
+import { Camera, Film, Info, Loader2, Maximize2, Minimize2, Monitor, Repeat2, SkipBack, SkipForward, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Alert, AlertTitle } from "@/components/ui/alert"
@@ -13,6 +13,7 @@ import PlayerTransportControls from "@/components/jav-library/PlayerTransportCon
 import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
 import MoviePartSelect from "@/components/jav-library/MoviePartSelect.vue"
 import NativePlaybackInfo from "@/components/jav-library/NativePlaybackInfo.vue"
+import NativeClipCaptureFeedback from "@/components/jav-library/NativeClipCaptureFeedback.vue"
 import { nativePlaybackInfoMessages } from "@/lib/native-playback-info"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
 import { formatCuratedCaptureKeyLabel, shouldIgnoreGlobalPlaybackHotkeysForTarget } from "@/lib/player-shortcuts"
@@ -42,11 +43,13 @@ function t(key: NativeMessage) { return nativeMessages[lang.value][key] }
 const capture = useNativeFrameCapture(bridge, snapshot, code => t(code === "CAPTURE_SAVE_FAILED" ? "captureSaveFailed"
   : code === "CAPTURE_TOO_LARGE" ? "captureTooLarge" : code === "CAPTURE_NOT_READY" ? "captureNotReady" : "captureFailed"))
 const captureLabel = computed(() => `${t("capture")} (${formatCuratedCaptureKeyLabel(capture.keyCode.value)})`)
+const clipFeedback = computed(() => capture.recording.value || capture.clipStatus.value && !clipDismissed.value)
+const clipDismissed = ref(false)
 const state = computed(() => snapshot.value?.state)
 const playing = computed(() => state.value?.status === "playing")
 const active = computed(() => state.value?.status === "playing" || state.value?.status === "paused")
 const immersive = usePlayerImmersiveChrome({ hasPlayback: active, isPlaying: playing })
-const chromeShown = computed(() => immersive.chromeVisible.value || diagnostics.value || settings.value || focusedControl.value || busy.value || capture.busy.value || Boolean(capture.receipt.value) || capture.previewOpen.value || Boolean(error.value))
+const chromeShown = computed(() => immersive.chromeVisible.value || diagnostics.value || settings.value || focusedControl.value || busy.value || capture.busy.value || Boolean(clipFeedback.value) || Boolean(capture.receipt.value) || capture.previewOpen.value || Boolean(error.value))
 const files = computed(() => snapshot.value?.movie?.files.map((file, index) => ({ ...file, partIndex: index + 1 })) ?? [])
 const currentFile = computed(() => files.value.find(file => file.id === state.value?.fileId))
 const queueIndex = computed(() => snapshot.value?.queue.indexOf(snapshot.value?.movie?.id ?? "") ?? -1)
@@ -82,6 +85,7 @@ async function exportDiagnostics(action: "copy" | "save") {
 }
 async function command(input: DesktopPlaybackCommand) {
   if (!bridge || !snapshot.value || busy.value) return
+  if (["seek", "part", "movie", "web", "stop", "close", "replay"].includes(input.action)) capture.cancelPress()
   busy.value = true; error.value = ""
   try { await bridge.command(snapshot.value.sessionId, input); receive(await bridge.snapshot()) }
   catch (failure) {
@@ -130,7 +134,7 @@ function keydown(event: KeyboardEvent) {
   if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || capture.previewOpen.value || shouldIgnoreGlobalPlaybackHotkeysForTarget(event.target)) return
   if (event.code === capture.keyCode.value) {
     event.preventDefault()
-    if (!event.repeat && !busy.value) void capture.capture()
+    if (!event.repeat && !busy.value) { clipDismissed.value = false; capture.startPress() }
     immersive.revealChrome()
     return
   }
@@ -143,18 +147,44 @@ function keydown(event: KeyboardEvent) {
     : key === "d" ? () => { diagnostics.value = !diagnostics.value } : undefined
   if (action) { event.preventDefault(); void action(); immersive.revealChrome() }
 }
+function keyup(event: KeyboardEvent) {
+  if (event.code !== capture.keyCode.value) return
+  event.preventDefault(); capture.finishPress()
+}
+function startCapture(event: PointerEvent) {
+  if (event.button !== 0 || busy.value) return
+  clipDismissed.value = false
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+  capture.startPress()
+}
+function captureClick(event: MouseEvent) {
+  if (event.detail === 0) void capture.capture()
+}
+function toggleGif() {
+  clipDismissed.value = false
+  if (capture.recording.value || capture.phase.value === "armed") capture.finishPress()
+  else capture.startPress()
+}
+function cancelGif() {
+  if (capture.recording.value) capture.cancelPress()
+  else void capture.clipAction("cancel")
+}
 onMounted(async () => {
   if (!bridge) { error.value = t("failure"); return }
   unsubscribe = bridge.subscribe(receive)
   receive(await bridge.snapshot())
   await capture.preferences()
   window.addEventListener("keydown", keydown)
+  window.addEventListener("keyup", keyup)
+  window.addEventListener("blur", capture.cancelPress)
   window.addEventListener("focus", capture.preferences)
 })
 onBeforeUnmount(() => {
   unsubscribe?.(); clearTimeout(clickTimer); clearTimeout(volumeTimer)
   immersive.dispose()
   window.removeEventListener("keydown", keydown)
+  window.removeEventListener("keyup", keyup)
+  window.removeEventListener("blur", capture.cancelPress)
   window.removeEventListener("focus", capture.preferences)
 })
 </script>
@@ -175,7 +205,9 @@ onBeforeUnmount(() => {
     </div>
     <NativePlaybackInfo v-if="diagnostics" :state="state" :lang="lang" :busy="infoBusy" :feedback="infoFeedback"
       :style="{ bottom: `${footerHeight + 12}px` }" @close="closeDiagnostics" @copy="exportDiagnostics('copy')" @save="exportDiagnostics('save')" />
-    <CaptureReceipt v-if="capture.receipt.value" :job="capture.receipt.value" :pending="capture.busy.value ? 1 : 0" :retryable="capture.retryable.value"
+    <NativeClipCaptureFeedback v-if="clipFeedback" :recording="capture.recording.value" :elapsed-sec="capture.elapsedSec.value" :progress="capture.progress.value" :clip="capture.clipStatus.value" :busy="capture.busy.value"
+      :style="{ bottom: `${footerHeight + 12}px` }" @cancel="cancelGif" @retry="capture.clipAction('retry')" @dismiss="clipDismissed = true" />
+    <CaptureReceipt v-if="capture.receipt.value && !clipFeedback" :job="capture.receipt.value" :pending="capture.busy.value ? 1 : 0" :retryable="capture.retryable.value"
       :style="{ bottom: `${footerHeight + 12}px` }"
       @retry="capture.capture(true)" @view="capture.previewOpen.value = true" @dismiss="capture.dismiss" />
     <p class="sr-only" role="status" aria-live="polite">{{ capture.receipt.value ? uiT(capture.busy.value ? 'curated.captureSaving' : capture.receipt.value.committed ? 'curated.captureSaved' : 'curated.captureFailed') : '' }} {{ capture.receipt.value?.error }}</p>
@@ -191,7 +223,8 @@ onBeforeUnmount(() => {
       <div class="flex items-center justify-between gap-3 text-sm text-white/80 tabular-nums"><span>{{ time(draft ?? state?.positionSec ?? 0) }} / {{ time(state?.durationSec ?? 0) }}</span><span class="max-w-[55%] truncate">{{ currentFile?.fileName }}</span></div>
       <Slider :model-value="[draft ?? state?.positionSec ?? 0]" :max="Math.max(1, state?.durationSec ?? 0)" :step="0.1" :disabled="!active || busy" :aria-label="t('time')" @update:model-value="draft = $event?.[0]" @value-commit="command({ action: 'seek', value: $event?.[0] }); draft = undefined" />
       <PlayerTransportControls :playing="playing" :disabled="!active || busy" :volume-values="[state?.volume ?? 100]" :volume-percent="state?.volume ?? 100" :muted="state?.volume === 0" :labels="labels" @toggle="toggle" @seek-back="seek(-10)" @seek-forward="seek(10)" @mute="mute" @volume="volume">
-        <Button variant="ghost" size="icon" class="rounded-full" :disabled="!capture.available.value || busy" :aria-label="captureLabel" :title="captureLabel" @click="capture.capture()"><Loader2 v-if="capture.busy.value" class="animate-spin motion-reduce:animate-none" /><Camera v-else /></Button>
+        <Button variant="ghost" size="icon" class="rounded-full" :disabled="!capture.available.value || busy" :aria-label="captureLabel" :title="captureLabel" @pointerdown="startCapture" @pointerup="capture.finishPress" @pointercancel="capture.cancelPress" @click="captureClick"><Loader2 v-if="capture.busy.value" class="animate-spin motion-reduce:animate-none" /><Camera v-else /></Button>
+        <Button variant="ghost" size="icon" class="rounded-full" :disabled="((!playing || !capture.available.value) && !capture.recording.value) || busy" :aria-label="capture.recording.value ? uiT('curated.stopClip') : 'GIF'" :title="capture.recording.value ? uiT('curated.stopClip') : 'GIF'" :aria-pressed="capture.recording.value" @click="toggleGif"><Film /></Button>
         <Button variant="ghost" size="icon" class="rounded-full" :disabled="queueIndex <= 0 || busy" :aria-label="extra.previous" @click="command({ action: 'movie', movieId: snapshot!.queue[queueIndex - 1]! })"><SkipBack /></Button>
         <Button variant="ghost" size="icon" class="rounded-full" :disabled="queueIndex < 0 || queueIndex >= (snapshot?.queue.length ?? 0) - 1 || busy" :aria-label="extra.next" @click="command({ action: 'movie', movieId: snapshot!.queue[queueIndex + 1]! })"><SkipForward /></Button>
         <Button variant="ghost" size="icon" class="rounded-full" :aria-label="extra.auto" :aria-pressed="snapshot?.autoAdvance" @click="command({ action: 'autoAdvance', enabled: !snapshot?.autoAdvance })"><Repeat2 /></Button>

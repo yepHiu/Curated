@@ -6,6 +6,11 @@ contextBridge.exposeInMainWorld("curatedPlayer", {
   saveDiagnostics: sessionId => ipcRenderer.invoke("curated:playback-save-diagnostics", sessionId),
   command: (sessionId, input) => ipcRenderer.invoke("curated:playback-command", sessionId, input),
   capture: (sessionId, retryId) => ipcRenderer.invoke("curated:playback-capture", sessionId, retryId),
+  prepareCapture: sessionId => ipcRenderer.invoke("curated:playback-prepare-capture", sessionId),
+  commitCapture: (sessionId, captureId, gif) => ipcRenderer.invoke("curated:playback-commit-capture", sessionId, captureId, gif),
+  discardCapture: (sessionId, captureId) => ipcRenderer.invoke("curated:playback-discard-capture", sessionId, captureId),
+  cancelClip: sessionId => ipcRenderer.invoke("curated:playback-cancel-clip", sessionId),
+  retryClip: sessionId => ipcRenderer.invoke("curated:playback-retry-clip", sessionId),
   capturePreferences: () => ipcRenderer.invoke("curated:playback-capture-preferences"),
   subscribe: callback => {
     const listener = (_event, state) => callback(state)

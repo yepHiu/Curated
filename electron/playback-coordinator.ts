@@ -5,7 +5,7 @@ import { NativeMpvPlayer } from "./native-mpv-player.js"
 import { emptyNativePlayerState, type NativeLabMovie, type NativePlayerState } from "./native-player-contract.js"
 import { projectPlaybackDiagnostics, playbackDiagnosticsReport } from "./native-playback-diagnostics.js"
 import { createPlaybackWatchTimeTracker, type PlaybackWatchTimeTracker } from "./playback-watch-time-core.js"
-import type { DesktopPlaybackCapture, DesktopPlaybackCommand, DesktopPlaybackOpen, DesktopPlaybackPreferences, DesktopPlaybackSnapshot, DesktopPlaybackSourceQuery } from "./playback-contract.js"
+import type { DesktopPlaybackCapture, DesktopPlaybackClip, DesktopPlaybackCommand, DesktopPlaybackOpen, DesktopPlaybackPreferences, DesktopPlaybackSnapshot, DesktopPlaybackSourceQuery } from "./playback-contract.js"
 
 export interface PlaybackContext { origin: string; generation: string; fetch: MediaFetcher }
 export interface PlaybackSurface {
@@ -78,7 +78,9 @@ export class NativePlaybackCoordinator extends EventEmitter {
   private timer?: ReturnType<typeof setInterval>
   private periodicPending = false
   private capturing = false
-  private captureCandidate?: { sessionId: string; image: Buffer; result: DesktopPlaybackCapture; actors: string[]; title: string }
+  private captureCandidate?: { sessionId: string; image: Buffer; result: DesktopPlaybackCapture; actors: string[]; title: string; gifEndSec?: number }
+  private captureExpiry?: ReturnType<typeof setTimeout>
+  private clipJob?: { active: Active; sessionId: string; state: DesktopPlaybackClip; taskId?: string; started: number; failures: number; timer?: ReturnType<typeof setTimeout> }
   private snapshotState: DesktopPlaybackSnapshot = { sessionId: "", revision: 0, engine: "native", windowOpen: false,
     state: emptyNativePlayerState(), fullscreen: false, queue: [], autoAdvance: false, locale: "zh-CN" }
 
@@ -113,6 +115,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
         && (!input.fileId || input.fileId === active.fileId)) {
         await this.ensureUnlocked(context)
         if (input.seekExisting && input.startSec !== undefined) {
+          this.clearPreparedCapture()
           active.tracker.onSeeking(input.startSec)
           await active.player.control({ action: "seek", value: Math.min(input.startSec, active.player.state.durationSec || input.startSec) })
           if (input.autoplay) await active.player.control({ action: "resume" })
@@ -302,7 +305,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       }
       if (!active) throw new Error("NO_ACTIVE_PLAYER")
       if (!["pause", "resume", "seek", "speed", "volume"].includes(input.action)) throw new Error("INVALID_CONTROL")
-      if (input.action === "seek") active.tracker.onSeeking(input.value ?? active.player.state.positionSec)
+      if (input.action === "seek") { this.clearPreparedCapture(); active.tracker.onSeeking(input.value ?? active.player.state.positionSec) }
       await active.player.control(input)
       if (input.action === "speed" || input.action === "volume") {
         this.savePreferences({ ...this.preferences(), [input.action]: input.value })
@@ -312,7 +315,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
     })
   }
   /** 采集和重试均绑定原会话/分部；重试上传原图和同一 ID，避免重复入库。 */
-  capture(sessionId: string, retryId?: string): Promise<DesktopPlaybackCapture> {
+  capture(sessionId: string, retryId?: string, mode: "save" | "prepare" | "gif" = "save"): Promise<DesktopPlaybackCapture> {
     if (this.capturing) return Promise.reject(new Error("CAPTURE_BUSY"))
     this.capturing = true
     return this.run(async () => {
@@ -322,15 +325,28 @@ export class NativePlaybackCoordinator extends EventEmitter {
       await this.ensureUnlocked(active.context)
       let candidate = this.captureCandidate
       if (retryId !== undefined) {
-        if (!candidate || candidate.sessionId !== sessionId || candidate.result.id !== retryId || candidate.result.phase !== "error") throw new Error("STALE_CAPTURE")
+        if (!candidate || candidate.sessionId !== sessionId || candidate.result.id !== retryId || !["prepared", "error"].includes(candidate.result.phase)) throw new Error("STALE_CAPTURE")
       } else {
+        if (this.clipJob?.state.phase === "processing") throw new Error("CLIP_BUSY")
+        this.snapshotState.clip = undefined
         const frame = await active.player.captureFrame()
         candidate = { sessionId, image: frame.image, actors: [...(active.movie.actors ?? [])], title: active.movie.title,
           result: { id: randomUUID(), movieId: active.movie.id, fileId: active.fileId, code: active.movie.code,
-            positionSec: frame.positionSec, capturedAt: frame.capturedAt, preview: "", phase: "error" } }
+            positionSec: frame.positionSec, capturedAt: frame.capturedAt, preview: "", phase: mode === "prepare" ? "prepared" : "error" } }
         this.captureCandidate = candidate
       }
       const { image, result } = candidate!
+      clearTimeout(this.captureExpiry)
+      if (mode === "prepare") {
+        this.captureExpiry = setTimeout(() => { if (this.captureCandidate === candidate) this.captureCandidate = undefined }, 60_000)
+        return { ...result, preview: `data:image/png;base64,${image.toString("base64")}` }
+      }
+      if (mode === "gif" && candidate!.gifEndSec === undefined) {
+        // 略低于上限，避免 JSON 浮点相减得到 6.00000000000001 被 Server 拒绝。
+        const end = Math.min(await active.player.playbackPosition(), result.positionSec + 6 - 0.000001, active.player.state.durationSec || Infinity)
+        // 暂停/缓冲期间未看到足够媒体内容时，只保存静态帧。
+        if (end - result.positionSec >= 0.4) candidate!.gifEndSec = end
+      }
       try {
         const form = new FormData()
         form.append("metadata", JSON.stringify({ id: result.id, movieId: result.movieId, fileId: result.fileId, code: result.code,
@@ -344,9 +360,98 @@ export class NativePlaybackCoordinator extends EventEmitter {
         if (error instanceof Error && error.message === "SERVER_LOCKED") { await this.finish("SERVER_LOCKED"); throw error }
         result.phase = "error"; result.error = "CAPTURE_SAVE_FAILED"
       }
-      if (result.phase === "saved") this.captureCandidate = undefined
+      if (result.phase === "saved") {
+        this.captureCandidate = undefined
+        if (candidate!.gifEndSec !== undefined) await this.startClip(active, result.id, result.positionSec, candidate!.gifEndSec)
+      }
       return { ...result, preview: `data:image/png;base64,${image.toString("base64")}` }
     }).finally(() => { this.capturing = false })
+  }
+  private clearPreparedCapture(): void {
+    if (this.captureCandidate?.result.phase === "prepared") { clearTimeout(this.captureExpiry); this.captureCandidate = undefined }
+  }
+  discardCapture(sessionId: string, captureId: string): Promise<void> {
+    return this.run(async () => {
+      if (this.captureCandidate?.sessionId === sessionId && this.captureCandidate.result.id === captureId) this.clearPreparedCapture()
+    })
+  }
+  private async startClip(active: Active, frameId: string, startSec: number, endSec: number): Promise<void> {
+    const job: NonNullable<typeof this.clipJob> = { active, sessionId: this.snapshotState.sessionId, started: performance.now(), failures: 0,
+      state: { frameId, startSec, endSec, phase: "processing", progress: 0 } }
+    this.clipJob = job
+    this.snapshotState.clip = job.state
+    this.publish()
+    try {
+      const task = await this.api<{ taskId: string }>(active.context, `/api/library/movies/${encodeURIComponent(active.movie.id)}/clips?fileId=${encodeURIComponent(active.fileId)}`,
+        { method: "POST", body: JSON.stringify({ fileId: active.fileId, format: "gif", startSec, endSec, fps: 10, width: 640, curatedFrameId: frameId }) })
+      id(task.taskId)
+      job.taskId = task.taskId
+      this.scheduleClip(job, 0)
+    } catch (error) {
+      if (error instanceof Error && error.message === "SERVER_LOCKED") { await this.finish("SERVER_LOCKED"); throw error }
+      job.state.phase = "error"; job.state.error = "CLIP_FAILED"; this.publish()
+    }
+  }
+  private scheduleClip(job: NonNullable<typeof this.clipJob>, delay: number): void {
+    clearTimeout(job.timer)
+    job.timer = setTimeout(() => { void this.run(() => this.pollClip(job)).catch(() => {}) }, Math.max(0, Math.min(delay, 150_000 - (performance.now() - job.started))))
+  }
+  private async pollClip(job: NonNullable<typeof this.clipJob>): Promise<void> {
+    if (this.clipJob !== job || this.active !== job.active || job.state.phase !== "processing") return
+    if (performance.now() - job.started >= 150_000) {
+      job.state.phase = "error"; job.state.error = "CLIP_TIMED_OUT"
+      await this.cancelClipTask(job); this.publish(); return
+    }
+    try {
+      const task = await this.api<{ status: string; progress?: number; metadata?: { artifactUrl?: unknown } }>(job.active.context, `/api/tasks/${encodeURIComponent(job.taskId!)}`)
+      job.failures = 0
+      job.state.error = undefined
+      job.state.progress = typeof task.progress === "number" && Number.isFinite(task.progress) ? Math.min(100, Math.max(0, task.progress)) : 0
+      if (task.status === "completed") {
+        const artifact = task.metadata?.artifactUrl
+        const ready = typeof artifact === "string" && artifact === `/api/curated-frames/${encodeURIComponent(job.state.frameId)}/motion`
+        job.state.phase = ready ? "saved" : "error"
+        job.state.error = ready ? undefined : "CLIP_FAILED"
+        if (ready) this.snapshotState.captureRevision = (this.snapshotState.captureRevision ?? 0) + 1
+      } else if (["failed", "partial_failed", "cancelled"].includes(task.status)) {
+        job.state.phase = task.status === "cancelled" ? "cancelled" : "error"; job.state.error = task.status === "cancelled" ? undefined : "CLIP_FAILED"
+      } else if (["pending", "running"].includes(task.status)) this.scheduleClip(job, 1000)
+      else { job.state.phase = "error"; job.state.error = "CLIP_FAILED" }
+      this.publish()
+    } catch (error) {
+      if (error instanceof Error && error.message === "SERVER_LOCKED") { await this.finish("SERVER_LOCKED"); return }
+      if (++job.failures >= 5) { job.state.phase = "error"; job.state.error = "CLIP_STATUS_UNAVAILABLE"; await this.cancelClipTask(job); this.publish() }
+      else this.scheduleClip(job, Math.min(30_000, 1000 * 2 ** job.failures))
+    }
+  }
+  private async cancelClipTask(job: NonNullable<typeof this.clipJob>): Promise<string | undefined> {
+    clearTimeout(job.timer)
+    if (!job.taskId) return
+    try { await this.api(job.active.context, `/api/tasks/${encodeURIComponent(job.taskId)}/clip`, { method: "DELETE" }) }
+    catch (error) { return error instanceof Error ? error.message : "CLIP_CANCEL_FAILED" }
+  }
+  cancelClip(sessionId: string): Promise<void> {
+    return this.run(async () => {
+      if (sessionId !== this.snapshotState.sessionId) throw new Error("STALE_PLAYBACK_SESSION")
+      const job = this.clipJob
+      if (!job || job.state.phase !== "processing") return
+      const failure = await this.cancelClipTask(job)
+      if (failure === "SERVER_LOCKED") { await this.finish("SERVER_LOCKED"); throw new Error(failure) }
+      if (failure) {
+        job.state.error = "CLIP_CANCEL_FAILED"; this.scheduleClip(job, 1000); this.publish()
+        throw new Error("CLIP_CANCEL_FAILED")
+      }
+      job.state.phase = "cancelled"; job.state.error = undefined; this.publish()
+    })
+  }
+  retryClip(sessionId: string): Promise<void> {
+    return this.run(async () => {
+      if (sessionId !== this.snapshotState.sessionId) throw new Error("STALE_PLAYBACK_SESSION")
+      const job = this.clipJob
+      if (!job || job.state.phase !== "error" || this.active !== job.active) throw new Error("STALE_CLIP")
+      await this.ensureUnlocked(job.active.context)
+      await this.startClip(job.active, job.state.frameId, job.state.startSec, job.state.endSec)
+    })
   }
   private async save(active: Active): Promise<void> {
     const state = active.player.state
@@ -364,6 +469,9 @@ export class NativePlaybackCoordinator extends EventEmitter {
     this.publish()
   }
   private async release(): Promise<void> {
+    clearTimeout(this.captureExpiry)
+    if (this.clipJob?.state.phase === "processing") await this.cancelClipTask(this.clipJob)
+    this.clipJob = undefined; this.snapshotState.clip = undefined
     this.captureCandidate = undefined
     clearInterval(this.timer); this.timer = undefined
     const active = this.active

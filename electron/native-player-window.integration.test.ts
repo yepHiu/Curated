@@ -128,6 +128,7 @@ describe.skipIf(process.platform !== "win32" || !existsSync(hostExe))("real Wind
       expect(pausedFrame!.image.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
       expect([pausedFrame!.image.readUInt32BE(16), pausedFrame!.image.readUInt32BE(20)]).toEqual([320, 180])
       expect(pausedFrame!.positionSec).toBeCloseTo(7, 1)
+      expect(await player.playbackPosition()).toBeCloseTo(pausedFrame!.positionSec, 2)
       expect(player.state.status).toBe("paused")
       await host.command("fullscreen")
       await host.command("resize", { width: 700, height: 540 })
@@ -136,6 +137,7 @@ describe.skipIf(process.platform !== "win32" || !existsSync(hostExe))("real Wind
       const playingFrame = await player.captureFrame()
       expect(playingFrame.positionSec).toBeGreaterThan(7.3)
       await until(() => player!.state.status === "playing" && player!.state.positionSec > playingFrame.positionSec + 0.1)
+      expect(await player.playbackPosition()).toBeGreaterThan(playingFrame.positionSec)
       expect(readdirSync(tmpdir()).filter(name => name.startsWith("curated-native-frame-") && !captureDirectories.has(name))).toEqual([])
       expect(player.state.codec).toMatch(/h\.?264/i)
     } finally {

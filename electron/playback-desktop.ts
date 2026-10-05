@@ -153,6 +153,28 @@ export function installDesktopPlayback(options: DesktopPlaybackOptions) {
     if (retryId !== undefined && (typeof retryId !== "string" || retryId.length > 100)) throw new Error("INVALID_CAPTURE")
     return coordinator.capture(sessionId, retryId)
   })
+  ipcMain.handle("curated:playback-prepare-capture", (event, sessionId: string) => {
+    assertController(event)
+    return coordinator.capture(sessionId, undefined, "prepare")
+  })
+  function assertCaptureId(value: unknown): asserts value is string {
+    if (typeof value !== "string" || !value || value.length > 100) throw new Error("INVALID_CAPTURE")
+  }
+  ipcMain.handle("curated:playback-commit-capture", (event, sessionId: string, captureId: string, gif: boolean) => {
+    assertController(event); assertCaptureId(captureId)
+    if (typeof gif !== "boolean") throw new Error("INVALID_CAPTURE")
+    return coordinator.capture(sessionId, captureId, gif ? "gif" : "save")
+  })
+  ipcMain.handle("curated:playback-discard-capture", (event, sessionId: string, captureId: string) => {
+    assertController(event); assertCaptureId(captureId)
+    return coordinator.discardCapture(sessionId, captureId)
+  })
+  ipcMain.handle("curated:playback-cancel-clip", (event, sessionId: string) => {
+    assertController(event); return coordinator.cancelClip(sessionId)
+  })
+  ipcMain.handle("curated:playback-retry-clip", (event, sessionId: string) => {
+    assertController(event); return coordinator.retryClip(sessionId)
+  })
   ipcMain.handle("curated:playback-capture-preferences", async event => {
     assertController(event)
     const main = options.current()?.window

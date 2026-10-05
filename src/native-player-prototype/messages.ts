@@ -15,6 +15,10 @@ const zh = {
   capture: "萃取帧", captureView: "查看萃取帧", captureSaving: "正在保存", captureSaved: "已保存到萃取帧库", captureFailed: "萃取帧失败，请重试",
   captureSaveFailed: "保存到 Server 失败，可重试保存这张帧", captureTooLarge: "这张帧超过保存大小限制，请选择其他画面", captureNotReady: "画面尚未就绪，请稍后再试",
   captureRetry: "重试保存", retryLoad: "重新加载", dismiss: "关闭", loading: "加载中",
+  clipRecording: "正在录制 GIF", clipProcessing: "正在生成 GIF…", clipSaved: "GIF 已保存到萃取帧库", clipFailed: "GIF 生成失败",
+  clipTimedOut: "GIF 生成超时，请稍后到萃取帧库查看", clipStatusUnavailable: "无法获取 GIF 生成状态，请稍后到萃取帧库查看",
+  clipStop: "结束 GIF 录制", cancel: "取消", cancelled: "已取消", retry: "重试",
+  clipCancelFailed: "取消失败，请重试",
 }
 export type NativeMessage = keyof typeof zh
 const en: Record<NativeMessage, string> = {
@@ -34,6 +38,10 @@ const en: Record<NativeMessage, string> = {
   capture: "Capture frame", captureView: "View captured frame", captureSaving: "Saving", captureSaved: "Saved to captured frames", captureFailed: "Frame capture failed; try again",
   captureSaveFailed: "Could not save to the Server. Retry saving this frame", captureTooLarge: "This frame exceeds the save limit. Choose another scene", captureNotReady: "The frame is not ready. Try again shortly",
   captureRetry: "Retry save", retryLoad: "Reload", dismiss: "Close", loading: "Loading",
+  clipRecording: "Recording GIF", clipProcessing: "Generating GIF…", clipSaved: "GIF saved to Curated Frames", clipFailed: "GIF generation failed",
+  clipTimedOut: "GIF generation timed out. Check Curated Frames later", clipStatusUnavailable: "Cannot get GIF status. Check Curated Frames later",
+  clipStop: "Finish GIF recording", cancel: "Cancel", cancelled: "Cancelled", retry: "Retry",
+  clipCancelFailed: "Cancellation failed. Try again",
 }
 const ja: Record<NativeMessage, string> = {
   title: "Windows ネイティブ再生プロトタイプ", subtitle: "元のメディア · mpv", prepare: "接続とエンジン", engine: "mpv.exe を選択",
@@ -52,5 +60,9 @@ const ja: Record<NativeMessage, string> = {
   capture: "フレームを抽出", captureView: "抽出フレームを表示", captureSaving: "保存中", captureSaved: "抽出フレームに保存しました", captureFailed: "フレーム抽出に失敗しました。再試行してください",
   captureSaveFailed: "Server に保存できませんでした。このフレームを再保存できます", captureTooLarge: "保存サイズの上限を超えています。別の場面を選択してください", captureNotReady: "映像の準備中です。しばらくしてから再試行してください",
   captureRetry: "保存を再試行", retryLoad: "再読み込み", dismiss: "閉じる", loading: "読み込み中",
+  clipRecording: "GIF を録画中", clipProcessing: "GIF を生成中…", clipSaved: "GIF を抽出フレームに保存しました", clipFailed: "GIF の生成に失敗しました",
+  clipTimedOut: "GIF の生成がタイムアウトしました。後で抽出フレームを確認してください", clipStatusUnavailable: "GIF の状態を取得できません。後で抽出フレームを確認してください",
+  clipStop: "GIF の録画を終了", cancel: "キャンセル", cancelled: "キャンセル済み", retry: "再試行",
+  clipCancelFailed: "キャンセルに失敗しました。再試行してください",
 }
 export const nativeMessages = { "zh-CN": zh, en, ja }

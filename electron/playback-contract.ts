@@ -21,6 +21,7 @@ export interface DesktopPlaybackOpen {
 }
 export interface DesktopPlaybackSnapshot {
   captureRevision?: number
+  clip?: DesktopPlaybackClip
   sessionId: string
   revision: number
   engine: "native"
@@ -42,13 +43,26 @@ export interface DesktopPlaybackCapture {
   positionSec: number
   capturedAt: string
   preview: string
-  phase: "saved" | "error"
+  phase: "prepared" | "saved" | "error"
   error?: string
+}
+export interface DesktopPlaybackClip {
+  frameId: string
+  startSec: number
+  endSec: number
+  phase: "processing" | "saved" | "error" | "cancelled"
+  progress: number
+  error?: "CLIP_FAILED" | "CLIP_TIMED_OUT" | "CLIP_STATUS_UNAVAILABLE" | "CLIP_CANCEL_FAILED"
 }
 export interface DesktopPlayerBridge extends Pick<DesktopPlaybackBridge, "snapshot" | "command" | "subscribe"> {
   copyDiagnostics(sessionId: string): Promise<void>
   saveDiagnostics(sessionId: string): Promise<"saved" | "cancelled">
   capture(sessionId: string, retryId?: string): Promise<DesktopPlaybackCapture>
+  prepareCapture(sessionId: string): Promise<DesktopPlaybackCapture>
+  commitCapture(sessionId: string, captureId: string, gif: boolean): Promise<DesktopPlaybackCapture>
+  discardCapture(sessionId: string, captureId: string): Promise<void>
+  cancelClip(sessionId: string): Promise<void>
+  retryClip(sessionId: string): Promise<void>
   capturePreferences(): Promise<{ keyCode: string; feedbackSoundEnabled: boolean }>
 }
 export type DesktopPlaybackCommand =

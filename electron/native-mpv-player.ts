@@ -241,6 +241,14 @@ export class NativeMpvPlayer extends EventEmitter {
   /** 通知状态订阅者时复制快照，避免外部修改引擎状态。 */
   private publish(): void { this.emit("state", structuredClone(this.state)) }
 
+  /** 录制结束读取媒体时钟；拒绝未就绪及仍在 seek 的片段。 */
+  async playbackPosition(): Promise<number> {
+    if (!["playing", "paused"].includes(this.state.status) || await this.command(["get_property", "seeking"])) throw new Error("CAPTURE_NOT_READY")
+    const value = await this.command(["get_property", "time-pos"])
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) throw new Error("CAPTURE_NOT_READY")
+    return value
+  }
+
   /** 冻结视频帧后取得准确时间；只输出视频，不包含 HUD、标题栏或字幕。 */
   async captureFrame(): Promise<{ image: Buffer; positionSec: number; capturedAt: string }> {
     if (!["playing", "paused"].includes(this.state.status) || await this.command(["get_property", "seeking"])) throw new Error("CAPTURE_NOT_READY")
