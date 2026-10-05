@@ -635,3 +635,11 @@ UI：四组两列字段和轻量速度曲线，源 FPS 与显示 Hz 分开；两
 native JSON 保存对话框已实际显示；Windows 窗口工具将其识别为另一进程 owned modal，按恢复流程刷新/重试仍拒绝操作（point is over electron.exe, not native-player-host.exe），未声称完成真实对话框输入。另起隔离 fixture 仅注入 dialog 的 cancelled/已选 QA 路径结果，其余沿用正式 main handler；取消不显示错误/成功反馈，真实磁盘白名单 JSON 写入与 UI 成功反馈通过。本机诊断文件 `.workspace/diagnostics-qa-saved.json` 与 ignored QA 记录均为合成数据。
 
 本轮没有真实影片截图/萃取、共享 Server 写入或正式应用退出；原生/Web 标题栏和萃取能力保留。日常测试 Desktop 重启到本轮产物；重启前没有活动播放（resume=null），因此不自动起播。未运行 test:display、混合 DPI、真实 LAN/HTTPS、安装/发布验收；无版本、push、合并或发布。
+
+#### 14.16.1 修复实时信息文字跳动（2026-10-06）
+
+用户确认现象为数字、单位与文字来回跳动。对正在打开的面板只读采样 8 秒，外框坐标/尺寸、行位置及滚动位置稳定；A/V 偏差与接收速度文本宽度却随数据变化。原因是格式化经 `Number(toFixed(...))` 删除末尾零，整数位数、符号与单位长度的变化又推移后续文字。此次修复保留小数位（默认 2 位、FPS/Hz 3 位、计数整数）、A/V 始终显示符号；数字/单位拆成固定 `9ch`/`5ch` 宽、16px 高的独立槽，数字右对齐，缺失值也保留单位占位。组合指标的分隔符位置固定；曲线始终预留空间，数据区固定滚动条占位并关闭滚动锚定。首次压力检查发现空单位仍影响行内基线，最终改为固定高度、垂直居中，缺失到实测值的切换也保持稳定。
+
+验证：定向前端 2 文件/5 测试、`pnpm typecheck`、定向 ESLint、`pnpm desktop:test:build` 和最终 `pnpm build:desktop-player` 通过。使用正式 production main、隔离 profile、认证合成片源，在 986×763、640×480、626×444 renderer 尺寸各连续采样 8 秒；所有数字槽、单位槽、分隔符、面板边界和滚动值保持不变，实际视频/音频码率、A/V、缓存值仍持续更新。窄窗滚动位置 650px 保持；数据区高度 134px/98px，无横向溢出。另在同一 QA DOM 同步临时替换文本，检查 `—`/空单位、`0.00 B/s`、`1023.99 KiB/s`、`1.00 MiB/s`、`-1234.56 ms`、`+0.00 ms`，全部槽位与分隔符坐标不变；压力检查后恢复文本，未改产品数据。证据在 ignored `output/playwright/desktop-player/info-jitter-{normal,640,626}.log`。此为布局验证，不等同跨屏混合 DPI 或新性能基准；此次未改 Electron/Server 逻辑，未重复完整引擎测试。
+
+测试 Desktop 已退出、重建并重新启动；重启前保存当前影片/分部/队列及进度，恢复 `fc2-4985807:primary` 于 2932.663067 秒（48:52）为暂停，重新打开播放信息供检查。没有截取或萃取用户影片画面。未改版本、push、合并或发布。
