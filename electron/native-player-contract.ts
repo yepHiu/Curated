@@ -22,6 +22,7 @@ export interface NativeLabStatus {
   engineReady: boolean
   connection?: NativeLabConnection
   state: NativePlayerState
+  window?: { embedded: boolean; fullscreen: boolean }
 }
 export interface NativeLabStart { movieId: string; fileId?: string; startSec: number }
 export interface NativeLabControl { action: "pause" | "resume" | "seek" | "speed" | "volume" | "stop"; value?: number }
@@ -36,6 +37,7 @@ export interface NativeLabBridge {
   resume(input: { movieId: string; fileId?: string }): Promise<number>
   start(input: NativeLabStart): Promise<void>
   control(input: NativeLabControl): Promise<void>
+  windowAction(action: "fullscreen" | "minimize" | "close"): Promise<void>
 }
 
 /** 每次播放从独立状态开始，防止上一片的诊断和时间串入新片。 */

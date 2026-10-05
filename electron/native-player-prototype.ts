@@ -1,8 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain, session } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, screen, session } from "electron"
 import path from "node:path"
 import { existsSync } from "node:fs"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { NativePlayerLab } from "./native-player-lab.js"
+import { NativeMpvPlayer } from "./native-mpv-player.js"
+import { NativePlayerWindow, type NativeWindowState } from "./native-player-window.js"
 import { serverSessionPartition } from "./server-connections.js"
 import type { NativeLabControl, NativeLabStart } from "./native-player-contract.js"
 
@@ -15,6 +17,7 @@ if (profile && !path.isAbsolute(profile)) throw new Error("INVALID_PROTOTYPE_PRO
 app.setPath("userData", profile ?? path.join(app.getPath("appData"), "Curated Native Playback Prototype"))
 let window: BrowserWindow | undefined
 let disposed = false
+const host = new NativePlayerWindow()
 const lab = new NativePlayerLab((origin) => {
   // 认证 session 独立于正式 Desktop，只在当前来源请求中发送 Cookie。
   const scoped = session.fromPartition(`${serverSessionPartition(origin)}-native-prototype`)
@@ -23,7 +26,19 @@ const lab = new NativePlayerLab((origin) => {
     if (new URL(url).origin !== origin) throw new Error("INVALID_MEDIA_ORIGIN")
     return await scoped.fetch(url, { ...init, credentials: "include", redirect: "error" })
   }
+}, () => { /* 创建播放会话时宿主已经 ready，HWND 只在主进程内部使用。 */
+  if (!host.state) throw new Error("NATIVE_HOST_NOT_READY")
+  return new NativeMpvPlayer(host.state.handle)
 })
+
+/** helper 使用物理像素，Electron 边界使用 DIP；最小化不应用空矩形。 */
+function syncWindow(state: NativeWindowState): void {
+  if (!window || window.isDestroyed()) return
+  if (!state.visible) { window.hide(); return }
+  if (state.width <= 0 || state.height <= 0) return
+  window.setBounds(screen.screenToDipRect(window, { x: state.x, y: state.y, width: state.width, height: state.height }))
+  if (!window.isVisible()) window.showInactive()
+}
 
 /** 可执行文件只来自本地主进程环境或原生选择器。 */
 function setExecutable(candidate: string): void {
@@ -45,7 +60,7 @@ function registerIpc(): void {
   ipcMain.handle("native-lab:status", (event) => {
     // 只返回不含敏感参数的诊断快照。
     assertSender(event)
-    return lab.status()
+    return { ...lab.status(), window: { embedded: true, fullscreen: host.state?.fullscreen === true } }
   })
   ipcMain.handle("native-lab:engine", async (event) => {
     // 只允许选择本机 mpv.exe，不提供通用执行桥。
@@ -90,16 +105,30 @@ function registerIpc(): void {
     assertSender(event)
     return lab.run(() => lab.control(input))
   })
+  ipcMain.handle("native-lab:window", async (event, action: unknown) => {
+    // 页面无法指定 HWND、位置或其它应用的窗口。
+    assertSender(event)
+    if (action === "close") { app.quit(); return }
+    if (action !== "fullscreen" && action !== "minimize") throw new Error("INVALID_WINDOW_ACTION")
+    await host.command(action)
+  })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // 原型入口独立，生产 main.ts 不加载此模块。
   if (process.platform !== "win32") throw new Error("WINDOWS_REQUIRED")
   if (process.env.CURATED_NATIVE_MPV) setExecutable(process.env.CURATED_NATIVE_MPV)
+  const bounds = await host.start(path.join(directory, "native-player-host.exe"))
+  host.on("bounds", syncWindow)
+  host.on("close-request", () => { /* 原生标题栏关闭也走同一有序回收路径。 */ app.quit() })
+  host.on("fault", () => { /* 宿主异常立即停止本次播放并退出，不留下音频或代理。 */ app.quit() })
   registerIpc()
-  window = new BrowserWindow({ width: 1000, height: 850, minWidth: 640, minHeight: 600,
-    title: "Curated · Windows 原生播放原型", show: false, autoHideMenuBar: true,
+  window = new BrowserWindow({ width: 1000, height: 800,
+    title: "Curated · Windows 原生播放原型", show: false, frame: false, transparent: true,
+    backgroundColor: "#00000000", thickFrame: false, skipTaskbar: true, autoHideMenuBar: true,
     webPreferences: { preload: path.join(directory, "native-player-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false } })
+  const handle = window.getNativeWindowHandle()
+  await host.command("attach", { handle: (handle.length === 8 ? handle.readBigUInt64LE() : BigInt(handle.readUInt32LE())).toString() })
   window.webContents.setWindowOpenHandler(() => { // 控制页不打开外部窗口。
     return { action: "deny" }
   })
@@ -107,19 +136,23 @@ app.whenReady().then(() => {
     event.preventDefault()
   })
   window.webContents.on("render-process-gone", () => { // renderer 异常时停止仍在独立窗口播放的引擎。
-    void lab.run(() => lab.stop())
+    app.quit()
   })
   window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => {
     // 原型不申请浏览器设备权限。
     callback(false)
   })
   window.once("ready-to-show", () => { // 先完成页面首帧再展示。
-    window?.show()
+    syncWindow(host.state ?? bounds)
+    window?.focus()
   })
-  void window.loadURL(page)
+  window.on("close", (event) => { /* 浏览器关闭先保存进度，再关闭宿主和播放器。 */
+    if (!disposed) { event.preventDefault(); app.quit() }
+  })
+  await window.loadURL(page)
 }).catch(() => { // 启动失败不输出媒体或认证上下文。
   console.error("Native playback prototype startup failed")
-  app.exit(1)
+  app.quit()
 })
 
 app.on("window-all-closed", () => { // 独立实验窗口退出即停止播放器。
@@ -129,5 +162,10 @@ app.on("before-quit", (event) => { // 保存有效进度并回收本次播放器
   if (disposed) return
   event.preventDefault()
   disposed = true
-  void lab.run(() => lab.stop()).finally(() => { app.exit(0) })
+  void lab.run(() => lab.stop()).finally(async () => {
+    // 先停止绘制者，再移除透明控件与视频宿主。
+    window?.destroy()
+    await host.dispose()
+    app.exit(0)
+  })
 })

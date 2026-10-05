@@ -20,4 +20,6 @@ contextBridge.exposeInMainWorld("nativePlayerLab", {
   start: (input) => ipcRenderer.invoke("native-lab:start", input),
   /** 执行枚举控制。 */
   control: (input) => ipcRenderer.invoke("native-lab:control", input),
+  /** 只暴露窗口动作枚举，不暴露句柄、位置或原生通用调用。 */
+  windowAction: (action) => ipcRenderer.invoke("native-lab:window", action),
 })

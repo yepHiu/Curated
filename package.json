@@ -20,7 +20,7 @@
     "build:electron:main": "tsc -p electron/tsconfig.json && node scripts/dev/copy-electron-preload.cjs && pnpm build:desktop-ui",
     "build:electron": "pnpm build:electron:main",
     "dev:electron": "pnpm build:electron && node scripts/dev/start-electron.cjs",
-    "build:native-player-prototype": "tsc -p electron/tsconfig.native-player.json && node scripts/dev/copy-native-player-preload.cjs && vite build --config vite.native-player.config.ts --configLoader native",
+    "build:native-player-prototype": "node scripts/dev/build-native-player-host.cjs && tsc -p electron/tsconfig.native-player.json && node scripts/dev/copy-native-player-preload.cjs && vite build --config vite.native-player.config.ts --configLoader native",
     "dev:native-player": "pnpm build:native-player-prototype && node scripts/dev/start-native-player-prototype.cjs",
     "preview": "vite preview",
     "release:frontend": "python scripts/release/release_cli.py build-frontend --version 0.0.0-local",
