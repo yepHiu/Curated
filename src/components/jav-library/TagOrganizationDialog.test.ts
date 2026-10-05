@@ -27,7 +27,7 @@ vi.mock("@/services/ai-service", () => ({ useAIService: () => ({ getTagOrganizat
 vi.mock("@/lib/experimental-agent", () => ({ useExperimentalAgent: () => ({ writeEnabled: ref(true) }) }))
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ locale: ref("en"), t: (key: string, values?: Record<string, unknown>) => values ? `${key}:${JSON.stringify(values)}` : key }) }))
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: { template: "<div><slot /></div>" }, DialogContent: { template: "<div><slot /></div>" }, DialogHeader: { template: "<header><slot /></header>" }, DialogTitle: { template: "<h2><slot /></h2>" }, DialogDescription: { template: "<p><slot /></p>" },
+  Dialog: { template: "<div><slot /></div>" }, DialogClose: { template: "<div><slot /></div>" }, DialogContent: { template: "<div><slot /></div>" }, DialogHeader: { template: "<header><slot /></header>" }, DialogTitle: { template: "<h2><slot /></h2>" }, DialogDescription: { template: "<p><slot /></p>" },
 }))
 vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenu: { template: "<div><slot /></div>" }, DropdownMenuTrigger: { template: "<div><slot /></div>" }, DropdownMenuContent: { template: "<div><slot /></div>" }, DropdownMenuGroup: { template: "<div><slot /></div>" }, DropdownMenuItem: { template: "<button @click=\"$emit('select')\"><slot /></button>" },

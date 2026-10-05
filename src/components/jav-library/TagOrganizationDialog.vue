@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue"
 import { RouterLink } from "vue-router"
 import { useI18n } from "vue-i18n"
-import { ChevronDown, MoreHorizontal } from "lucide-vue-next"
+import { ChevronDown, MoreHorizontal, X } from "lucide-vue-next"
 import { useLibraryService } from "@/services/library-service"
 import { useAIService } from "@/services/ai-service"
 import type { TagOrganizationItem, LibraryTopic } from "@/services/contracts/topic-service"
@@ -10,7 +10,7 @@ import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useTagOrganization, isOrganizationActive, organizationProgressText, organizationProgressValue, organizationErrorText } from "@/composables/use-tag-organization"
 
@@ -94,8 +94,13 @@ async function showResults(id: string, more = false) {
 
 <template>
   <Dialog v-model:open="state.dialogOpen.value">
-    <DialogContent class="max-h-[85dvh] overflow-y-auto sm:max-w-xl">
-      <DialogHeader>
+    <DialogContent class="max-h-[85dvh] overflow-y-auto sm:max-w-xl" :show-close-button="false">
+      <DialogClose as-child>
+        <Button variant="ghost" size="icon" class="absolute top-3 right-3 size-11 rounded-full lg:size-8" :aria-label="t('common.close')">
+          <X aria-hidden="true" />
+        </Button>
+      </DialogClose>
+      <DialogHeader class="pr-9">
         <DialogTitle>{{ t("topics.organize") }}</DialogTitle>
         <DialogDescription>{{ t("topics.explanation") }}</DialogDescription>
       </DialogHeader>
@@ -108,7 +113,7 @@ async function showResults(id: string, more = false) {
         </div>
         <p v-if="state.statsError.value" role="alert" class="text-sm text-destructive">
           {{ t("topics.coverageFailed") }}
-          <Button variant="ghost" size="sm" class="min-h-11 lg:min-h-8" @click="state.refreshStats">{{ t("topics.retryLoad") }}</Button>
+          <Button variant="ghost" size="sm" class="min-h-11 rounded-full lg:min-h-8" @click="state.refreshStats">{{ t("topics.retryLoad") }}</Button>
         </p>
         <dl v-else-if="state.stats.value" class="grid grid-cols-2 gap-3 rounded-lg border border-border/60 p-3 sm:grid-cols-4">
           <div v-for="kind in (['organized', 'unorganized', 'outdated', 'needsAttention'] as const)" :key="kind" class="flex min-w-0 flex-col gap-1">
@@ -123,19 +128,19 @@ async function showResults(id: string, more = false) {
       <div v-if="state.active.value" class="flex min-w-0 flex-col gap-2 rounded-lg bg-muted/40 p-3" data-organization-active>
         <div class="flex min-w-0 items-center justify-between gap-3 text-sm">
           <span class="min-w-0 truncate" role="status">{{ organizationProgressText(state.active.value) }}</span>
-          <Button variant="ghost" size="sm" class="min-h-11 shrink-0 lg:min-h-8" :disabled="state.busy.value" @click="state.cancel(state.active.value.id)">{{ t("topics.cancel") }}</Button>
+          <Button variant="ghost" size="sm" class="min-h-11 shrink-0 rounded-full lg:min-h-8" :disabled="state.busy.value" @click="state.cancel(state.active.value.id)">{{ t("topics.cancel") }}</Button>
         </div>
         <Progress :model-value="organizationProgressValue(state.active.value)" class="h-1" :aria-label="organizationProgressText(state.active.value)" />
       </div>
       <div v-else class="flex min-w-0 flex-wrap items-center justify-between gap-3" data-organization-scope>
         <p class="w-full min-w-0 truncate text-sm font-medium sm:w-auto sm:flex-1" :title="scopeLabel">{{ scopeLabel }}</p>
-        <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <Button class="min-h-11 shrink-0 lg:min-h-9" :disabled="state.busy.value || invalidSelection || !writeEnabled || (!state.selection.value && (coverageUnavailable || !state.stats.value?.unorganized))" data-organize-unorganized @click="state.start()">{{ startLabel }}</Button>
+        <div class="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+          <Button class="min-h-11 shrink-0 rounded-full lg:min-h-9" :disabled="state.busy.value || invalidSelection || !writeEnabled || (!state.selection.value && (coverageUnavailable || !state.stats.value?.unorganized))" data-organize-unorganized @click="state.start()">{{ startLabel }}</Button>
           <template v-if="!state.selection.value">
-            <Button v-if="state.stats.value?.outdated" variant="outline" class="min-h-11 lg:min-h-9" :disabled="state.busy.value || !writeEnabled || coverageUnavailable" data-organize-outdated @click="state.start('outdated')">{{ t("topics.startOutdated", { count: state.stats.value.outdated }) }}</Button>
+            <Button v-if="state.stats.value?.outdated" variant="outline" class="min-h-11 rounded-full lg:min-h-9" :disabled="state.busy.value || !writeEnabled || coverageUnavailable" data-organize-outdated @click="state.start('outdated')">{{ t("topics.startOutdated", { count: state.stats.value.outdated }) }}</Button>
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
-                <Button variant="ghost" size="icon" class="size-11 lg:size-9" :aria-label="t('topics.scopeActions')" :disabled="state.busy.value || !writeEnabled || coverageUnavailable || !state.stats.value?.total"><MoreHorizontal /></Button>
+                <Button variant="ghost" size="icon" class="size-11 rounded-full lg:size-9" :aria-label="t('topics.scopeActions')" :disabled="state.busy.value || !writeEnabled || coverageUnavailable || !state.stats.value?.total"><MoreHorizontal aria-hidden="true" /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end"><DropdownMenuGroup>
                 <DropdownMenuItem :disabled="state.busy.value || !writeEnabled || coverageUnavailable || !state.stats.value?.total" @select="state.start('all')">{{ t("topics.reorganizeAll") }}</DropdownMenuItem>
@@ -150,14 +155,14 @@ async function showResults(id: string, more = false) {
       <section v-if="state.stats.value?.needsAttention || issuesOpen" class="flex min-w-0 flex-col gap-2" :aria-label="t('topics.issuesTitle')" data-organization-issues>
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h3 class="text-sm font-medium">{{ t("topics.issuesTitle", { count: state.stats.value?.needsAttention ?? 0 }) }}</h3>
-          <Button v-if="!issuesOpen" variant="outline" size="sm" class="min-h-11 lg:min-h-8" @click="showIssues()">{{ t("topics.viewIssues") }}</Button>
-          <Button v-else variant="ghost" size="sm" class="min-h-11 lg:min-h-8" @click="issuesOpen = false">{{ t("topics.leaveForLater") }}</Button>
+          <Button v-if="!issuesOpen" variant="outline" size="sm" class="min-h-11 rounded-full lg:min-h-8" @click="showIssues()">{{ t("topics.viewIssues") }}</Button>
+          <Button v-else variant="ghost" size="sm" class="min-h-11 rounded-full lg:min-h-8" @click="issuesOpen = false">{{ t("topics.leaveForLater") }}</Button>
         </div>
         <p class="text-xs text-muted-foreground">{{ t("topics.issuesHint") }}</p>
         <template v-if="issuesOpen">
-          <div class="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" class="min-h-11 lg:min-h-8" :disabled="state.busy.value || Boolean(state.active.value) || !writeEnabled || coverageUnavailable || !state.stats.value?.needsAttention" @click="state.retryIssues">{{ t("topics.retryIssues") }}</Button>
-            <Button variant="ghost" size="sm" class="min-h-11 lg:min-h-8" :disabled="issuesLoading" @click="showIssues()">{{ t("topics.retryLoad") }}</Button>
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="outline" size="sm" class="min-h-11 rounded-full lg:min-h-8" :disabled="state.busy.value || Boolean(state.active.value) || !writeEnabled || coverageUnavailable || !state.stats.value?.needsAttention" @click="state.retryIssues">{{ t("topics.retryIssues") }}</Button>
+            <Button variant="ghost" size="sm" class="min-h-11 rounded-full lg:min-h-8" :disabled="issuesLoading" @click="showIssues()">{{ t("topics.retryLoad") }}</Button>
           </div>
           <p v-if="issuesError" role="alert" class="text-xs text-destructive">{{ t("topics.loadFailed") }}</p>
           <ul class="flex max-h-60 flex-col overflow-y-auto overscroll-contain rounded-lg border border-border/60" data-organization-issue-list>
@@ -166,12 +171,12 @@ async function showResults(id: string, more = false) {
                 <RouterLink :to="{ name: 'detail', params: { id: item.movieId } }" class="break-words text-sm font-medium hover:underline" @click="state.dialogOpen.value = false">{{ item.title }}</RouterLink>
                 <p class="break-words text-xs text-muted-foreground">{{ organizationErrorText(item.reason) }}</p>
               </div>
-              <Button variant="outline" size="sm" class="min-h-11 shrink-0 lg:min-h-8" :disabled="state.busy.value || Boolean(state.active.value) || !writeEnabled" @click="state.retryMovie(item.movieId)">{{ t("topics.retryMovie") }}</Button>
+              <Button variant="outline" size="sm" class="min-h-11 shrink-0 rounded-full lg:min-h-8" :disabled="state.busy.value || Boolean(state.active.value) || !writeEnabled" @click="state.retryMovie(item.movieId)">{{ t("topics.retryMovie") }}</Button>
             </li>
           </ul>
           <p v-if="issuesLoading" role="status" class="text-xs text-muted-foreground">{{ t("topics.loading") }}</p>
           <p v-else-if="!issuesError && !issues.length" role="status" class="text-xs text-muted-foreground">{{ t("topics.noIssues") }}</p>
-          <Button v-if="issuesMore && !issuesError" variant="ghost" size="sm" class="min-h-11 self-start lg:min-h-8" :disabled="issuesLoading" @click="showIssues(true)">{{ t("topics.more") }}</Button>
+          <Button v-if="issuesMore && !issuesError" variant="ghost" size="sm" class="min-h-11 self-end rounded-full lg:min-h-8" :disabled="issuesLoading" @click="showIssues(true)">{{ t("topics.more") }}</Button>
         </template>
       </section>
       <section class="flex min-w-0 flex-col gap-2" :aria-label="t('topics.history')">
@@ -193,7 +198,7 @@ async function showResults(id: string, more = false) {
               </button>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                  <Button variant="ghost" size="icon" class="size-11 shrink-0 lg:size-8" :aria-label="t('topics.taskActions')"><MoreHorizontal /></Button>
+                  <Button variant="ghost" size="icon" class="size-11 shrink-0 rounded-full lg:size-8" :aria-label="t('topics.taskActions')"><MoreHorizontal aria-hidden="true" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuGroup>
@@ -210,9 +215,9 @@ async function showResults(id: string, more = false) {
             <div v-if="expandedJob === job.id" class="flex flex-col gap-2 px-3 pb-3 text-xs" data-organization-history-detail>
               <p class="text-muted-foreground">{{ t("topics.result", { success: job.succeeded, unresolved: job.unresolved, failed: job.failed }) }}</p>
               <p v-if="job.status === 'partial_failed'" role="status" class="text-muted-foreground">{{ t("topics.completedWithIssues", { success: job.succeeded, unresolved: job.unresolved, failed: job.failed }) }}</p>
-              <Button v-if="job.failed && state.stats.value?.needsAttention" variant="outline" size="sm" class="min-h-11 self-start lg:min-h-8" @click="showIssues()">{{ t("topics.viewIssues") }}</Button>
+              <Button v-if="job.failed && state.stats.value?.needsAttention" variant="outline" size="sm" class="min-h-11 self-end rounded-full lg:min-h-8" @click="showIssues()">{{ t("topics.viewIssues") }}</Button>
               <p v-if="job.error" class="text-destructive">{{ organizationErrorText(job.error) }}</p>
-              <Button variant="ghost" size="sm" class="min-h-11 self-start lg:min-h-8" :disabled="resultLoading" @click="showResults(job.id)">{{ t("topics.details") }}</Button>
+              <Button variant="ghost" size="sm" class="min-h-11 self-end rounded-full lg:min-h-8" :disabled="resultLoading" @click="showResults(job.id)">{{ t("topics.details") }}</Button>
               <div v-if="selectedJob === job.id" class="flex flex-col gap-3">
                 <p v-if="resultError" role="alert" class="text-destructive">{{ t("topics.loadFailed") }}</p>
                 <article v-for="item in items" :key="item.movieId" class="flex flex-col gap-1 border-b border-border/60 pb-2 last:border-0">
@@ -222,14 +227,14 @@ async function showResults(id: string, more = false) {
                   <p v-for="evidence in item.evidence" :key="evidence.topic" class="break-words text-muted-foreground">{{ evidence.topic }} · {{ t(`topics.evidenceField.${evidence.field}`) }}：{{ evidence.quote }}</p>
                 </article>
                 <p v-if="resultLoading" role="status" class="text-muted-foreground">{{ t("topics.loading") }}</p>
-                <Button v-if="hasMore" variant="ghost" size="sm" class="min-h-11 self-start lg:min-h-8" :disabled="resultLoading" @click="showResults(job.id, true)">{{ t("topics.more") }}</Button>
+                <Button v-if="hasMore" variant="ghost" size="sm" class="min-h-11 self-end rounded-full lg:min-h-8" :disabled="resultLoading" @click="showResults(job.id, true)">{{ t("topics.more") }}</Button>
               </div>
             </div>
           </li>
         </ol>
       </section>
-      <div v-if="hiddenTopics.length" class="flex flex-wrap gap-2">
-        <Button v-for="topic in hiddenTopics" :key="topic.id" variant="outline" size="sm" @click="restoreTopic(topic.id)">{{ t("topics.restore", { name: topic.name }) }}</Button>
+      <div v-if="hiddenTopics.length" class="flex flex-wrap justify-end gap-2">
+        <Button v-for="topic in hiddenTopics" :key="topic.id" variant="outline" size="sm" class="min-h-11 rounded-full lg:min-h-8" @click="restoreTopic(topic.id)">{{ t("topics.restore", { name: topic.name }) }}</Button>
       </div>
     </DialogContent>
   </Dialog>
