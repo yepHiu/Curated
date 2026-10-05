@@ -210,9 +210,20 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
     window_class.hIcon = LoadIconW(NULL, IDI_APPLICATION);
     window_class.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
     if (!RegisterClassW(&window_class)) return 4;
+    /* 初始尺寸与最小尺寸都用 DIP，避免高 DPI 屏幕启动时只留下狭窄控件区。 */
+    UINT system_dpi = GetDpiForSystem();
+    MONITORINFO initial_monitor = { .cbSize = sizeof(MONITORINFO) };
+    POINT initial_point = {0, 0};
+    GetMonitorInfoW(MonitorFromPoint(initial_point, MONITOR_DEFAULTTOPRIMARY), &initial_monitor);
+    int initial_width = MulDiv(1000, (int)system_dpi, 96);
+    int initial_height = MulDiv(800, (int)system_dpi, 96);
+    int work_width = initial_monitor.rcWork.right - initial_monitor.rcWork.left;
+    int work_height = initial_monitor.rcWork.bottom - initial_monitor.rcWork.top;
+    if (initial_width > work_width) initial_width = work_width;
+    if (initial_height > work_height) initial_height = work_height;
     host_window = CreateWindowExW(0, window_class.lpszClassName, L"Curated · Native Playback",
                                  WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
-                                 CW_USEDEFAULT, CW_USEDEFAULT, 1000, 800,
+                                 CW_USEDEFAULT, CW_USEDEFAULT, initial_width, initial_height,
                                  NULL, NULL, instance, NULL);
     if (!host_window) return 5;
     BOOL dark = TRUE;

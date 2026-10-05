@@ -126,7 +126,8 @@ app.whenReady().then(async () => {
   window = new BrowserWindow({ width: 1000, height: 800,
     title: "Curated · Windows 原生播放原型", show: false, frame: false, transparent: true,
     backgroundColor: "#00000000", thickFrame: false, skipTaskbar: true, autoHideMenuBar: true,
-    webPreferences: { preload: path.join(directory, "native-player-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false } })
+    webPreferences: { preload: path.join(directory, "native-player-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false,
+      backgroundThrottling: false } })
   const handle = window.getNativeWindowHandle()
   await host.command("attach", { handle: (handle.length === 8 ? handle.readBigUInt64LE() : BigInt(handle.readUInt32LE())).toString() })
   window.webContents.setWindowOpenHandler(() => { // 控制页不打开外部窗口。
