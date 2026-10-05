@@ -22,7 +22,7 @@ See the [implementation and verification record](plan/2026-10-04-multipart-movie
 
 ## Home and movie library scrolling
 
-At the bottom of Home, keep scrolling down to open All Movies. At the top of All Movies, keep scrolling up to return to Home at its previous scroll position. Mouse wheels and trackpads use a short continued scroll; on touchscreens, swipe upward at the bottom of Home or downward at the top of All Movies. The reverse transition slides the movie page down to reveal Home. Favorites, Recently Added, Trash and batch selection do not trigger this return gesture. Reduced-motion preferences shorten both transitions.
+Home and All Movies keep scrolling within the current page. Continuing to scroll with a mouse wheel or trackpad, or swiping on a touchscreen at either page boundary, does not switch pages. Use the “Continue to Movies” button at the bottom of Home or the sidebar Movies entry to open the movie library; use the sidebar Home entry to return. Normal scrolling, the movie library’s back-to-top button, and scroll restoration when returning from movie details remain available.
 
 ## Movie release dates
 
@@ -321,7 +321,7 @@ The complete shipped/target catalog is [docs/features/2026-05-03-feature-invento
 | Security | Optional PIN App Lock, HTTP-only sessions, trusted-forever devices, idle lock, Settings LAN access toggle |
 | Desktop | Electron tray shell, Windows installer/portable, FFmpeg bundle, GitHub update check |
 
-On the homepage, scroll to the end of the recent, recommendation, and continue-watching sections, then keep scrolling down to open the Movies library. The library slides up over the homepage and starts at the top; the sidebar selection follows the Movies route. The “Continue to Movies” button at the bottom provides the same action for touch and keyboard use. The former Taste Radar section is no longer shown.
+On the homepage, the “Continue to Movies” button below the recent, recommendation, and continue-watching sections opens the Movies library. The library slides up over the homepage and starts at the top; the sidebar selection follows the Movies route. The button supports mouse, touch, and keyboard use. Scrolling at page boundaries keeps the current page open. The former Taste Radar section is no longer shown.
 
 In the web player, **D** steps backward and **F** steps forward while pausing playback. Use the fullscreen button to toggle fullscreen. Frame duration comes from stream metadata or media-timestamp measurements; when neither is available, the player uses a 30fps estimate.
 

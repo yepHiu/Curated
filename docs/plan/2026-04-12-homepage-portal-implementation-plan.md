@@ -194,7 +194,7 @@ git commit -m "feat: localize homepage portal"
 - [x] Rebalance hero preview depth for light mode by removing hard-coded black drop shadows and using theme-aware shadows plus brightness / saturation falloff on side previews.
 - [x] Make homepage taste radar chips clickable and route them into the appropriate browse filters (`tags` for exact tags, `library` for actor/studio filters).
 
-### 2026-10-02：首页与影片页双向滚动（已实现）
+### 2026-10-02：首页与影片页双向滚动（历史实现，2026-10-05 已取消）
 
 - 首页底部继续向下滚动进入影片页；影片列表顶部继续向上滚动返回首页，并恢复首页离开时的位置。触屏对应为首页底部向上划、影片列表顶部向下划。
 - 影片列表使用 80px 的连续滚动/触屏阈值，忽略缩放和横向手势；滚轮间隔超过 250ms 重置累计值。收藏、最近加入、回收站与批量选择模式不触发返回。
@@ -214,3 +214,11 @@ git commit -m "feat: localize homepage portal"
 - 共用滚动 composable 改为 500ms 的 requestAnimationFrame 动画，以即时位置写入持续推进到顶部；减少动画偏好直接到顶。用户滚轮、触摸、指针或键盘输入，以及容器/浏览键切换和卸载，均终止动画。
 - 返回顶部或用户滚动会使旧位置恢复回调失效，避免延迟恢复把列表拉回旧位置。
 - 浏览器连续两次从底部点击均到达 `scrollTop=0`，按钮隐藏，继续上滚可返回首页。18 项相关单测覆盖虚拟列表修正、用户中断、减少动画偏好和过期恢复；类型检查与改动文件 ESLint 通过。
+
+### 2026-10-05：取消首页与影片页滚动切换
+
+- 按用户要求取消首页底部继续下滚进入影片页、影片页顶部继续上滚返回首页的交互；鼠标滚轮、触控板与触屏滑动均只作用于当前页面。
+- 移除 HomepagePortal 与 VirtualMovieMasonry 的边界手势处理、影片页返回首页的属性/事件传递与注入入口，以及不再使用的反向抽屉动画。
+- 保留首页底部「继续浏览影片」按钮及其进入动画、侧栏导航、页面内部正常滚动、影片列表「回到顶部」和详情页返回后的滚动位置恢复。
+- 将原双向滚动测试更新为边界滚动不跳转验证，并保留按钮与侧栏显式导航验证；操作说明同步更新至 `docs/guide.md`。
+- 验证：7 个测试文件共 61 项相关单测、`pnpm typecheck`、改动源码 ESLint 通过；Chromium e2e 验证首页底部/影片页顶部的滚轮与触屏操作不跳转，底部按钮与侧栏导航正常。
