@@ -29,6 +29,7 @@ scripts/*
 scripts/dev/*
 !scripts/dev/copy-electron-preload.cjs
 !scripts/dev/start-electron.cjs
+!scripts/dev/start-desktop-test.cjs
 !scripts/dev/start-native-player-prototype.cjs
 !scripts/dev/copy-native-player-preload.cjs
 !scripts/dev/build-native-player-host.cjs

@@ -22,6 +22,8 @@
     "native-player:prepare": "python scripts/dev/prepare-native-engine.py",
     "build:electron": "pnpm build:electron:main",
     "dev:electron": "pnpm build:electron && node scripts/dev/start-electron.cjs",
+    "desktop:test:build": "node scripts/dev/start-desktop-test.cjs --build-only",
+    "desktop:test": "node scripts/dev/start-desktop-test.cjs",
     "build:native-player-prototype": "node scripts/dev/build-native-player-host.cjs && tsc -p electron/tsconfig.native-player.json && node scripts/dev/copy-native-player-preload.cjs && vite build --config vite.native-player.config.ts --configLoader native",
     "dev:native-player": "pnpm build:native-player-prototype && node scripts/dev/start-native-player-prototype.cjs",
     "preview": "vite preview",
