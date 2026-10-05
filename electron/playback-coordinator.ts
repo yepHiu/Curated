@@ -77,8 +77,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       const active = this.active
       if (active && active.context.generation === context.generation && active.movie.id === input.movieId
         && (!input.fileId || input.fileId === active.fileId)) {
-        const auth = await this.api<{ unlocked: boolean }>(context, "/api/auth/status")
-        if (!auth.unlocked) { await this.finish("SERVER_LOCKED"); throw new Error("SERVER_LOCKED") }
+        await this.ensureUnlocked(context)
         if (input.seekExisting && input.startSec !== undefined) {
           active.tracker.onSeeking(input.startSec)
           await active.player.control({ action: "seek", value: Math.min(input.startSec, active.player.state.durationSec || input.startSec) })
@@ -108,10 +107,21 @@ export class NativePlaybackCoordinator extends EventEmitter {
       id: file.id, fileName: file.fileName, resumePositionSec: 0,
     })) }
   }
+  private async ensureUnlocked(context: PlaybackContext): Promise<void> {
+    try {
+      const auth = await this.api<{ unlocked: boolean }>(context, "/api/auth/status")
+      if (!auth.unlocked) throw new Error("SERVER_LOCKED")
+    } catch (error) {
+      if (error instanceof Error && error.message === "SERVER_LOCKED") await this.finish("SERVER_LOCKED")
+      throw error
+    }
+  }
   private async start(context: PlaybackContext, input: DesktopPlaybackOpen): Promise<void> {
-    const auth = await this.api<{ unlocked: boolean }>(context, "/api/auth/status")
-    if (!auth.unlocked) { await this.finish("SERVER_LOCKED"); throw new Error("SERVER_LOCKED") }
-    const movie = await this.detail(context, input.movieId)
+    await this.ensureUnlocked(context)
+    const movie = await this.detail(context, input.movieId).catch(async error => {
+      if (error instanceof Error && error.message === "SERVER_LOCKED") await this.finish("SERVER_LOCKED")
+      throw error
+    })
     if (input.fileId && !movie.files.some(file => file.id === input.fileId)) throw new Error("INVALID_MOVIE_FILE")
     await this.release()
     try {
@@ -156,8 +166,8 @@ export class NativePlaybackCoordinator extends EventEmitter {
         this.periodicPending = true
         void this.run(async () => {
           if (this.active !== active) return
-          const status = await this.api<{ unlocked: boolean }>(context, "/api/auth/status").catch(() => undefined)
-          if (status && !status.unlocked) { await this.finish("SERVER_LOCKED"); return }
+          try { await this.ensureUnlocked(context) }
+          catch { return } // 临时网络错误保留播放；401/403 已停止并发布锁定状态。
           await this.save(active)
         }).finally(() => { this.periodicPending = false })
       }, 5000)
@@ -192,7 +202,10 @@ export class NativePlaybackCoordinator extends EventEmitter {
           if (nextFile || nextMovie) {
             try { await this.start(active.context, { movieId: nextFile ? active.movie.id : nextMovie!, fileId: nextFile,
               autoplay: true, queue: this.snapshotState.queue, autoAdvance: true, locale: this.snapshotState.locale }) }
-            catch { /* start 已发布明确错误并回收资源。 */ }
+            catch (error) {
+              // 详情预检失败发生在 start 替换资源之前，EOF 仍须释放旧资源。
+              if (this.active === active) await this.finish(error instanceof Error ? error.message : "NATIVE_START_FAILED")
+            }
             return
           }
         }

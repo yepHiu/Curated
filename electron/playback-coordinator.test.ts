@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { NativePlaybackCoordinator, validatePlaybackOpen, type PlaybackContext, type PlaybackSurface } from "./playback-coordinator"
 import { NativeMpvPlayer } from "./native-mpv-player"
 import type { NativeLabControl } from "./native-player-contract"
@@ -24,10 +24,11 @@ function fixture() {
   let disposed = 0
   let focused = 0
   let unlocked = true
+  let authStatus = 200
   const context: PlaybackContext = { origin: "http://127.0.0.1:12345", generation: "one", fetch: async (url, init) => {
     const path = new URL(url).pathname + new URL(url).search
     requests.push({ path, body: init?.body as string | undefined })
-    if (path === "/api/auth/status") return Response.json({ unlocked })
+    if (path === "/api/auth/status") return Response.json({ unlocked }, { status: authStatus })
     if (path.includes("/playback-session")) return Response.json({ mode: "direct", fileId: "p1", resumePositionSec: 30, durationSec: 100 })
     if (path.startsWith("/api/library/movies/")) return Response.json({ code: "TEST", title: "Fixture",
       files: [{ id: "p1", fileName: "1.mp4" }, { id: "p2", fileName: "2.mp4" }] })
@@ -36,7 +37,8 @@ function fixture() {
   const surface: PlaybackSurface = { createPlayer: () => { const player = new Player(); players.push(player); return player },
     focus: async () => { focused++ }, action: async () => {}, fullscreen: () => false, dispose: async () => { disposed++ } }
   const coordinator = new NativePlaybackCoordinator("fixture", async () => surface, () => defaultPlaybackPreferences, () => {})
-  return { coordinator, context, requests, players, disposed: () => disposed, focused: () => focused, lock: () => { unlocked = false } }
+  return { coordinator, context, requests, players, disposed: () => disposed, focused: () => focused,
+    lock: (status = 200) => { unlocked = false; authStatus = status } }
 }
 describe("production native coordinator", () => {
   it("uses direct resume, focuses existing playback, serializes replacement and rejects stale commands", async () => {
@@ -84,6 +86,35 @@ describe("production native coordinator", () => {
       await f.coordinator.command(current.sessionId, { action: "stop" })
       expect(f.players).toHaveLength(2)
       expect(f.coordinator.snapshot().windowOpen).toBe(false)
+    } finally { await f.coordinator.stop() }
+  })
+  it.each([401, 403])("stops and closes the native surface when periodic authentication returns HTTP %i", async status => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] })
+    const f = fixture()
+    try {
+      await f.coordinator.open(f.context, { movieId: "a", autoplay: true })
+      f.lock(status)
+      await vi.advanceTimersByTimeAsync(5000)
+      await f.coordinator.run(async () => {})
+      expect(f.coordinator.snapshot()).toMatchObject({ windowOpen: false, state: { status: "error", error: "SERVER_LOCKED" } })
+      expect(f.players[0]!.stopped).toBe(true)
+      expect(f.disposed()).toBe(1)
+    } finally { await f.coordinator.stop(); vi.useRealTimers() }
+  })
+  it("releases an ended session if the next part's detail preflight fails", async () => {
+    const f = fixture()
+    try {
+      await f.coordinator.open(f.context, { movieId: "a", autoplay: true, autoAdvance: true })
+      const fetch = f.context.fetch
+      f.context.fetch = async (url, init) => {
+        if (new URL(url).pathname === "/api/library/movies/a") throw new Error("NETWORK_FAILED")
+        return fetch(url, init)
+      }
+      f.players[0]!.state.status = "ended"
+      f.players[0]!.emit("state", f.players[0]!.state)
+      await f.coordinator.run(async () => {})
+      expect(f.players[0]!.stopped).toBe(true)
+      expect(f.coordinator.snapshot()).toMatchObject({ windowOpen: false, state: { status: "error", error: "NETWORK_FAILED" } })
     } finally { await f.coordinator.stop() }
   })
   it("releases native resources before emitting a Web handoff at the actual position", async () => {
