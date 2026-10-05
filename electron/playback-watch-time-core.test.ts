@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from "vitest"
 import { createPlaybackWatchTimeTracker } from "./playback-watch-time-core"
 describe("shared watch time calculation", () => {
+  it("counts high-frequency native time-pos updates below 50ms", async () => {
+    let now = 0
+    const sink = vi.fn()
+    const tracker = createPlaybackWatchTimeTracker({ movieId: "movie", now: () => now, addDelta: sink })
+    tracker.onPlay(0)
+    for (let frame = 1; frame <= 60; frame++) { now = frame * 16; tracker.onTimeUpdate(frame / 60) }
+    await tracker.flush()
+    expect(sink.mock.calls[0]?.[2]).toBeCloseTo(0.96, 3)
+  })
   it("splits actual wall time at local midnight and does not replay already saved days after a failed flush", async () => {
     let now = new Date(2026, 9, 5, 23, 59, 58).getTime()
     const sink = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("offline")).mockResolvedValue(undefined)

@@ -25,7 +25,8 @@ export interface PlaybackWatchTimeTrackerOptions {
 const MAX_SINGLE_SAMPLE_SEC = 30
 const MAX_API_DELTA_SEC = 300
 const MAX_MEDIA_ADVANCE_SEC = 300
-const MIN_MEDIA_ADVANCE_SEC = 0.05
+// mpv 可每帧发送 time-pos，30/60fps 的合法推进小于旧 Web 采样阈值。
+const MIN_MEDIA_ADVANCE_SEC = 0
 
 function normalizeMediaTime(value: number): number {
   if (!Number.isFinite(value) || value < 0) return 0
