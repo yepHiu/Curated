@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { Copy, Info, Maximize2, Minus, Minimize2, Monitor, Repeat2, SkipBack, SkipForward, Square, X } from "lucide-vue-next"
+import { Info, Maximize2, Minimize2, Monitor, Repeat2, SkipBack, SkipForward } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Alert, AlertTitle } from "@/components/ui/alert"
@@ -94,14 +94,6 @@ function click() {
 function doubleClick() { clearTimeout(clickTimer); void command({ action: "fullscreen" }) }
 function focusIn(event: FocusEvent) { focusedControl.value = event.target instanceof HTMLElement && event.target.tabIndex >= 0; immersive.revealChrome() }
 function focusOut(event: FocusEvent) { focusedControl.value = event.relatedTarget instanceof HTMLElement && event.relatedTarget.tabIndex >= 0 }
-function dragWindow(event: PointerEvent) {
-  if (event.button !== 0 || snapshot.value?.fullscreen || (event.target instanceof Element && event.target.closest('button, [role="combobox"]'))) return
-  void command({ action: "drag" })
-}
-function maximizeWindow(event: MouseEvent) {
-  if (event.target instanceof Element && event.target.closest('button, [role="combobox"]')) return
-  void command({ action: "maximize" })
-}
 function keydown(event: KeyboardEvent) {
   if (shouldIgnoreGlobalPlaybackHotkeysForTarget(event.target)) return
   const key = event.key.toLowerCase()
@@ -129,16 +121,9 @@ onBeforeUnmount(() => {
 <template>
   <main class="native-player-surface dark relative h-screen overflow-hidden text-white" @pointermove="immersive.revealChrome" @focusin="focusIn" @focusout="focusOut">
     <button type="button" tabindex="-1" class="absolute inset-0 outline-none" :aria-label="playing ? t('pause') : t('resume')" @click="click" @dblclick="doubleClick" />
-    <header class="absolute inset-x-0 top-0 flex flex-col gap-3 bg-gradient-to-b from-black/80 to-transparent p-4 pb-12 transition-opacity sm:p-5 sm:pb-12" :class="chromeShown ? 'opacity-100' : 'pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100'">
-      <div class="flex min-h-9 items-center justify-between gap-3 select-none" data-player-window-bar @pointerdown="dragWindow" @dblclick="maximizeWindow">
-        <div class="min-w-0 flex-1"><p class="truncate text-lg font-medium">{{ snapshot?.movie?.title || snapshot?.movie?.code || 'Curated' }}</p><p class="truncate text-sm text-white/60">{{ snapshot?.movie?.code }}</p></div>
-        <div class="flex shrink-0 items-center gap-2" role="group" :aria-label="t('windowControls')">
-          <Button variant="ghost" size="icon" class="rounded-full" :disabled="busy" :aria-label="t('minimize')" :title="t('minimize')" @click="command({ action: 'minimize' })"><Minus /></Button>
-          <Button variant="ghost" size="icon" class="rounded-full" :disabled="busy" :aria-label="snapshot?.maximized || snapshot?.fullscreen ? t('restoreWindow') : t('maximize')" :title="snapshot?.maximized || snapshot?.fullscreen ? t('restoreWindow') : t('maximize')" @click="command({ action: 'maximize' })"><Copy v-if="snapshot?.maximized || snapshot?.fullscreen" /><Square v-else /></Button>
-          <Button variant="secondary" size="icon" class="rounded-full bg-danger/15 text-danger hover:bg-danger/25 hover:text-danger focus-visible:ring-danger/40" :disabled="busy" :aria-label="t('close')" :title="t('close')" @click="command({ action: 'close' })"><X /></Button>
-        </div>
-      </div>
-      <div class="flex justify-end">
+    <header class="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between gap-4 bg-gradient-to-b from-black/80 to-transparent p-4 pb-12 transition-opacity sm:p-5 sm:pb-12" :class="chromeShown ? 'opacity-100' : 'opacity-0 focus-within:opacity-100'">
+      <div class="min-w-0"><p class="truncate text-lg font-medium">{{ snapshot?.movie?.title || snapshot?.movie?.code || 'Curated' }}</p><p class="truncate text-sm text-white/60">{{ snapshot?.movie?.code }}</p></div>
+      <div class="pointer-events-auto flex shrink-0 items-center">
         <MoviePartSelect v-if="files.length > 1" :files="files" :model-value="state?.fileId" :disabled="busy" @update:model-value="command({ action: 'part', fileId: $event })" />
       </div>
     </header>

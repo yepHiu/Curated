@@ -48,10 +48,10 @@ describe("production native coordinator", () => {
     const action = vi.spyOn(f.surface, "action")
     try {
       const session = await f.coordinator.open(f.context, { movieId: "a", autoplay: false })
-      await f.coordinator.command(session.sessionId, { action: "maximize" })
-      await f.coordinator.command(session.sessionId, { action: "drag" })
-      expect(action.mock.calls).toEqual([["maximize"], ["drag"]])
-      await expect(f.coordinator.command("old-session", { action: "maximize" })).rejects.toThrow("STALE")
+      await f.coordinator.command(session.sessionId, { action: "fullscreen" })
+      await f.coordinator.command(session.sessionId, { action: "minimize" })
+      expect(action.mock.calls).toEqual([["fullscreen"], ["minimize"]])
+      await expect(f.coordinator.command("old-session", { action: "fullscreen" })).rejects.toThrow("STALE")
       f.coordinator.windowStateChanged()
       const revision = f.coordinator.snapshot().revision
       maximized = true

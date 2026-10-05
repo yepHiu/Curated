@@ -12,7 +12,7 @@ export interface NativeWindowState {
   fullscreen: boolean
   maximized: boolean
 }
-type HostAction = "attach" | "fullscreen" | "minimize" | "maximize" | "drag" | "focus" | "restore" | "resize" | "quit"
+type HostAction = "attach" | "fullscreen" | "minimize" | "maximize" | "focus" | "restore" | "resize" | "quit"
 interface Pending { resolve(): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
 
 /** 自有 Win32 宿主的内部协议；HWND 与测试用几何命令不进入 renderer。 */
@@ -25,9 +25,9 @@ export class NativePlayerWindow extends EventEmitter {
   state?: NativeWindowState
 
   /** 宿主只接收父 PID，等待 ready 后才允许启动播放器。 */
-  async start(executable: string, customChrome = false): Promise<NativeWindowState> {
+  async start(executable: string): Promise<NativeWindowState> {
     if (this.child || this.stopping) throw new Error("NATIVE_HOST_ALREADY_STARTED")
-    const child = spawn(executable, [String(process.pid), ...(customChrome ? ["--custom-chrome"] : [])], { windowsHide: true, stdio: "pipe", shell: false })
+    const child = spawn(executable, [String(process.pid)], { windowsHide: true, stdio: "pipe", shell: false })
     this.child = child
     child.stdout.on("data", (chunk: Buffer) => { /* NDJSON 有界读取；非协议日志视为故障。 */ this.receive(chunk.toString("utf8")) })
     child.stdin.on("error", () => { /* 断管立即拒绝待响应命令。 */ this.fail() })

@@ -16,7 +16,7 @@
 static HWND host_window, overlay_window;
 static HANDLE parent_process;
 static DWORD parent_pid;
-static BOOL fullscreen, closing, custom_chrome;
+static BOOL fullscreen, closing;
 static WINDOWPLACEMENT saved_placement = { .length = sizeof(WINDOWPLACEMENT) };
 static DWORD saved_style;
 #define HOST_COMMAND (WM_APP + 1)
@@ -127,13 +127,6 @@ static void apply_command(const char *json) {
         if (IsIconic(host_window)) ShowWindow(host_window, SW_RESTORE);
         SetForegroundWindow(host_window);
         report_state("bounds");
-    } else if (ok && strcmp(action, "drag") == 0) {
-        /* 拖动属于视频宿主，不能让透明 Electron 自己移动。异步进入系统移动循环。 */
-        POINT cursor;
-        if (!fullscreen && (GetAsyncKeyState(VK_LBUTTON) & 0x8000) && GetCursorPos(&cursor)) {
-            ReleaseCapture();
-            ok = PostMessageW(host_window, WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(cursor.x, cursor.y));
-        }
     } else if (ok && strcmp(action, "restore") == 0) {
         ShowWindow(host_window, SW_RESTORE);
         report_state("bounds");
@@ -170,22 +163,6 @@ static DWORD WINAPI read_commands(LPVOID unused) {
 /* Windows 消息只管理本次视频宿主；关闭请求先交给父进程有序回收。 */
 static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
     switch (message) {
-    case WM_NCCALCSIZE:
-        if (custom_chrome) {
-            /* DWM 仍可能按系统菜单绘制标题栏；只保留宿主负责的缩放边缘。 */
-            RECT *rect = wparam ? &((NCCALCSIZE_PARAMS *)lparam)->rgrc[0] : (RECT *)lparam;
-            if (!fullscreen) {
-                UINT dpi = GetDpiForWindow(hwnd);
-                int border = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi) + GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
-                InflateRect(rect, -border, -border);
-            }
-            return 0;
-        }
-        break;
-    case WM_NCPAINT:
-    case WM_NCACTIVATE:
-        if (custom_chrome) return TRUE;
-        break;
     case WM_CLOSE:
         if (!closing) { closing = TRUE; printf("{\"event\":\"close\"}\n"); fflush(stdout); }
         return 0;
@@ -230,10 +207,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
     (void)previous; (void)command_line; (void)show;
     int count = 0;
     LPWSTR *args = CommandLineToArgvW(GetCommandLineW(), &count);
-    if (!args || (count != 2 && count != 3)) return 2;
+    if (!args || count != 2) return 2;
     parent_pid = wcstoul(args[1], NULL, 10);
-    custom_chrome = count == 3 && wcscmp(args[2], L"--custom-chrome") == 0;
-    if (count == 3 && !custom_chrome) { LocalFree(args); return 2; }
     LocalFree(args);
     parent_process = OpenProcess(SYNCHRONIZE, FALSE, parent_pid);
     if (!parent_process) return 3;
@@ -259,10 +234,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
     int work_height = initial_monitor.rcWork.bottom - initial_monitor.rcWork.top;
     if (initial_width > work_width) initial_width = work_width;
     if (initial_height > work_height) initial_height = work_height;
-    /* 正式播放器由 Curated 绘制标题栏；保留系统缩放边框和最大化能力。 */
-    DWORD style = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN;
-    if (custom_chrome) style &= ~(DWORD)WS_CAPTION;
-    host_window = CreateWindowExW(0, window_class.lpszClassName, L"Curated · Native Playback", style,
+    host_window = CreateWindowExW(0, window_class.lpszClassName, L"Curated · Native Playback",
+                                 WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                                  CW_USEDEFAULT, CW_USEDEFAULT, initial_width, initial_height,
                                  NULL, NULL, instance, NULL);
     if (!host_window) return 5;

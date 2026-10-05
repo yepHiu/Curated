@@ -47,7 +47,7 @@ export function installDesktopPlayback(options: DesktopPlaybackOptions) {
       else if (state.width > 0 && state.height > 0 && !window.isVisible()) window.showInactive()
     }
     try {
-      const bounds = await host.start(helper, true)
+      const bounds = await host.start(helper)
       host.on("bounds", sync)
       host.on("close-request", () => { void coordinator.stop().then(options.focusMain) })
       host.on("fault", () => { if (!disposing) void coordinator.stop("NATIVE_HOST_FAILED") })

@@ -35,7 +35,7 @@ export interface DesktopPlaybackSnapshot {
 }
 export type DesktopPlaybackCommand =
   | NativeLabControl
-  | { [Action in "focus" | "fullscreen" | "minimize" | "maximize" | "drag" | "close" | "web" | "replay"]: { action: Action } }["focus" | "fullscreen" | "minimize" | "maximize" | "drag" | "close" | "web" | "replay"]
+  | { [Action in "focus" | "fullscreen" | "minimize" | "close" | "web" | "replay"]: { action: Action } }["focus" | "fullscreen" | "minimize" | "close" | "web" | "replay"]
   | { action: "part"; fileId: string }
   | { action: "movie"; movieId: string }
   | { action: "autoAdvance"; enabled: boolean }

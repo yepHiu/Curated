@@ -45,10 +45,10 @@ describe.skipIf(process.platform !== "win32" || !existsSync(hostExe))("real Wind
     await expect(host.command("restore")).rejects.toThrow("NATIVE_HOST_CLOSED")
   }, 20000)
 
-  it("keeps custom-chrome maximize, focus, minimize and fullscreen on the native host", async () => {
+  it("keeps system-chrome maximize, focus, minimize and fullscreen on the native host", async () => {
     const host = new NativePlayerWindow()
     try {
-      const normal = await host.start(hostExe, true)
+      const normal = await host.start(hostExe)
       expect(normal.maximized).toBe(false)
       await host.command("maximize")
       expect(host.state!.maximized).toBe(true)

@@ -10,7 +10,7 @@ export interface PlaybackContext { origin: string; generation: string; fetch: Me
 export interface PlaybackSurface {
   createPlayer(): NativeMpvPlayer
   focus(): Promise<void>
-  action(action: "fullscreen" | "minimize" | "maximize" | "drag"): Promise<void>
+  action(action: "fullscreen" | "minimize"): Promise<void>
   fullscreen(): boolean
   maximized?(): boolean
   dispose(): Promise<void>
@@ -251,7 +251,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       if (!input || typeof input !== "object") throw new Error("INVALID_CONTROL")
       if (input.action === "stop" || input.action === "close") { await this.finish(); return }
       if (input.action === "focus") { await this.surface?.focus(); return }
-      if (input.action === "fullscreen" || input.action === "minimize" || input.action === "maximize" || input.action === "drag") {
+      if (input.action === "fullscreen" || input.action === "minimize") {
         await this.surface?.action(input.action); this.publish(); return
       }
       if (input.action === "autoAdvance") {
