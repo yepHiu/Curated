@@ -7,9 +7,9 @@ alwaysApply: true
 
 `codex/windows-native-player-prototype` 首版已实现 mpv.exe 独立进程、named pipe JSON IPC、受限 loopback 原始媒体代理及本地三语控制页。主进程使用当前 Server 的独立 HttpOnly session，转发 Range，不向 renderer/mpv 暴露 Cookie；支持 PIN、影片/文件选择、逐文件续播与进度保存、暂停/seek/倍速/音量/停止及解码/掉帧诊断。认证锁定、换源及退出回收自己启动的进程。
 
-当前原型已实现同窗播放：自有 Win32 helper 的 HWND 承载 mpv wid，透明 Electron owned window 叠加现有 Curated 控件。宿主报告物理客户端边界/DPI，主进程转换 DIP；移动/缩放、最小化、全屏和退出随宿主联动。helper 拒绝属于其它 PID 的叠加窗口，父进程死亡/断管自动退出；renderer 只接收窗口动作枚举，不接触 HWND。共享 PlayerTransportControls、MoviePartSelect、PlayerPlaybackSettingsMenu；原生设置仅显示倍速，分段切换保留音量/静音/倍速。
+当前原型已实现同窗播放：自有 Win32 helper 的 HWND 承载 mpv wid，透明 Electron owned window 叠加现有 Curated 控件。2026-10-06 修复透明层独立拖动/缩放：撤销该层的移动/缩放/最大化能力，helper 通过 SetWindowPos 独占两层物理几何，主进程只同步可见性，不再重复转换 DIP 设置边界；移动/缩放、最小化、全屏和退出随宿主联动。helper 拒绝属于其它 PID 的叠加窗口，父进程死亡/断管自动退出；renderer 只接收窗口动作枚举，不接触 HWND。共享 PlayerTransportControls、MoviePartSelect、PlayerPlaybackSettingsMenu；原生设置仅显示倍速，分段切换保留音量/静音/倍速。
 
-运行 `pnpm dev:native-player`，独立构建写入 `.workspace/native-player-dist/`，profile 为 `%APPDATA%/Curated Native Playback Prototype`。本机提供 mpv.exe，可用 `CURATED_NATIVE_MPV` 预选；构建需 MinGW gcc，或绝对 `CURATED_NATIVE_CC`。生产 main/preload 与默认媒体路径不变，PlayerPage 只复用共享控制栏，无新公共 HTTP 端点或 library-config 字段。97 项 Electron 测试、40 项播放页相关测试、typecheck、前端局部 ESLint 与独立构建通过；实际原生/Web 合成截图及 fixture 的第二片 12 秒续播、seek/静音/倍速/切片/全屏/最小化恢复已验证。真实问题 MP4、跨屏混合 DPI、LAN/HTTPS、萃取/小窗、HDR/轨道、分发及 macOS 未验收。REQ-0058 保持 in_progress。详见 `docs/plan/2026-10-05-windows-native-player-prototype.md` §12 与 guide。
+运行 `pnpm dev:native-player`，独立构建写入 `.workspace/native-player-dist/`，profile 为 `%APPDATA%/Curated Native Playback Prototype`。本机提供 mpv.exe，可用 `CURATED_NATIVE_MPV` 预选；构建需 MinGW gcc，或绝对 `CURATED_NATIVE_CC`。生产 main/preload 与默认媒体路径不变，PlayerPage 只复用共享控制栏，无新公共 HTTP 端点或 library-config 字段。98 项 Electron 测试通过，新增实际 Electron 入口的透明层边角命中、六组物理边界、最小化恢复及关闭回收验证；本次独立构建和生产 Electron tsc 通过。此前 40 项播放页相关测试、typecheck、前端局部 ESLint 与实际原生/Web 合成截图及 fixture 的第二片 12 秒续播、seek/静音/倍速/切片/全屏/最小化恢复已验证。真实问题 MP4、跨屏混合 DPI、LAN/HTTPS、萃取/小窗、HDR/轨道、分发及 macOS 未验收。REQ-0058 保持 in_progress。详见 `docs/plan/2026-10-05-windows-native-player-prototype.md` §12 与 guide。
 
 ## 2026-10-04 FC2 与同番号多文件（已实现）
 

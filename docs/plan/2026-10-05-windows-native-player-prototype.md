@@ -314,7 +314,7 @@ mpv 支持 `--wid`：Windows 下传入 HWND，mpv 创建自己的子窗口并使
 ### 12.1 已落地的架构和 UI
 
 - `electron/native-player-host.c` 是独立编写的 Win32 helper，只链接系统库。以父 PID 启动，创建黑色视频宿主，mpv 通过 `--wid` 绘制；不引入 Qt/GPL 应用实现。helper 只接受内部有限动作，叠加窗口必须属于启动它的 Electron PID。父进程死亡或 stdin EOF 自动退出。
-- `NativePlayerWindow` 管理有界 NDJSON、请求关联、超时和清理。helper 报告物理客户端矩形/DPI，并在本地移动消息中同步 owned UI 位置；Electron 主进程转换为 DIP，同步可见性。全屏保留原位置与最大化状态，关闭按保存进度 → 停止 mpv/代理 → 销毁 UI/helper 顺序执行。
+- `NativePlayerWindow` 管理有界 NDJSON、请求关联、超时和清理。helper 报告物理客户端矩形/DPI，并通过 SetWindowPos 独占 owned UI 物理位置和尺寸；Electron 主进程仅同步可见性，不再重复转换 DIP 设置边界。透明层自身禁止移动/缩放，修复记录见 §12.4。全屏保留原位置与最大化状态，关闭按保存进度 → 停止 mpv/代理 → 销毁 UI/helper 顺序执行。
 - 透明无框 Electron 窗口仅承载 Web 控件，使用原生 owner 关系保持窗口层级，无全局置顶。主进程禁用此入口的后台节流，避免透明窗口遮挡时控件动画/轮询停顿。helper 的初始/最小尺寸使用 DIP，适配本机高 DPI；跨显示器混合 DPI 仍需专项验收。
 - renderer 继续只接受有限业务桥，新增 `windowAction(fullscreen|minimize|close)`，不暴露 HWND、任意窗口几何、通用 mpv/shell 调用。已有身份/PIN/媒体代理和逐文件进度合约保留；原生模式禁用 mpv 默认 OSC/输入，Curated 负责鼠标、键盘和控件。
 - `PlayerTransportControls` 从既有 PlayerPage 提取，直接共享圆形播放/快进后退按钮、音量和静音；动作插槽保留原 Web 队列、设置、外部播放器、PiP、全屏。原型共享分段选择和设置菜单，native 菜单仅显示倍速；准备弹窗负责连接/解锁/搜索/起播。播放时标题、进度条、底栏和信息面板叠在视频上。
@@ -325,7 +325,7 @@ mpv 支持 `--wid`：Windows 下传入 HWND，mpv 创建自己的子窗口并使
 | 检查 | 结果 |
 |---|---|
 | Windows helper 编译 | MinGW gcc 15.2；C11、Wall/Wextra/Werror 通过；仅生成忽略目录内 exe |
-| Electron 测试 | 14 文件 / 97 项通过；包括认证 Range、逐文件/锁定/并发/回收、真实 mpv 坏媒体与控制，以及 4 项真实宿主生命周期/嵌入测试 |
+| Electron 测试 | 2026-10-06 复验 15 文件 / 98 项通过；包括认证 Range、逐文件/锁定/并发/回收、真实 mpv 坏媒体与控制、4 项真实宿主生命周期/嵌入测试及新增实际 Electron 透明层绑定测试 |
 | 真实 Win32 宿主 | ready、尺寸、非法尺寸/外部 PID HWND 拒绝、全屏/恢复、最小化/恢复、EOF、父 PID 退出、mpv wid 绘制与 seek/恢复通过 |
 | Web 共享控件回归 | 6 文件 / 40 项通过：PlayerPage progress-hover/loading/i18n/frame-markers、PlayerPlaybackSettingsMenu、PlayerView；native 菜单只显示倍速 |
 | 类型、静态与独立构建 | pnpm typecheck、相关 src ESLint、native tsc/Vite 构建通过；Electron 文件未匹配仓库 ESLint 配置，以 tsc/测试验证 |
@@ -344,3 +344,17 @@ mpv 支持 `--wid`：Windows 下传入 HWND，mpv 创建自己的子窗口并使
 本轮已完成开发原型中的原生视频/Web UI 合成。正式 Desktop 路由/业务入口与播放引擎适配、萃取帧/录制/原生 PiP、音轨/字幕/HDR、混合 DPI 跨屏、长期 A/V 同步、真实 LAN/HTTPS 和问题 MP4 对照、引擎许可证/分发/安装包、macOS 仍未交付。完整 display-scaling 套件未运行；生产打包、push、合并、发布均未执行。不能将现阶段开发窗口认作正式主页面已切换原生引擎。
 
 本轮实现提交：`014de668`（宿主/透明窗口）、`45113d70`（共享控制栏）、`73d406ed`（高 DPI/后台节流）、`d231d1e1`（Curated 原生播放 UI）。
+
+### 12.4 2026-10-06 透明控件层独立移动/缩放修复
+
+用户在真实启动后发现拖动窗口边缘时透明层单独变化，视频窗口没有跟随。现场 Win32 检查确认旧透明层左上/右下返回 HTTOPLEFT=13、HTBOTTOMRIGHT=17；实际透明层为 1599×816，视频客户端为 1478×1144，已发生分离。owned window 只提供归属和窗口层级，不会自动锁定几何；Electron 默认可移动/缩放导致透明层拥有独立操作能力。另有 helper 的物理 SetWindowPos 和主进程 DIP setBounds 两套几何写入，高 DPI 舍入出现 1 像素误差。
+
+修复明确唯一几何控制方：
+
+1. 透明 BrowserWindow 禁止移动、缩放、最大化、最小化和自行全屏；will-move/will-resize 阻止透明层自身系统操作。可交互的原生外框继续承担窗口操作，页面按钮调用宿主有限动作。
+2. Win32 helper 在 attach 首次展示前、WM_MOVE/WM_SIZE/WM_DPICHANGED 时按宿主客户端物理区域同步透明层；主进程移除 screenToDipRect/setBounds，仅在页面 ready 后同步可见性。避免两套坐标往返舍入。
+3. 新增 `electron/native-player-overlay.integration.test.ts` 与 Win32 PowerShell probe，运行编译后的真实原型入口，避免复制 BrowserWindow 选项后测试产生假通过。测试只操作自己创建的 helper/overlay 和临时 profile，不使用全局鼠标。PowerShell fixture 保留 UTF-8 BOM，避免 Windows PowerShell 5.1 按本机 ANSI 读取中文注释而影响脚本执行。
+
+本轮实际验证：透明层初始及结束的八个边角均返回 HTCLIENT=1，且无 WS_THICKFRAME；视频宿主边角/标题栏仍返回 13、17、2。初始、连续四次移动/缩放、最小化恢复后的六组物理边界完全相等；透明层随宿主隐藏/恢复，正常关闭后本次 Electron 退出。完整 Electron 15 文件/98 项通过（已配置真实 mpv）；原型 C/TS/Vue 构建及生产 Electron tsc 通过，git diff --check 通过。本轮未修改共享前端控件，40 项前端回归为上轮记录。
+
+此前真实宿主测试和 UI 合成截图证明了正常播放，但没有覆盖透明层自身的系统边角命中，因而漏掉本次独立缩放问题。新增实际 Electron 窗口检查补足这个缺口。代码提交 `efe0a108`；继续保留原型分支，REQ-0058 的真实问题片源与混合 DPI 对照仍待完成。
