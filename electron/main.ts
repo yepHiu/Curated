@@ -88,6 +88,7 @@ let connectionAttempt: AbortController | undefined
 let discoveryScan: AbortController | undefined
 let nativePlayback: ReturnType<typeof installDesktopPlayback> | undefined
 let connectionGeneration = 0
+let playbackTransitioning = false
 const desktopFetch: typeof fetch = (input, init) => networkSession.fetch(input instanceof URL ? input.href : input, { ...init, credentials: "omit" })
 
 const singleInstanceLock = app.requestSingleInstanceLock()
@@ -119,7 +120,7 @@ if (!singleInstanceLock) {
       await networkSession.setProxy(proxyConfiguration(runningPreferences))
       nativePlayback = installDesktopPlayback({ directory: __dirname, appPath: app.getAppPath(),
         userData: app.getPath("userData"), packaged: app.isPackaged, focusMain: () => { if (!isQuitting) showMainWindow() },
-        current: () => mainWindow && !mainWindow.isDestroyed() && currentServerUrl && rendererBaseUrl
+        current: () => !isQuitting && !playbackTransitioning && mainWindow && !mainWindow.isDestroyed() && currentServerUrl && rendererBaseUrl
           ? { window: mainWindow, origin: currentServerUrl, renderer: rendererBaseUrl, generation: String(connectionGeneration) } : undefined })
       registerDesktopIpc()
       createAppTray()
@@ -714,6 +715,8 @@ async function connectServer(target: SavedServer, confirm: boolean): Promise<voi
     if (pageStatus >= 400) throw new Error(`服务器页面返回 ${pageStatus}，请检查 Server 的 Web 界面是否已部署。`)
     if (!isAllowedAppUrl(candidate.webContents.getURL(), renderer)) throw new Error("服务器页面跳转到了其他地址。")
     controller.signal.throwIfAborted()
+    // 候选已通过验证；清理旧播放期间不再接受旧主窗口的新起播请求。
+    playbackTransitioning = true
     await nativePlayback?.stop()
     controller.signal.throwIfAborted()
     if (!target.id) target = serverStore!.save({ name: info.name.slice(0, 80) || "Curated Server", url: target.url })
@@ -732,5 +735,5 @@ async function connectServer(target: SavedServer, confirm: boolean): Promise<voi
   } catch (error) {
     candidate?.destroy()
     throw error
-  } finally { if (abortCandidate) controller.signal.removeEventListener("abort", abortCandidate); loadingConnection = undefined; connecting = false; if (connectionAttempt === controller) connectionAttempt = undefined }
+  } finally { playbackTransitioning = false; if (abortCandidate) controller.signal.removeEventListener("abort", abortCandidate); loadingConnection = undefined; connecting = false; if (connectionAttempt === controller) connectionAttempt = undefined }
 }
