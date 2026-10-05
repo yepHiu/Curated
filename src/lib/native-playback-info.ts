@@ -32,7 +32,7 @@ export const nativePlaybackInfoMessages = { "zh-CN": zh, en, ja }
 export type NativeInfoLanguage = keyof typeof nativePlaybackInfoMessages
 const missing = "—"
 export function metric(value: number | null | undefined, unit = "", digits = 2): string {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? `${Number(value.toFixed(digits))}${unit ? ` ${unit}` : ""}` : missing
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? `${value.toFixed(digits)}${unit ? ` ${unit}` : ""}` : missing
 }
 export function bytes(value: number | null | undefined): string {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return missing
@@ -44,8 +44,12 @@ export function bitrate(value: number | null | undefined): string {
   return metric(value / (value >= 1e6 ? 1e6 : 1000), value >= 1e6 ? "Mbps" : "Kbps")
 }
 export function avOffset(value: number | null | undefined): string {
-  return typeof value === "number" && Number.isFinite(value) ? `${value > 0 ? "+" : ""}${Number((value * 1000).toFixed(2))} ms` : missing
+  if (typeof value !== "number" || !Number.isFinite(value)) return missing
+  const ms = Number((value * 1000).toFixed(2))
+  return `${ms < 0 ? "" : "+"}${ms.toFixed(2)} ms`
 }
+interface NativeInfoMetric { number: string; unit: string; reserveUnit: boolean }
+interface NativeInfoRow { label: string; value: string; metrics?: NativeInfoMetric[] }
 /** 固定 30 秒横轴与自适应纵轴，闲置时保留真实零值。 */
 export function transferPolyline(history: number[]): string {
   const values = history.slice(-30).map(value => Number.isFinite(value) && value >= 0 ? value : 0)
@@ -54,19 +58,25 @@ export function transferPolyline(history: number[]): string {
 }
 export function playbackInfoGroups(state: NativePlayerState | undefined, lang: NativeInfoLanguage) {
   const t = nativePlaybackInfoMessages[lang], d = state?.diagnostics, n = d?.network
-  const row = (key: InfoKey, value: string | null | undefined) => ({ label: t[key], value: value || missing })
+  const row = (key: InfoKey, value: string | null | undefined): NativeInfoRow => ({ label: t[key], value: value || missing })
+  // 数字与单位独立占位；缺失、整数进位、正负号或单位切换均不改变后续文字的位置。
+  const measured = (key: InfoKey, values: string[], reserveUnit = true): NativeInfoRow => ({ ...row(key, values.join(" / ")),
+    metrics: values.map(value => {
+      const space = value.indexOf(" ")
+      return { number: space < 0 ? value : value.slice(0, space), unit: space < 0 ? "" : value.slice(space + 1), reserveUnit }
+    }) })
   return [
     { title: t.playback, rows: [row("player", d?.engineVersion ? `mpv · ${d.engineVersion.replace(/^mpv\s+/i, "")}` : "mpv"),
       row("transport", n ? `${n.protocol.toUpperCase()} / Range` : null), row("mime", n?.mime), row("container", d?.container),
-      row("status", state ? t[state.status] : null), row("speed", metric(state?.speed, "×"))] },
-    { title: t.video, rows: [row("resolution", d?.width && d.height ? `${d.width} × ${d.height}` : null), row("fps", metric(d?.sourceFps, "fps", 3)),
-      row("codec", state?.codec), row("pixel", d?.pixelFormat), row("bitrate", bitrate(d?.videoBitrate)),
-      row("hwdec", state?.hwdec === "no" ? t.software : state?.hwdec), row("output", d?.videoOutput), row("displayFps", metric(d?.displayFps, "Hz", 3)),
-      row("dropped", `${metric(state?.droppedFrames, "", 0)} / ${metric(state?.decoderDroppedFrames, "", 0)}`), row("frames", metric(d?.estimatedFrames, "", 0))] },
-    { title: t.audio, rows: [row("codec", d?.audioCodec), row("samplerate", metric(d?.audioSampleRate == null ? null : d.audioSampleRate / 1000, "kHz")),
-      row("channels", d?.audioChannels), row("bitrate", bitrate(d?.audioBitrate)), row("avsync", avOffset(d?.avSyncSec))] },
-    { title: t.network, rows: [row("host", n?.sourceHost), row("transfer", n ? `${bytes(n.bytesPerSec)}/s` : null), row("received", bytes(n?.receivedBytes)),
-      row("requests", n ? `${n.requests} / ${n.rangeRequests}` : null), row("cache", `${metric(d?.cacheDurationSec, "s")} / ${bytes(d?.cacheBytes)}`),
-      row("buffer", metric(d?.bufferingPercent, "%")), row("waiting", d?.pausedForCache == null ? null : d.pausedForCache ? t.yes : t.no)] },
+      row("status", state ? t[state.status] : null), measured("speed", [metric(state?.speed, "×")])] },
+    { title: t.video, rows: [row("resolution", d?.width && d.height ? `${d.width} × ${d.height}` : null), measured("fps", [metric(d?.sourceFps, "fps", 3)]),
+      row("codec", state?.codec), row("pixel", d?.pixelFormat), measured("bitrate", [bitrate(d?.videoBitrate)]),
+      row("hwdec", state?.hwdec === "no" ? t.software : state?.hwdec), row("output", d?.videoOutput), measured("displayFps", [metric(d?.displayFps, "Hz", 3)]),
+      measured("dropped", [metric(state?.droppedFrames, "", 0), metric(state?.decoderDroppedFrames, "", 0)], false), measured("frames", [metric(d?.estimatedFrames, "", 0)], false)] },
+    { title: t.audio, rows: [row("codec", d?.audioCodec), measured("samplerate", [metric(d?.audioSampleRate == null ? null : d.audioSampleRate / 1000, "kHz")]),
+      row("channels", d?.audioChannels), measured("bitrate", [bitrate(d?.audioBitrate)]), measured("avsync", [avOffset(d?.avSyncSec)])] },
+    { title: t.network, rows: [row("host", n?.sourceHost), measured("transfer", [n ? `${bytes(n.bytesPerSec)}/s` : missing]), measured("received", [bytes(n?.receivedBytes)]),
+      measured("requests", [metric(n?.requests, "", 0), metric(n?.rangeRequests, "", 0)], false), measured("cache", [metric(d?.cacheDurationSec, "s"), bytes(d?.cacheBytes)]),
+      measured("buffer", [metric(d?.bufferingPercent, "%")]), row("waiting", d?.pausedForCache == null ? null : d.pausedForCache ? t.yes : t.no)] },
   ]
 }

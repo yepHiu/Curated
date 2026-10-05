@@ -28,7 +28,7 @@ onMounted(() => panel.value?.focus({ preventScroll: true }))
       </div>
     </div>
     <Separator />
-    <div class="min-h-0 overflow-y-auto overscroll-contain px-4 py-3 text-xs">
+    <div class="min-h-0 overflow-y-auto overscroll-contain px-4 py-3 text-xs [overflow-anchor:none] [scrollbar-gutter:stable]">
       <p role="status" aria-live="polite" class="text-muted-foreground" :class="feedback ? 'mb-3' : ''">{{ feedback }}</p>
       <section v-for="(group, index) in groups" :key="group.title" :aria-label="group.title" class="flex flex-col gap-2">
         <Separator v-if="index" class="my-3" />
@@ -36,11 +36,22 @@ onMounted(() => panel.value?.focus({ preventScroll: true }))
         <dl class="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.5fr)] gap-x-4 gap-y-1.5">
           <template v-for="row in group.rows" :key="row.label">
             <dt class="text-muted-foreground">{{ row.label }}</dt>
-            <dd class="break-words font-mono tabular-nums">{{ row.value }}</dd>
+            <dd class="break-words font-mono tabular-nums">
+              <span v-if="row.metrics" class="inline-flex items-center gap-2 whitespace-nowrap">
+                <template v-for="(measurement, measurementIndex) in row.metrics" :key="measurementIndex">
+                  <span v-if="measurementIndex" class="text-muted-foreground">/</span>
+                  <span class="inline-flex items-center gap-1">
+                    <span data-info-number class="inline-block h-4 w-[9ch] shrink-0 text-right">{{ measurement.number }}</span>
+                    <span v-if="measurement.reserveUnit" data-info-unit class="inline-block h-4 w-[5ch] shrink-0">{{ measurement.unit }}</span>
+                  </span>
+                </template>
+              </span>
+              <template v-else>{{ row.value }}</template>
+            </dd>
           </template>
         </dl>
       </section>
-      <svg v-if="history" viewBox="0 0 240 36" role="img" :aria-label="labels.history" class="mt-3 h-10 w-full text-primary" preserveAspectRatio="none">
+      <svg viewBox="0 0 240 36" role="img" :aria-label="labels.history" class="mt-3 h-10 w-full text-primary" preserveAspectRatio="none">
         <polyline :points="history" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke" />
       </svg>
     </div>
