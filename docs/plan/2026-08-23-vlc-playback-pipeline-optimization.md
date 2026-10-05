@@ -1,7 +1,8 @@
 # 对照 VLC 优化 Curated 播放链路（方案）
 
 - 日期：2026-08-23
-- 状态：方案（未实施）
+- 状态：proposed
+- 状态范围：本文原生播放方向仍为提案；部分 Web/HLS 改善已实现，当前行为与验证以播放链路实施计划及审计复审为准。2026-10-05 补充 Desktop 解决 MP4 帧节奏问题的可行性，不表示已批准实施或已完成原型。
 - 对照源码：[videolan/vlc](https://github.com/videolan/vlc)（libVLCcore + `modules/`）
 - 对照本仓库：`backend/internal/playback/`、`backend/internal/app/playback_decision.go`、`src/components/jav-library/PlayerPage.vue`、`src/lib/player-hls-seek.ts`
 - 既有相关计划：`docs/plan/2026-08-16-playback-pipeline-capability-and-performance-audit.md`、`docs/plan/2026-08-22-direct-play-frame-stability.md`、`docs/plan/2026-08-23-hls-transcode-seek.md`
@@ -396,7 +397,7 @@ Go + FFmpeg + 浏览器 HLS，栈和内容域最像。HLS 大修在 [#2322](http
 
 ## 10. 2026-09-09 Electron 集成 libmpv 可行性补充
 
-状态：技术建议，尚未实现或完成原型验证。当前 `electron/preload.cjs` 仅暴露目录选择；现有 Electron 壳与 Web 播放器不等于已嵌入 libmpv。
+状态：技术建议，尚未实现或完成原型验证。2026-10-05 核对：当前 `electron/preload.cjs` 暴露目录选择、连接管理、Desktop 版本及更新检查等能力，没有原生播放控制 IPC；现有 Electron 壳与 Web 播放器不等于已嵌入 libmpv。
 
 Electron 可以通过原生桥接集成 libmpv。libmpv 是 C API 播放库，不能直接作为 Vue 组件或替换 Chromium 的 `<video>` 解码器。控制桥接与视频画面合成是两项独立工作。
 
@@ -421,3 +422,59 @@ Electron 可以通过原生桥接集成 libmpv。libmpv 是 C API 播放库，�
 - [libmpv Client API 与窗口嵌入说明](https://github.com/mpv-player/mpv/blob/master/include/mpv/client.h)：推荐 Render API，同时说明 `wid` 更简单但存在问题。
 - [libmpv Render API](https://github.com/mpv-player/mpv/blob/master/include/mpv/render.h)：支持 OpenGL 和软件渲染，并规定线程与上下文要求。
 - [mpv 许可与构建条件](https://github.com/mpv-player/mpv/blob/master/Copyright)。
+
+## 11. 2026-10-05 · 在 Desktop 解决部分 MP4 播放不稳
+
+状态：proposed。用户询问能否在 Desktop 解决；本次完成源码核对与可行性分析，没有新增播放实现、PRD requirement 或发布包。
+
+### 11.1 结论与问题范围
+
+可以在 Desktop 引入 mpv/libmpv 原生播放路径，使原始 MP4 的拆包、解码和播放时钟由原生引擎处理，绕开已记录的 Chromium 直放兼容性问题，并减少为适配浏览器而进行的实时转码。它针对的是时间轴与浏览器播放路径的问题；持续网络吞吐不足、读盘瓶颈、损坏片源或本机解码性能不足仍需分别测量处理。
+
+历史样本 DVDMS-981 的定位记录为：标称约 29.97 fps，片头首包 PTS 约 -0.033 秒，带被标记为丢弃的 priming IDR。当前后端遇到片头负 PTS 且流推送开启时选择 CFR 转码，其他命中的可 copy 源优先 remux。负 PTS 及帧率差是当前路由启发式，不能单凭这些字段认定所有文件损坏，也不能证明 mpv 已在该样本上通过实测。
+
+### 11.2 当前实现事实
+
+- Desktop 是独立 Electron 客户端，连接本机或远端 Server；`electron/main.ts` 创建 BrowserWindow 并加载 Server Web UI。
+- `PlayerPage.vue` 仍以 HTMLVideoElement/hls.js 为播放实现。现有协议方式调用外部播放器不等于内置原生引擎，也没有完成播放状态双向同步。
+- `electron/preload.cjs` 没有 mpv/libmpv 的播放、暂停、seek 或状态事件。
+- Server 已提供支持 Range 的原始 `/api/library/movies/{id}/stream`；多文件选择使用可选 `fileId`，`src/api/playback-url.ts` 已支持构造相应原始媒体 URL。
+- Desktop 按 Server origin 隔离 Chromium session。受保护媒体使用 HttpOnly Cookie；原生进程不会自动继承该 session，必须实现受控的认证桥接。
+- 现有进度、逐文件续播、观看时长、连播、小窗和萃取帧依赖当前播放宿主及 HTMLVideoElement，不能仅替换画面节点就认为全部接入完成。
+
+### 11.3 推荐播放路径
+
+```text
+Desktop
+  现有资料库与播放界面
+    → 统一播放适配接口
+      → Electron 主进程管理 mpv/libmpv
+        → 原始 HTTP Range 媒体（含选中的 fileId）
+          → 原生拆包、解码、时钟与视频输出
+
+Web
+  现有资料库与播放界面
+    → 现有 HTMLVideoElement/hls.js
+      → 原文件直放 / Server remux / Server transcode
+```
+
+Desktop 初期统一读取 Server 的原始 HTTP 媒体，包括本机 Server，避免新增客户端文件路径授权。远端 Server 的磁盘路径不能作为 Desktop 的本地路径使用。只有以后明确设计了本机路径授权与校验契约，才评估直接打开本机文件。
+
+原生引擎、进程和窗口由 Desktop 管理，资料库、媒体授权及进度持久化继续属于 Server。当前 PlayerPage 来自 Server 托管的 Web UI；如果为它增加原生适配接口，通常同时涉及 Server 的前端交付与 Desktop 的引擎交付，需按组件实际改动独立准备版本，不能承诺只升级 Desktop 就获得完整整合体验。
+
+原生引擎读取远端原始流同样能绕开 Chromium 拆包与解码；是否流畅仍取决于客户端性能及网络是否足以传输原始码率。网络不够时保留现有 HLS 路径。原生启动应直接解析原始媒体访问，避免先创建自动 HLS 会话再丢弃。
+
+### 11.4 集成顺序与验收
+
+1. **验证原生播放与控制契约。** Windows 先由 Electron 管理独立 mpv 进程，以 JSON IPC 同步播放、暂停、seek、倍速、音量、时间、结束和错误；先用独立原生窗口验证。对同一批问题 MP4 比较 Chromium 直放、现有 HLS 与 mpv 原始流，记录呈现节奏、音画同步、起播和跳转时间。必须同时验证本机 Server、远端 Server、PIN 认证及 `fileId`；尚无这些实测结果。
+2. **接入现有业务状态。** 建立 Web/原生双实现的统一控制与事件接口，复用 Server 进度及观看时长接口。源切换、连续 seek、逐文件续播和连播使用同一绝对媒体时间定义；退出、锁定、服务器切换及渲染进程异常必须回收本次原生进程。失败时保持当前位置、暂停意图和选择的文件，通过已有 Web/HLS 能力进行有界回退。
+3. **验证应用内画面与交互。** 在 libmpv/helper 或 mpv 窗口嵌入路线之间依据原型选择，检查原生画面上方的菜单、进度条、HUD，以及窗口缩放、DPI、跨屏、全屏、焦点和快捷键。原生窗口层与 DOM 层的合成是独立工作，不能假设现有 HTML 控件自然盖在原生视频上。Windows 验证不代替 macOS 验证。
+4. **补齐截图、萃取与小窗后再评估默认路径。** 视频截图需原生截图或使用现有源帧接口，并验证时间与 fileId 一致；片段萃取继续复用 Server 能力，但计时与暂停/seek 取消需接原生事件。浏览器原生 PiP 依赖 HTMLVideoElement，原生播放需单独设计桌面小窗及宿主生命周期。不得把原生预览能播作为现有产品交互已完整兼容的证据。
+
+Electron 主进程应校验可信主窗口与当前 Server，按 movieId/fileId 解析媒体请求。媒体认证留在受控原生桥接层，使用当前 origin 对应 session，不向页面暴露 Cookie，不接受任意 shell 命令或跨来源媒体地址。具体认证传输可在原型中选择受限 Cookie 桥接或主进程媒体代理；若涉及 Server 新授权端点，需另行定义合约。以上均为待实现设计。
+
+### 11.5 预期收益与验证边界
+
+预期减少时间轴兼容性、浏览器 codec 限制及实时转码追赶造成的卡顿，降低 Server 转码开销；原生跳转无需为了浏览器 HLS 重新启动整条编码会话。不能在没有实测前承诺所有问题 MP4 流畅、固定起播时间或任意 HDR/硬解能力。
+
+本次依据为现有源码和历史排查记录，只有文档更新；没有运行原生媒体原型、修改业务架构或替代现有播放默认行为。实现应由上述样本与产品交互验收结果决定。
