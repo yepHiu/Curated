@@ -68,7 +68,7 @@ export function playbackInfoGroups(state: NativePlayerState | undefined, lang: N
   return [
     { title: t.playback, rows: [row("player", d?.engineVersion ? `mpv · ${d.engineVersion.replace(/^mpv\s+/i, "")}` : "mpv"),
       row("transport", n ? `${n.protocol.toUpperCase()} / Range` : null), row("mime", n?.mime), row("container", d?.container),
-      row("status", state ? t[state.status] : null), measured("speed", [metric(state?.speed, "×")])] },
+      row("status", state?.status), measured("speed", [metric(state?.speed, "×")])] },
     { title: t.video, rows: [row("resolution", d?.width && d.height ? `${d.width} × ${d.height}` : null), measured("fps", [metric(d?.sourceFps, "fps", 3)]),
       row("codec", state?.codec), row("pixel", d?.pixelFormat), measured("bitrate", [bitrate(d?.videoBitrate)]),
       row("hwdec", state?.hwdec === "no" ? t.software : state?.hwdec), row("output", d?.videoOutput), measured("displayFps", [metric(d?.displayFps, "Hz", 3)]),

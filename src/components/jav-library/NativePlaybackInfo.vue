@@ -41,7 +41,7 @@ onMounted(() => panel.value?.focus({ preventScroll: true }))
                 <template v-for="(measurement, measurementIndex) in row.metrics" :key="measurementIndex">
                   <span v-if="measurementIndex" class="text-muted-foreground">/</span>
                   <span class="inline-flex items-center gap-1">
-                    <span data-info-number class="inline-block h-4 w-[9ch] shrink-0 text-right">{{ measurement.number }}</span>
+                    <span data-info-number class="inline-block h-4 w-[9ch] shrink-0 text-left">{{ measurement.number }}</span>
                     <span v-if="measurement.reserveUnit" data-info-unit class="inline-block h-4 w-[5ch] shrink-0">{{ measurement.unit }}</span>
                   </span>
                 </template>

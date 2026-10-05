@@ -24,7 +24,10 @@ describe("native playback information", () => {
     expect(groups[3]!.rows.map(row => row.value)).toContain("0.00 B/s")
     expect(groups[3]!.rows.map(row => row.value)).toContain("1.00 KiB")
     expect(groups[1]!.rows.map(row => row.value)).toContain("0 / 0")
-    expect(playbackInfoGroups(state, "en")[0]!.rows.map(row => row.value)).toContain("Paused")
+    for (const lang of ["zh-CN", "en", "ja"] as const) {
+      expect(playbackInfoGroups(state, lang)[0]!.rows[4]!.value).toBe("paused")
+      expect(playbackInfoGroups({ ...state, status: "playing" }, lang)[0]!.rows[4]!.value).toBe("playing")
+    }
     expect(playbackInfoGroups(undefined, "ja")[0]!.title).toBe("再生")
   })
   it("keeps numeric and unit slots through missing values, sign changes and unit changes", () => {
