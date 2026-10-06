@@ -258,6 +258,7 @@ class ComponentReleaseTests(unittest.TestCase):
 
     def test_desktop_stages_only_client_runtime(self):
         for name in ('node_modules/electron/dist/electron.exe', 'electron-dist/main.js', 'electron-dist/desktop-release.json',
+                     'electron-dist/native-player-host.exe', 'electron-dist/player/index.html', 'electron-dist/playback-preload.cjs',
                      'public/Curated-desktop-icon.png', 'icon/curated-desktop.ico', 'LICENSE', 'backend/curated.exe'):
             file = self.root / name
             file.parent.mkdir(parents=True, exist_ok=True)
@@ -265,7 +266,12 @@ class ComponentReleaseTests(unittest.TestCase):
         server_icon = self.root / 'backend/internal/assets/curated.ico'
         server_icon.parent.mkdir(parents=True, exist_ok=True)
         server_icon.write_text('dark server icon')
-        stage_desktop(self.root, self.root / 'desktop', '0.1.0', '20260927.000000')
+        from scripts.release.tests.test_native_player import NativeEnginePayloadTests
+        bundle = self.root / 'engine'
+        bundle.mkdir()
+        NativeEnginePayloadTests().fixture(bundle)
+        with patch.dict('os.environ', {'CURATED_NATIVE_BUNDLE': str(bundle)}):
+            stage_desktop(self.root, self.root / 'desktop', '0.1.0', '20260927.000000')
         app = self.root / 'desktop/resources/app'
         self.assertEqual(json.loads((app / 'package.json').read_text())['version'], '0.1.0')
         self.assertEqual((self.root / 'electron-dist/desktop-release.json').read_text(), 'fixture')

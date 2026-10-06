@@ -34,11 +34,12 @@ def validate_payload(directory: Path, component: str) -> None:
                or p.endswith(('/curated.exe', '/ffmpeg.exe', '/ffprobe.exe')) for p in files):
             raise ValueError('Desktop payload contains Server dependencies')
         engine = directory / 'resources/app/native-player'
-        if engine.exists():
-            validate_native_bundle(engine)
-            required |= {'resources/app/electron-dist/native-player-host.exe',
-                         'resources/app/electron-dist/player/index.html',
-                         'resources/app/electron-dist/playback-preload.cjs'}
+        if not engine.exists():
+            raise ValueError('Windows Desktop native engine is required')
+        validate_native_bundle(engine)
+        required |= {'resources/app/electron-dist/native-player-host.exe',
+                     'resources/app/electron-dist/player/index.html',
+                     'resources/app/electron-dist/playback-preload.cjs'}
         metadata = json.loads((directory / 'resources/app/electron-dist/desktop-release.json').read_text())
         if metadata['distribution'] != 'desktop':
             raise ValueError('Desktop metadata must be standalone')
@@ -58,7 +59,7 @@ def stage_desktop(root: Path, destination: Path, version: str, stamp: str) -> No
     (destination / 'resources/default_app.asar').unlink(missing_ok=True)
     payload = destination / 'resources/app'
     shutil.copytree(root / 'electron-dist', payload / 'electron-dist')
-    stage_native_player(payload)
+    stage_native_player(payload, required=True)
     (payload / 'package.json').write_text(json.dumps({'name': 'curated-desktop', 'productName': 'Curated Desktop',
         'version': version, 'main': 'electron-dist/main.js', 'type': 'module'}) + '\n')
     metadata = payload / 'electron-dist/desktop-release.json'

@@ -51,9 +51,13 @@ class NativeEnginePayloadTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'escapes'):
                 validate_native_bundle(root)
 
-    def test_web_only_desktop_can_build_without_a_prepared_engine(self):
+    def test_optional_stager_returns_false_without_a_prepared_engine(self):
         with patch.dict('os.environ', {}, clear=True):
             self.assertFalse(stage_native_player(Path('unused')))
+
+    def test_production_windows_requires_a_prepared_engine(self):
+        with patch.dict('os.environ', {}, clear=True), self.assertRaisesRegex(ValueError, 'requires a prepared'):
+            stage_native_player(Path('unused'), required=True)
 
 
 if __name__ == '__main__':

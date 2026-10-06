@@ -1,10 +1,16 @@
 """Optional Windows engine payload. Unprepared development binaries are never staged."""
 from __future__ import annotations
-from hashlib import sha256
+from hashlib import file_digest
 import json
 import os
 from pathlib import Path
 import shutil
+from zipfile import ZipFile
+from .pe_imports import imports
+
+WINDOWS_IMPORTS = set(('advapi32 avicap32 avrt bcrypt bcryptprimitives cfgmgr32 crypt32 dnsapi '
+    'dwmapi dwrite gdi32 gdiplus imm32 iphlpapi kernel32 msimg32 ncrypt ntdll ole32 oleaut32 '
+    'opengl32 rpcrt4 shcore shell32 shlwapi user32 userenv usp10 uxtheme version winmm ws2_32 wsock32').split())
 
 
 def _entry(root: Path, value: dict) -> Path:
@@ -18,7 +24,9 @@ def _entry(root: Path, value: dict) -> Path:
     file = (root / relative).resolve()
     if not file.is_relative_to(root.resolve()) or not file.is_file():
         raise ValueError(f'Missing native engine material: {name}')
-    if not isinstance(digest, str) or len(digest) != 64 or sha256(file.read_bytes()).hexdigest() != digest:
+    with file.open('rb') as stream:
+        actual = file_digest(stream, 'sha256').hexdigest()
+    if not isinstance(digest, str) or len(digest) != 64 or actual != digest:
         raise ValueError(f'Native engine checksum mismatch: {name}')
     return file
 
@@ -46,12 +54,31 @@ def validate_native_bundle(directory: Path) -> dict:
     for item in components:
         if not item.get('revision') or not item.get('license') or not item.get('sourcePath'):
             raise ValueError('Native engine source catalogue requires exact revisions and licenses')
+    if manifest.get('provider') == 'msys2':
+        runtime_names = {item['file'].lower() for item in runtime}
+        if len(runtime_names) != len(runtime) or any('/' in name or (name != 'mpv.exe' and not name.endswith('.dll')) for name in runtime_names):
+            raise ValueError('Production engine contains duplicate or unexpected runtime files')
+        system = set(manifest.get('systemImports', []))
+        for name in system:
+            if not (name.startswith(('api-ms-', 'ext-ms-')) and name.endswith('.dll')) and name.removesuffix('.dll') not in WINDOWS_IMPORTS:
+                raise ValueError('Unknown Windows system import')
+        for item in runtime:
+            missing = imports(directory / item['file']) - runtime_names - system
+            if missing:
+                raise ValueError(f"Native engine dependency missing for {item['file']}: {sorted(missing)}")
+        with ZipFile(directory / manifest['correspondingSource']['file']) as source:
+            index = json.loads(source.read('source-index.json'))
+        for component in components:
+            if component['sourcePath'].removeprefix('snapshots/') not in index:
+                raise ValueError('Native engine component has no corresponding source snapshot')
     return manifest
 
 
-def stage_native_player(destination: Path, bundle: Path | None = None) -> bool:
+def stage_native_player(destination: Path, bundle: Path | None = None, *, required: bool = False) -> bool:
     configured = os.environ.get('CURATED_NATIVE_BUNDLE')
     if bundle is None and not configured:
+        if required:
+            raise ValueError('Windows Desktop requires a prepared CURATED_NATIVE_BUNDLE')
         return False
     source = bundle or Path(configured)
     if not source.is_absolute():
