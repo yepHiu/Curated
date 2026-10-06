@@ -72,7 +72,12 @@ func normalizeTopicProposals(proposed, existing []storage.TopicDefinition) ([]st
 // proposeTopicVocabulary retries an invalid model response once with bounded,
 // structured feedback. No checkpoint advances until the response is valid.
 func (a *App) proposeTopicVocabulary(ctx context.Context, inputs []topicVocabularySample, catalog []storage.TopicDefinition, locale string) ([]storage.TopicDefinition, error) {
-	data := map[string]any{"existing": topicVocabularyHints(catalog, inputs), "movies": inputs, "labelLocale": locale}
+	data := struct {
+		LabelLocale     string                    `json:"labelLocale"`
+		Existing        []storage.TopicDefinition `json:"existing"`
+		Movies          []topicVocabularySample   `json:"movies"`
+		ValidationError string                    `json:"validationError,omitempty"`
+	}{LabelLocale: locale, Existing: topicVocabularyHints(catalog, inputs), Movies: inputs}
 	var validationErr error
 	for attempt := 0; attempt < 2; attempt++ {
 		raw, err := a.topicComplete(ctx, prompts.TopicVocabularyPrompt(), data)
@@ -94,7 +99,7 @@ func (a *App) proposeTopicVocabulary(ctx context.Context, inputs []topicVocabula
 				return normalized, nil
 			}
 		}
-		data["validationError"] = topicOrganizationErrorCode(validationErr)
+		data.ValidationError = topicOrganizationErrorCode(validationErr)
 	}
 	return nil, validationErr
 }

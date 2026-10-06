@@ -22,7 +22,13 @@ func (a *App) classifyTopicBatch(ctx context.Context, defs []storage.TopicDefini
 	for offset := 0; ; {
 		end := min(offset+size, len(defs))
 		page := defs[offset:end]
-		raw, err := a.topicComplete(ctx, prompts.TopicClassificationPrompt(), map[string]any{"vocabulary": page, "movies": inputs})
+		// Keep the shared vocabulary before changing movie data so providers can
+		// reuse the request prefix across batches. Maps sort movies first.
+		data := struct {
+			Vocabulary []storage.TopicDefinition `json:"vocabulary"`
+			Movies     []storage.TopicMovieInput `json:"movies"`
+		}{page, inputs}
+		raw, err := a.topicComplete(ctx, prompts.TopicClassificationPrompt(), data)
 		if err != nil {
 			if topicOrganizationErrorCode(err) == "AI_CONTEXT_TOO_LARGE" && len(inputs) == 1 && len(page) > 1 {
 				size = max(1, len(page)/2)

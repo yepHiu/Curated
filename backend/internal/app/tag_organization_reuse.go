@@ -113,7 +113,11 @@ func (a *App) reuseTopicProposals(ctx context.Context, proposed, catalog []stora
 // topicReusePage validates the whole page before mutating any pending mapping.
 // Identical duplicate mappings are harmless; conflicting or invented targets retry.
 func (a *App) topicReusePage(ctx context.Context, proposals, page []storage.TopicDefinition) (map[string]storage.TopicDefinition, error) {
-	data := map[string]any{"proposed": proposals, "existing": page}
+	data := struct {
+		Existing        []storage.TopicDefinition `json:"existing"`
+		Proposed        []storage.TopicDefinition `json:"proposed"`
+		ValidationError string                    `json:"validationError,omitempty"`
+	}{Existing: page, Proposed: proposals}
 	targets := map[string]storage.TopicDefinition{}
 	names := map[string]string{}
 	for _, d := range page {
@@ -151,7 +155,7 @@ func (a *App) topicReusePage(ctx context.Context, proposals, page []storage.Topi
 		if validationErr == nil {
 			return mappings, nil
 		}
-		data["validationError"] = "AI_ORGANIZATION_REUSE_INVALID"
+		data.ValidationError = "AI_ORGANIZATION_REUSE_INVALID"
 	}
 	return nil, &core.ToolError{Code: "AI_ORGANIZATION_REUSE_INVALID", Message: "Invalid topic reuse mapping after correction"}
 }
