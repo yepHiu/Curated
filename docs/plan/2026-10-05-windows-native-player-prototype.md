@@ -756,3 +756,10 @@ staging 只复制声明文件，重新 hash 并检查 x64 PE normal/delay DLL im
 `git fetch origin` 后再次检查：除明确排除的独立看板外，全部本地产品分支与远端产品分支的现有提交均已包含在 master。`origin/release-channels` 是独立更新通道数据分支，不属于产品源码，不合并。主线没有 `scripts/project-dashboard`，独立看板未引入。原有离线转码方案与索引的未提交修改已恢复。
 
 本次仅新增发布恢复工作流与说明；`python -m unittest discover -s scripts/release/tests -p 'test_component_cd.py'` 的 19 项通过。前一节产品构建与全量回归结果仍适用，产品代码及依赖未变，不重复运行。恢复工作流在来源分支已通过 actionlint v1.7.7（见恢复计划）；本次没有触发工作流、推送远程或执行实际发布。
+
+
+### 14.23 最新 master 新批次打包触发（2026-10-07）
+
+用户要求再次触发新版本包。发布前读取稳定 Release/通道，当前公开基线仍为 Server 1.7.9 / Desktop 0.2.4；20261007 与 20261007-2 未公开。基于集成后的 master 准备新批次 `release-20261007-3`，Server 1.7.10 / Desktop 0.2.5，不额外递增未发布版本，不移动旧标签。说明同时包含 Windows 原生播放、独立源码资产、FC2 元数据、AI 请求缓存前缀、跨平台 lock 校验和 Windows Go 缓存策略修复。独立看板仍排除。
+
+批次及说明已提交为 `3bf7790665ced4a0f6c7d11af88f2b40321c8abd`，master 与新标签已原子推送；15 项 batch 测试通过，元数据/源码摘要/版本表校验通过。用户原有未提交文档已恢复，未带入发布源码。标签触发 [CD run 37513511993](https://github.com/yepHiu/Curated/actions/runs/37513511993)，已核对 headSha 与标签提交一致，记录时为 pending。后续完整质量门禁、Windows 两端与 Mac Desktop 构建/安装验收全部通过后由标签 CD 正式发布。本节仅确认触发成功，不代表包已生成或公开；实际结果以该运行及 Release 为准。
