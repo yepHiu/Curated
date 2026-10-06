@@ -8,6 +8,10 @@ Actions run `37505997682` 的 attempt 1 在上传前失败；Windows 与 macOS �
 
 ## 恢复步骤
 
+优先使用 `.github/workflows/recover-release.yml`，在 GitHub runner 上下载和上传，避免本地大文件传输瓶颈。将包含修复及该工作流的提交推送后，在 **Recover verified release assets** 中选择含修复的分支，填写 tag `release-20261007-2`、run_id `37505997682`、attempt `1`。`mode=draft` 暂存上传；`mode=publish` 正式公开并推进更新通道。该工作流分别检出当前修复工具与原标签源码，并检查指定原运行的 commit、CD 工作流身份、全部质量与构建门禁成功后才下载资产。
+
+以下为等价的本地备用恢复方式：
+
 在包含 `e4dcd138` 的干净工具工作区执行以下命令。原标签单独检出，仅作为 `--source-root`；运行的 Python 脚本必须来自修复工作区。
 
 ```powershell
@@ -31,4 +35,4 @@ python scripts/release/component_cd.py publish --tag release-20261007-2 --source
 
 ## 验证
 
-修复发布脚本测试共 107 项通过，覆盖 CRLF 生成/LF 发布、真实锁内容变化拒绝、来源提交校验和源码资产独立发布。实际资产恢复结果以本次操作记录为准。
+修复发布脚本测试共 107 项通过，覆盖 CRLF 生成/LF 发布、真实锁内容变化拒绝、来源提交校验和源码资产独立发布。恢复工作流经 actionlint v1.7.7 检查通过；原运行 attempt 1 的必需 job 名称及成功状态已通过 GitHub API 核对。实际云端恢复尚未执行。

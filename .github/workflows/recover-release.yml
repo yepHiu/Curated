@@ -1,0 +1,119 @@
+name: Recover verified release assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Original immutable release batch tag
+        required: true
+        default: release-20261007-2
+      run_id:
+        description: Original CD run containing successful builds
+        required: true
+        default: '37505997682'
+      attempt:
+        description: Successful build attempt (not the failed publish retry)
+        required: true
+        default: '1'
+      mode:
+        description: Upload a draft or publish and advance update channels
+        type: choice
+        options: [draft, publish]
+        default: draft
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: curated-release-publication
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out corrected release tools
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check out original immutable source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          path: .workspace/recovery/source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify original source and successful quality and build jobs
+        id: original
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          ORIGINAL_RUN: ${{ inputs.run_id }}
+          ORIGINAL_ATTEMPT: ${{ inputs.attempt }}
+        run: |
+          python - <<'PY'
+          import json, os, re, subprocess
+          from pathlib import Path
+          from scripts.release.component_cd import metadata
+          from scripts.release.release_lib.batches import verify_changes
+          run, attempt = os.environ['ORIGINAL_RUN'], os.environ['ORIGINAL_ATTEMPT']
+          if not all(re.fullmatch(r'[1-9][0-9]*', value) for value in (run, attempt)):
+              raise ValueError('Run and attempt must be positive integers')
+          root = Path('.workspace/recovery/source').resolve()
+          meta = metadata(root, os.environ['RELEASE_TAG'])
+          verify_changes(root, meta['batch'])
+          repo = os.environ['GITHUB_REPOSITORY']
+          def api(path):
+              return json.loads(subprocess.check_output(['gh', 'api', f'repos/{repo}/{path}']))
+          original = api(f'actions/runs/{run}')
+          if original['head_sha'] != meta['commit'] or original['path'] != '.github/workflows/cd-release.yml':
+              raise ValueError('Original CD run does not match the frozen source')
+          jobs = api(f'actions/runs/{run}/attempts/{attempt}/jobs?per_page=100')
+          if jobs['total_count'] > 100:
+              raise ValueError('Unexpected job count; cannot verify all gates')
+          required = {'Validate release source and notes', 'Build Windows x64 packages',
+                      'Check the exact release commit / Runtime browser e2e',
+                      'Check the exact release commit / Frontend, Electron, and release scripts',
+                      'Check the exact release commit / Go test and vet'}
+          if meta['component'] != 'server':
+              required.add('Build Mac Desktop (Apple Silicon)')
+          successful = {job['name'] for job in jobs['jobs'] if job['conclusion'] == 'success'}
+          if not required <= successful:
+              raise ValueError(f'Original quality/build gates not successful: {sorted(required - successful)}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"component={meta['component']}\n")
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          name: windows-release-${{ inputs.tag }}-${{ inputs.attempt }}
+          path: .workspace/recovery/windows
+      - uses: actions/download-artifact@v4
+        if: steps.original.outputs.component != 'server'
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          name: macos-desktop-${{ inputs.tag }}-${{ inputs.attempt }}
+          path: .workspace/recovery/macos
+      - name: Stage and upload with corrected tools against original source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_MODE: ${{ inputs.mode }}
+        run: |
+          python scripts/release/component_cd.py stage --tag "$RELEASE_TAG" --source-root .workspace/recovery/source --windows .workspace/recovery/windows --macos .workspace/recovery/macos --output .workspace/recovery/staged
+          python scripts/release/component_cd.py publish --tag "$RELEASE_TAG" --source-root .workspace/recovery/source --output .workspace/recovery/staged --mode "$RELEASE_MODE"
+      - name: Preserve recovery manifests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovered-release-${{ inputs.tag }}-${{ github.run_attempt }}
+          path: .workspace/recovery/staged/assets/*.json
+          include-hidden-files: true
+          if-no-files-found: ignore
