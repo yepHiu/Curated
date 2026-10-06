@@ -1,0 +1,45 @@
+Curated Windows native playback engine
+
+mpv is a separate, unmodified executable controlled through its documented JSON
+IPC protocol. The original engine and library licenses apply to those files;
+Curated's MIT license does not replace third-party terms. In this distribution,
+mpv is GPL-2.0-or-later and the bundled FFmpeg libraries are GPL-3.0-or-later.
+The manifest and build-inputs.json list the exact versions and license identifiers
+for each source snapshot. Original binary-package license files and mpv/FFmpeg
+COPYING/LICENSE/Copyright files are included here. Notices in the complete
+corresponding source archive are preserved without modification.
+
+Complete corresponding sources are shipped locally in
+sources/complete-sources.tar.zst. This includes upstream source archives or bare Git
+repositories, MSYS2 PKGBUILD recipes, .SRCINFO, local patches, and pinned Cargo
+crate sources. No internet access is needed to obtain these sources. Extract
+the archive with 7-Zip. Run restore-sources.py from the extracted directory:
+
+  python restore-sources.py extracted-directory restored-sources
+
+Alternatively restore directly from complete-sources.tar.zst with Python 3.14,
+or Python 3.12+ with zstandard installed. The script is also provided beside this
+notice for convenience. Restoring sources requires additional temporary space.
+
+The whisper.cpp source cache preserves the exact upstream commit and source tree,
+plus the history/tag and abbreviation needed to reproduce its recorded pkgver.
+Unrelated older Git history is omitted; CURATED-SOURCE-SNAPSHOT.json records the
+original package SHA, retained revision and version check. No source code or
+upstream build recipe is modified by this reduction.
+
+Use an MSYS2 UCRT64 environment to build the restored recipes with makepkg-mingw.
+Provision build tools and dependencies at the versions recorded in the original
+.BUILDINFO records in sources/build-inputs.json, rather than using a moving
+repository state. For Rust recipes set CARGO_HOME to the restored cargo-home;
+the provided registry replacement uses the local vendor directory, checksums
+and offline mode. Upstream tarballs remain in their original recipe locations.
+Windows Git symlink restoration may require Developer Mode or an MSYS2 shell.
+
+You may replace the engine executable and DLLs with compatible builds under their
+licenses. Curated applies no technical restriction to replacement of these files.
+Updating an engine pin requires independent source, license and packaged playback
+verification. The development QA download is not this production distribution.
+
+Upstream projects: https://mpv.io/ and https://ffmpeg.org/
+Package provider and recipes: https://www.msys2.org/ and
+https://github.com/msys2/MINGW-packages

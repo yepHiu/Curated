@@ -1,4 +1,11 @@
 {
+  "desktopPlayback": {
+  "title": "Desktop player",
+  "saveFailed": "Unable to save Desktop playback settings.",
+  "localPreference": "Preview · Applies to this Desktop, using the current login session.",
+  "preferNative": "Prefer the Desktop native player",
+  "unavailable": "The native engine is unavailable on this client. Web playback remains available."
+},
   "mediaEmpty": {
     "title": "Nothing here yet",
     "description": "Make room for the things you love.",

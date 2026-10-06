@@ -13,6 +13,8 @@ import {
 } from "electron"
 import { probeServer as probeIdentity, localServerSuggestion, connectionPartition, hasServerIdentityChanged } from "./connections.js"
 import { discoverServers } from "./discovery.js"
+import { installDesktopPlayback } from "./playback-desktop.js"
+import { shouldUsePrebuiltFrontend, startPrebuiltFrontend, type PrebuiltFrontend } from "./prebuilt-frontend.js"
 import { DesktopPreferencesStore, proxyConfiguration, validatePreferences, type DesktopPreferences } from "./settings.js"
 import path from "node:path"
 import { existsSync, readFileSync } from "node:fs"
@@ -71,6 +73,7 @@ let currentServerUrl: string | undefined
 const connectionPageUrl = pathToFileURL(path.join(__dirname, "launcher", "index.html")).href
 let managedBackend: ManagedBackend | undefined
 let managedFrontend: ManagedFrontend | undefined
+let prebuiltFrontend: PrebuiltFrontend | undefined
 let rendererBaseUrl: string | undefined
 let appIconPath: string | undefined
 let appTray: Tray | undefined
@@ -85,6 +88,9 @@ let runningPreferences: DesktopPreferences
 let networkSession: Electron.Session
 let connectionAttempt: AbortController | undefined
 let discoveryScan: AbortController | undefined
+let nativePlayback: ReturnType<typeof installDesktopPlayback> | undefined
+let connectionGeneration = 0
+let playbackTransitioning = false
 const desktopFetch: typeof fetch = (input, init) => networkSession.fetch(input instanceof URL ? input.href : input, { ...init, credentials: "omit" })
 
 const singleInstanceLock = app.requestSingleInstanceLock()
@@ -114,6 +120,10 @@ if (!singleInstanceLock) {
       runningPreferences = preferencesStore.read()
       networkSession = session.fromPartition("curated-connection-probes")
       await networkSession.setProxy(proxyConfiguration(runningPreferences))
+      nativePlayback = installDesktopPlayback({ directory: __dirname, appPath: app.getAppPath(),
+        userData: app.getPath("userData"), packaged: app.isPackaged, focusMain: () => { if (!isQuitting) showMainWindow() },
+        current: () => !isQuitting && !playbackTransitioning && mainWindow && !mainWindow.isDestroyed() && currentServerUrl && rendererBaseUrl
+          ? { window: mainWindow, origin: currentServerUrl, renderer: rendererBaseUrl, generation: String(connectionGeneration) } : undefined })
       registerDesktopIpc()
       createAppTray()
       installApplicationMenu()
@@ -185,11 +195,17 @@ app.on("before-quit", () => {
   discoveryScan?.abort()
 })
 
+// 真正退出时等待播放器、预编译页面监听及自建服务回收。
 app.on("will-quit", async (event) => {
-  if (!managedBackend && !managedFrontend) {
+  if (!managedBackend && !managedFrontend && !nativePlayback && !prebuiltFrontend) {
     return
   }
   event.preventDefault()
+  const playback = nativePlayback
+  nativePlayback = undefined
+  await playback?.stop()
+  await prebuiltFrontend?.stop()
+  prebuiltFrontend = undefined
   const backend = managedBackend
   const frontend = managedFrontend
   managedBackend = undefined
@@ -654,6 +670,7 @@ function installApplicationMenu(): void {
   ]))
 }
 
+/** 先验证目标和候选页面，再提交连接；本机测试可加载独立预编译前端。 */
 async function connectServer(target: SavedServer, confirm: boolean): Promise<void> {
   if (connecting) throw new Error("正在连接，请稍候。")
   connecting = true
@@ -682,7 +699,17 @@ async function connectServer(target: SavedServer, confirm: boolean): Promise<voi
     const selectedPartition = hasServerIdentityChanged(target.serverId, info.serverId, target.url)
       ? connectionPartition({ url: target.url, serverId: info.serverId, name: target.name })
       : target.partition ?? serverSessionPartition(target.url)
-    const renderer = target.url === managedBackend?.baseUrl && managedFrontend
+    // 日常测试复用一次构建的页面；开发热更新与远端服务器仍走原有选择逻辑。
+    if (shouldUsePrebuiltFrontend({ backendBaseUrl: target.url, isPackaged: app.isPackaged }) && !prebuiltFrontend) {
+      prebuiltFrontend = await startPrebuiltFrontend({
+        directory: path.resolve(app.getAppPath(), process.env.CURATED_ELECTRON_FRONTEND_DIR!),
+        backendBaseUrl: target.url,
+        baseUrl: process.env.CURATED_ELECTRON_FRONTEND_URL || "http://127.0.0.1:5183",
+      })
+    }
+    const renderer = shouldUsePrebuiltFrontend({ backendBaseUrl: target.url, isPackaged: app.isPackaged }) && prebuiltFrontend
+      ? prebuiltFrontend.baseUrl
+      : target.url === managedBackend?.baseUrl && managedFrontend
       ? managedFrontend.baseUrl
       : await resolveRendererBaseUrl({ backendBaseUrl: target.url, isPackaged: app.isPackaged, env: process.env, fetchImpl: desktopFetch })
     candidate = createMainWindow(renderer, appIconPath, target.url, selectedPartition)
@@ -704,10 +731,15 @@ async function connectServer(target: SavedServer, confirm: boolean): Promise<voi
     if (pageStatus >= 400) throw new Error(`服务器页面返回 ${pageStatus}，请检查 Server 的 Web 界面是否已部署。`)
     if (!isAllowedAppUrl(candidate.webContents.getURL(), renderer)) throw new Error("服务器页面跳转到了其他地址。")
     controller.signal.throwIfAborted()
+    // 候选已通过验证；清理旧播放期间不再接受旧主窗口的新起播请求。
+    playbackTransitioning = true
+    await nativePlayback?.stop()
+    controller.signal.throwIfAborted()
     if (!target.id) target = serverStore!.save({ name: info.name.slice(0, 80) || "Curated Server", url: target.url })
     serverStore!.bindIdentity(target.id, info.serverId, selectedPartition)
     serverStore!.remember(target.id)
     const previous = mainWindow
+    connectionGeneration++
     mainWindow = candidate
     currentServerUrl = target.url
     rendererBaseUrl = renderer
@@ -719,5 +751,5 @@ async function connectServer(target: SavedServer, confirm: boolean): Promise<voi
   } catch (error) {
     candidate?.destroy()
     throw error
-  } finally { if (abortCandidate) controller.signal.removeEventListener("abort", abortCandidate); loadingConnection = undefined; connecting = false; if (connectionAttempt === controller) connectionAttempt = undefined }
+  } finally { playbackTransitioning = false; if (abortCandidate) controller.signal.removeEventListener("abort", abortCandidate); loadingConnection = undefined; connecting = false; if (connectionAttempt === controller) connectionAttempt = undefined }
 }

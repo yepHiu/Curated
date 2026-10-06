@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "../.workspace/native-player-dist" },
+  "include": ["native-*.ts"],
+  "exclude": ["*.test.ts"]
+}

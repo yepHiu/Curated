@@ -36,6 +36,10 @@
 
 [FC2 元数据获取可靠性](2026-10-06-fc2-metadata-reliability.md) 为 `verified`：独立来源、字段补全、访问错误与图片来源上下文，已完成 FC2-3977618 在线只读验证及后端全量检查；需新 Server 编译重启/升级生效，未生产发布。
 
+## Windows 原生播放原型（2026-10-05）
+
+用户已要求在专用分支先制作 Windows 原型。[`2026-10-05-windows-native-player-prototype.md`](2026-10-05-windows-native-player-prototype.md) 为当前实施计划，状态 `in-progress`，关联 REQ-0058。§12 已实现原生视频与 Curated 控件同窗，复用圆形控制栏，并修复透明层几何绑定与整面焦点边框；合成媒体和实际 Electron fixture 已通过。2026-10-06 已按 §14 用户授权实施正式 main 会话/入口/本地专用窗口与记录/侧栏，新增 REQ-0059（in_progress 70），见 §14.9；§13/14 的引擎分发已有开发下载与可选 staging 校验，但完整对应源码/许可及原生安装验收待完成。用户指定 CD1 已完成两引擎各五分钟对照（§14.10），native 零观察掉帧、Chromium 掉帧 27.64%；P3 更多片源、混合 DPI 与完整业务验收仍待完成，主页面内嵌和 macOS 为后续阶段。历史 VLC 对照研究不因此整体进入实施。
+
 ## 状态流转
 
 1. `research` / `proposed` 文档可以只记录问题、证据和备选方案。

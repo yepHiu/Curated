@@ -258,6 +258,7 @@ class ComponentReleaseTests(unittest.TestCase):
 
     def test_desktop_stages_only_client_runtime(self):
         for name in ('node_modules/electron/dist/electron.exe', 'electron-dist/main.js', 'electron-dist/desktop-release.json',
+                     'electron-dist/native-player-host.exe', 'electron-dist/player/index.html', 'electron-dist/playback-preload.cjs',
                      'public/Curated-desktop-icon.png', 'icon/curated-desktop.ico', 'LICENSE', 'backend/curated.exe'):
             file = self.root / name
             file.parent.mkdir(parents=True, exist_ok=True)
@@ -265,7 +266,14 @@ class ComponentReleaseTests(unittest.TestCase):
         server_icon = self.root / 'backend/internal/assets/curated.ico'
         server_icon.parent.mkdir(parents=True, exist_ok=True)
         server_icon.write_text('dark server icon')
-        stage_desktop(self.root, self.root / 'desktop', '0.1.0', '20260927.000000')
+        from scripts.release.tests.test_native_player import NativeEnginePayloadTests
+        bundle = self.root / 'engine'
+        bundle.mkdir()
+        NativeEnginePayloadTests().fixture(bundle)
+        from scripts.release.release_lib.native_player import stage_native_sources
+        source_asset = stage_native_sources(bundle, self.root / 'source-release', '0.1.0', 'release-20261007-2')
+        with patch.dict('os.environ', {'CURATED_NATIVE_BUNDLE': str(bundle)}):
+            stage_desktop(self.root, self.root / 'desktop', '0.1.0', '20260927.000000', source_asset=source_asset)
         app = self.root / 'desktop/resources/app'
         self.assertEqual(json.loads((app / 'package.json').read_text())['version'], '0.1.0')
         self.assertEqual((self.root / 'electron-dist/desktop-release.json').read_text(), 'fixture')
@@ -273,6 +281,56 @@ class ComponentReleaseTests(unittest.TestCase):
         self.assertEqual((app / 'curated-desktop.ico').read_text(), 'fixture')
         self.assertEqual((app / 'public/Curated-desktop-icon.png').read_text(), 'fixture')
         self.assertFalse((app / 'public/Curated-icon.png').exists())
+        self.assertFalse((app / 'native-player/sources/complete.tar.zst').exists())
         (app / 'curated.exe').write_text('bad')
         with self.assertRaises(ValueError):
             validate_payload(self.root / 'desktop', 'desktop')
+
+    def test_separate_sources_are_required_verified_and_excluded_from_update_feeds(self):
+        """新批次必须上传完整来源资产，但 Desktop 更新清单只列应用安装包。"""
+        from scripts.release.tests.test_native_player import NativeEnginePayloadTests
+        from scripts.release.release_lib.native_player import stage_native_sources
+        self.meta.update(component='both', tag='release-20261007-2',
+                         batch={'desktopNativeSources': True, 'modules': {
+                             'server': {'changed': True}, 'desktop': {'changed': True}}})
+        windows, macos = self.root / 'windows', self.root / 'macos'
+        windows.mkdir(); macos.mkdir()
+        entries = []
+        for name, identity in cd.expected_assets(self.meta).items():
+            folder = windows if identity['platform'] == 'windows' else macos
+            (folder / name).write_bytes(name.encode())
+            entries.append({**identity, 'sourceCommit': 'abc', 'sha256': cd.legacy.sha256(folder / name)})
+        lock = self.root / 'scripts/release/native-player/windows-x64-production.json'
+        lock.parent.mkdir(parents=True)
+        lock.write_text('{}')
+        bundle = self.root / 'engine'
+        bundle.mkdir()
+        manifest = NativeEnginePayloadTests().fixture(bundle)
+        inputs = bundle / 'sources/build-inputs.json'
+        inputs.write_text('{"lock":{}}')
+        manifest.update(lockSha256=cd.legacy.sha256(lock))
+        manifest['buildInputs']['sha256'] = cd.legacy.sha256(inputs)
+        (bundle / 'engine-manifest.json').write_text(json.dumps(manifest))
+        source = stage_native_sources(bundle, windows, '0.1.0', self.meta['tag'])
+        source['sourceCommit'] = 'abc'
+        with self.assertRaisesRegex(ValueError, 'requires a separate'):
+            cd.validate_native_sources(self.root, self.meta, None, [windows])
+        cd.validate_native_sources(self.root, self.meta, source, [windows])
+        wrong = {**source, 'sourceCommit': 'another'}
+        with self.assertRaisesRegex(ValueError, 'another Desktop'):
+            cd.validate_native_sources(self.root, self.meta, wrong, [windows])
+        (windows / 'windows-components.json').write_text(json.dumps({'sourceCommit': 'abc',
+            'artifacts': [e for e in entries if e['platform'] == 'windows'], 'nativeSources': source}))
+        (macos / 'desktop-macos.json').write_text(json.dumps({'schema': 1, 'component': 'desktop',
+            'version': '0.1.0', 'platform': 'macos', 'arch': 'arm64', 'distribution': 'desktop',
+            'sourceCommit': 'abc', 'artifacts': [e for e in entries if e['platform'] == 'macos']}))
+        output = self.root / 'output'
+        cd.stage(self.root, self.meta, windows, macos, output)
+        verified = cd.verify_distribution(self.meta, output / 'assets', self.root)
+        self.assertEqual(verified['nativeSources'], source)
+        feed = json.loads((output / 'assets/desktop.json').read_text())
+        self.assertNotIn(source['fileName'], {e['fileName'] for e in feed['artifacts']})
+        self.assertIn(source['fileName'], (output / 'assets/SHA256SUMS.txt').read_text())
+        (output / 'assets' / source['fileName']).write_bytes(b'corrupt')
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            cd.verify_distribution(self.meta, output / 'assets', self.root)

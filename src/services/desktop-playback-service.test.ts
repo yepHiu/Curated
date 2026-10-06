@@ -1,0 +1,110 @@
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { createRouter, createMemoryHistory } from "vue-router"
+import { updateActivePlaybackSession } from "@/composables/use-active-playback-session"
+import type { DesktopPlaybackBridge, DesktopPlaybackSnapshot } from "../../electron/playback-contract"
+import { emptyNativePlayerState } from "../../electron/native-player-contract"
+const libraryModuleLoaded = vi.hoisted(/* 记录影片模块的执行，检测提前启动网络读取。 */ () => vi.fn())
+vi.mock("@/lib/playback-progress-storage", () => ({
+  parseResumeSecondsFromQuery: (value: unknown) => typeof value === "string" ? Number(value) : undefined,
+  getProgress: vi.fn(), hydratePlaybackProgress: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock("@/lib/played-movies-storage", () => ({ hasPlayedMovie: vi.fn(), hydratePlayedMovies: vi.fn().mockResolvedValue(undefined) }))
+vi.mock("@/lib/player-playlist", () => ({ listPlayerPlaylistMovies: () => [{ id: "a" }, { id: "b" }],
+  resolvePlayerPlaylistSource: () => "browse", readPlaylistAutoAdvance: () => true }))
+vi.mock("@/lib/locale-storage", () => ({ resolveInitialLocale: () => "zh-CN" }))
+vi.mock("@/composables/use-active-playback-session", () => ({ updateActivePlaybackSession: vi.fn() }))
+vi.mock("@/lib/curated-frames/revision", () => ({ bumpCuratedFramesRevision: vi.fn() }))
+const router = createRouter({ history: createMemoryHistory(), routes: [
+  { path: "/library", name: "library", component: {} }, { path: "/player/:id", name: "player", component: {} },
+] })
+beforeEach(() => {
+  // 隔离每例的模块加载、Web 模式和可选 Desktop 桥。
+  vi.resetModules()
+  libraryModuleLoaded.mockReset()
+  vi.doMock("@/services/library-service", () => {
+    // 逐例注册，确保记录本例的实际模块执行而不是复用 Vitest 的 mock 模块缓存。
+    libraryModuleLoaded()
+    return { useLibraryService: /* 提供队列所需的最小影片状态。 */ () => ({ movies: { value: [] }, trashedMovies: { value: [] } }) }
+  })
+  vi.stubEnv("VITE_USE_WEB_API", "true")
+  delete window.javLibrary
+})
+describe("Desktop playback routing", () => {
+  it("intercepts before PlayerView, passes frozen identities and leaves the source page available", async () => {
+    // 原生选择成功后才允许执行影片模块，保持原有队列和页面返回行为。
+    const open = vi.fn().mockResolvedValue({ sessionId: "s", revision: 1, windowOpen: true })
+    const capabilities = vi.fn().mockResolvedValue({ protocol: 1, available: true, preferences: { preferNative: true } })
+    window.javLibrary = { playback: { open, capabilities } as unknown as NonNullable<Window["javLibrary"]>["playback"] }
+    const { desktopPlaybackService: service } = await import("./desktop-playback-service")
+    const stop = vi.fn(); service.bindWebStop(stop)
+    const to = router.resolve("/player/a?fileId=p2&t=42&autoplay=1")
+    expect(await service.intercept(to, router.resolve("/library?q=test"))).toBe("/library?q=test")
+    expect(stop).toHaveBeenCalledOnce()
+    expect(libraryModuleLoaded).toHaveBeenCalledOnce()
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ movieId: "a", fileId: "p2", startSec: 42, autoplay: true, queue: ["a", "b"] }))
+  })
+  it("uses Web when the bridge is missing, disabled or explicitly bypassed", async () => {
+    // 浏览器启动和关闭 native 的 Desktop 都不能提前启动影片模块。
+    const { desktopPlaybackService: service } = await import("./desktop-playback-service")
+    service.initialize(vi.fn())
+    expect(libraryModuleLoaded).not.toHaveBeenCalled()
+    const to = router.resolve("/player/a")
+    expect(await service.intercept(to, router.resolve("/library"))).toBe(true)
+    const open = vi.fn()
+    window.javLibrary = { playback: { open, capabilities: async () => ({ protocol: 1, available: true, preferences: { preferNative: false } }) } as unknown as NonNullable<Window["javLibrary"]>["playback"] }
+    expect(await service.intercept(to, router.resolve("/library"))).toBe(true)
+    expect(open).not.toHaveBeenCalled()
+    expect(libraryModuleLoaded).not.toHaveBeenCalled()
+  })
+  it("falls back once on ordinary engine failure and sends auth failure to unlock", async () => {
+    const open = vi.fn().mockRejectedValue(new Error("MPV_START_FAILED"))
+    window.javLibrary = { playback: { open, capabilities: async () => ({ protocol: 1, available: true, preferences: { preferNative: true } }) } as unknown as NonNullable<Window["javLibrary"]>["playback"] }
+    const { desktopPlaybackService: service } = await import("./desktop-playback-service")
+    const to = router.resolve("/player/a?autoplay=1")
+    expect(await service.intercept(to, router.resolve("/library"))).toMatchObject({ name: "player", query: { engine: "web" } })
+    open.mockRejectedValue(new Error("SERVER_LOCKED"))
+    expect(await service.intercept(to, router.resolve("/library"))).toMatchObject({ name: "lock" })
+  })
+  it("uses the Web fallback if the deferred library module cannot load", async () => {
+    // 延迟模块加载失败也走单次回退，不能留下失败的路由或启动原生引擎。
+    libraryModuleLoaded.mockImplementationOnce(() => { /* 模拟首次延迟加载的失败。 */ throw new Error("library chunk unavailable") })
+    const open = vi.fn()
+    window.javLibrary = { playback: { open, capabilities: /* 提供可选择的原生引擎能力。 */ async () => ({ protocol: 1, available: true, preferences: { preferNative: true } }) } as unknown as NonNullable<Window["javLibrary"]>["playback"] }
+    const { desktopPlaybackService: service } = await import("./desktop-playback-service")
+    expect(await service.intercept(router.resolve("/player/a?fileId=p2"), router.resolve("/library")))
+      .toMatchObject({ name: "player", query: { engine: "web", fileId: "p2" } })
+    expect(open).not.toHaveBeenCalled()
+  })
+  it("restores native sidebar commands and the original Web handoff context after a page reload", async () => {
+    const restored: DesktopPlaybackSnapshot = { sessionId: "restored", revision: 12, windowOpen: true,
+      engine: "native", fullscreen: false, queue: ["a"], autoAdvance: false, locale: "zh-CN",
+      movie: { id: "a", code: "TEST", title: "Fixture", files: [] },
+      state: { ...emptyNativePlayerState(), fileId: "p2", status: "playing", durationSec: 100, positionSec: 36 },
+      sourceQuery: { back: "browse", browse: "fc2", q: "original" } }
+    let receive: ((next: DesktopPlaybackSnapshot) => void) | undefined
+    let fallback: Parameters<DesktopPlaybackBridge["onWebFallback"]>[0] | undefined
+    const command = vi.fn().mockResolvedValue(undefined)
+    const bridge: Pick<DesktopPlaybackBridge, "command" | "snapshot" | "subscribe" | "onWebFallback"> = { command, snapshot: async () => restored,
+      subscribe: callback => { receive = callback; return () => {} }, onWebFallback: callback => { fallback = callback; return () => {} },
+    }
+    window.javLibrary = { playback: bridge as DesktopPlaybackBridge }
+    const { desktopPlaybackService: service } = await import("./desktop-playback-service")
+    const navigate = vi.fn().mockResolvedValue(undefined)
+    service.initialize(navigate)
+    await Promise.resolve()
+    expect(updateActivePlaybackSession).toHaveBeenLastCalledWith(expect.objectContaining({ routeQuery: { back: "browse", browse: "fc2", q: "original", fileId: "p2" } }))
+    await service.command("pause")
+    await service.command("focus")
+    expect(command.mock.calls).toEqual([["restored", { action: "pause" }], ["restored", { action: "focus" }]])
+    receive?.({ ...restored, revision: 11, state: { ...restored.state, positionSec: 1 } })
+    expect(service.snapshot.value?.state.positionSec).toBe(36)
+    const { bumpCuratedFramesRevision } = await import("@/lib/curated-frames/revision")
+    receive?.({ ...restored, revision: 13, captureRevision: 1 })
+    expect(bumpCuratedFramesRevision).toHaveBeenCalledOnce()
+    receive?.({ ...restored, revision: 14, captureRevision: 1 })
+    receive?.({ ...restored, revision: 12, captureRevision: 2 })
+    expect(bumpCuratedFramesRevision).toHaveBeenCalledOnce()
+    fallback?.({ movieId: "a", fileId: "p2", startSec: 37 })
+    expect(navigate).toHaveBeenLastCalledWith({ name: "player", params: { id: "a" }, query: { back: "browse", browse: "fc2", q: "original", engine: "web", fileId: "p2", t: "37", autoplay: "1" } })
+  })
+})

@@ -1,0 +1,20 @@
+const { contextBridge, ipcRenderer } = require("electron")
+// 本地控件只操作已有 session；没有连接、PIN、检索、文件选择或任意命令能力。
+contextBridge.exposeInMainWorld("curatedPlayer", {
+  snapshot: () => ipcRenderer.invoke("curated:playback-snapshot"),
+  copyDiagnostics: sessionId => ipcRenderer.invoke("curated:playback-copy-diagnostics", sessionId),
+  saveDiagnostics: sessionId => ipcRenderer.invoke("curated:playback-save-diagnostics", sessionId),
+  command: (sessionId, input) => ipcRenderer.invoke("curated:playback-command", sessionId, input),
+  capture: (sessionId, retryId) => ipcRenderer.invoke("curated:playback-capture", sessionId, retryId),
+  prepareCapture: sessionId => ipcRenderer.invoke("curated:playback-prepare-capture", sessionId),
+  commitCapture: (sessionId, captureId, gif) => ipcRenderer.invoke("curated:playback-commit-capture", sessionId, captureId, gif),
+  discardCapture: (sessionId, captureId) => ipcRenderer.invoke("curated:playback-discard-capture", sessionId, captureId),
+  cancelClip: sessionId => ipcRenderer.invoke("curated:playback-cancel-clip", sessionId),
+  retryClip: sessionId => ipcRenderer.invoke("curated:playback-retry-clip", sessionId),
+  capturePreferences: () => ipcRenderer.invoke("curated:playback-capture-preferences"),
+  subscribe: callback => {
+    const listener = (_event, state) => callback(state)
+    ipcRenderer.on("curated:playback-state", listener)
+    return () => ipcRenderer.removeListener("curated:playback-state", listener)
+  },
+})

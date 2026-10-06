@@ -3,6 +3,7 @@ import type { RouteLocationNormalizedLoaded } from "vue-router"
 import type { Movie } from "@/domain/movie/types"
 import { clearActivePlaybackSession } from "@/composables/use-active-playback-session"
 import { authLockService, isAuthLockEnabled } from "@/services/auth-lock-service"
+import { desktopPlaybackService } from "@/services/desktop-playback-service"
 
 export interface HostedPlaybackTarget {
   movie: Movie
@@ -15,6 +16,8 @@ export const playbackHostKey: InjectionKey<PlaybackHost> = Symbol("curated-playb
 
 /** 由应用壳层拥有一个活动播放器；只在原生 PiP 存在时跨业务路由保留。 */
 export function createPlaybackHost(route: RouteLocationNormalizedLoaded) {
+  const nativeSession = desktopPlaybackService.snapshot
+  const nativeActive = computed(() => nativeSession.value?.windowOpen === true)
   let stopMedia: (() => void) | null = null
   let toggleMedia: (() => Promise<void>) | null = null
   let exitPip: (() => Promise<void>) | null = null
@@ -26,12 +29,12 @@ export function createPlaybackHost(route: RouteLocationNormalizedLoaded) {
 
   /** 当前影片返回主页面时复用实例，不重新请求 descriptor 或应用过时的续播时间。 */
   function hasMovie(movieId: string) {
-    return target.value?.movie.id === movieId
+    return target.value?.movie.id === movieId || nativeActive.value && nativeSession.value?.movie?.id === movieId
   }
 
   /** 同番号切换分片仍是独立播放目标，普通返回相同目标才复用。 */
   function hasTarget(movieId: string, fileId = "") {
-    return hasMovie(movieId) && target.value?.fileId === fileId
+    return target.value?.movie.id === movieId && target.value.fileId === fileId
   }
 
   /** 保存播放器来源路由，防止后台播放时被其它页面的 query 和 params 污染。 */
@@ -71,11 +74,13 @@ export function createPlaybackHost(route: RouteLocationNormalizedLoaded) {
 
   /** 侧栏与播放器通过同一宿主操作媒体，不需要跨组件持有 video 引用。 */
   async function togglePlayback() {
+    if (nativeActive.value) { await desktopPlaybackService.command(nativeSession.value?.state.status === "playing" ? "pause" : "resume"); return }
     await toggleMedia?.()
   }
 
   /** 导航成功后只退出前台同片小窗，避免后台退出事件释放实例或误操作后继影片。 */
   async function restoreNormalPlayback(movieId: string) {
+    if (nativeActive.value && nativeSession.value?.movie?.id === movieId) { await desktopPlaybackService.command("focus"); return }
     if (hasMovie(movieId) && visible.value) await exitPip?.()
   }
 
@@ -104,15 +109,26 @@ export function createPlaybackHost(route: RouteLocationNormalizedLoaded) {
 
   watch(authLockService.status, (status) => {
     // 认证失效时停止活动视频，即使业务路由尚未跳转到锁定页。
-    if (isAuthLockEnabled() && status.pinEnabled && !status.unlocked) stop()
+    if (isAuthLockEnabled() && status.pinEnabled && !status.unlocked) {
+      stop()
+      void desktopPlaybackService.command("stop")
+    }
   }, { flush: "sync" })
 
   onBeforeUnmount(() => {
     // 锁定页替换壳层、服务器页面销毁和应用退出均结束实例。
     stop()
   })
+  const unbind = desktopPlaybackService.bindWebStop(() => stop(false))
+  onBeforeUnmount(unbind)
 
-  return { target, pipActive, playing, visible, playerRoute, hasMovie, hasTarget, start, stop, registerMediaControls, togglePlayback, restoreNormalPlayback, setPipActive, setPlaying }
+  /** 后台原生窗口与 Web PiP 拥有独立展示状态。 */
+  async function stopPlayback() {
+    if (nativeActive.value) await desktopPlaybackService.command("stop")
+    stop()
+  }
+
+  return { target, pipActive, playing, visible, playerRoute, nativeSession, nativeActive, hasMovie, hasTarget, start, stop, stopPlayback, registerMediaControls, togglePlayback, restoreNormalPlayback, setPipActive, setPlaying }
 }
 
 /** 在壳层提供作用域内的播放所有权，不跨服务器或重新挂载的应用共享实例。 */

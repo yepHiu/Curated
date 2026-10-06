@@ -14,12 +14,13 @@ const route = useRoute()
 const router = useRouter()
 const { activePlaybackSession: resumeSession, playbackSessionSnapshot, dismissActivePlaybackSession } = useActivePlaybackSession()
 const playbackHost = usePlaybackHost()
-const livePlayback = computed(() => Boolean(playbackHost?.target.value && playbackHost.pipActive.value && !playbackHost.visible.value))
-const playing = computed(() => playbackHost?.playing.value ?? false)
+const nativePlayback = computed(() => playbackHost?.nativeActive?.value === true)
+const livePlayback = computed(() => nativePlayback.value || Boolean(playbackHost?.target.value && playbackHost.pipActive.value && !playbackHost.visible.value))
+const playing = computed(() => nativePlayback.value ? playbackHost?.nativeSession.value?.state.status === "playing" : playbackHost?.playing.value ?? false)
 // 原有续播规则会隐藏起播、近结尾、结束或手动隐藏的快照，活动小窗仍须保留操作入口。
 const activePlaybackSession = computed(() => {
   if (!livePlayback.value) return resumeSession.value
-  const movie = playbackHost?.target.value?.movie
+  const movie = nativePlayback.value ? playbackHost?.nativeSession.value?.movie : playbackHost?.target.value?.movie
   if (!movie) return null
   const snapshot = playbackSessionSnapshot.value
   if (snapshot?.movieId === movie.id) return snapshot
@@ -34,11 +35,14 @@ function togglePlayback() {
 
 /** 停止先保存并暂停，再释放原生小窗和会话。 */
 function stopPlayback() {
+  if (nativePlayback.value) { void playbackHost?.stopPlayback(); return }
   playbackHost?.stop()
 }
 
 /** 先让播放面成为前台，再退出小窗，避免后台关闭策略卸载正在返回的媒体。 */
 async function returnToPlayer() {
+  const nativeId = playbackHost?.nativeSession.value?.movie?.id
+  if (nativePlayback.value && nativeId) { await playbackHost?.restoreNormalPlayback(nativeId); return }
   const movieId = playbackHost?.target.value?.movie.id
   const target = activePlaybackResumeTarget.value
   if (!movieId || !target) return
@@ -67,6 +71,7 @@ function formatSidebarPlaybackClock(seconds: number): string {
 /** 活动实例返回时不携带快照 t，避免重新 seek 到侧栏上次发布的位置。 */
 const activePlaybackResumeTarget = computed(() => {
   const active = activePlaybackSession.value
+  if (nativePlayback.value) return active?.resumeRouteTarget
   if (!active || !playbackHost?.hasMovie(active.movieId)) return active?.resumeRouteTarget
   const query = { ...playbackHost.playerRoute.query }
   delete query.t

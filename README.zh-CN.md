@@ -19,6 +19,10 @@
 
 # Curated
 
+日常 Desktop 测试先运行 `pnpm desktop:test:build` 构建一次，再用 `pnpm desktop:test` 启动。Electron 直接托管已编译页面，运行期间无需 Vite；见[测试运行说明](docs/guide.md#desktop-test-runs-with-prebuilt-pages)。
+
+Windows Desktop 已接入可选 mpv 原生窗口，复用现有播放入口、登录和圆形控件，支持逐文件进度、静态萃取帧、GIF 与播放诊断。生产流水线必须带固定引擎、完整离线对应源码和许可，并验证安装目录中的播放器。设置 → 播放开启本机原生偏好；见[使用与分发说明](docs/guide.md#windows-desktop-native-playback-integration)和[实施及验收记录](docs/plan/2026-10-05-windows-native-player-prototype.md)。安装/发布的实际状态和更多片源、DPI 等边界以记录为准。
+
 「影片」和「FC2」分别浏览，共用存储池与标签。同一番号多个文件共用一张海报，可选择分片播放并分别续播；见 [FC2 与多文件影片说明](docs/guide.md#fc2-and-multipart-movies)。
 
 AI 整理标签显示已整理、未整理和待更新数量，单片出错跳过并汇总供用户决定，默认仅整理未整理影片；支持更新已变更资料、单片、批量及显式全库重整，并自动处理常见题材冲突。详见[操作手册](docs/guide.md#ai-user-tags-and-homepage-topics)。
@@ -108,7 +112,7 @@ icon/       品牌源文件（wordmark / appicon / mark）
 
 ## 说明
 
-- 当前阶段是 Web 优先 + 最小 Electron 壳。更深的 IPC、mpv 与广泛原生桥接仍是目标方向。
+- 当前阶段是 Web 优先 + 最小 Electron 壳。Windows mpv 播放使用已实现的受限桥接；其它原生能力继续按后续阶段推进。
 - `docs/film-scanner/` 是参考材料，不是生产模块树。
 - 远程端存储目录只读，增删改和默认目录设置在服务器所在电脑完成；上传仍使用服务端目标，见[目录管理说明](docs/guide.md#remote-storage-directory-access)。
 - 远程端保留设备偏好；全局设置、安全、AI 管理和备份维护在 Server 本机操作，见[远程设置说明](docs/guide.md#remote-settings-access)。

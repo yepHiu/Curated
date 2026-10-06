@@ -81,6 +81,15 @@ async function mountComponent(props?: Record<string, unknown>) {
 }
 
 describe("PlayerPlaybackSettingsMenu", () => {
+  it("only offers speed controls for the native engine", async () => {
+    // 原生播放器不显示无法执行的 Web 模式选择。
+    const wrapper = await mountComponent({ native: true })
+    expect(wrapper.text()).toContain("Playback Speed")
+    expect(wrapper.find('[data-radio-value="hls"]').exists()).toBe(false)
+    expect(wrapper.find('[data-radio-value="direct"]').exists()).toBe(false)
+    await wrapper.get('[data-radio-value="1.5"]').trigger("click")
+    expect(wrapper.emitted("update:playbackRate")).toEqual([[1.5]])
+  })
   it("renders the trigger and grouped playback settings options", async () => {
     const wrapper = await mountComponent()
 

@@ -4,7 +4,7 @@ import type { AcceptableValue } from "reka-ui"
 import type { MovieFile } from "@/domain/movie/types"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-const props = defineProps<{ files: MovieFile[]; modelValue?: string; disabled?: boolean; portalTo?: HTMLElement }>()
+const props = defineProps<{ files: Pick<MovieFile, 'id' | 'partIndex' | 'fileName'>[]; modelValue?: string; disabled?: boolean; portalTo?: HTMLElement }>()
 const emit = defineEmits<{ 'update:modelValue': [fileId: string] }>()
 const { t } = useI18n()
 

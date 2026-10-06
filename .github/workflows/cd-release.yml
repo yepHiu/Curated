@@ -88,7 +88,7 @@ jobs:
     name: Build Windows x64 packages
     needs: [prepare, quality]
     runs-on: windows-2025
-    timeout-minutes: 45
+    timeout-minutes: 90
     outputs:
       artifact_name: ${{ env.RELEASE_ARTIFACT }}
     env:
@@ -114,7 +114,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
+          # Tag-scoped Windows caches missed across releases; archiving the Go
+          # build/module cache took 7m32s in run 37505997682. Keep the runner's
+          # local Go cache, but skip cross-run restore/save on the publish path.
+          cache: false
       - name: Install frontend and Electron dependencies
         run: |
           pnpm install --frozen-lockfile
@@ -142,6 +145,33 @@ jobs:
           }
       - name: Test Windows installer confirmation and directory flow
         run: python -m unittest scripts.release.tests.test_installer_flow scripts.release.tests.test_windows_migration
+      - name: Install the Windows native host compiler
+        if: needs.prepare.outputs.component != 'server'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc
+      - name: Select the native host compiler
+        if: needs.prepare.outputs.component != 'server'
+        shell: msys2 {0}
+        run: echo "CURATED_NATIVE_CC=$(cygpath -w "$MINGW_PREFIX/bin/gcc.exe")" >> "$GITHUB_ENV"
+      - name: Restore frozen native engine inputs
+        if: needs.prepare.outputs.component != 'server'
+        uses: actions/cache@v4
+        with:
+          path: .workspace/native-player-downloads/
+          key: native-mpv-v1-${{ hashFiles('scripts/release/native-player/windows-x64-production.json') }}
+      - name: Prepare and verify the distributable Windows native engine
+        if: needs.prepare.outputs.component != 'server'
+        run: |
+          python -m pip install -r scripts/release/native-player/requirements.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest scripts.release.tests.test_native_materials scripts.release.tests.test_native_player scripts.release.tests.test_pe_imports
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/release/prepare_native_player.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "CURATED_NATIVE_BUNDLE=$((Resolve-Path '.workspace/native-player-production').Path)" >> $env:GITHUB_ENV
       - name: Build release with the tag version
         run: |
           python scripts/release/component_cd.py windows --tag "$env:RELEASE_TAG" 2>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/component-build.log"

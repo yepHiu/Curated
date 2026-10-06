@@ -19,6 +19,10 @@
 
 # Curated
 
+Desktop テストは `pnpm desktop:test:build` で一度ビルドし、`pnpm desktop:test` で起動します。Electron がビルド済みページを配信するため、実行中に Vite は不要です。[実行ガイド](docs/guide.md#desktop-test-runs-with-prebuilt-pages)を参照してください。
+
+Windows Desktop は任意の mpv 再生ウィンドウに対応し、既存の再生入口・認証・丸型操作 UI、ファイル別進捗、静止画/GIF と再生情報を共有します。Windows 本番ビルドには固定エンジン、完全なオフライン対応ソースとライセンスが必須で、インストール先の再生を検証します。設定の再生ページで有効にできます。[使用・配布ガイド](docs/guide.md#windows-desktop-native-playback-integration)と[実装・検証記録](docs/plan/2026-10-05-windows-native-player-prototype.md)に、インストール/公開の状態と残る検証範囲を記載しています。
+
 「作品」と「FC2」は別々に閲覧でき、ストレージとタグを共有します。同じ品番の複数ファイルは一枚のポスターにまとまり、パート選択と個別の再生位置に対応します。[FC2 と複数ファイルの案内](docs/guide.md#fc2-and-multipart-movies)をご覧ください。
 
 AI タグ整理は整理済み・未整理・要更新を集計し、問題のある作品はスキップして後で確認でき、既定では未整理作品のみ処理します。変更作品の更新、単体・選択範囲・全体の再整理と一般的な題材競合の自動修正に対応します。[操作ガイド](docs/guide.md#ai-user-tags-and-homepage-topics)を参照してください。

@@ -1,5 +1,24 @@
 # Agent 构建 / 编译 / 测试范式（Curated）
 
+## Desktop 日常测试：构建一次，直接运行
+
+先停止该分支的原生播放并完全退出测试 Desktop，再于根目录运行 `pnpm desktop:test:build`，构建 Web API 页面到 `.workspace/desktop-test-ui` 并构建 Electron 壳和本地播放器，避免 Windows 正在运行的宿主 EXE 锁定输出。后续 `pnpm desktop:test` 只启动已有产物，不自动编译，不需要 `pnpm dev`。需保持开发 Server `127.0.0.1:8080` 在线。源码变化后先退出、重建再启动。Electron 内托管复用 `5183`；首次切换应结束旧测试 Vite，保留其它开发服务。详见 guide。
+
+## Windows 原生播放原型（2026-10-05）
+
+在专用原型分支的仓库根运行，生产 Desktop 构建入口不变：
+
+```powershell
+pnpm build:native-player-prototype
+pnpm dev:native-player
+```
+
+开发命令先以 Windows MinGW gcc 编译 `electron/native-player-host.c`，再编译独立 Electron/Vue 入口并启动。gcc 需在 PATH，或设置绝对编译器路径 `CURATED_NATIVE_CC`；构建脚本会将编译器目录加入其子进程 PATH，避免 MSYS2 编译器 DLL 不可见。helper 只链接 Win32 系统库，无 Qt/Node native addon；产物为 `.workspace/native-player-dist/`。需自行运行 Server 并选择本机已有 mpv.exe。可用主进程环境 `CURATED_NATIVE_MPV` 指定引擎绝对路径，`CURATED_NATIVE_PROFILE` 指定绝对临时 profile。默认 profile 与正式 Desktop 隔离。详细操作与业务写入效果见 [原型指南](../guide.md#windows-native-playback-prototype)。
+
+相关检查：`pnpm typecheck`、`pnpm exec eslint src/native-player-prototype src/env.d.ts src/components/jav-library/PlayerTransportControls.vue src/components/jav-library/PlayerPlaybackSettingsMenu.vue src/components/jav-library/MoviePartSelect.vue src/components/jav-library/PlayerPage.vue`、`pnpm build:native-player-prototype`。仓库 ESLint 配置只匹配 src；Electron TS 用两份 tsconfig 编译和 Electron 测试验证，不能将 ignored-file 提示当成 lint 通过。
+
+先完整构建原型，再在 Windows 设置 `CURATED_NATIVE_MPV` 后运行 `pnpm test:electron`。2026-10-06 当前 15 文件 / 98 项通过，包含认证原始 HTTP MP4/Range/控制/坏媒体、真实 HWND 播放、宿主缩放/全屏/最小化恢复、外部 HWND 拒绝、EOF/父 PID 退出回收，以及实际 Electron 入口的透明层八个边角命中、六组物理边界、最小化恢复与关闭回收。透明层测试使用独立临时 profile，只选择本次 Electron PID 的 helper/owner 窗口；其 PowerShell fixture 必须保留 UTF-8 BOM，兼容 Windows PowerShell 5.1 中文注释。无 mpv 时跳过真实引擎用例，无 Windows 或未编译产物时跳过对应集成用例；这些跳过不能视作嵌入验收。测试用 FFmpeg 生成合成片源，本机须可执行 `ffmpeg`。此前共享 UI 回归为 PlayerPage 的 progress-hover/loading/i18n/frame-markers、PlayerPlaybackSettingsMenu 和 PlayerView 六个测试文件，40 项通过。设置 `NODE_OPTIONS=--no-experimental-webstorage` 与现有 Vitest 范式一致。实际原生/Web 合成需桌面客户端截图；单独 Chromium 页面截图不能证明视频层显示。合成验证不能替代问题片源对照，本轮未运行完整 display-scaling 或发布打包。
+
 ## Release batches — 2026-10-01 (current)
 
 This supersedes older release policies below. New source supports one **Curated YYYYMMDD** Release, with **-2**, **-3**, etc. for later Beijing-date batches, containing Server, Desktop or both. `pnpm release:prepare` inspects each module against its published source; `--write` prepares independent versions, immutable batch metadata and Notes for review. No change means no release. `release:version:show` shows both source versions. CD consumes the batch and never creates Full; old all-in-one CLI/publication triggers are disabled. Shared/unknown delivery inputs conservatively affect both modules and need scope review. Same-source retries reuse versions and batch identity.

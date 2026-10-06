@@ -17,6 +17,7 @@ from scripts.release.release_lib.component_channels import reuse_assets, read_ch
 from scripts.release.release_lib.latest_release import reconcile_latest
 from scripts.release.release_lib.batches import load_batch, selected_components, verify_changes
 from scripts.release.release_lib.component_channels import read_channel_file
+from scripts.release.release_lib.native_player import source_asset_name, validate_source_reference, validate_source_archive
 
 PATTERN = re.compile(r'(full|server|desktop)-v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))')
 
@@ -151,7 +152,35 @@ def validate_entries(meta: dict, entries: list[dict], directories: list[Path]) -
             raise ValueError('Batch artifact URL belongs to another release')
 
 
+def validate_native_sources(root: Path, meta: dict, entry: dict | None, directories: list[Path]) -> None:
+    """新 Windows Desktop 必须与完整源码同批发布；该资产不进入应用更新下载列表。"""
+    required = meta.get('batch', {}).get('desktopNativeSources', False)
+    if not required:
+        if entry is not None:
+            raise ValueError('Unexpected native source asset')
+        return
+    if not entry:
+        raise ValueError('Desktop release requires a separate complete native source asset')
+    validate_source_reference(entry)
+    if (entry['tag'], entry['fileName'], entry.get('sourceCommit')) != (
+            meta['tag'], source_asset_name(meta['versions']['desktop']), meta['commit']):
+        raise ValueError('Native source asset belongs to another Desktop release')
+    paths = [directory / entry['fileName'] for directory in directories if (directory / entry['fileName']).is_file()]
+    if len(paths) != 1 or legacy.sha256(paths[0]) != entry['sha256']:
+        raise ValueError('Native source asset missing or checksum mismatch')
+    manifest = validate_source_archive(paths[0])
+    lock = root / 'scripts/release/native-player/windows-x64-production.json'
+    if manifest.get('lockSha256') != legacy.sha256(lock):
+        raise ValueError('Native source asset does not match the frozen release engine lock')
+    from zipfile import ZipFile
+    with ZipFile(paths[0]) as archive:
+        inputs = json.loads(archive.read(manifest['buildInputs']['file']))
+        if inputs.get('lock') != json.loads(lock.read_text(encoding='utf-8')):
+            raise ValueError('Native source build records differ from the frozen engine lock')
+
+
 def stage(root: Path, meta: dict, windows: Path, macos: Path, output: Path) -> None:
+    """组装并校验同批所有资产，将独立源码与应用更新清单分开。"""
     manifest = json.loads((windows / 'windows-components.json').read_text())
     if manifest['sourceCommit'] != meta['commit']:
         raise ValueError('Windows packages were built from another commit')
@@ -167,6 +196,8 @@ def stage(root: Path, meta: dict, windows: Path, macos: Path, output: Path) -> N
                 'format': entry['fileName'].rsplit('.', 1)[1], 'signing': 'ad-hoc', 'notarized': False,
                 'sourceCommit': entry.get('sourceCommit', mac['sourceCommit'])})
     validate_entries(meta, entries, [windows, macos])
+    native_sources = manifest.get('nativeSources')
+    validate_native_sources(root, meta, native_sources, [windows])
     assets = output / 'assets'
     assets.mkdir(parents=True, exist_ok=False)
     for entry in entries:
@@ -175,21 +206,29 @@ def stage(root: Path, meta: dict, windows: Path, macos: Path, output: Path) -> N
         shutil.copy2(source, assets / name)
         entry.setdefault('sourceCommit', meta['commit'])
         entry.setdefault('url', f"https://github.com/yepHiu/Curated/releases/download/{meta['tag']}/{name}")
+    if native_sources:
+        shutil.copy2(windows / native_sources['fileName'], assets / native_sources['fileName'])
     for component in sorted({e['component'] for e in entries}):
         document = {'schema': 1, 'component': component, 'version': meta['versions'][component],
                     'sourceCommit': meta['commit'], 'artifacts': [e for e in entries if e['component'] == component]}
         (assets / f'{component}.json').write_text(json.dumps(document, indent=2) + '\n')
-    (assets / 'release.json').write_text(json.dumps({**meta, 'schema': 1, 'artifacts': entries}, indent=2) + '\n')
+    (assets / 'release.json').write_text(json.dumps({**meta, 'schema': 1, 'artifacts': entries,
+        **({'nativeSources': native_sources} if native_sources else {})}, indent=2) + '\n')
     (assets / 'SHA256SUMS.txt').write_text(''.join(f'{legacy.sha256(p)}  {p.name}\n' for p in sorted(assets.iterdir())))
 
 
-def verify_distribution(meta: dict, assets: Path) -> dict:
+def verify_distribution(meta: dict, assets: Path, root: Path | None = None) -> dict:
+    """上传前验证安装包、通道与独立源码材料，完整成功才允许公开。"""
     manifest = json.loads((assets / 'release.json').read_text())
     if any(manifest.get(k) != v for k, v in meta.items()):
         raise ValueError('Staged source mismatch')
     validate_entries(meta, manifest['artifacts'], [assets])
+    native_sources = manifest.get('nativeSources')
+    validate_native_sources(root or Path(__file__).resolve().parents[2], meta, native_sources, [assets])
     components = {e['component'] for e in manifest['artifacts']}
     names = set(expected_assets(meta)) | {f'{c}.json' for c in components} | {'release.json', 'SHA256SUMS.txt'}
+    if native_sources:
+        names.add(native_sources['fileName'])
     if {p.name for p in assets.iterdir()} != names:
         raise ValueError('Unexpected staged assets')
     checksums = ''.join(f'{legacy.sha256(assets / name)}  {name}\n' for name in sorted(names - {'SHA256SUMS.txt'}))
@@ -289,7 +328,7 @@ def check_batch_identity(meta: dict) -> None:
 def publish(root: Path, meta: dict, output: Path, mode: str) -> None:
     notes = release_body(root, meta)
     assets = output / 'assets'
-    verify_distribution(meta, assets)
+    verify_distribution(meta, assets, root)
     changes = validate_channel_advance(assets)
     if 'batch' in meta:
         changes = batch_channels(meta, changes, assets)
@@ -314,6 +353,7 @@ def publish(root: Path, meta: dict, output: Path, mode: str) -> None:
 
 
 def main() -> None:
+    """按不可变标签执行构建、来源校验、发布或已验证资产的恢复。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('check', 'windows', 'macos', 'stage', 'publish', 'channels'))
     parser.add_argument('--tag', required=True)
@@ -342,7 +382,7 @@ def main() -> None:
             with open(target, 'a') as stream:
                 stream.writelines(f'{k}={meta[k]}\n' for k in ('tag', 'component', 'version', 'commit'))
     elif args.command == 'windows':
-        package_windows(root, args.windows, meta['component'])
+        package_windows(root, args.windows, meta['component'], release_tag=meta['tag'])
     elif args.command == 'macos':
         if 'desktop' not in selected_components(meta):
             raise ValueError('This batch has no Desktop update')
@@ -361,7 +401,7 @@ def main() -> None:
         release = legacy.find_release(meta['tag'])
         if not release or release['draft'] or legacy.source_marker(meta) not in release['body']:
             raise ValueError('Channel recovery requires a published release from this commit')
-        verify_distribution(meta, args.output / 'assets')
+        verify_distribution(meta, args.output / 'assets', root)
         legacy.verify_uploaded(release, args.output / 'assets')
         changes = validate_channel_advance(args.output / 'assets')
         if 'batch' in meta:

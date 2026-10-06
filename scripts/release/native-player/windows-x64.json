@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "engine": "mpv",
+  "platform": "windows",
+  "arch": "x64",
+  "mpvRevision": "c152964208",
+  "builderRevision": "05a60b3cfd04e3e3b89918f4a27f3dde2935dff2",
+  "buildRun": "https://github.com/shinchiro/mpv-winbuild-cmake/actions/runs/37245752254",
+  "artifactUrl": "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261005/mpv-x86_64-20261005-git-c152964208.7z",
+  "artifactSha256": "ec0e549ce107332f9b0f04f81f2ab7ce1eb23fcab63e65b939bae9dc59dcb3a5",
+  "executableSha256": "a2394381355f70b0b4aa500e6ab72ea4c6a7be6ac926898103c87cd2402140b5",
+  "distributionReady": false
+}

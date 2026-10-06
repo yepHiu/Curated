@@ -29,6 +29,11 @@ scripts/*
 scripts/dev/*
 !scripts/dev/copy-electron-preload.cjs
 !scripts/dev/start-electron.cjs
+!scripts/dev/start-desktop-test.cjs
+!scripts/dev/start-native-player-prototype.cjs
+!scripts/dev/copy-native-player-preload.cjs
+!scripts/dev/build-native-player-host.cjs
+!scripts/dev/prepare-native-engine.py
 !scripts/dev/generate-desktop-icon.py
 !scripts/dev/generate-brand-assets.py
 !scripts/dev/clean-brand-wordmark.py
@@ -40,6 +45,7 @@ scripts/prd/*
 !scripts/release/cd_release.py
 !scripts/release/component_cd.py
 !scripts/release/prepare_batch.py
+!scripts/release/prepare_native_player.py
 !scripts/release/batches/
 !scripts/release/batches/*.json
 !scripts/release/recover_release.py
@@ -48,6 +54,7 @@ scripts/prd/*
 !scripts/release/windows_legacy_smoke.py
 !scripts/release/legacy-upgrade-baseline.json
 !scripts/release/desktop_smoke.cjs
+!scripts/release/native_player_smoke.cjs
 !scripts/release/desktop_upgrade_smoke.cjs
 !scripts/release/download_upgrade_baseline.py
 !scripts/release/upgrade-baseline.json
@@ -63,6 +70,8 @@ scripts/prd/*
 !scripts/release/version.json
 !scripts/release/versions/
 !scripts/release/versions/*.json
+!scripts/release/native-player/
+!scripts/release/native-player/*.json
 !scripts/release/macos/
 !scripts/release/macos/**
 !scripts/release/windows/

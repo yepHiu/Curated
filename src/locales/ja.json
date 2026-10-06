@@ -1,4 +1,11 @@
 {
+  "desktopPlayback": {
+  "title": "Desktop プレイヤー",
+  "saveFailed": "Desktop の再生設定を保存できません。",
+  "localPreference": "試用 · この Desktop のみに適用し、現在のログインを使用します。",
+  "preferNative": "Desktop ネイティブプレイヤーを優先",
+  "unavailable": "このクライアントではネイティブエンジンが利用できません。Web 再生を使用します。"
+},
   "mediaEmpty": {
     "title": "ここはまだ空っぽです",
     "description": "好きなものを、少しずつ集めていきましょう。",

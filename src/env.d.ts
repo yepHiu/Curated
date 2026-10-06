@@ -2,7 +2,10 @@
 
 /** Electron / 桌面壳注入：返回本机绝对路径 */
 interface Window {
+  curatedPlayer?: import("../electron/playback-contract").DesktopPlayerBridge
+  nativePlayerLab?: import("../electron/native-player-contract").NativeLabBridge
   javLibrary?: {
+    playback?: import("../electron/playback-contract").DesktopPlaybackBridge
     openServerConnections?: (serverId?: string) => Promise<void>
     addServer?: (input: { name: string; url: string }) => Promise<void>
     getServerConnections?: () => Promise<import("../electron/desktop-contract").DesktopServerConnections>

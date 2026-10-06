@@ -6,6 +6,7 @@ import vm from "node:vm"
 import { describe, expect, it } from "vitest"
 
 import { pickDirectoryChannel } from "./desktop-shell"
+import type { DesktopPlaybackBridge } from "./playback-contract"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -15,6 +16,7 @@ describe("Electron preload bridge", () => {
     const exposed: Record<string, unknown> = {}
     const invokedChannels: string[] = []
     const invokedArgs: unknown[][] = []
+    const listeners = new Map<string, (...args: unknown[]) => void>()
     const code = readFileSync(path.join(__dirname, "preload.cjs"), "utf8")
 
     vm.runInNewContext(code, {
@@ -30,6 +32,8 @@ describe("Electron preload bridge", () => {
             },
           },
           ipcRenderer: {
+            on: (channel: string, listener: (...args: unknown[]) => void) => { listeners.set(channel, listener) },
+            removeListener: (channel: string, listener: (...args: unknown[]) => void) => { if (listeners.get(channel) === listener) listeners.delete(channel) },
             invoke: async (channel: string, ...args: unknown[]) => {
               invokedArgs.push(args)
               invokedChannels.push(channel)
@@ -42,8 +46,8 @@ describe("Electron preload bridge", () => {
 
     expect(Object.keys(exposed)).toEqual(["javLibrary"])
 
-    const api = exposed.javLibrary as { addServer: (input: { name: string; url: string }) => Promise<unknown>; windowChrome: string; getServerConnections: () => Promise<unknown>; openServerConnections: (serverId?: string) => Promise<unknown>; pickDirectory: () => Promise<unknown>; getDesktopInfo: () => Promise<unknown>; checkDesktopUpdate: () => Promise<unknown> }
-    expect(Object.keys(api).sort()).toEqual(["addServer", "checkDesktopUpdate", "getDesktopInfo", "getServerConnections", "openServerConnections", "pickDirectory", "windowChrome"])
+    const api = exposed.javLibrary as { playback: DesktopPlaybackBridge; addServer: (input: { name: string; url: string }) => Promise<unknown>; windowChrome: string; getServerConnections: () => Promise<unknown>; openServerConnections: (serverId?: string) => Promise<unknown>; pickDirectory: () => Promise<unknown>; getDesktopInfo: () => Promise<unknown>; checkDesktopUpdate: () => Promise<unknown> }
+    expect(Object.keys(api).sort()).toEqual(["addServer", "checkDesktopUpdate", "getDesktopInfo", "getServerConnections", "openServerConnections", "pickDirectory", "playback", "windowChrome"])
     expect(api.windowChrome).toBe(platform === "darwin" ? "macos" : "native")
     await expect(api.pickDirectory()).resolves.toEqual({ path: "D:/Media" })
     await api.getDesktopInfo()
@@ -53,5 +57,13 @@ describe("Electron preload bridge", () => {
     await api.openServerConnections("saved-server-id")
     expect(invokedArgs.at(-1)).toEqual(["saved-server-id"])
     expect(invokedChannels).toEqual([pickDirectoryChannel, "curated:desktop-info", "curated:desktop-check-update", "curated:add-server", "curated:server-connections", "curated:open-servers"])
+    const received: unknown[] = []
+    const unsubscribe = api.playback.subscribe(value => { received.push(value) })
+    listeners.get("curated:playback-state")?.({ sensitiveIpcEvent: true }, { sessionId: "current" })
+    expect(received).toEqual([{ sessionId: "current" }])
+    unsubscribe()
+    expect(listeners.size).toBe(0)
+    await api.playback.command("current", { action: "pause" })
+    expect(invokedArgs.at(-1)).toEqual(["current", { action: "pause" }])
   })
 })

@@ -11,6 +11,32 @@ alwaysApply: true
 
 2026-10-06 当前 Server 代理只读实测：FC2-3977618 由 PPVDataBank 返回标题、85 分钟、封面和一张预览；封面 HTTP 200 / WebP 可解码。Javten 403、JavDB 验证页、官方商品不存在；TLS/HTTP2 浏览器特征不保证绕过验证。源码生效需新 Server 编译并重启/升级，未替换生产二进制或写生产数据库。记录：`docs/plan/2026-10-06-fc2-metadata-reliability.md`。
 
+## Desktop 预编译测试运行 — 2026-10-06
+
+根目录 `pnpm desktop:test:build` 一次构建 Web API 页面到 `.workspace/desktop-test-ui` 并构建 Electron；`pnpm desktop:test` 只复用产物和 `.workspace/desktop-native-test-profile`，连接既有 `127.0.0.1:8080` 开发 Server。`electron/prebuilt-frontend.ts` 在 Electron 内监听 `127.0.0.1:5183`，提供 SPA、资源 MIME/缓存和流式同源 `/api` 转发；无独立 Node/Vite 编译或监听进程。`CURATED_ELECTRON_FRONTEND_DIR` 显式启用，仅本机开发连接生效；正式包和远端仍加载 Server 页面。退出回收托管连接；没有新增公共 API 或 library-config 字段。源码变化后需重新构建。详见 guide。
+
+## 2026-10-06 正式 Windows Desktop 原生播放接入（分支源码）
+
+专用分支 `codex/windows-native-player-prototype` 已按用户授权实施 M1–M3。正式 `main.ts` 安装 `playback-desktop.ts`/`NativePlaybackCoordinator`；受限 `window.javLibrary.playback` 供已提交主窗口 frame 查询能力、本机偏好、打开/控制/快照/订阅，本地 `window.curatedPlayer` 仅控制当前会话。使用主窗口实际 Session/HttpOnly Cookie、原始媒体代理和 direct descriptor；renderer 只传业务 ID/时间/枚举动作及受限导航上下文，不传 URL/exe/HWND。
+
+router 在 PlayerView/HLS prefetch 前选择可选 native，专用 `electron-dist/player/index.html` 共享圆形控件/分部/倍速；主窗口仍浏览，侧栏可暂停/停止/返回。main 唯一写逐文件进度、历史与日时长，保存冻结队列/来源；页面刷新恢复快照。成功切 Server/锁定/退出回收，失败切换保留；关闭主窗口到托盘保留播放器。`userData/playback-settings.json` 默认 preferNative=false，volume/speed 本机持久，不增加 HTTP API/library-config 字段。
+
+正式原生窗口现已支持静态萃取帧：圆形相机按钮/现有可配置快捷键（默认 C），mpv 临时冻结取得源分辨率 PNG 与实际 time-pos，再恢复原播放状态；main 用当前 Session multipart 写现有 `POST /api/curated-frames`。冻结 movieId/fileId/标题/演员/时间/ID，失败缓存一张原图供同 ID 重试，换会话清理；401/403 关闭原生播放。仅本地控制页的 `capture(sessionId,retryId?)`、`capturePreferences()` 受限 IPC；后者固定读取主页面快捷键/音效偏好。复用 CaptureReceipt/FrameImageViewer，保存后 captureRevision 驱动主页面帧库刷新。12 MiB/既有像素上限、临时文件清理、中文/英文/日文反馈；额外本机导出与逐帧尚未接入。详见计划 §14.15。
+
+原生 GIF 已接入同一萃取流程：相机/快捷键短按静态、长按 400ms 录制，或圆形 GIF 开始/结束；范围以真实媒体时钟限制 0.4–6 秒。main 保留一张 prepared PNG（未提交 60 秒回收），commit 时读取实际结束位置、保存原图，以当前 Session 调用既有 clips?fileId、tasks/{id} 与 DELETE tasks/{id}/clip，Server 生成 GIF/10fps/640px 并关联同一 curatedFrameId；不在 Desktop 安装额外 FFmpeg。仅本地 bridge 提供 prepareCapture/commitCapture/discardCapture/cancelClip/retryClip，任务 ID/地址由 main 管理。轮询限 150 秒/连续失败 5 次，换源/退出清理，失败重试复用同图或已保存帧/冻结范围；GIF 完成增加 captureRevision。NativeClipCaptureFeedback 采用实色语义面板与三语状态、进度、取消/重试；真实 LAN/HTTPS/安装未新增验收。见计划 §14.17。
+
+正式原生窗口的 Info / D 现为 `NativePlaybackInfo` 两列分组面板：mpv 版本、MIME/容器/状态/倍速、视频分辨率/源帧率/解码像素/码率估算/硬解/输出/显示 Hz/两类掉帧/预计帧数、音频参数/码率估算/有符号 A/V、真实 Server host 和媒体接收速率/累计字节/请求/Range/缓存。引擎诊断每秒采样；代理 Transform 按背压计数，速率用单调时钟，历史限 30 点，旧会话回收计时器。原始流音视频共享，不能视作 DASH 分段/双独立下载速度；未测得值为 null。仅本地 bridge 新增 `copyDiagnostics(sessionId)` / `saveDiagnostics(sessionId)`，main 构造指标白名单 JSON，经 clipboard/native save dialog 输出；不包含完整源地址、凭据、业务身份、文件路径或 HWND。窄窗内部滚动、标题行圆形导出/关闭、Esc/D 关闭与焦点恢复；Web 与独立旧原型面板布局不改。无新 HTTP API/config。详见计划 §14.16。
+
+开发态仍用 `pnpm native-player:prepare`（QA pin，不可分发）与 `pnpm dev:electron`。Windows 生产包必须先运行 `python scripts/release/prepare_native_player.py`，设置绝对 `CURATED_NATIVE_BUNDLE`；缺引擎/源码/许可、SHA 或 x64 DLL 闭包失败均停止。生产 lock 固定 MSYS2 mpv 0.41.0-8 / FFmpeg libraries 9.0.2-1，105 二进制包/131 运行文件、153 源码快照、731 Cargo 源码；每个包 `.BUILDINFO` 与源码 PKGBUILD SHA 相符。安装目录只带运行文件、许可和源码下载说明；完整对应源码与构建材料作为同一 Release 的独立 Native Sources ZIP 分发，不进入 Desktop 更新下载列表，不加入 FFmpeg/FFprobe CLI。CD 显式装 UCRT64 gcc/windres，安装后以最小 PATH 和认证合成源验原生播放/seek/截帧/换片/清理；macOS 保留 Web。默认 preferNative=false。更多片源/整片同步/混合 DPI/真实 LAN/HTTPS 仍待验；真实安装生命周期与发布状态见计划 §14.18，不把本机源代码验收当已发布。
+
+## 2026-10-05 Windows 原生播放原型（独立开发入口）
+
+`codex/windows-native-player-prototype` 首版已实现 mpv.exe 独立进程、named pipe JSON IPC、受限 loopback 原始媒体代理及本地三语控制页。主进程使用当前 Server 的独立 HttpOnly session，转发 Range，不向 renderer/mpv 暴露 Cookie；支持 PIN、影片/文件选择、逐文件续播与进度保存、暂停/seek/倍速/音量/停止及解码/掉帧诊断。认证锁定、换源及退出回收自己启动的进程。
+
+当前原型已实现同窗播放：自有 Win32 helper 的 HWND 承载 mpv wid，透明 Electron owned window 叠加现有 Curated 控件。2026-10-06 修复透明层独立拖动/缩放：撤销该层的移动/缩放/最大化能力，helper 通过 SetWindowPos 独占两层物理几何，主进程只同步可见性，不再重复转换 DIP 设置边界；移动/缩放、最小化、全屏和退出随宿主联动。helper 拒绝属于其它 PID 的叠加窗口，父进程死亡/断管自动退出；renderer 只接收窗口动作枚举，不接触 HWND。共享 PlayerTransportControls、MoviePartSelect、PlayerPlaybackSettingsMenu；原生设置仅显示倍速，分段切换保留音量/静音/倍速。
+
+运行 `pnpm dev:native-player`，独立构建写入 `.workspace/native-player-dist/`，profile 为 `%APPDATA%/Curated Native Playback Prototype`。本机提供 mpv.exe，可用 `CURATED_NATIVE_MPV` 预选；构建需 MinGW gcc，或绝对 `CURATED_NATIVE_CC`。生产 main/preload 与默认媒体路径不变，PlayerPage 只复用共享控制栏，无新公共 HTTP 端点或 library-config 字段。98 项 Electron 测试通过，新增实际 Electron 入口的透明层边角命中、六组物理边界、最小化恢复及关闭回收验证；本次独立构建和生产 Electron tsc 通过。此前 40 项播放页相关测试、typecheck、前端局部 ESLint 与实际原生/Web 合成截图及 fixture 的第二片 12 秒续播、seek/静音/倍速/切片/全屏/最小化恢复已验证。真实问题 MP4、跨屏混合 DPI、LAN/HTTPS、萃取/小窗、HDR/轨道、分发及 macOS 未验收。REQ-0058 保持 in_progress。详见 `docs/plan/2026-10-05-windows-native-player-prototype.md` §12 与 guide。
+
 ## 2026-10-04 FC2 与同番号多文件（已实现）
 
 实际命名样本兼容：普通番号紧接一位 A-Z 字母表示分部（STAR-380A/B、STAR-684A-C/B-C 对应 1/2），带连接符的 -C/-UC 仍为版本标记。Go scanner / moviecode 和 TypeScript Mock 导入预览同步；A 与 CD1 统一为第 1 部，整理输出 CDn。用户 31 个视频样本在启用/关闭整理下均形成 27 部影片，重扫保持文件 ID；TXT 不参与影片扫描。实现与证据见下述同主题计划。

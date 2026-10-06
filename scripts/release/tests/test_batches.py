@@ -91,6 +91,19 @@ class BatchTests(unittest.TestCase):
         self.commit()
         self.assertIsNone(prepare_batch.plan(self.root, '20261001'))
 
+    def test_native_desktop_batch_declares_separate_sources_and_download_in_notes(self):
+        """生产 Desktop 的批次必须声明独立源码，源码链接与应用下载区分。"""
+        self.write('scripts/release/native-player/windows-x64-production.json', '{}')
+        batch, _ = self.prepare(('desktop',))
+        self.assertIs(batch['desktopNativeSources'], True)
+        text = (self.root / 'docs/release-notes' / (batch['tag'] + '.md')).read_text()
+        self.assertIn('Curated-Desktop-Native-Sources-1.0.1-windows-x64.zip', text)
+        self.assertIn('not needed for playback', text)
+        batch['desktopNativeSources'] = False
+        self.write('scripts/release/batches/' + batch['tag'] + '.json', json.dumps(batch))
+        with self.assertRaisesRegex(ValueError, 'Separate native sources'):
+            batches.load_batch(self.root, batch['tag'])
+
     def test_hosted_layout_and_translations_do_not_release_desktop(self):
         self.write('src/layouts/AppShell.vue', 'Updated hosted layout')
         self.write('src/locales/en.json', '{"topics": "Updated hosted translations"}')
