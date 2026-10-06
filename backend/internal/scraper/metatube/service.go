@@ -24,11 +24,11 @@ import (
 
 	"curated-backend/internal/library/moviecode"
 	"curated-backend/internal/scraper"
+	fc2source "curated-backend/internal/scraper/fc2"
 )
 
-// Metatube movie providers dedicated to FC2 PPV IDs (order: higher official priority first).
-// Keep in sync with github.com/metatube-community/metatube-sdk-go/engine/register.go for your version.
-var fc2MovieProviderNames = []string{"FC2", "fc2hub"}
+// fc2MovieProviderNames is the bounded automatic FC2 field-priority order.
+var fc2MovieProviderNames = []string{"fc2hub", "FC2", "PPVDataBank", "JavDB"}
 
 // providerHealthProbeKeyword is the search term used to verify a provider responds successfully.
 // SSIS is one of the most widely available JAV labels across nearly all adult metadata providers.
@@ -37,14 +37,8 @@ const providerHealthProbeKeyword = "SSIS"
 // providerHealthMaxLatencyMs: health probe round-trip above this is reported as fail (not merely slow).
 const providerHealthMaxLatencyMs int64 = 5000
 
-func isFC2MovieProviderName(name string) bool {
-	switch strings.TrimSpace(name) {
-	case "FC2", "fc2hub":
-		return true
-	default:
-		return false
-	}
-}
+// isFC2MovieProviderName 判断来源是否支持精确 FC2 查询。
+func isFC2MovieProviderName(name string) bool { return fc2source.Supports(strings.TrimSpace(name)) }
 
 // Service wraps the metatube-sdk-go engine for movie and actor scraping, with runtime provider health tracking.
 type Service struct {
@@ -52,6 +46,8 @@ type Service struct {
 	engine      *engine.Engine
 	healthMu    sync.RWMutex
 	health      map[string]ProviderRuntimeHealth
+	fc2Lookup   func(context.Context, string, string, string) (scraper.Metadata, error)
+	fc2Health   func(context.Context, string) error
 	movieSearch func(string, string, bool) ([]*model.MovieSearchResult, error)
 	movieInfo   func(providerid.ProviderID, bool) (*model.MovieInfo, error)
 }
@@ -85,10 +81,13 @@ func NewService(logger *zap.Logger, requestTimeout time.Duration) (*Service, err
 		return nil, fmt.Errorf("metatube schema migrate: %w", err)
 	}
 
+	fc2Client := fc2source.NewClient(requestTimeout)
 	return &Service{
 		logger:      logger,
 		engine:      eng,
 		health:      make(map[string]ProviderRuntimeHealth),
+		fc2Lookup:   fc2Client.Lookup,
+		fc2Health:   fc2Client.CheckHealth,
 		movieSearch: eng.SearchMovie,
 		movieInfo:   eng.GetMovieInfoByProviderID,
 	}, nil
@@ -99,12 +98,17 @@ func (s *Service) Engine() *engine.Engine {
 	return s.engine
 }
 
-// ListMovieProviderNames returns sorted Metatube movie provider names registered in this engine build.
+// ListMovieProviderNames 合并 SDK 来源与独立 FC2 适配器名称，供设置单独选择。
 func (s *Service) ListMovieProviderNames() []string {
 	m := s.engine.GetMovieProviders()
 	out := make([]string, 0, len(m))
 	for name := range m {
 		out = append(out, name)
+	}
+	for _, name := range fc2MovieProviderNames {
+		if _, exists := m[name]; !exists {
+			out = append(out, name)
+		}
 	}
 	sort.Strings(out)
 	return out
@@ -132,7 +136,10 @@ func (s *Service) PreferredMovieProviderChain(strategy string) []string {
 	case "auto-cn-friendly":
 		for _, candidate := range []string{"JavBus", "JavDB", "DMM", "Fanza", "MGStage", "Prestige", "FC2", "fc2hub"} {
 			if resolved, ok := index[strings.ToLower(candidate)]; ok {
-				preferred = append(preferred, resolved)
+				// 普通影片只加入 SDK 已注册来源；FC2 自动模式另用完整专用链。
+				if _, err := s.engine.GetMovieProviderByName(resolved); err == nil {
+					preferred = append(preferred, resolved)
+				}
 			}
 		}
 	default:
@@ -156,12 +163,27 @@ func firstValidMovieSearchResult(results []*model.MovieSearchResult) *model.Movi
 
 // rankMovieSearchResults dedupes and sorts like engine.SearchMovieAll post-processing.
 func (s *Service) rankMovieSearchResults(keyword string, results []*model.MovieSearchResult) []*model.MovieSearchResult {
-	msr := sets.NewOrderedSetWithHash(func(v *model.MovieSearchResult) string { return v.Provider + v.ID })
-	msr.Add(results...)
+	msr := sets.NewOrderedSetWithHash(func(v *model.MovieSearchResult) string { // 仅对已验证结果生成去重键。
+		return v.Provider + v.ID
+	})
+	for _, result := range results {
+		if result != nil && result.IsValid() {
+			msr.Add(result)
+		}
+	}
 	out := msr.AsSlice()
 	ps := new(slices.WeightedSlice[*model.MovieSearchResult, float64])
 	for _, result := range out {
-		if !result.IsValid() {
+		if result == nil || !result.IsValid() {
+			continue
+		}
+		if mtnum.IsFC2(keyword) && isFC2MovieProviderName(result.Provider) {
+			for index, name := range fc2MovieProviderNames {
+				if result.Provider == name {
+					ps.Append(result, float64(1000-index))
+					break
+				}
+			}
 			continue
 		}
 		if _, err := s.engine.GetMovieProviderByName(result.Provider); err != nil {
@@ -173,30 +195,6 @@ func (s *Service) rankMovieSearchResults(keyword string, results []*model.MovieS
 	return ps.SortFunc(sort.Stable).Slice()
 }
 
-// searchMovieFC2Providers queries only FC2-dedicated Metatube providers (no fanza/javbus etc.).
-func (s *Service) searchMovieFC2Providers(ctx context.Context, keyword string) ([]*model.MovieSearchResult, error) {
-	var merged []*model.MovieSearchResult
-	for _, name := range fc2MovieProviderNames {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-		if _, err := s.engine.GetMovieProviderByName(name); err != nil {
-			continue
-		}
-		r, err := s.engine.SearchMovie(keyword, name, false)
-		if err != nil || len(r) == 0 {
-			continue
-		}
-		merged = append(merged, r...)
-	}
-	if len(merged) == 0 {
-		return nil, fmt.Errorf("no results from FC2 metadata providers for %s", keyword)
-	}
-	return s.rankMovieSearchResults(mtnum.Trim(keyword), merged), nil
-}
-
 // Scrape fetches movie metadata via a provider chain, single provider, or automatic search depending on options and FC2 detection.
 func (s *Service) Scrape(ctx context.Context, movieID string, number string, opts scraper.MovieScrapeOptions) (scraper.Metadata, error) {
 	select {
@@ -206,6 +204,9 @@ func (s *Service) Scrape(ctx context.Context, movieID string, number string, opt
 	}
 
 	isFC2 := mtnum.IsFC2(mtnum.Trim(number))
+	if isFC2 {
+		return s.scrapeFC2(ctx, movieID, number, opts)
+	}
 
 	// Determine provider chain to use
 	chain := s.resolveProviderChain(opts, isFC2)
@@ -758,6 +759,16 @@ func isTransientHealthProbeErr(err error) bool {
 // It performs a lightweight search to verify the provider is responsive.
 func (s *Service) CheckProviderHealth(ctx context.Context, name string) (status string, latencyMs int64, err error) {
 	start := time.Now()
+	if isFC2MovieProviderName(name) {
+		err := s.fc2Health(ctx, name)
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			s.recordProviderFailure(name, latency, err)
+			return "fail", latency, err
+		}
+		s.recordProviderSuccess(name, latency)
+		return "ok", latency, nil
+	}
 
 	_, err = s.engine.GetMovieProviderByName(name)
 	if err != nil {
@@ -847,24 +858,25 @@ func (s *Service) recordProviderFailure(name string, latencyMs int64, err error)
 	s.health[name] = cur
 }
 
+// classifyProviderError 优先保留访问阻断与网络错误，避免多源错误中的空结果掩盖它们。
 func classifyProviderError(err error) string {
 	if err == nil {
 		return ""
 	}
 	msg := strings.ToLower(err.Error())
 	switch {
-	case strings.Contains(msg, "no results"):
-		return "provider_empty_result"
+	case strings.Contains(msg, "forbidden"), strings.Contains(msg, "hotlink"):
+		return "hotlink_denied"
 	case strings.Contains(msg, "timeout"):
 		return "connect_timeout"
 	case strings.Contains(msg, "tls"):
 		return "tls_failure"
-	case strings.Contains(msg, "forbidden"), strings.Contains(msg, "hotlink"):
-		return "hotlink_denied"
 	case strings.Contains(msg, "region"), strings.Contains(msg, "geo"), strings.Contains(msg, "restricted"):
 		return "region_restricted"
 	case strings.Contains(msg, "lookup "), strings.Contains(msg, "no such host"):
 		return "dns_failure"
+	case strings.Contains(msg, "no results"):
+		return "provider_empty_result"
 	default:
 		return "provider_invalid_content"
 	}

@@ -56,8 +56,8 @@ func validateURL(ctx context.Context, u *url.URL) error {
 	return nil
 }
 
-// Download 使用当前代理配置获取有界图片，每次重定向重新验证。
-func Download(ctx context.Context, root, id, source string, proxy config.ProxyConfig) (File, error) {
+// Download 使用当前代理获取有界图片；可选 Referer 保留补全图片的来源详情地址。
+func Download(ctx context.Context, root, id, source string, proxy config.ProxyConfig, referer ...string) (File, error) {
 	client, e := proxyenv.NewHTTPClientForProxy(proxy, 25*time.Second)
 	if e != nil {
 		return File{}, e
@@ -104,7 +104,7 @@ func Download(ctx context.Context, root, id, source string, proxy config.ProxyCo
 		return File{}, e
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0")
-	req.Header.Set("Referer", req.URL.Scheme+"://"+req.URL.Host+"/")
+	req.Header.Set("Referer", imageReferer(req.URL, referer))
 	resp, e := client.Do(req)
 	if e != nil {
 		return File{}, e
@@ -118,6 +118,17 @@ func Download(ctx context.Context, root, id, source string, proxy config.ProxyCo
 		return File{}, e
 	}
 	return Save(root, id, b)
+}
+
+// imageReferer 优先使用来源详情地址，旧调用仍使用图片站点主页。
+func imageReferer(source *url.URL, referer []string) string {
+	if len(referer) > 0 {
+		page, err := url.Parse(strings.TrimSpace(referer[0]))
+		if err == nil && page.Scheme == "https" && page.Hostname() != "" && page.User == nil {
+			return page.String()
+		}
+	}
+	return source.Scheme + "://" + source.Host + "/"
 }
 
 // Save 解码验证后按内容寻址保存原图和 JPEG 缩略图，已有文件不覆盖。

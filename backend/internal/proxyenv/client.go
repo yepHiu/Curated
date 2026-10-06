@@ -5,11 +5,18 @@ package proxyenv
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"curated-backend/internal/config"
+	"golang.org/x/net/http/httpproxy"
 )
+
+// ProxyFromEnvironment 每次请求读取当前代理，避免标准库的环境变量首次读取缓存。
+func ProxyFromEnvironment(request *http.Request) (*url.URL, error) {
+	return httpproxy.FromEnvironment().ProxyFunc()(request.URL)
+}
 
 const defaultOutboundTestTimeout = 20 * time.Second
 

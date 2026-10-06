@@ -154,14 +154,17 @@ func replaceMovieTags(ctx context.Context, tx *sql.Tx, movieID string, tags []st
 	return nil
 }
 
+// replaceMediaAssets 保留多来源补全图片的原始 provider 与 Referer。
 func replaceMediaAssets(ctx context.Context, tx *sql.Tx, metadata scraper.Metadata) error {
 	if metadata.CoverURL != "" {
-		if err := upsertMediaAsset(ctx, tx, metadata.MovieID+":cover", metadata.MovieID, "cover", metadata.CoverURL, metadata.Provider, metadata.Homepage); err != nil {
+		source := metadataAssetSource(metadata, metadata.CoverURL)
+		if err := upsertMediaAsset(ctx, tx, metadata.MovieID+":cover", metadata.MovieID, "cover", metadata.CoverURL, source.Provider, source.Homepage); err != nil {
 			return err
 		}
 	}
 	if metadata.ThumbURL != "" {
-		if err := upsertMediaAsset(ctx, tx, metadata.MovieID+":thumb", metadata.MovieID, "thumb", metadata.ThumbURL, metadata.Provider, metadata.Homepage); err != nil {
+		source := metadataAssetSource(metadata, metadata.ThumbURL)
+		if err := upsertMediaAsset(ctx, tx, metadata.MovieID+":thumb", metadata.MovieID, "thumb", metadata.ThumbURL, source.Provider, source.Homepage); err != nil {
 			return err
 		}
 	}
@@ -169,11 +172,20 @@ func replaceMediaAssets(ctx context.Context, tx *sql.Tx, metadata scraper.Metada
 		if previewURL == "" {
 			continue
 		}
-		if err := upsertMediaAsset(ctx, tx, fmt.Sprintf("%s:preview:%02d", metadata.MovieID, index+1), metadata.MovieID, "preview_image", previewURL, metadata.Provider, metadata.Homepage); err != nil {
+		source := metadataAssetSource(metadata, previewURL)
+		if err := upsertMediaAsset(ctx, tx, fmt.Sprintf("%s:preview:%02d", metadata.MovieID, index+1), metadata.MovieID, "preview_image", previewURL, source.Provider, source.Homepage); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// metadataAssetSource 为单源历史调用保留默认值，多源图片使用独立上下文。
+func metadataAssetSource(metadata scraper.Metadata, resource string) scraper.AssetSource {
+	if source, ok := metadata.AssetSources[resource]; ok {
+		return source
+	}
+	return scraper.AssetSource{Provider: metadata.Provider, Homepage: metadata.Homepage}
 }
 
 func upsertMediaAsset(ctx context.Context, tx *sql.Tx, id, movieID, assetType, sourceURL, sourceProvider, refererURL string) error {

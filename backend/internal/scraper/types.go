@@ -24,6 +24,14 @@ type Metadata struct {
 	ThumbURL        string
 	PreviewVideoURL string
 	PreviewImages   []string
+	// AssetSources maps each resource URL to its original provider and referer after field enrichment.
+	AssetSources map[string]AssetSource
+}
+
+// AssetSource preserves the download context of an image supplied by a secondary metadata source.
+type AssetSource struct {
+	Provider string
+	Homepage string
 }
 
 // ActorProfile is merged into the library actors row after a successful actor scrape.
@@ -39,12 +47,14 @@ type ActorProfile struct {
 }
 
 // MovieScrapeOptions controls movie metadata scraping. Provider empty means all registered sources (Metatube SearchMovieAll),
-// except FC2 IDs (common/number.IsFC2) which is limited to FC2 + fc2hub providers only.
+// FC2 uses its dedicated exact-number adapters and bounded field enrichment.
 type MovieScrapeOptions struct {
 	Provider string
 	// ProviderChain is an ordered list of providers to try in sequence; takes precedence over Provider when non-empty.
 	// When FC2 content is detected, the chain is filtered to FC2-only providers.
 	ProviderChain []string
+	// Automatic distinguishes a generated normal-movie chain from a user-selected FC2 chain.
+	Automatic bool
 }
 
 // Service defines the metadata scraping contract for movies and actors.

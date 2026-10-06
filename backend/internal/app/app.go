@@ -1545,13 +1545,14 @@ func (a *App) MetadataMovieStrategy() string {
 	}
 }
 
+// movieScrapeOptionsForRun 将设置映射为运行策略，并区分自动生成链与用户自定义链。
 func (a *App) movieScrapeOptionsForRun() scraper.MovieScrapeOptions {
 	a.metadataMovieMu.RLock()
 	defer a.metadataMovieMu.RUnlock()
 	if ms, ok := a.scraper.(*metatube.Service); ok {
 		switch strings.TrimSpace(strings.ToLower(a.cfg.MetadataMovieStrategy)) {
 		case "auto-cn-friendly":
-			return scraper.MovieScrapeOptions{ProviderChain: ms.PreferredMovieProviderChain("auto-cn-friendly")}
+			return scraper.MovieScrapeOptions{ProviderChain: ms.PreferredMovieProviderChain("auto-cn-friendly"), Automatic: true}
 		case "auto-global":
 			return scraper.MovieScrapeOptions{}
 		case "custom-chain":

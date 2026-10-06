@@ -4,6 +4,7 @@ import (
 	"context"
 	"curated-backend/internal/library/moviecode"
 	"curated-backend/internal/scraper"
+	fc2source "curated-backend/internal/scraper/fc2"
 	"errors"
 	"fmt"
 	mtnum "github.com/metatube-community/metatube-sdk-go/common/number"
@@ -40,17 +41,20 @@ func exactWishlistResult(number string, results []*model.MovieSearchResult) (*mo
 	return selected, nil
 }
 
-// ScrapeWishlist 复用 provider 策略，仅对愿望补全强制精确身份，不影响既有影片刮削。
+// ScrapeWishlist 复用普通来源策略与 FC2 多源补全，对愿望身份冲突保留人工复核标识。
 func (s *Service) ScrapeWishlist(ctx context.Context, id, number string, opts scraper.MovieScrapeOptions) (scraper.Metadata, error) {
+	if mtnum.IsFC2(mtnum.Trim(number)) {
+		metadata, err := s.scrapeFC2(ctx, id, number, opts)
+		if errors.Is(err, fc2source.ErrIdentity) {
+			return scraper.Metadata{}, fmt.Errorf("WISHLIST_IDENTITY_MISMATCH: %w", err)
+		}
+		return metadata, err
+	}
 	chain := s.resolveProviderChain(opts, mtnum.IsFC2(mtnum.Trim(number)))
 	var results []*model.MovieSearchResult
 	var err error
 	if len(chain) == 0 {
-		if mtnum.IsFC2(mtnum.Trim(number)) {
-			results, err = s.searchMovieFC2Providers(ctx, number)
-		} else {
-			results, err = s.engine.SearchMovieAll(number, false)
-		}
+		results, err = s.engine.SearchMovieAll(number, false)
 		if err != nil {
 			return scraper.Metadata{}, err
 		}

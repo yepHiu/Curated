@@ -177,7 +177,11 @@ func (a *App) enrichWishlist(parent context.Context, item contracts.WishlistItem
 			}
 		}
 		if !copied {
-			file, e = wishlistassets.Download(ctx, root, item.ID, spec.url, a.Proxy())
+			referer := metadata.Homepage
+			if source, ok := metadata.AssetSources[spec.url]; ok {
+				referer = source.Homepage
+			}
+			file, e = wishlistassets.Download(ctx, root, item.ID, spec.url, a.Proxy(), referer)
 		}
 		if e != nil {
 			failures++

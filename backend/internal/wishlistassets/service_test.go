@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/png"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,6 +38,23 @@ func TestSavePersistentImages(t *testing.T) {
 	}
 	if _, e = Save(root, "test-id", []byte("not an image")); e == nil {
 		t.Fatal("bad image accepted")
+	}
+}
+
+// TestImageReferer 验证补全来源详情页取代 CDN 主页，旧调用和非法值仍有默认值。
+func TestImageReferer(t *testing.T) {
+	source, _ := url.Parse("https://cdn.example/cover.jpg")
+	for _, test := range []struct {
+		referer []string
+		want    string
+	}{
+		{[]string{"https://ppvdatabank.com/article/3977618/"}, "https://ppvdatabank.com/article/3977618/"},
+		{nil, "https://cdn.example/"},
+		{[]string{"javascript:invalid"}, "https://cdn.example/"},
+	} {
+		if got := imageReferer(source, test.referer); got != test.want {
+			t.Fatalf("referer=%q want=%q", got, test.want)
+		}
 	}
 }
 

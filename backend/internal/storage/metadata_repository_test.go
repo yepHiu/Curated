@@ -10,6 +10,54 @@ import (
 	"curated-backend/internal/scraper"
 )
 
+// TestSaveEnrichedMetadataAssetSources 验证次来源图片及旧单源图片保存各自的下载上下文。
+func TestSaveEnrichedMetadataAssetSources(t *testing.T) {
+	t.Parallel()
+	store, err := NewSQLiteStore(filepath.Join(t.TempDir(), "assets.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID: "scan", Path: "D:/Media/FC2-3977618.mp4", FileName: "FC2-3977618.mp4", Number: "FC2-3977618",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := scraper.Metadata{
+		MovieID: outcome.MovieID, Number: "FC2-3977618", Title: "Primary title", Provider: "fc2hub", Homepage: "https://javten.com/video/1/id3977618/title",
+		CoverURL: "https://cdn.example/cover.jpg", ThumbURL: "https://javten.com/thumb.jpg", PreviewImages: []string{"https://cdn.example/sample.jpg"},
+		AssetSources: map[string]scraper.AssetSource{
+			"https://cdn.example/cover.jpg":  {Provider: "PPVDataBank", Homepage: "https://ppvdatabank.com/article/3977618/"},
+			"https://cdn.example/sample.jpg": {Provider: "FC2", Homepage: "https://adult.contents.fc2.com/article/3977618/"},
+		},
+	}
+	if err := store.SaveMovieMetadata(ctx, metadata); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct{ kind, provider, referer string }{
+		{"cover", "PPVDataBank", "https://ppvdatabank.com/article/3977618/"},
+		{"thumb", "fc2hub", metadata.Homepage},
+		{"preview_image", "FC2", "https://adult.contents.fc2.com/article/3977618/"},
+	} {
+		var provider, referer string
+		if err := store.db.QueryRowContext(ctx, `SELECT source_provider, referer_url FROM media_assets WHERE movie_id = ? AND type = ?`, outcome.MovieID, test.kind).Scan(&provider, &referer); err != nil {
+			t.Fatal(err)
+		}
+		if provider != test.provider || referer != test.referer {
+			t.Fatalf("%s context=%s %s want=%s %s", test.kind, provider, referer, test.provider, test.referer)
+		}
+	}
+	var primary string
+	if err := store.db.QueryRowContext(ctx, `SELECT provider FROM movies WHERE id = ?`, outcome.MovieID).Scan(&primary); err != nil || primary != "fc2hub" {
+		t.Fatalf("primary provider changed: %s %v", primary, err)
+	}
+}
+
 func TestSaveMovieMetadata(t *testing.T) {
 	t.Parallel()
 
