@@ -114,7 +114,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
+          # Tag-scoped Windows caches missed across releases; archiving the Go
+          # build/module cache took 7m32s in run 37505997682. Keep the runner's
+          # local Go cache, but skip cross-run restore/save on the publish path.
+          cache: false
       - name: Install frontend and Electron dependencies
         run: |
           pnpm install --frozen-lockfile
