@@ -161,6 +161,7 @@ def main():
                     os.environ['CURATED_SMOKE_SERVER'] = 'http://127.0.0.1:18881'
                 if 'desktop' in selected:
                     subprocess.run(['node', str(ROOT / 'scripts/release/desktop_smoke.cjs'), str(before['desktop'][1] / 'Curated Desktop.exe')], check=True, timeout=90)
+                    subprocess.run(['node', str(ROOT / 'scripts/release/native_player_smoke.cjs'), str(before['desktop'][1] / 'Curated Desktop.exe')], check=True, timeout=150)
                 if server is not None:
                     assert server.poll() is None, 'Desktop exit stopped independent Server'
                     assert health()['version'] == current['server']

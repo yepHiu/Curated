@@ -45,6 +45,7 @@ scripts/prd/*
 !scripts/release/cd_release.py
 !scripts/release/component_cd.py
 !scripts/release/prepare_batch.py
+!scripts/release/prepare_native_player.py
 !scripts/release/batches/
 !scripts/release/batches/*.json
 !scripts/release/recover_release.py
@@ -53,6 +54,7 @@ scripts/prd/*
 !scripts/release/windows_legacy_smoke.py
 !scripts/release/legacy-upgrade-baseline.json
 !scripts/release/desktop_smoke.cjs
+!scripts/release/native_player_smoke.cjs
 !scripts/release/desktop_upgrade_smoke.cjs
 !scripts/release/download_upgrade_baseline.py
 !scripts/release/upgrade-baseline.json
