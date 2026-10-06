@@ -15,11 +15,12 @@ from scripts.release.release_lib.native_player import validate_native_bundle
 
 
 def prepare(lock_path: Path, output: Path, cache: Path) -> Path:
+    """准备并复用完整冻结资料；运行目录不能替代尚未校验的对应源码。"""
     lock = json.loads(lock_path.read_text(encoding='utf-8'))
     if (lock.get('schema'), lock.get('provider'), lock.get('engine'), lock.get('platform'), lock.get('arch')) != (1, 'msys2', 'mpv', 'windows', 'x64'):
         raise ValueError('Unsupported production engine lock')
     if output.exists():
-        manifest = validate_native_bundle(output)
+        manifest = validate_native_bundle(output, prepared=True)
         if manifest.get('lockSha256') != digest(lock_path) or manifest.get('preparationRevision') != 2:
             raise ValueError('Existing bundle uses another engine lock; select a new output directory')
         return output

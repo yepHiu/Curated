@@ -15,7 +15,7 @@ from .build_steps import (build_frontend, build_backend, build_electron_main,
                          _bundle_ffmpeg_runtime, _find_iscc, _run, utc_build_stamp)
 from .components import artifact_name, component_plan
 from .git_utils import resolve_commit
-from .native_player import stage_native_player, validate_native_bundle
+from .native_player import stage_native_player, validate_native_bundle, stage_native_sources
 
 FEED_ROOT = 'https://raw.githubusercontent.com/yepHiu/Curated/release-channels'
 IDENTITIES = {'server': 'Curated.Server', 'desktop': 'Curated.Desktop'}
@@ -27,6 +27,7 @@ def versions(root: Path) -> dict[str, str]:
 
 
 def validate_payload(directory: Path, component: str) -> None:
+    """验证双端依赖隔离，Windows Desktop 必须是排除大源码归档的可运行目录。"""
     files = {p.relative_to(directory).as_posix().lower() for p in directory.rglob('*') if p.is_file()}
     if component == 'desktop':
         required = {'curated desktop.exe', 'resources/app/electron-dist/main.js', 'resources/app/package.json'}
@@ -36,7 +37,9 @@ def validate_payload(directory: Path, component: str) -> None:
         engine = directory / 'resources/app/native-player'
         if not engine.exists():
             raise ValueError('Windows Desktop native engine is required')
-        validate_native_bundle(engine)
+        engine_manifest = validate_native_bundle(engine)
+        if engine_manifest.get('distribution') != 'runtime-with-separate-sources':
+            raise ValueError('Windows Desktop requires sources outside the runtime payload')
         required |= {'resources/app/electron-dist/native-player-host.exe',
                      'resources/app/electron-dist/player/index.html',
                      'resources/app/electron-dist/playback-preload.cjs'}
@@ -53,13 +56,14 @@ def validate_payload(directory: Path, component: str) -> None:
         raise ValueError(f'Incomplete {component} payload: {required - files}')
 
 
-def stage_desktop(root: Path, destination: Path, version: str, stamp: str) -> None:
+def stage_desktop(root: Path, destination: Path, version: str, stamp: str, *, source_asset: dict) -> None:
+    """组装独立客户端，只带必需运行资料并附同一发布的源码下载引用。"""
     shutil.copytree(root / 'node_modules/electron/dist', destination)
     (destination / 'electron.exe').rename(destination / 'Curated Desktop.exe')
     (destination / 'resources/default_app.asar').unlink(missing_ok=True)
     payload = destination / 'resources/app'
     shutil.copytree(root / 'electron-dist', payload / 'electron-dist')
-    stage_native_player(payload, required=True)
+    stage_native_player(payload, required=True, source_asset=source_asset)
     (payload / 'package.json').write_text(json.dumps({'name': 'curated-desktop', 'productName': 'Curated Desktop',
         'version': version, 'main': 'electron-dist/main.js', 'type': 'module'}) + '\n')
     metadata = payload / 'electron-dist/desktop-release.json'
@@ -96,7 +100,8 @@ def compile_installer(root: Path, work: Path, output: Path, component: str, vers
     return output / name
 
 
-def package_windows(root: Path, output: Path, component: str = 'full') -> Path:
+def package_windows(root: Path, output: Path, component: str = 'full', *, release_tag: str | None = None) -> Path:
+    """生成独立应用安装包和源码伴随资产，以同一精确发布标签关联二者。"""
     if platform.system() != 'Windows' or platform.machine().lower() not in ('amd64', 'x86_64'):
         raise RuntimeError('Windows components require a Windows x64 host')
     selected = ['server', 'desktop'] if component in ('full', 'both') else [component]
@@ -112,6 +117,7 @@ def package_windows(root: Path, output: Path, component: str = 'full') -> Path:
             raise FileExistsError(output / name)
     stamp = utc_build_stamp()
     reused = {}
+    native_sources = None
     with tempfile.TemporaryDirectory(prefix='curated-components-') as temporary:
         work = Path(temporary)
         helper = work / 'curated-migrate.exe'
@@ -136,7 +142,10 @@ def package_windows(root: Path, output: Path, component: str = 'full') -> Path:
                 validate_payload(payload, c)
             else:
                 build_electron_main()
-                stage_desktop(root, payload, current[c], stamp)
+                native_sources = stage_native_sources(Path(os.environ['CURATED_NATIVE_BUNDLE']), output,
+                                                      current[c], release_tag or os.environ['RELEASE_TAG'])
+                native_sources['sourceCommit'] = resolve_commit(root, 'HEAD')
+                stage_desktop(root, payload, current[c], stamp, source_asset=native_sources)
             compile_installer(root, work, output, c, current[c], {
                 'APP_ID': IDENTITIES[c], 'SOURCE': str(payload),
                 'EXE': 'curated.exe' if c == 'server' else 'Curated Desktop.exe',
@@ -180,5 +189,6 @@ def package_windows(root: Path, output: Path, component: str = 'full') -> Path:
                 entry['components'] = {k: current[k] for k in selected}
             artifacts.append(entry)
     (output / 'windows-components.json').write_text(json.dumps({'schema': 1,
-        'sourceCommit': resolve_commit(root, 'HEAD'), 'buildStamp': stamp, 'artifacts': artifacts}, indent=2) + '\n')
+        'sourceCommit': resolve_commit(root, 'HEAD'), 'buildStamp': stamp, 'artifacts': artifacts,
+        **({'nativeSources': native_sources} if native_sources else {})}, indent=2) + '\n')
     return output

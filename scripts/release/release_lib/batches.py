@@ -94,6 +94,7 @@ def input_digest(root: Path, baseline: str, paths: list[str]) -> str:
 
 
 def load_batch(root: Path, tag: str, current: dict | None = None) -> dict | None:
+    """验证批次版本与模块边界；独立原生源码只能属于更新的 Desktop。"""
     if not (re.fullmatch(r'release-[0-9-]+', tag) or re.fullmatch(r'server-v[0-9.]+', tag)):
         return None
     file = root / 'scripts/release/batches' / f'{tag}.json'
@@ -126,6 +127,8 @@ def load_batch(root: Path, tag: str, current: dict | None = None) -> dict | None
             selected.append(component)
     if not selected:
         raise ValueError('No deliverable changes: do not create a release')
+    if 'desktopNativeSources' in batch and (batch['desktopNativeSources'] is not True or 'desktop' not in selected):
+        raise ValueError('Separate native sources require an updated Desktop module')
     expected_tag = f"server-v{batch['modules']['server']['after']}" if bridge else f"release-{batch['id']}"
     if tag != expected_tag or (bridge and 'server' not in selected):
         raise ValueError('Invalid batch tag or Server bridge')

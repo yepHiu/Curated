@@ -1,7 +1,7 @@
 /* Exercise the installed Windows player with synthetic authenticated HTTP/Range media. */
 const { createRequire } = require('node:module')
 const { execFileSync } = require('node:child_process')
-const { mkdtempSync, readFileSync, rmSync } = require('node:fs')
+const { existsSync, mkdtempSync, readFileSync, rmSync } = require('node:fs')
 const { createServer } = require('node:http')
 const { tmpdir } = require('node:os')
 const path = require('node:path')
@@ -11,6 +11,13 @@ const { _electron } = createRequire(require.resolve('@playwright/test/package.js
 ;(async () => {
   assert.equal(process.platform, 'win32')
   const executable = path.resolve(process.argv[2])
+  // 实际安装目录只能带运行资料；对应源码下载地址必须来自同批官方 Release。
+  const engineDirectory = path.join(path.dirname(executable), 'resources', 'app', 'native-player')
+  const engineManifest = JSON.parse(readFileSync(path.join(engineDirectory, 'engine-manifest.json'), 'utf8'))
+  assert.equal(engineManifest.distribution, 'runtime-with-separate-sources')
+  assert.equal(existsSync(path.join(engineDirectory, engineManifest.correspondingSource.file)), false)
+  assert.ok(engineManifest.sourceAsset.url.startsWith('https://github.com/yepHiu/Curated/releases/download/'))
+  assert.ok(readFileSync(path.join(engineDirectory, 'licenses', 'SOURCE-DOWNLOAD.txt'), 'utf8').includes(engineManifest.sourceAsset.url))
   const temporary = mkdtempSync(path.join(tmpdir(), 'curated-native-package-'))
   const video = path.join(temporary, 'synthetic.mp4')
   execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=30',

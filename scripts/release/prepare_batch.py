@@ -11,11 +11,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.release.release_lib import batches
 from scripts.release.release_lib.component_channels import read_channel, read_channel_file
 from scripts.release.release_lib.components import artifact_name
+from scripts.release.release_lib.native_player import source_asset_name
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def plan(root: Path, date: str | None = None, bumps: dict | None = None) -> dict | None:
+    """根据公共基线规划不可变批次，新 Windows Desktop 明确要求独立源码资产。"""
     # Account for remote tags without changing local refs or guessing from stale fetches.
     remote = batches.git(root, 'ls-remote', '--tags', 'origin')
     tags = {line.split('refs/tags/', 1)[1].removesuffix('^{}') for line in remote.splitlines() if 'refs/tags/' in line}
@@ -47,10 +49,13 @@ def plan(root: Path, date: str | None = None, bumps: dict | None = None) -> dict
     tag = f"server-v{modules['server']['after']}" if bridge else f'release-{identifier}'
     if tag in tags:
         raise ValueError(f'{tag} already exists; never move an immutable tag')
-    return {'schema': 1, 'id': identifier, 'tag': tag, 'serverBridge': bridge, 'modules': modules}
+    return {'schema': 1, 'id': identifier, 'tag': tag, 'serverBridge': bridge, 'modules': modules,
+            **({'desktopNativeSources': True} if modules['desktop']['changed'] and
+               (root / 'scripts/release/native-player/windows-x64-production.json').exists() else {})}
 
 
 def notes(root: Path, batch: dict) -> str:
+    """生成版本快照、应用下载与单独源码下载说明，供发布前审阅。"""
     lines = [f"# Curated {batch['id']}", '', '## GitHub Release Body', '',
              'Independent Server and Desktop updates.', '', '### Module updates', '',
              '| Module | Status | Before | After |', '| --- | --- | --- | --- |']
@@ -80,6 +85,13 @@ def notes(root: Path, batch: dict) -> str:
                 name = artifact_name(component, m['after'], platform, arch, fmt)
                 entries.append({'fileName': name, 'url': f"https://github.com/yepHiu/Curated/releases/download/{batch['tag']}/{name}"})
         lines.extend(f"- [{a['fileName']}]({a['url']})" for a in entries)
+    if batch.get('desktopNativeSources'):
+        source_name = source_asset_name(batch['modules']['desktop']['after'])
+        lines += ['', '### Native engine corresponding sources', '',
+                  'The Desktop installer includes playback binaries and licenses. Complete corresponding '
+                  'sources and build materials are available separately, at no charge, from this same Release. '
+                  'They are not needed for playback or downloaded by the Desktop updater.', '',
+                  f"- [{source_name}](https://github.com/yepHiu/Curated/releases/download/{batch['tag']}/{source_name})"]
     lines += ['', '### Full Changelog', '']
     for component, m in batch['modules'].items():
         if m['changed']:
