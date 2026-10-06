@@ -7,7 +7,6 @@ import { listPlayerPlaylistMovies, resolvePlayerPlaylistSource, readPlaylistAuto
 import { resolveInitialLocale } from "@/lib/locale-storage"
 import { resolveNavigationBackLink } from "@/lib/navigation-intent"
 import { updateActivePlaybackSession } from "@/composables/use-active-playback-session"
-import { useLibraryService } from "@/services/library-service"
 import { bumpCuratedFramesRevision } from "@/lib/curated-frames/revision"
 
 const snapshot = ref<DesktopPlaybackSnapshot>()
@@ -54,6 +53,7 @@ export const desktopPlaybackService = {
     const current = snapshot.value
     if (current?.sessionId) await window.javLibrary?.playback?.command(current.sessionId, { action })
   },
+  /** 认证路由允许后选择引擎；只有 native 需要加载影片服务和构造播放队列。 */
   async intercept(to: RouteLocationNormalized | RouteLocationResolved, from: RouteLocationNormalized | RouteLocationResolved): Promise<true | RouteLocationRaw> {
     const bridge = window.javLibrary?.playback
     if (to.name !== "player" || typeof to.params.id !== "string" || !bridge || import.meta.env.VITE_USE_WEB_API !== "true") return true
@@ -65,13 +65,15 @@ export const desktopPlaybackService = {
     }
     // 原生选定后才停止旧 Web；不进入 PlayerView，因此没有 HLS prefetch。
     stopWeb?.()
-    const library = useLibraryService()
-    const source = resolvePlayerPlaylistSource(to.query)
-    const queue = listPlayerPlaylistMovies({ source, movies: library.movies.value, trashedMovies: library.trashedMovies.value,
-      query: to.query, hasPlayedMovie, getProgress }).map(movie => movie.id).slice(0, 5000)
-    const locale = resolveInitialLocale()
     query = { ...to.query }
     try {
+      // Router 启动阶段尚未确认认证；选定 native 后才加载会启动受保护读取的服务。
+      const { useLibraryService } = await import("@/services/library-service")
+      const library = useLibraryService()
+      const source = resolvePlayerPlaylistSource(to.query)
+      const queue = listPlayerPlaylistMovies({ source, movies: library.movies.value, trashedMovies: library.trashedMovies.value,
+        query: to.query, hasPlayedMovie, getProgress }).map(/* 原生桥只接收影片身份。 */ movie => movie.id).slice(0, 5000)
+      const locale = resolveInitialLocale()
       const next = await bridge.open({ movieId: to.params.id, fileId: typeof to.query.fileId === "string" ? to.query.fileId : undefined,
         seekExisting: to.query.back === "curated-frames" || to.query.from === "curated-frames" || from.name === "player",
         startSec: parseResumeSecondsFromQuery(to.query.t), autoplay: to.query.autoplay === "1", queue,
