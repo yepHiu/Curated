@@ -708,3 +708,11 @@ staging 只复制声明文件，重新 hash 并检查 x64 PE normal/delay DLL im
 补丁后复验：312 文件/1688 项前端全量通过（首轮与其它检查并行造成超时，限制本机 4 workers 后独立复跑成功）；新增失败回退后相关 3 文件/11 项通过；19 文件/140 项真实候选引擎 Electron 通过；全量 lint、最终 typecheck/Web 构建、Electron/播放器构建与 9 项浏览器运行时通过。更新 Vue 后重新生成正式结构 payload，再次通过最小 PATH、无效开发 mpv 覆盖下的安装目录引擎、认证 Range、播放/seek/PNG/换片/退出回收；源码资料与引擎未变化，无需重复大归档准备。生产触发前依旧未公开新包。
 
 2026-10-07 01:09（北京时间）已完成本次用户授权的生产触发：专用分支 codex/windows-native-player-prototype 与不可变 release-20261007 标签一同推送，标签固定提交 571245b21ad70716aa615e0104f86cfa8ba9dd5f，未合并或更新 master。批次 Server 1.7.9 → 1.7.10、Desktop 0.2.4 → 0.2.5，来源摘要与发布说明核对一致；[CD run 37501360378](https://github.com/yepHiu/Curated/actions/runs/37501360378) 已 in_progress，目前验证源码与说明，之后依次执行精确提交质量检查、Windows 原生资料/安装验收及 Mac 包验收，全部成功才公开并推进更新通道。这里记录的是触发成功，不是安装包已公开；失败时保留标签和旧公共版本，按流水线诊断处理。Windows 包内含完整离线对应源码，因此本地 QA 安装包约 1.60 GiB，最终生产大小以 CD 产物为准。
+
+### 14.19 安装包精简与源码独立交付（2026-10-07）
+
+用户指出不需要把大份源码资料放进安装包。已取消尚未发布的 run 37501360378（最终 cancelled），保留原不可变 release-20261007 标签及原公共版本，不发布 1.7 GB 安装器。新版安装目录只包含 mpv/实际所需 DLL、许可、小型构建记录和准确源码下载说明；完整源码、原始构建输入、许可与还原脚本作为同一 Release 的 Curated-Desktop-Native-Sources-<Desktop version>-windows-x64.zip 单独提供，不进入更新器的安装包选择列表。
+
+实现沿用已经校验的 MSYS2 引擎与完整准备目录，不删除对应源码、不替换第三方许可、不更改播放行为。准备资料仍核对准确配方/源码/二进制 SHA 和完整来源；运行 manifest 区分精简目录并保存同一官方 Release 源码资产 URL/SHA，SOURCE-DOWNLOAD.txt 明示无需下载源码即可播放。独立 ZIP 保留已压缩完整归档，采用 ZIP_STORED 避免再次压缩；Windows 构建记录保存 nativeSources。新批次声明 desktopNativeSources，发布 staging/公开前校验源码 ZIP 成员、材料 SHA、准确引擎 lock、批次/版本/commit，以及上传完整资产的结果；源码包存在于 release.json 与 SHA256SUMS，但不进入 desktop.json 的应用安装列表。真实安装的合成播放 gate 同时确认安装目录无大源码归档且下载说明存在。旧批次与旧标签不改写。
+
+本地真实 Inno 编译通过，用时 114.859 秒；安装器 221382516 bytes（约 221 MB / 211 MiB），对比原 1723432848 bytes 减少约 87%。安装后 payload 653061110 bytes（约 623 MiB），独立来源 ZIP 1508785338 bytes（约 1.41 GiB）。正式结构精简 payload 在最小 PATH、无效开发 mpv override、认证 HTTP Range 下通过播放、seek、320×180 PNG、换片、安装目录引擎及退出回收；未截图/截帧用户影片，未写共享 Server。源码资产缺失/损坏/异批/错误引擎 lock、安装目录误带归档与更新清单隔离都有发布脚本回归覆盖；最终测试与新批次 run 记录随后回填。

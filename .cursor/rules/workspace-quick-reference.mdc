@@ -11,7 +11,7 @@ alwaysApply: true
 
 在 `codex/windows-native-player-prototype` 根运行 `pnpm native-player:prepare`（需 7-Zip，固定 SHA 的开发 mpv 写 ignored .workspace/native-player），随后 `pnpm dev:electron`。正式构建已含本地播放页/Win32 helper，需 MinGW gcc（同目录 windres）或绝对 CURATED_NATIVE_CC；也可用绝对 CURATED_NATIVE_MPV 指定开发引擎。Server 单独启动并加载此分支的新前端，Desktop 连接它；设置 → 播放开启「优先使用桌面原生播放器」（默认关闭，本机 profile）。从现有播放入口直接打开专用窗口，不再需要原型准备弹窗或二次 PIN；主页/侧栏保持可用。
 
-开发态无桥/无资源/旧 UI/非 Windows 继续 Web；native 可切 Web，认证失败回解锁。Windows 生产 staging 现在必须有完整 mpv 资料：根目录 `python -m pip install -r scripts/release/native-player/requirements.txt`，再 `python scripts/release/prepare_native_player.py`，设置绝对 `CURATED_NATIVE_BUNDLE` 指向 `.workspace/native-player-production`。生产使用独立 MSYS2 lock、对应源码/构建/许可与 DLL 闭包校验，QA pin 不分发；CD 显式准备引擎与 gcc/windres，并验安装目录引擎在最小 PATH 下工作。完整源码离线随包，Windows 包体增加；安装/发布实际状态见计划 §14.18。指定 CD1 五分钟对照见 §14.10。原型历史入口仍独立，以本节及 guide 为准。
+开发态无桥/无资源/旧 UI/非 Windows 继续 Web；native 可切 Web，认证失败回解锁。Windows 生产 staging 现在必须有完整 mpv 资料：根目录 `python -m pip install -r scripts/release/native-player/requirements.txt`，再 `python scripts/release/prepare_native_player.py`，设置绝对 `CURATED_NATIVE_BUNDLE` 指向 `.workspace/native-player-production`。生产使用独立 MSYS2 lock、对应源码/构建/许可与 DLL 闭包校验，QA pin 不分发；CD 显式准备引擎与 gcc/windres，并验安装目录引擎在最小 PATH 下工作。完整源码改为同一 Release 独立 Native Sources ZIP，安装包仅带运行文件/许可/准确源码下载说明；源码资产及校验必须通过才能公开，更新器不下载源码。安装/发布实际状态见计划 §14.19。指定 CD1 五分钟对照见 §14.10。原型历史入口仍独立，以本节及 guide 为准。
 
 ## Windows 原生播放原型 — 2026-10-05
 
