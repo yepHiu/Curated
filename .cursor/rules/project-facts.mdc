@@ -15,9 +15,9 @@ alwaysApply: true
 
 根目录 `pnpm desktop:test:build` 一次构建 Web API 页面到 `.workspace/desktop-test-ui` 并构建 Electron；`pnpm desktop:test` 只复用产物和 `.workspace/desktop-native-test-profile`，连接既有 `127.0.0.1:8080` 开发 Server。`electron/prebuilt-frontend.ts` 在 Electron 内监听 `127.0.0.1:5183`，提供 SPA、资源 MIME/缓存和流式同源 `/api` 转发；无独立 Node/Vite 编译或监听进程。`CURATED_ELECTRON_FRONTEND_DIR` 显式启用，仅本机开发连接生效；正式包和远端仍加载 Server 页面。退出回收托管连接；没有新增公共 API 或 library-config 字段。源码变化后需重新构建。详见 guide。
 
-## 2026-10-06 正式 Windows Desktop 原生播放接入（分支源码）
+## 2026-10-07 正式 Windows Desktop 原生播放接入（已合入本地 master）
 
-专用分支 `codex/windows-native-player-prototype` 已按用户授权实施 M1–M3。正式 `main.ts` 安装 `playback-desktop.ts`/`NativePlaybackCoordinator`；受限 `window.javLibrary.playback` 供已提交主窗口 frame 查询能力、本机偏好、打开/控制/快照/订阅，本地 `window.curatedPlayer` 仅控制当前会话。使用主窗口实际 Session/HttpOnly Cookie、原始媒体代理和 direct descriptor；renderer 只传业务 ID/时间/枚举动作及受限导航上下文，不传 URL/exe/HWND。
+专用分支 `codex/windows-native-player-prototype` 已按用户授权实施 M1–M3，并于 2026-10-07 合入本地 `master`（4ac3c9c9）；跨平台引擎 lock 哈希修复分支也已合入（91cba070）。本次合并未推送远程或触发发布。正式 `main.ts` 安装 `playback-desktop.ts`/`NativePlaybackCoordinator`；受限 `window.javLibrary.playback` 供已提交主窗口 frame 查询能力、本机偏好、打开/控制/快照/订阅，本地 `window.curatedPlayer` 仅控制当前会话。使用主窗口实际 Session/HttpOnly Cookie、原始媒体代理和 direct descriptor；renderer 只传业务 ID/时间/枚举动作及受限导航上下文，不传 URL/exe/HWND。
 
 router 在 PlayerView/HLS prefetch 前选择可选 native，专用 `electron-dist/player/index.html` 共享圆形控件/分部/倍速；主窗口仍浏览，侧栏可暂停/停止/返回。main 唯一写逐文件进度、历史与日时长，保存冻结队列/来源；页面刷新恢复快照。成功切 Server/锁定/退出回收，失败切换保留；关闭主窗口到托盘保留播放器。`userData/playback-settings.json` 默认 preferNative=false，volume/speed 本机持久，不增加 HTTP API/library-config 字段。
 

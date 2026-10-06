@@ -726,3 +726,22 @@ staging 只复制声明文件，重新 hash 并检查 x64 PE normal/delay DLL im
 实施：只在 `.github/workflows/cd-release.yml` 的 Windows build 作业为 `actions/setup-go@v5` 显式设置 `cache: false`，移除已无用途的 cache-dependency-path。保留 backend/go.mod 的 Go 版本选择及 Go 默认本机缓存路径；同一作业内多次构建仍复用本机模块和编译缓存。Linux backend-quality 的现有缓存、pnpm 缓存及原生引擎输入缓存保持现状；构建、安装和播放器验收门禁继续执行。发布标签作业不再恢复或保存 setup-go 缓存，因此不再因这项 post 归档阻塞后续发布。
 
 代价与验收：Windows 发布需要冷下载依赖、冷编译；净收益以未来采用此提交的 CD 运行实测为准，不把本次 7 分 35 秒直接承诺为净节省。下一次核对 Go setup 无缓存恢复、无 Post setup-go 缓存保存，并比较 Windows 作业整体耗时与实际构建耗时。若后续冷下载成为瓶颈，再根据日志评估只读恢复模块缓存；本次不新增缓存维护流水线。actionlint v1.7.7 已通过 CD 工作流检查（关闭外部 shellcheck/pyflakes 集成）；本次仅修改 CI 配置，无需重跑 UI、Go 业务测试或生成生产包。修改在专用分支本地提交，不改版本或既有不可变标签；现有 run 使用其原始工作流，新策略需推送并由后续包含该修改的发布运行采用。
+
+
+### 14.21 合入本地 master（2026-10-07）
+
+用户要求将原生播放器代码合入 master。已保留两边提交历史，使用非快进合并将 `codex/windows-native-player-prototype`（c176822f）合入本地主线，合并提交为 `4ac3c9c9`；随后合入 `codex/fix-release-native-lock`（e4dcd138），合并提交为 `91cba070`，纳入跨平台 LF/CRLF 引擎 lock 哈希兼容修复。主线既有 FC2 刮削与 AI 缓存修复保留；三个文档合并冲突均保留双方各自内容，没有代码冲突。
+
+合并前未提交的离线转码方案和索引修改先暂存保护，再恢复为未提交状态。旧 VLC 研究文档的修改已包含在原生分支中，恢复时保留较新的已批准/已实现状态说明，避免退回历史提案状态。原生播放仍为 Windows 可选能力，`preferNative=false`；本次未改变既有版本和不可变发布标签，未推送远程、生成安装包或触发发布。
+
+本地主线验证：
+
+- `pnpm install --frozen-lockfile` 成功；`pnpm lint` 通过。
+- Web API 模式 `pnpm build`（含 typecheck）通过，体积报告无提醒或超限。
+- `pnpm build:electron` 通过，包括 Electron TypeScript、连接页、Win32 helper 和原生播放器页面。
+- `pnpm test:electron`：16 文件 / 132 项通过；3 文件 / 8 项真实引擎或独立原型集成测试因本次环境未启用相应输入跳过。本次未重复真实媒体/安装包验收。
+- 显式 `VITE_USE_WEB_API=false`、`NODE_OPTIONS=--no-experimental-webstorage` 的 `pnpm test --maxWorkers 4`：312 文件 / 1689 项全部通过。首轮受本机 `.env` 的 Web API 模式影响，25 项设置测试失败；切回测试所需 Mock 模式后全量通过，没有修改产品权限逻辑。
+- `python -m unittest discover -s scripts/release/tests -p 'test_*.py'`：107 项通过。
+- `pnpm test:e2e` 首轮 7 项通过、2 项导航超时；失败项定向复跑后均通过，其中 Mock 演员页至设置页导航在单 worker 复跑通过。9 项最终均通过，记录首轮与复跑结果，不宣称首轮全绿。
+
+本次验证覆盖源码集成和构建回归；既有混合 DPI、更多片源、整片 A/V、真实 LAN/HTTPS 待验范围仍以此前章节为准。
