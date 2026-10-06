@@ -706,3 +706,5 @@ staging 只复制声明文件，重新 hash 并检查 x64 PE normal/delay DLL im
 发布前生产依赖审计发现 Vue server-renderer 和 source-map-js 两项高危，已分别升级 Vue 3.5.42 与 source-map-js 1.2.2；官方 registry 复审高危归零（剩余两项 low），pnpm 11.0.0 frozen-lockfile 安装通过。锁文件的 Vue 编译器/Babel 依赖按新版要求更新，保留原平台 libc 约束，没有改产品偏好。运行时 e2e 同时暴露 Desktop 路由适配的静态影片服务 import 在认证前启动读取；现在只有已选 native 的播放导航才动态导入，模块加载失败也进入单次 Web 回退。现有锁定启动验收重新通过，并补充模块加载边界与失败回退验证。
 
 补丁后复验：312 文件/1688 项前端全量通过（首轮与其它检查并行造成超时，限制本机 4 workers 后独立复跑成功）；新增失败回退后相关 3 文件/11 项通过；19 文件/140 项真实候选引擎 Electron 通过；全量 lint、最终 typecheck/Web 构建、Electron/播放器构建与 9 项浏览器运行时通过。更新 Vue 后重新生成正式结构 payload，再次通过最小 PATH、无效开发 mpv 覆盖下的安装目录引擎、认证 Range、播放/seek/PNG/换片/退出回收；源码资料与引擎未变化，无需重复大归档准备。生产触发前依旧未公开新包。
+
+2026-10-07 01:09（北京时间）已完成本次用户授权的生产触发：专用分支 codex/windows-native-player-prototype 与不可变 release-20261007 标签一同推送，标签固定提交 571245b21ad70716aa615e0104f86cfa8ba9dd5f，未合并或更新 master。批次 Server 1.7.9 → 1.7.10、Desktop 0.2.4 → 0.2.5，来源摘要与发布说明核对一致；[CD run 37501360378](https://github.com/yepHiu/Curated/actions/runs/37501360378) 已 in_progress，目前验证源码与说明，之后依次执行精确提交质量检查、Windows 原生资料/安装验收及 Mac 包验收，全部成功才公开并推进更新通道。这里记录的是触发成功，不是安装包已公开；失败时保留标签和旧公共版本，按流水线诊断处理。Windows 包内含完整离线对应源码，因此本地 QA 安装包约 1.60 GiB，最终生产大小以 CD 产物为准。
