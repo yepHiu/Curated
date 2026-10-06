@@ -18,6 +18,7 @@ from scripts.release.release_lib.latest_release import reconcile_latest
 from scripts.release.release_lib.batches import load_batch, selected_components, verify_changes
 from scripts.release.release_lib.component_channels import read_channel_file
 from scripts.release.release_lib.native_player import source_asset_name, validate_source_reference, validate_source_archive
+from scripts.release.release_lib.native_materials import matches_lock_digest
 
 PATTERN = re.compile(r'(full|server|desktop)-v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))')
 
@@ -170,7 +171,7 @@ def validate_native_sources(root: Path, meta: dict, entry: dict | None, director
         raise ValueError('Native source asset missing or checksum mismatch')
     manifest = validate_source_archive(paths[0])
     lock = root / 'scripts/release/native-player/windows-x64-production.json'
-    if manifest.get('lockSha256') != legacy.sha256(lock):
+    if not matches_lock_digest(lock, manifest.get('lockSha256')):
         raise ValueError('Native source asset does not match the frozen release engine lock')
     from zipfile import ZipFile
     with ZipFile(paths[0]) as archive:
