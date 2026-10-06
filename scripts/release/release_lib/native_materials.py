@@ -129,12 +129,12 @@ def source_members(source: dict, cache: Path):
             archive.extractall(original, filter='data')
         repository = original / safe_relative(snapshot['path'])
         revision = snapshot['revision']
-        git = lambda location, *args: subprocess.check_output(['git', '-C', str(location), *args], text=True).strip()
+        git = lambda location, *args: subprocess.check_output(['git', '-c', 'core.longpaths=true', '-C', str(location), *args], text=True).strip()
         if git(repository, 'rev-parse', revision + '^{commit}') != revision:
             raise ValueError('Pinned Git source revision missing')
         git(repository, 'update-ref', 'refs/heads/curated-source', revision)
         reduced = directory / 'reduced'
-        subprocess.run(['git', 'clone', '--quiet', '--bare', '--single-branch', '--branch', 'curated-source',
+        subprocess.run(['git', '-c', 'core.longpaths=true', 'clone', '--quiet', '--bare', '--single-branch', '--branch', 'curated-source',
                         '--depth=' + str(snapshot['depth']), repository.resolve().as_uri(), str(reduced)], check=True)
         # Do not preserve local temporary paths in the redistributed repository.
         shutil.copy2(repository / 'config', reduced / 'config')
