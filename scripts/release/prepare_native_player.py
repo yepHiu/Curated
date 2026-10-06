@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from scripts.release.release_lib.native_materials import download, digest, package_archive, stage_package, write_source_archive
 from scripts.release.release_lib.native_player import validate_native_bundle
+from scripts.release.release_lib.native_materials import lock_digest, matches_lock_digest
 
 
 def prepare(lock_path: Path, output: Path, cache: Path) -> Path:
@@ -21,7 +22,7 @@ def prepare(lock_path: Path, output: Path, cache: Path) -> Path:
         raise ValueError('Unsupported production engine lock')
     if output.exists():
         manifest = validate_native_bundle(output, prepared=True)
-        if manifest.get('lockSha256') != digest(lock_path) or manifest.get('preparationRevision') != 2:
+        if not matches_lock_digest(lock_path, manifest.get('lockSha256')) or manifest.get('preparationRevision') != 2:
             raise ValueError('Existing bundle uses another engine lock; select a new output directory')
         return output
     inputs = [p['binary'] for p in lock['packages']] + lock['sources'] + lock['crates']
@@ -81,7 +82,7 @@ def prepare(lock_path: Path, output: Path, cache: Path) -> Path:
                            'sourcePath': 'vendor/' + c['name'] + '-' + c['version'], 'sourceArchiveSha256': c['sha256']}
                           for c in lock['crates'])
         manifest = {'schema': 1, 'engine': 'mpv', 'platform': 'windows', 'arch': 'x64',
-                    'provider': 'msys2', 'version': lock['version'], 'lockSha256': digest(lock_path), 'preparationRevision': 2,
+                    'provider': 'msys2', 'version': lock['version'], 'lockSha256': lock_digest(lock_path), 'preparationRevision': 2,
                     'runtime': sorted(runtime, key=lambda r: r['file']), 'licenses': licenses,
                     'systemImports': lock['systemImports'], 'components': components,
                     'correspondingSource': {'file': source_archive.relative_to(bundle).as_posix(), 'sha256': digest(source_archive)},

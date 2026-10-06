@@ -8,7 +8,7 @@ import tarfile
 import tempfile
 import unittest
 from zipfile import ZipFile
-from scripts.release.release_lib.native_materials import download, stage_package, write_source_archive, read_source_index
+from scripts.release.release_lib.native_materials import download, stage_package, write_source_archive, read_source_index, lock_digest, matches_lock_digest
 
 ROOT = Path(__file__).resolve().parents[3]
 RESTORE_SCRIPT = ROOT / 'scripts/release/native-player/restore-sources.py'
@@ -24,6 +24,26 @@ def package(file, entries):
 
 
 class NativeMaterialTests(unittest.TestCase):
+    def test_lock_hash_survives_cross_platform_checkout_but_rejects_other_changes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            lock = Path(temporary) / 'lock.json'
+            lf = b'{\n  "engine": "mpv"\n}\n'
+            crlf = lf.replace(b'\n', b'\r\n')
+            canonical = hashlib.sha256(lf).hexdigest()
+            historical = hashlib.sha256(crlf).hexdigest()
+            for data in (lf, crlf):
+                with self.subTest(checkout=data):
+                    lock.write_bytes(data)
+                    self.assertEqual(lock_digest(lock), canonical)
+                    self.assertTrue(matches_lock_digest(lock, canonical))
+                    self.assertTrue(matches_lock_digest(lock, historical))
+                    self.assertFalse(matches_lock_digest(lock, '0' * 64))
+                    self.assertFalse(matches_lock_digest(lock, None))
+            for changed in (lf.replace(b'mpv', b'other'), lf.replace(b'  ', b' '), lf.rstrip()):
+                lock.write_bytes(changed)
+                self.assertFalse(matches_lock_digest(lock, canonical))
+                self.assertFalse(matches_lock_digest(lock, historical))
+
     def test_shallow_git_sources_preserve_commit_tree_and_build_version(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

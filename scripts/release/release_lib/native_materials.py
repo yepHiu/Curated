@@ -20,6 +20,18 @@ def digest(file: Path) -> str:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def lock_digest(file: Path) -> str:
+    """Hash the frozen text with LF endings, independent of Git autocrlf."""
+    return hashlib.sha256(file.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
+
+
+def matches_lock_digest(file: Path, expected: str) -> bool:
+    """Accept canonical LF and historical Windows CRLF records only."""
+    data = file.read_bytes().replace(b'\r\n', b'\n')
+    return expected in {hashlib.sha256(data).hexdigest(),
+                        hashlib.sha256(data.replace(b'\n', b'\r\n')).hexdigest()}
+
+
 def download(entry: dict, cache: Path) -> Path:
     name = entry['file']
     if PurePosixPath(name).name != name or '\\' in name or ':' in name:

@@ -302,7 +302,8 @@ class ComponentReleaseTests(unittest.TestCase):
             entries.append({**identity, 'sourceCommit': 'abc', 'sha256': cd.legacy.sha256(folder / name)})
         lock = self.root / 'scripts/release/native-player/windows-x64-production.json'
         lock.parent.mkdir(parents=True)
-        lock.write_text('{}')
+        # Model the Windows producer's autocrlf checkout and the Linux publisher.
+        lock.write_bytes(b'{\r\n}\r\n')
         bundle = self.root / 'engine'
         bundle.mkdir()
         manifest = NativeEnginePayloadTests().fixture(bundle)
@@ -313,9 +314,14 @@ class ComponentReleaseTests(unittest.TestCase):
         (bundle / 'engine-manifest.json').write_text(json.dumps(manifest))
         source = stage_native_sources(bundle, windows, '0.1.0', self.meta['tag'])
         source['sourceCommit'] = 'abc'
+        lock.write_bytes(b'{\n}\n')
         with self.assertRaisesRegex(ValueError, 'requires a separate'):
             cd.validate_native_sources(self.root, self.meta, None, [windows])
         cd.validate_native_sources(self.root, self.meta, source, [windows])
+        lock.write_bytes(b'{"changed":true}\n')
+        with self.assertRaisesRegex(ValueError, 'frozen release engine lock'):
+            cd.validate_native_sources(self.root, self.meta, source, [windows])
+        lock.write_bytes(b'{\n}\n')
         wrong = {**source, 'sourceCommit': 'another'}
         with self.assertRaisesRegex(ValueError, 'another Desktop'):
             cd.validate_native_sources(self.root, self.meta, wrong, [windows])
