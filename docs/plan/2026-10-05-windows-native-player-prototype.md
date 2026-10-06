@@ -702,3 +702,7 @@ staging 只复制声明文件，重新 hash 并检查 x64 PE normal/delay DLL im
 本地已通过：19 文件/140 项真实候选引擎 Electron 测试；312 文件/1688 项前端；全量 lint/typecheck、生产 Web 与 Electron 构建、Go test ./... 和 vet；actionlint 检查新 CD 工作流。最终 stage_desktop 生成的正式结构 payload 又通过最小 PATH 的实际认证播放、媒体时钟、seek、320×180 原图、part replacement、安装目录 executable 和无遗留子进程检查。全部媒体均为合成样本，没有截取用户影片或写共享 Server。
 
 本地完整源码已从归档离线恢复，Git 长路径选项下核对 whisper.cpp 为原提交、原树 e08fcfd8890eccc6d7e13b2b809c4a483c34516f 和原版本号；恢复的 Cargo vendor/config 与校验材料均存在。真实 Inno 编译 260.515 秒成功，QA installer 1723432848 bytes（1643.59 MiB）；最终 102 项 release pipeline 测试通过。之后从干净提交准备 20261007 批次并触发不可变标签 CD，实际 Windows 安装/升级/卸载与 Mac 验收成功才允许公开。具体 run/tag/version 将回填本节。本地 payload 成功不等同已发布；更多片源、整片 A/V、混合 DPI、真实 LAN/HTTPS 仍沿原边界继续待验。
+
+发布前生产依赖审计发现 Vue server-renderer 和 source-map-js 两项高危，已分别升级 Vue 3.5.42 与 source-map-js 1.2.2；官方 registry 复审高危归零（剩余两项 low），pnpm 11.0.0 frozen-lockfile 安装通过。锁文件的 Vue 编译器/Babel 依赖按新版要求更新，保留原平台 libc 约束，没有改产品偏好。运行时 e2e 同时暴露 Desktop 路由适配的静态影片服务 import 在认证前启动读取；现在只有已选 native 的播放导航才动态导入，模块加载失败也进入单次 Web 回退。现有锁定启动验收重新通过，并补充模块加载边界与失败回退验证。
+
+补丁后复验：312 文件/1688 项前端全量通过（首轮与其它检查并行造成超时，限制本机 4 workers 后独立复跑成功）；新增失败回退后相关 3 文件/11 项通过；19 文件/140 项真实候选引擎 Electron 通过；全量 lint、最终 typecheck/Web 构建、Electron/播放器构建与 9 项浏览器运行时通过。更新 Vue 后重新生成正式结构 payload，再次通过最小 PATH、无效开发 mpv 覆盖下的安装目录引擎、认证 Range、播放/seek/PNG/换片/退出回收；源码资料与引擎未变化，无需重复大归档准备。生产触发前依旧未公开新包。
