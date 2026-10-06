@@ -667,3 +667,15 @@ UI：复用 usePlayerClipCapture 的媒体时钟状态机，起点以主进程�
 正式 production main + 隔离 profile + 认证合成 Server fixture 通过当前 Session 调用真实 HTTP/Range；fixture 按现有 Server 合约真实执行 FFmpeg GIF 生成（并非共享开发 Server 业务入库）。GIF 按钮录制区间 73.7–76.333333 秒，输出 640×360、10fps、26 帧/2.6 秒、GIF89a，UI 显示已入帧库，captureRevision 增加两次（静态/动图）。实际短按只上传一帧且无 clips 请求；实际 C 长按在 109.833333–115.833333 自动完成，按键抬起后累计仅一张新帧/一个 GIF 任务；6 秒 GIF 为 60 帧。保留静态帧的生成中任务按取消后 fixture 为 cancelled；640×480/626×444 面板均距底栏约 12px、取消按钮完整可见、无横向溢出。末尾 1 微秒上限与取消失败/认证分支修正由定向用例覆盖，最终产物已重建。证据在 ignored `output/playwright/desktop-player/native-gif-ui.log`、`native-gif-inputs.log`、`native-gif-qa-results.json`、`native-gif-qa.gif`。
 
 测试 Desktop 已重建/启动；保留 `fc2-4985807:primary`、队列/来源于 2932.663067 秒（48:52），恢复为暂停，读取 UI 确认 GIF 按钮可见且暂停时禁用。没有截图/萃取用户影片或向共享 Server 生成 GIF。当前原生只支持 GIF 片段格式，MP4/WebM/额外本机导出/逐帧等范围继续待做；REQ-0058/0059 状态、分发资料/安装边界不变。无版本、push、合并或发布。
+
+#### 14.17.1 截取成功反馈自动退出与位置对齐 Web（2026-10-06）
+
+用户反馈静态帧/GIF 成功提示常驻且位置过高。本次沿用 Web 播放面的局部反馈：静态帧成功回执 2 秒退出，打开原图预览期间暂停计时、关闭后重新计时；GIF 成功或已取消提示 1.6 秒退出。生成中与失败结果保留取消/重试动作，手动关闭仍可用。位置按 Web 原有静态帧桌面底部 96px/窄屏 176px、GIF 128px 起算，仅按实际进度条与按钮区域及底部 padding 向上避让 12px；排除原生底栏上方的 48px 渐变留白和时间行，不改变全局 token 或 Web 布局。
+
+原因与实现：原来 GIF 的 8 秒计时器只重置局部录制 phase，却仍由持久 snapshot.clip 控制显示，终态一直可见；静态提交若遇到旧 clip 也可能跳过 expiry。现在 composable 管理独立的图片/GIF 计时器和按 session/frameId/phase 识别的本地隐藏标记，页面统一使用该可见状态；连续收到相同终态快照不重开提示或重置计时。GIF 完成/手动关闭同时清理其起始帧回执，避免退出后又显示静态帧；新捕获、换会话及卸载清理旧计时器。失败重试仍使用同帧/同 ID。反馈下移后的实际点击验证发现 footer 透明渐变截获 GIF 取消点击，最终将 GIF 反馈提升到与现有 CaptureReceipt 一致的局部 z-20，保留正常按钮命中。
+
+验证：前端定向 2 文件/19 项通过，包括静态 2 秒到期/大图保留、GIF 处理中保留/成功 1.6 秒退出、重复终态快照不复现、关联静态帧不复现、旧 GIF 计时器不删除新回执、手动关闭、既有短/长按/媒体时长/重试/会话隔离；typecheck、定向 ESLint、desktop:test:build、最终 build:desktop-player 与 diff 检查通过。仅 renderer/业务组件修改，未重复无变化的 Electron/Server 测试。
+
+正式 production main + 隔离 profile + 认证合成 Server/真实 mpv/真实 GIF 生成验证：986×763、640×480、626×444 下静态回执均比原先下降约 80px，与进度/按钮区域保持约 12px 间距，全部操作可见且无横向溢出；成功回执自动退出。大图打开超过 2 秒仍保留、关闭后自动退出；真实 GIF 成功后自动退出，main 仍保留 saved，但后续快照不再显示 GIF 或其起始帧。失败图片等待超过 2 秒仍可重试、成功后退出；hold 任务处理反馈保持、真实点击取消后自动退出。最终在 640×480/626×444 再验证 GIF 录制反馈及取消按钮中心命中、实际取消与退出，确认 z-20 生效。证据位于 ignored output/playwright/desktop-player/capture-feedback-ui.log 和 capture-feedback-narrow.log；全部截帧/GIF 为合成素材，没有截图或萃取用户影片，没有写入共享 Server 的帧库。
+
+验收 fixture 已退出，日常测试 Desktop 已重启到本轮产物。重启前不存在活动原生窗口（保存 intent 为 null），因此不自动起播旧影片。未运行 test:display、混合 DPI、真实 LAN/HTTPS 或安装验收；UI 约定同步规范与组件规则。未改版本、push、合并或发布。
