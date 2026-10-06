@@ -745,3 +745,14 @@ staging 只复制声明文件，重新 hash 并检查 x64 PE normal/delay DLL im
 - `pnpm test:e2e` 首轮 7 项通过、2 项导航超时；失败项定向复跑后均通过，其中 Mock 演员页至设置页导航在单 worker 复跑通过。9 项最终均通过，记录首轮与复跑结果，不宣称首轮全绿。
 
 本次验证覆盖源码集成和构建回归；既有混合 DPI、更多片源、整片 A/V、真实 LAN/HTTPS 待验范围仍以此前章节为准。
+
+
+### 14.22 产品分支最新提交同步（2026-10-07）
+
+用户要求将分支代码全部合入 master，随后明确更正：独立看板不合入 master。以最新指示为准，`codex/local-project-dashboard` 保留独立，不纳入产品主线。
+
+重新检查全部本地分支，原生引擎修复分支新增 8a506c9c / e47b64df，包含冻结发布资产的恢复说明及 `.github/workflows/recover-release.yml`。已通过 `3303cb3b` 非快进合并纳入本地 master；该工作流使用修正后的工具校验原始不可变来源及成功门禁，再恢复既有资产，不修改原始标签。
+
+`git fetch origin` 后再次检查：除明确排除的独立看板外，全部本地产品分支与远端产品分支的现有提交均已包含在 master。`origin/release-channels` 是独立更新通道数据分支，不属于产品源码，不合并。主线没有 `scripts/project-dashboard`，独立看板未引入。原有离线转码方案与索引的未提交修改已恢复。
+
+本次仅新增发布恢复工作流与说明；`python -m unittest discover -s scripts/release/tests -p 'test_component_cd.py'` 的 19 项通过。前一节产品构建与全量回归结果仍适用，产品代码及依赖未变，不重复运行。恢复工作流在来源分支已通过 actionlint v1.7.7（见恢复计划）；本次没有触发工作流、推送远程或执行实际发布。
