@@ -48,10 +48,12 @@ func isFC2MovieProviderName(name string) bool {
 
 // Service wraps the metatube-sdk-go engine for movie and actor scraping, with runtime provider health tracking.
 type Service struct {
-	logger   *zap.Logger
-	engine   *engine.Engine
-	healthMu sync.RWMutex
-	health   map[string]ProviderRuntimeHealth
+	logger      *zap.Logger
+	engine      *engine.Engine
+	healthMu    sync.RWMutex
+	health      map[string]ProviderRuntimeHealth
+	movieSearch func(string, string, bool) ([]*model.MovieSearchResult, error)
+	movieInfo   func(providerid.ProviderID, bool) (*model.MovieInfo, error)
 }
 
 // ProviderRuntimeHealth tracks the outcome of recent provider health probes for cooldown decisions.
@@ -84,9 +86,11 @@ func NewService(logger *zap.Logger, requestTimeout time.Duration) (*Service, err
 	}
 
 	return &Service{
-		logger: logger,
-		engine: eng,
-		health: make(map[string]ProviderRuntimeHealth),
+		logger:      logger,
+		engine:      eng,
+		health:      make(map[string]ProviderRuntimeHealth),
+		movieSearch: eng.SearchMovie,
+		movieInfo:   eng.GetMovieInfoByProviderID,
 	}, nil
 }
 
@@ -140,6 +144,7 @@ func (s *Service) PreferredMovieProviderChain(strategy string) []string {
 	return preferred
 }
 
+// firstValidMovieSearchResult 跳过空项与无效搜索结果。
 func firstValidMovieSearchResult(results []*model.MovieSearchResult) *model.MovieSearchResult {
 	for _, r := range results {
 		if r != nil && r.IsValid() {
@@ -270,7 +275,7 @@ func (s *Service) resolveProviderChain(opts scraper.MovieScrapeOptions, isFC2 bo
 
 // scrapeWithChain tries each provider in the chain sequentially until one succeeds.
 func (s *Service) scrapeWithChain(ctx context.Context, movieID, number string, chain []string) (scraper.Metadata, error) {
-	var lastErr error
+	var failures []error
 	for i, providerName := range chain {
 		select {
 		case <-ctx.Done():
@@ -279,7 +284,11 @@ func (s *Service) scrapeWithChain(ctx context.Context, movieID, number string, c
 		}
 
 		if _, err := s.engine.GetMovieProviderByName(providerName); err != nil {
-			lastErr = fmt.Errorf("unknown provider %q", providerName)
+			if isFC2MovieProviderName(providerName) {
+				failures = append(failures, fmt.Errorf("provider %q currently supports FC2 metadata only", providerName))
+			} else {
+				failures = append(failures, fmt.Errorf("unknown provider %q", providerName))
+			}
 			s.logger.Warn("skipping unknown provider in chain",
 				zap.String("provider", providerName),
 				zap.Int("index", i),
@@ -295,10 +304,10 @@ func (s *Service) scrapeWithChain(ctx context.Context, movieID, number string, c
 		)
 
 		start := time.Now()
-		results, err := s.engine.SearchMovie(number, providerName, false)
+		results, err := s.movieSearch(number, providerName, false)
 		latency := time.Since(start).Milliseconds()
 		if err != nil {
-			lastErr = err
+			failures = append(failures, fmt.Errorf("%s search failed: %w", providerName, err))
 			s.recordProviderFailure(providerName, latency, err)
 			s.logger.Warn("search failed in chain",
 				zap.String("number", number),
@@ -310,16 +319,15 @@ func (s *Service) scrapeWithChain(ctx context.Context, movieID, number string, c
 
 		first := firstValidMovieSearchResult(results)
 		if first == nil {
-			lastErr = fmt.Errorf("no results from %s", providerName)
-			s.recordProviderFailure(providerName, latency, lastErr)
+			emptyErr := fmt.Errorf("no results from %s", providerName)
+			failures = append(failures, emptyErr)
+			s.recordProviderFailure(providerName, latency, emptyErr)
 			s.logger.Warn("no results from provider in chain",
 				zap.String("number", number),
 				zap.String("provider", providerName),
 			)
 			continue
 		}
-		s.recordProviderSuccess(providerName, latency)
-
 		// Found a valid result
 		s.logger.Info("search result selected from chain",
 			zap.String("number", number),
@@ -329,11 +337,20 @@ func (s *Service) scrapeWithChain(ctx context.Context, movieID, number string, c
 			zap.Int("tried", i+1),
 		)
 
-		return s.fetchMovieInfo(ctx, movieID, number, first)
+		metadata, err := s.fetchMovieInfo(ctx, movieID, number, first)
+		latency = time.Since(start).Milliseconds()
+		if err != nil {
+			failures = append(failures, fmt.Errorf("%s detail failed: %w", providerName, err))
+			s.recordProviderFailure(providerName, latency, err)
+			s.logger.Warn("detail failed in provider chain", zap.String("number", number), zap.String("provider", providerName), zap.Error(err))
+			continue
+		}
+		s.recordProviderSuccess(providerName, latency)
+		return metadata, nil
 	}
 
 	// All providers in chain failed
-	return scraper.Metadata{}, fmt.Errorf("all providers in chain failed for %s: %w", number, lastErr)
+	return scraper.Metadata{}, fmt.Errorf("all providers in chain failed for %s: %w", number, errors.Join(failures...))
 }
 
 // scrapeSingleOrAuto handles single provider or automatic (all sources) scraping.
@@ -347,13 +364,12 @@ func (s *Service) scrapeSingleOrAuto(ctx context.Context, movieID, number, prefe
 			return scraper.Metadata{}, fmt.Errorf("unknown movie metadata provider %q", prefer)
 		}
 		start := time.Now()
-		results, err = s.engine.SearchMovie(number, prefer, false)
+		results, err = s.movieSearch(number, prefer, false)
 		latency := time.Since(start).Milliseconds()
 		if err != nil {
 			s.recordProviderFailure(prefer, latency, err)
 			return scraper.Metadata{}, fmt.Errorf("search failed for %s on provider %q: %w", number, prefer, err)
 		}
-		s.recordProviderSuccess(prefer, latency)
 	} else if isFC2 {
 		results, err = s.searchMovieFC2Providers(ctx, number)
 		if err != nil {
@@ -381,7 +397,24 @@ func (s *Service) scrapeSingleOrAuto(ctx context.Context, movieID, number, prefe
 		zap.Int("totalResults", len(results)),
 	)
 
-	return s.fetchMovieInfo(ctx, movieID, number, first)
+	var detailErrors []error
+	for _, result := range results {
+		if result == nil || !result.IsValid() {
+			continue
+		}
+		start := time.Now()
+		metadata, detailErr := s.fetchMovieInfo(ctx, movieID, number, result)
+		if detailErr == nil {
+			s.recordProviderSuccess(result.Provider, time.Since(start).Milliseconds())
+			return metadata, nil
+		}
+		s.recordProviderFailure(result.Provider, time.Since(start).Milliseconds(), detailErr)
+		detailErrors = append(detailErrors, fmt.Errorf("%s detail failed: %w", result.Provider, detailErr))
+		if err := ctx.Err(); err != nil {
+			return scraper.Metadata{}, err
+		}
+	}
+	return scraper.Metadata{}, errors.Join(detailErrors...)
 }
 
 // effectivePosterURLs merges Metatube's detail and search-result poster fields.
@@ -434,6 +467,9 @@ func effectivePosterURLs(info *model.MovieInfo, result *model.MovieSearchResult)
 
 // fetchMovieInfo fetches detailed movie info from a search result.
 func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, result *model.MovieSearchResult, exact ...bool) (scraper.Metadata, error) {
+	if result == nil || !result.IsValid() {
+		return scraper.Metadata{}, fmt.Errorf("invalid search result for %s", number)
+	}
 	pid, err := providerid.New(result.Provider, result.ID)
 	if err != nil {
 		return scraper.Metadata{}, fmt.Errorf("invalid provider result for %s: provider=%s id=%s: %w", number, result.Provider, result.ID, err)
@@ -445,9 +481,12 @@ func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, re
 	default:
 	}
 
-	info, err := s.engine.GetMovieInfoByProviderID(pid, true)
+	info, err := s.movieInfo(pid, true)
 	if err != nil {
 		return scraper.Metadata{}, fmt.Errorf("get movie info failed for %s (provider=%s): %w", number, result.Provider, err)
+	}
+	if info == nil || strings.TrimSpace(info.Title) == "" {
+		return scraper.Metadata{}, fmt.Errorf("invalid movie detail for %s (provider=%s): missing title", number, result.Provider)
 	}
 
 	if len(exact) > 0 && exact[0] {
