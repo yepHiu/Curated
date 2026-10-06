@@ -3,6 +3,14 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-10-06 FC2 元数据（源码已实现）
+
+`internal/scraper/fc2` 独立适配 Javten（`fc2hub`）、FC2 官方、PPVDataBank、JavDB；参照 MDCz v0.18.0 的搜索/解析与字段聚合行为。`req/v3` 提供 Chrome 请求特征和动态代理，20 秒请求上限、4 MiB 响应上限、同站最多 5 次跳转。FC2 自动查询最多两路并发、45 秒总预算；按上述顺序保留主标题/来源，补齐缺失字段和更长简介。官方不存在页与 403/HTTP 200 验证页分开处理；访问受阻五分钟冷却，指定单源可重试；全失败保留逐源错误。
+
+自动策略忽略生成的普通来源链并使用完整 FC2 专用链；显式单源保持单源，自定义链过滤 FC2 兼容来源，没有兼容来源时使用默认 FC2 链。PPVDataBank/JavDB 已出现在来源选择与健康探测中；本轮 JavDB 适配器只支持 FC2，SDK v1.3.2 未注册 JavDB，不加入普通影片自动链。愿望清单与 Agent FC2 标题查询复用适配器。补全图片的原 provider/详情 Referer 保存到现有 media_assets 字段；wishlist 下载同样传递 Referer。普通影片链在详情失败后继续，只有完整成功才记健康。无新 API、配置键或迁移。
+
+2026-10-06 当前 Server 代理只读实测：FC2-3977618 由 PPVDataBank 返回标题、85 分钟、封面和一张预览；封面 HTTP 200 / WebP 可解码。Javten 403、JavDB 验证页、官方商品不存在；TLS/HTTP2 浏览器特征不保证绕过验证。源码生效需新 Server 编译并重启/升级，未替换生产二进制或写生产数据库。记录：`docs/plan/2026-10-06-fc2-metadata-reliability.md`。
+
 ## 2026-10-04 FC2 与同番号多文件（已实现）
 
 实际命名样本兼容：普通番号紧接一位 A-Z 字母表示分部（STAR-380A/B、STAR-684A-C/B-C 对应 1/2），带连接符的 -C/-UC 仍为版本标记。Go scanner / moviecode 和 TypeScript Mock 导入预览同步；A 与 CD1 统一为第 1 部，整理输出 CDn。用户 31 个视频样本在启用/关闭整理下均形成 27 部影片，重扫保持文件 ID；TXT 不参与影片扫描。实现与证据见下述同主题计划。

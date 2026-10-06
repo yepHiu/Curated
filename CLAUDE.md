@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## FC2 metadata — 2026-10-06
+
+FC2 uses context-aware adapters in `internal/scraper/fc2` for Javten (`fc2hub`), official FC2, PPVDataBank and JavDB. Automatic queries use two concurrent sources within 45 seconds and enrich missing fields in that priority order. Explicit single providers and compatible custom chains keep their scope. Source selection/health includes PPVDataBank and JavDB; JavDB currently supports FC2 only because SDK v1.3.2 has no registered JavDB provider. Images preserve their original provider/Referer; wishlist and Agent FC2 searches reuse the adapters. Access failures retain HTTP status/challenge errors and use a five-minute automatic cooldown; official missing products are distinct. Ordinary provider chains continue after detail failure. No new API, config key or database migration. FC2-3977618 metadata and cover were verified read-only using the current Server proxy; source changes require a new Server build/restart or upgrade. See guide “FC2 metadata sources” and docs/plan/2026-10-06-fc2-metadata-reliability.md.
+
 ## FC2 / multipart API — 2026-10-04
 
 `GET /api/library/movies?mode=fc2` selects FC2; ordinary explicit modes exclude it, empty mode is shared full-library data. List fileCount and detail files expose same-code video files. Playback/stream/session/native-play/frame/clips and progress PUT accept query fileId; descriptors, progress and captures return source identity. Capture metadata carries fileId; clip frame attachments enforce it. Migration 0064 preserves original file identity and adds per-file progress. Storage/tag resources stay shared. Source is locally verified, not published. See API.md “FC2 and movie file selection” and guide “FC2 and multipart movies”; compliance remains paused.

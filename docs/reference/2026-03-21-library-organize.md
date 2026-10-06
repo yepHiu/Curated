@@ -1,5 +1,9 @@
 # 库目录整理与周期扫描
 
+## FC2 元数据来源与现有配置（2026-10-06）
+
+不新增 `library-config.cfg` 字段。FC2 的 `auto-cn-friendly` / `auto-global` 策略使用 Javten（`fc2hub`）、FC2 官方（`FC2`）、PPVDataBank、JavDB 专用来源；显式单源只用指定来源，自定义链只查询其中的 FC2 兼容来源，没有兼容来源时沿用自动 FC2 来源。JavDB 当前适配仅支持 FC2，不进入普通影片自动链。最多两路并发、45 秒总预算，成功来源按优先级补齐字段，图片保留原来源 Referer。403/验证页进入五分钟自动冷却，单源重试可以重新访问。保存代理后该客户端下一次请求读取新值；源码行为需重新编译并重启/升级 Server。操作与在线验证见 [guide](../guide.md#fc2-metadata-sources)。
+
 ## Comic library settings keys
 
 The optional comic module uses separate keys in `config/library-config.cfg`; they do not replace or overload movie library settings.

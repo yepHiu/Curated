@@ -20,6 +20,16 @@ Opening movie details selects part 1 by default; if part 1 is absent, it selects
 
 See the [implementation and verification record](plan/2026-10-04-multipart-movies-and-fc2-library.md) and [file selection API](../API.md#fc2-and-movie-file-selection).
 
+## FC2 metadata sources
+
+FC2 metadata refresh and wishlist enrichment use dedicated adapters for **Javten (`fc2hub`) → FC2 official (`FC2`) → PPVDataBank → JavDB**, in that field-priority order. Automatic strategies query at most two sources concurrently with a 45-second total budget. The first successful source provides the title and source-page link; later sources fill missing fields, and a longer summary can replace a shorter one. Images retain their own source and Referer for downloads. These adapters also supply FC2 results to Agent title searches. The new JavDB adapter currently supports FC2 codes; this Metatube SDK build does not provide ordinary-title JavDB scraping.
+
+An explicitly selected provider uses that provider alone. A custom chain containing FC2 sources queries only those compatible sources in the configured order; a chain containing ordinary-title sources alone uses the automatic FC2 sources. Both automatic strategies use the complete FC2 source list regardless of the generated ordinary-title chain. Existing configuration keys remain valid.
+
+HTTP 403 and verification pages are reported as access failures, including when a verification page returns HTTP 200. Automatic FC2 queries put blocked sources into a five-minute cooldown; selecting that source alone permits a retry. An official product-not-found page means the movie is unavailable from that source and does not mark the source unhealthy. When all sources fail, the task retains each source's error. Ordinary-title provider chains also continue after a detail-fetch failure and mark a source healthy only after a complete metadata fetch succeeds.
+
+The October 6, 2026 read-only check of `FC2-3977618`, using the installed Server's proxy and legacy ordinary-title chain, obtained its title, 85-minute runtime, cover and one preview image from PPVDataBank. The cover returned HTTP 200 and decoded successfully. Javten returned HTTP 403, JavDB returned a verification page, and FC2 official reported the product missing. Browser request characteristics do not guarantee passing site verification. This check did not alter the installed Server or production database. Rebuild/restart or upgrade Server, then use **More actions → Refresh metadata** to apply this behavior to existing movies. See the [implementation record](plan/2026-10-06-fc2-metadata-reliability.md).
+
 ## Home and movie library scrolling
 
 Home and All Movies keep scrolling within the current page. Continuing to scroll with a mouse wheel or trackpad, or swiping on a touchscreen at either page boundary, does not switch pages. Use the “Continue to Movies” button at the bottom of Home or the sidebar Movies entry to open the movie library; use the sidebar Home entry to return. Normal scrolling, the movie library’s back-to-top button, and scroll restoration when returning from movie details remain available.
@@ -542,6 +552,7 @@ Use this table as the citation hub. Dated `docs/plan/*.md` files are working pap
 | [Plan status rules](plan/README.md) | How to read `docs/plan/` |
 | [Compliance and Film/TV separation research — paused](plan/2026-07-18-curated-compliance-and-metadata-source-decoupling.md#当前决定本仓库暂缓2026-10-04) | Paused here by the October 4 decision: compliance work now belongs to a separate project; earlier proposals remain historical reference, with no runtime changes |
 | [Multipart movies and dedicated FC2 browsing](plan/2026-10-04-multipart-movies-and-fc2-library.md) | Locally verified support for same-code video parts, separate Movies/FC2 browsing and shared Watch History; storage and tags remain shared |
+| [FC2 metadata reliability](plan/2026-10-06-fc2-metadata-reliability.md) | Dedicated sources, bounded field enrichment, access errors and image provenance; live FC2-3977618 metadata and cover verification |
 | [Wishlist design and implementation plan](plan/2026-09-22-wishlist.md) | Implemented code-only intake, server enrichment, persistent images, import reuse and backup; includes local verification evidence and remaining live-site acceptance |
 | [September code review and fixes](plan/2026-09-05-project-code-review.md) | Installer lifetime, Agent proxy/session isolation, frame stepping, and regression evidence |
 | [Agent charter](plan/2026-08-18-agent-charter.md) | Constitutional rules for all Agent/AI features (principles, architecture, tool registry, roadmap) |
