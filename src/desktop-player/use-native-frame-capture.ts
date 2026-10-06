@@ -13,7 +13,9 @@ export function useNativeFrameCapture(bridge: DesktopPlayerBridge | undefined, s
   const busy = ref(false), receipt = ref<Receipt>(), previewOpen = ref(false)
   const keyCode = ref("KeyC"), feedbackSoundEnabled = ref(true)
   const result = shallowRef<DesktopPlaybackCapture>()
-  let timer: ReturnType<typeof setTimeout> | undefined
+  let receiptTimer: ReturnType<typeof setTimeout> | undefined
+  let clipTimer: ReturnType<typeof setTimeout> | undefined
+  const dismissedClip = ref("")
   let disposed = false
   let generation = 0
   let prepared: Promise<DesktopPlaybackCapture | undefined> | undefined
@@ -24,21 +26,33 @@ export function useNativeFrameCapture(bridge: DesktopPlayerBridge | undefined, s
   const clip = usePlayerClipCapture({ currentTime: computed(() => snapshot.value?.state.positionSec ?? 0),
     duration: computed(() => snapshot.value?.state.durationSec ?? 0), onClipReady: () => commit(true) })
   const recording = clip.isRecording
-  const clipStatus = computed(() => snapshot.value?.clip)
+  const clipKey = computed(() => snapshot.value?.clip ? `${snapshot.value.sessionId}:${snapshot.value.clip.frameId}:${snapshot.value.clip.phase}` : "")
+  const clipStatus = computed(() => clipKey.value !== dismissedClip.value ? snapshot.value?.clip : undefined)
+  const clipFeedback = computed(() => recording.value || Boolean(clipStatus.value))
 
-  function dismiss() { clearTimeout(timer); receipt.value = undefined; result.value = undefined; previewOpen.value = false }
+  function dismissReceipt() { clearTimeout(receiptTimer); receipt.value = undefined; result.value = undefined; previewOpen.value = false }
+  function dismiss() {
+    clearTimeout(clipTimer)
+    dismissedClip.value = clipKey.value
+    clip.reset()
+    dismissReceipt()
+  }
   function expire() {
-    clearTimeout(timer)
-    if (receipt.value?.committed && !previewOpen.value) timer = setTimeout(dismiss, 8000)
+    clearTimeout(receiptTimer)
+    // GIF 的起始静态帧只作为同一次录制的回执，不在 GIF 提示退出后重新出现。
+    if (receipt.value?.committed && !previewOpen.value && snapshot.value?.clip?.frameId !== result.value?.id) {
+      receiptTimer = setTimeout(dismissReceipt, 2000)
+    }
   }
   watch(() => snapshot.value?.sessionId, () => { invalidatePress(); clip.reset(); dismiss() }, { flush: "sync" })
   watch(previewOpen, expire)
-  watch(() => snapshot.value?.clip?.phase, phase => {
-    if (phase && phase !== "processing") {
-      clip.phase.value = phase === "saved" ? "success" : phase === "error" ? "error" : "idle"
-      clearTimeout(timer)
-      if (phase !== "error") timer = setTimeout(() => { clip.reset(); dismiss() }, 8000)
-    }
+  watch(clipKey, () => {
+    clearTimeout(clipTimer)
+    const task = snapshot.value?.clip
+    if (!task) return
+    clearTimeout(receiptTimer)
+    clip.phase.value = task.phase === "processing" ? "processing" : task.phase === "saved" ? "success" : task.phase === "error" ? "error" : "idle"
+    if (task.phase === "saved" || task.phase === "cancelled") clipTimer = setTimeout(dismiss, 1600)
   })
 
   async function preferences() {
@@ -52,12 +66,13 @@ export function useNativeFrameCapture(bridge: DesktopPlayerBridge | undefined, s
   async function capture(retry = false) {
     const current = snapshot.value
     if (!bridge || !current || !available.value || pressed || prepared) return
-    const retryId = retry ? result.value?.id : undefined
+    const candidate = result.value, preview = receipt.value?.preview ?? ""
+    const retryId = retry ? candidate?.id : undefined
     if (retry && !retryable.value) return
-    clearTimeout(timer)
+    dismiss()
     busy.value = true
     receipt.value = { movie: { code: current.movie?.code ?? "" }, phase: "saving", committed: false,
-      positionSec: retry ? result.value!.positionSec : current.state.positionSec, preview: retry ? receipt.value?.preview ?? "" : "", error: "" }
+      positionSec: retry ? candidate!.positionSec : current.state.positionSec, preview: retry ? preview : "", error: "" }
     if (!retry) { result.value = undefined; void playCuratedCaptureTriggerCue(feedbackSoundEnabled.value) }
     try {
       const next = await bridge.capture(current.sessionId, retryId)
@@ -74,7 +89,7 @@ export function useNativeFrameCapture(bridge: DesktopPlayerBridge | undefined, s
   }
   function startPress() {
     if (!bridge || !available.value || pressed || prepared || previewOpen.value) return
-    clip.reset(); dismiss()
+    dismiss()
     const current = snapshot.value!
     const epoch = ++generation
     pressSession = current.sessionId; pressed = true
@@ -111,7 +126,8 @@ export function useNativeFrameCapture(bridge: DesktopPlayerBridge | undefined, s
       result.value = next
       receipt.value = { movie: { code: next.code }, positionSec: next.positionSec, preview: next.preview, phase: next.phase === "saved" ? "saved" : "error",
         committed: next.phase === "saved", error: next.error ? message(next.error) : "" }
-      if (!snapshot.value.clip) { clip.reset(); expire() }
+      if (snapshot.value.clip?.frameId !== next.id) clip.reset()
+      expire()
     } catch (failure) {
       if (epoch === generation && !disposed) {
         clip.reset()
@@ -143,5 +159,5 @@ export function useNativeFrameCapture(bridge: DesktopPlayerBridge | undefined, s
   }
   onBeforeUnmount(() => { disposed = true; invalidatePress(); dismiss(); disposeCuratedCaptureFeedbackAudio() })
   return { busy, receipt, previewOpen, keyCode, available, retryable, capture, dismiss, preferences, startPress, finishPress, cancelPress,
-    recording, phase: clip.phase, elapsedSec: clip.elapsedSec, progress: clip.progress, clipStatus, clipAction }
+    recording, phase: clip.phase, elapsedSec: clip.elapsedSec, progress: clip.progress, clipStatus, clipFeedback, clipAction }
 }

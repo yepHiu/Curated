@@ -12,7 +12,7 @@ const message = computed(() => props.recording ? t("player.clipRecording") : pro
   : props.clip?.error === "CLIP_TIMED_OUT" ? t("player.clipExportTimedOut") : props.clip?.error === "CLIP_STATUS_UNAVAILABLE" ? t("player.clipStatusUnavailable") : t("player.clipExportFailed"))
 </script>
 <template>
-  <div data-native-clip-feedback class="absolute left-1/2 w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-border bg-background px-4 py-3 text-foreground shadow-lg" @click.stop @pointerdown.stop @keydown.stop>
+  <div data-native-clip-feedback class="absolute left-1/2 z-20 w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-border bg-background px-4 py-3 text-foreground shadow-lg" @click.stop @pointerdown.stop @keydown.stop>
     <div class="flex flex-wrap items-center gap-2 text-sm font-semibold">
       <Circle v-if="recording" class="size-3 shrink-0 fill-danger text-danger" aria-hidden="true" />
       <Loader2 v-else-if="clip?.phase === 'processing'" class="size-4 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" />

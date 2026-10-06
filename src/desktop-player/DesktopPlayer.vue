@@ -33,7 +33,14 @@ const focusedControl = ref(false)
 const draft = ref<number>()
 const surface = ref<HTMLElement>()
 const footer = ref<HTMLElement>()
+const playbackControls = ref<HTMLElement>()
 const { height: footerHeight } = useElementSize(footer, { width: 0, height: 0 }, { box: "border-box" })
+const { height: controlsHeight } = useElementSize(playbackControls, { width: 0, height: 0 }, { box: "border-box" })
+const { width: surfaceWidth } = useElementSize(surface)
+// 对齐 Web 的回执位置，只避让实际进度条/按钮，不把渐变留白与时间行算作控件。
+const feedbackClearance = computed(() => controlsHeight.value + (surfaceWidth.value >= 640 ? 20 : 16) + 12)
+const receiptBottom = computed(() => Math.max(surfaceWidth.value >= 640 ? 96 : 176, feedbackClearance.value))
+const clipBottom = computed(() => Math.max(128, feedbackClearance.value))
 const { locale, t: uiT } = useI18n()
 const lang = computed(() => snapshot.value?.locale === "en-US" ? "en" : snapshot.value?.locale === "ja-JP" ? "ja" : "zh-CN")
 const extra = computed(() => lang.value === "en" ? { web: "Use Web player", auto: "Auto-advance", previous: "Previous movie", next: "Next movie" }
@@ -43,8 +50,7 @@ function t(key: NativeMessage) { return nativeMessages[lang.value][key] }
 const capture = useNativeFrameCapture(bridge, snapshot, code => t(code === "CAPTURE_SAVE_FAILED" ? "captureSaveFailed"
   : code === "CAPTURE_TOO_LARGE" ? "captureTooLarge" : code === "CAPTURE_NOT_READY" ? "captureNotReady" : "captureFailed"))
 const captureLabel = computed(() => `${t("capture")} (${formatCuratedCaptureKeyLabel(capture.keyCode.value)})`)
-const clipFeedback = computed(() => capture.recording.value || capture.clipStatus.value && !clipDismissed.value)
-const clipDismissed = ref(false)
+const clipFeedback = capture.clipFeedback
 const state = computed(() => snapshot.value?.state)
 const playing = computed(() => state.value?.status === "playing")
 const active = computed(() => state.value?.status === "playing" || state.value?.status === "paused")
@@ -134,7 +140,7 @@ function keydown(event: KeyboardEvent) {
   if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || capture.previewOpen.value || shouldIgnoreGlobalPlaybackHotkeysForTarget(event.target)) return
   if (event.code === capture.keyCode.value) {
     event.preventDefault()
-    if (!event.repeat && !busy.value) { clipDismissed.value = false; capture.startPress() }
+    if (!event.repeat && !busy.value) capture.startPress()
     immersive.revealChrome()
     return
   }
@@ -153,7 +159,6 @@ function keyup(event: KeyboardEvent) {
 }
 function startCapture(event: PointerEvent) {
   if (event.button !== 0 || busy.value) return
-  clipDismissed.value = false
   ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
   capture.startPress()
 }
@@ -161,7 +166,6 @@ function captureClick(event: MouseEvent) {
   if (event.detail === 0) void capture.capture()
 }
 function toggleGif() {
-  clipDismissed.value = false
   if (capture.recording.value || capture.phase.value === "armed") capture.finishPress()
   else capture.startPress()
 }
@@ -206,9 +210,9 @@ onBeforeUnmount(() => {
     <NativePlaybackInfo v-if="diagnostics" :state="state" :lang="lang" :busy="infoBusy" :feedback="infoFeedback"
       :style="{ bottom: `${footerHeight + 12}px` }" @close="closeDiagnostics" @copy="exportDiagnostics('copy')" @save="exportDiagnostics('save')" />
     <NativeClipCaptureFeedback v-if="clipFeedback" :recording="capture.recording.value" :elapsed-sec="capture.elapsedSec.value" :progress="capture.progress.value" :clip="capture.clipStatus.value" :busy="capture.busy.value"
-      :style="{ bottom: `${footerHeight + 12}px` }" @cancel="cancelGif" @retry="capture.clipAction('retry')" @dismiss="clipDismissed = true" />
+      :style="{ bottom: `${clipBottom}px` }" @cancel="cancelGif" @retry="capture.clipAction('retry')" @dismiss="capture.dismiss" />
     <CaptureReceipt v-if="capture.receipt.value && !clipFeedback" :job="capture.receipt.value" :pending="capture.busy.value ? 1 : 0" :retryable="capture.retryable.value"
-      :style="{ bottom: `${footerHeight + 12}px` }"
+      :style="{ bottom: `${receiptBottom}px` }"
       @retry="capture.capture(true)" @view="capture.previewOpen.value = true" @dismiss="capture.dismiss" />
     <p class="sr-only" role="status" aria-live="polite">{{ capture.receipt.value ? uiT(capture.busy.value ? 'curated.captureSaving' : capture.receipt.value.committed ? 'curated.captureSaved' : 'curated.captureFailed') : '' }} {{ capture.receipt.value?.error }}</p>
     <Dialog v-model:open="capture.previewOpen.value">
@@ -221,8 +225,9 @@ onBeforeUnmount(() => {
     <footer ref="footer" class="absolute inset-x-0 bottom-0 flex flex-col gap-3 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-4 pt-12 transition-opacity sm:p-5 sm:pt-12" :class="chromeShown ? 'opacity-100' : 'pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100'">
       <Alert v-if="error || state?.error || state?.progressError" variant="destructive"><AlertTitle>{{ error || state?.error || t('saveFailed') }}</AlertTitle></Alert>
       <div class="flex items-center justify-between gap-3 text-sm text-white/80 tabular-nums"><span>{{ time(draft ?? state?.positionSec ?? 0) }} / {{ time(state?.durationSec ?? 0) }}</span><span class="max-w-[55%] truncate">{{ currentFile?.fileName }}</span></div>
-      <Slider :model-value="[draft ?? state?.positionSec ?? 0]" :max="Math.max(1, state?.durationSec ?? 0)" :step="0.1" :disabled="!active || busy" :aria-label="t('time')" @update:model-value="draft = $event?.[0]" @value-commit="command({ action: 'seek', value: $event?.[0] }); draft = undefined" />
-      <PlayerTransportControls :playing="playing" :disabled="!active || busy" :volume-values="[state?.volume ?? 100]" :volume-percent="state?.volume ?? 100" :muted="state?.volume === 0" :labels="labels" @toggle="toggle" @seek-back="seek(-10)" @seek-forward="seek(10)" @mute="mute" @volume="volume">
+      <div ref="playbackControls" class="flex flex-col gap-3">
+        <Slider :model-value="[draft ?? state?.positionSec ?? 0]" :max="Math.max(1, state?.durationSec ?? 0)" :step="0.1" :disabled="!active || busy" :aria-label="t('time')" @update:model-value="draft = $event?.[0]" @value-commit="command({ action: 'seek', value: $event?.[0] }); draft = undefined" />
+        <PlayerTransportControls :playing="playing" :disabled="!active || busy" :volume-values="[state?.volume ?? 100]" :volume-percent="state?.volume ?? 100" :muted="state?.volume === 0" :labels="labels" @toggle="toggle" @seek-back="seek(-10)" @seek-forward="seek(10)" @mute="mute" @volume="volume">
         <Button variant="ghost" size="icon" class="rounded-full" :disabled="!capture.available.value || busy" :aria-label="captureLabel" :title="captureLabel" @pointerdown="startCapture" @pointerup="capture.finishPress" @pointercancel="capture.cancelPress" @click="captureClick"><Loader2 v-if="capture.busy.value" class="animate-spin motion-reduce:animate-none" /><Camera v-else /></Button>
         <Button variant="ghost" size="icon" class="rounded-full" :disabled="((!playing || !capture.available.value) && !capture.recording.value) || busy" :aria-label="capture.recording.value ? uiT('curated.stopClip') : 'GIF'" :title="capture.recording.value ? uiT('curated.stopClip') : 'GIF'" :aria-pressed="capture.recording.value" @click="toggleGif"><Film /></Button>
         <Button variant="ghost" size="icon" class="rounded-full" :disabled="queueIndex <= 0 || busy" :aria-label="extra.previous" @click="command({ action: 'movie', movieId: snapshot!.queue[queueIndex - 1]! })"><SkipBack /></Button>
@@ -232,7 +237,8 @@ onBeforeUnmount(() => {
         <Button variant="ghost" size="icon" class="rounded-full" :aria-label="extra.web" :title="extra.web" @click="command({ action: 'web' })"><Monitor /></Button>
         <Button data-native-info-trigger variant="ghost" size="icon" class="rounded-full" :aria-label="nativePlaybackInfoMessages[lang].title" :aria-pressed="diagnostics" @click="diagnostics = !diagnostics"><Info /></Button>
         <Button variant="ghost" size="icon" class="rounded-full" :aria-label="snapshot?.fullscreen ? t('exitFullscreen') : t('fullscreen')" :aria-pressed="snapshot?.fullscreen" @click="command({ action: 'fullscreen' })"><Minimize2 v-if="snapshot?.fullscreen" /><Maximize2 v-else /></Button>
-      </PlayerTransportControls>
+        </PlayerTransportControls>
+      </div>
     </footer>
   </main>
 </template>

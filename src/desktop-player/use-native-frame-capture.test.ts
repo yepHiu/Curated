@@ -24,6 +24,96 @@ function fixture() {
   return { snapshot, bridge, capture, wrapper }
 }
 describe("native frame receipt lifecycle", () => {
+  it("expires a saved still after two seconds, keeping image preview open until it is closed", async () => {
+    vi.useFakeTimers()
+    const f = fixture()
+    try {
+      f.capture.startPress()
+      f.capture.finishPress()
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(1999)
+      expect(f.capture.receipt.value?.committed).toBe(true)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(f.capture.receipt.value).toBeUndefined()
+      await f.capture.capture()
+      f.capture.previewOpen.value = true
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(f.capture.receipt.value?.preview).toBe(frame.preview)
+      expect(f.capture.previewOpen.value).toBe(true)
+      f.capture.previewOpen.value = false
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(f.capture.receipt.value).toBeUndefined()
+    } finally { f.wrapper.unmount(); vi.useRealTimers() }
+  })
+  it("expires GIF success without showing its still receipt again or resetting on repeated snapshots", async () => {
+    vi.useFakeTimers()
+    const f = fixture()
+    try {
+      f.bridge.commitCapture.mockImplementationOnce(async () => {
+        f.snapshot.value.clip = { frameId: frame.id, startSec: 12, endSec: 14, phase: "processing", progress: 25 }
+        return frame
+      })
+      f.capture.startPress()
+      await flushPromises()
+      f.snapshot.value.state.positionSec = 14
+      await vi.advanceTimersByTimeAsync(500)
+      f.capture.finishPress()
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(f.capture.clipFeedback.value).toBe(true)
+      expect(f.capture.clipStatus.value?.phase).toBe("processing")
+      f.snapshot.value.clip!.phase = "saved"
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(800)
+      f.snapshot.value = { ...f.snapshot.value, revision: 2, clip: { ...f.snapshot.value.clip! } }
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(799)
+      expect(f.capture.clipStatus.value?.phase).toBe("saved")
+      await vi.advanceTimersByTimeAsync(1)
+      expect(f.capture.clipFeedback.value).toBe(false)
+      expect(f.capture.receipt.value).toBeUndefined()
+      expect(f.snapshot.value.clip?.phase).toBe("saved")
+      f.snapshot.value = { ...f.snapshot.value, revision: 3, clip: { ...f.snapshot.value.clip! } }
+      await nextTick()
+      expect(f.capture.clipStatus.value).toBeUndefined()
+      f.snapshot.value.clip = { frameId: "new-frame", startSec: 20, endSec: 23, phase: "processing", progress: 0 }
+      await nextTick()
+      expect(f.capture.clipFeedback.value).toBe(true)
+      f.snapshot.value.clip.phase = "error"
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(f.capture.clipStatus.value?.phase).toBe("error")
+      await f.capture.clipAction("retry")
+      expect(f.bridge.retryClip).toHaveBeenCalledWith("one")
+    } finally { f.wrapper.unmount(); vi.useRealTimers() }
+  })
+  it("does not let an old GIF timer dismiss a new still, and clears both results on manual dismissal", async () => {
+    vi.useFakeTimers()
+    const f = fixture()
+    try {
+      f.snapshot.value.clip = { frameId: "old-frame", startSec: 1, endSec: 2, phase: "saved", progress: 100 }
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(1000)
+      f.capture.startPress()
+      f.capture.finishPress()
+      await flushPromises()
+      // Main may not have published the cleared old clip yet: it must not suppress still expiry.
+      expect(f.capture.clipFeedback.value).toBe(false)
+      await vi.advanceTimersByTimeAsync(600)
+      expect(f.capture.receipt.value?.committed).toBe(true)
+      await vi.advanceTimersByTimeAsync(1400)
+      expect(f.capture.receipt.value).toBeUndefined()
+      f.snapshot.value.clip = { frameId: "next-frame", startSec: 3, endSec: 4, phase: "saved", progress: 100 }
+      await nextTick()
+      f.capture.dismiss()
+      expect(f.capture.clipFeedback.value).toBe(false)
+      expect(f.capture.receipt.value).toBeUndefined()
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(f.capture.clipFeedback.value).toBe(false)
+    } finally { f.wrapper.unmount(); vi.useRealTimers() }
+  })
   it("commits a short press once after preparing the actual starting frame", async () => {
     const f = fixture()
     try {
