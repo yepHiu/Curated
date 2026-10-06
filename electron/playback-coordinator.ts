@@ -174,7 +174,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       locale: input.locale ?? "zh-CN", sourceQuery: structuredClone(input.sourceQuery ?? {}) }
     this.lastContext = context
       this.surface ??= await this.createSurface()
-      await this.surface.setTitle(movie.title?.trim() || movie.code || "Curated")
+      await this.surface.setTitle(movie.code?.trim() || "Curated")
       const proxy = new NativeMediaProxy(`${context.origin}/api/library/movies/${encodeURIComponent(movie.id)}/stream?fileId=${encodeURIComponent(fileId)}`, async (url, init) => {
         const response = await context.fetch(url, init)
         if (response.status === 401 || response.status === 403) {
