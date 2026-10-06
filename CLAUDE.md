@@ -24,6 +24,10 @@ This supersedes earlier Full release plans below. New production releases use on
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Windows native engine distribution — 2026-10-07
+
+Windows `stage_desktop` now requires a prepared absolute `CURATED_NATIVE_BUNDLE`. `prepare_native_player.py` consumes the immutable MSYS2 production lock, validates binary/source recipe hashes and selected runtime checksums, preserves package build records, all corresponding source snapshots/Cargo dependencies and licenses, and creates a deduplicated Zstandard archive with offline restoration. The x64 PE import/delay-import closure must be fully bundled or a known Windows system DLL. mpv/FFmpeg licenses remain third-party terms; Curated remains MIT. Packaged playback ignores the development executable override. CD installs the host compiler and verifies native operation from the installed path with synthetic authenticated media/minimal PATH; Mac stays Web. No new business API, library-config or IPC endpoint. Install/release evidence: native plan §14.18.
+
 ## Windows Desktop native integration — 2026-10-06 (branch source)
 
 Formal main/preload now expose optional `window.javLibrary.playback`: capabilities, setPreferences, open, snapshot, command(sessionId, enum), subscribe and onWebFallback. Only the committed trusted main frame may open/change preferences; local `window.curatedPlayer` controls the current session through a separate preload. `NativePlaybackCoordinator` owns mpv/proxy/host, one serial session, captured current main Session/origin/generation, file identity, frozen queue/source query and native progress/history/daily watch-time writes. Router chooses native before PlayerView/HLS prefetch; dedicated local player reuses existing round controls and the helper's exclusive physical geometry. Default is Web; per-machine preference/volume/speed live in userData/playback-settings.json.

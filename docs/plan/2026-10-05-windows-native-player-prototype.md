@@ -687,3 +687,18 @@ UI：复用 usePlayerClipCapture 的媒体时钟状态机，起点以主进程�
 正式 production main + 隔离 profile + 认证合成 Server/真实 mpv/真实 GIF 生成验证：986×763、640×480、626×444 下静态回执均比原先下降约 80px，与进度/按钮区域保持约 12px 间距，全部操作可见且无横向溢出；成功回执自动退出。大图打开超过 2 秒仍保留、关闭后自动退出；真实 GIF 成功后自动退出，main 仍保留 saved，但后续快照不再显示 GIF 或其起始帧。失败图片等待超过 2 秒仍可重试、成功后退出；hold 任务处理反馈保持、真实点击取消后自动退出。最终在 640×480/626×444 再验证 GIF 录制反馈及取消按钮中心命中、实际取消与退出，确认 z-20 生效。证据位于 ignored output/playwright/desktop-player/capture-feedback-ui.log 和 capture-feedback-narrow.log；全部截帧/GIF 为合成素材，没有截图或萃取用户影片，没有写入共享 Server 的帧库。
 
 验收 fixture 已退出，日常测试 Desktop 已重启到本轮产物。重启前不存在活动原生窗口（保存 intent 为 null），因此不自动起播旧影片。未运行 test:display、混合 DPI、真实 LAN/HTTPS 或安装验收；UI 约定同步规范与组件规则。未改版本、push、合并或发布。
+
+
+### 14.18 原生引擎分发材料与生产流水线（2026-10-07）
+
+用户明确本次生产包必须包含原生播放器，先补齐分发材料与流水线。此前开发 QA pin 保持 distributionReady=false，不能因开发播放成功就作为生产来源。Windows stage_desktop 改为强制 prepared CURATED_NATIVE_BUNDLE；缺引擎/源码/构建/许可、SHA 或 DLL 闭包失败均拒绝出包。macOS 继续 Web；本机 preferNative 默认 false 不变。
+
+生产来源采用 MSYS2 UCRT64 mpv 0.41.0-8，运行时 FFmpeg libraries 9.0.2-1。windows-x64-production.json 固定 105 个提供运行文件的二进制包（131 文件）、153 份源码快照和 731 份 Cargo crate 的 URL/SHA；开发 shinchiro pin 与生产 lock 分开。每个二进制 .BUILDINFO 的 pkgbuild_sha256sum 与对应源码 PKGBUILD 原文 SHA 完全一致，保存完整 .BUILDINFO/.PKGINFO、版本/许可证目录、原始上游源码包或准确 Git 源码、补丁与构建配方。头文件/静态依赖快照与 Rust 锁文件的 crates-io 依赖均包含，恢复脚本生成离线 Cargo vendor/checksum/config；不把可变化的仓库首页作为对应源码。
+
+源码归档保留原始文件字节，通过 SHA blobs 去重，使用 complete-sources.tar.zst（1435.88 MiB）。whisper.cpp 原始 Git 缓存约 710 MB，固定在 60c0be6ac8fa71b1a2ae2dd938a31a34a508e774 并保留 184 层/标签及 9 位缩写后约 9 MB；assert 原提交、源码树及 v1.9.4-183-g60c0be6ac 均一致，只省略无关更早历史，不改变源码/PKGBUILD。CURATED-SOURCE-SNAPSHOT.json 保存原始源码包 SHA 与还原策略。包内 120 个许可/说明/恢复文件及 884 个源码组件条目，mpv 的 GPL/Copyright 与 FFmpeg COPYING 原文独立保存。引擎总资料 1620.94 MiB，离线材料使本次 Windows 包明显大于旧 Web-only 包；后续若需更小交付，应评估可控的精简构建，不能删掉必需对应源码来缩包。
+
+staging 只复制声明文件，重新 hash 并检查 x64 PE normal/delay DLL import 闭包，除明确 Windows 系统 DLL/API set 外必须有本地 DLL。正式运行始终选择 resources/app/native-player/mpv.exe，忽略开发 CURATED_NATIVE_MPV；不把 Server 的 ffmpeg.exe/ffprobe.exe 带入 Desktop。CD 显式装 UCRT64 gcc/windres，按 lock 缓存下载输入，Python 3.12 安装固定 Zstandard wheel，准备/校验后出包；Windows 作业期限为 90 分钟。windows_smoke 在真实安装器生命周期之外增加安装目录原生播放验证，以合成 H.264/AAC/HttpOnly Cookie/HTTP Range、最小 PATH、无效开发引擎覆盖完成播放、seek、PNG、换片和退出回收；不依赖开发机 mpv 或 MSYS PATH。
+
+本地已通过：19 文件/140 项真实候选引擎 Electron 测试；312 文件/1688 项前端；全量 lint/typecheck、生产 Web 与 Electron 构建、Go test ./... 和 vet；actionlint 检查新 CD 工作流。最终 stage_desktop 生成的正式结构 payload 又通过最小 PATH 的实际认证播放、媒体时钟、seek、320×180 原图、part replacement、安装目录 executable 和无遗留子进程检查。全部媒体均为合成样本，没有截取用户影片或写共享 Server。
+
+本地完整源码已从归档离线恢复，Git 长路径选项下核对 whisper.cpp 为原提交、原树 e08fcfd8890eccc6d7e13b2b809c4a483c34516f 和原版本号；恢复的 Cargo vendor/config 与校验材料均存在。真实 Inno 编译 260.515 秒成功，QA installer 1723432848 bytes（1643.59 MiB）；最终 102 项 release pipeline 测试通过。之后从干净提交准备 20261007 批次并触发不可变标签 CD，实际 Windows 安装/升级/卸载与 Mac 验收成功才允许公开。具体 run/tag/version 将回填本节。本地 payload 成功不等同已发布；更多片源、整片 A/V、混合 DPI、真实 LAN/HTTPS 仍沿原边界继续待验。
