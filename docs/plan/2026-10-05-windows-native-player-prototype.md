@@ -718,3 +718,11 @@ staging 只复制声明文件，重新 hash 并检查 x64 PE normal/delay DLL im
 本地真实 Inno 编译通过，用时 114.859 秒；安装器 221382516 bytes（约 221 MB / 211 MiB），对比原 1723432848 bytes 减少约 87%。安装后 payload 653061110 bytes（约 623 MiB），独立来源 ZIP 1508785338 bytes（约 1.41 GiB）。正式结构精简 payload 在最小 PATH、无效开发 mpv override、认证 HTTP Range 下通过播放、seek、320×180 PNG、换片、安装目录引擎及退出回收；未截图/截帧用户影片，未写共享 Server。源码资产缺失/损坏/异批/错误引擎 lock、安装目录误带归档与更新清单隔离都有发布脚本回归覆盖；最终测试与新批次 run 记录随后回填。
 
 精简交付的全量 release pipeline 105 项通过，新增批次声明/下载说明后相关 40 项再次通过；真实 1.41 GiB 来源 ZIP 也通过发布校验器与本仓库准确引擎 lock 对照。仅打包/发布脚本修改，无前端/Go/播放实现变化；没有重复执行无变化的 UI 或媒体功能全量测试。已准备并推送新不可变 release-20261007-2，固定提交 c5f40bf7aa2d357c67fc82b5eb497afaa92599ff，版本仍为 Server 1.7.10 / Desktop 0.2.5（前一批未公开，不移动旧标签）。[CD run 37505997682](https://github.com/yepHiu/Curated/actions/runs/37505997682) 已触发并排队，实际生产安装/升级/播放器验收与全资产上传成功后自动公开。运行状态与本地 QA 大小不代表已发布或最终生产文件字节数。
+
+### 14.20 Windows 发布 Go 缓存策略优化（2026-10-07）
+
+用户要求优化发布作业的 Go 缓存耗时。[Windows job 112417874727](https://github.com/yepHiu/Curated/actions/runs/37505997682/job/112417874727) 共 25 分 44 秒，Setup Go 本身仅 21 秒；结尾 Post setup-go 保存缓存耗时 7 分 35 秒，约占作业 29.5%。日志中 tar/zstd 命令从 18:10:39 UTC 执行至约 18:18:12，上传 246633924 bytes 仅约 2 秒。证据定位到本地读取、归档和压缩阶段，不能进一步断言全部时间由压缩 CPU 或文件扫描造成。本次缓存未命中，缓存列表显示相同 key 在多个不同发布 ref 下分别保存，跨发布标签不能保证复用。
+
+实施：只在 `.github/workflows/cd-release.yml` 的 Windows build 作业为 `actions/setup-go@v5` 显式设置 `cache: false`，移除已无用途的 cache-dependency-path。保留 backend/go.mod 的 Go 版本选择及 Go 默认本机缓存路径；同一作业内多次构建仍复用本机模块和编译缓存。Linux backend-quality 的现有缓存、pnpm 缓存及原生引擎输入缓存保持现状；构建、安装和播放器验收门禁继续执行。发布标签作业不再恢复或保存 setup-go 缓存，因此不再因这项 post 归档阻塞后续发布。
+
+代价与验收：Windows 发布需要冷下载依赖、冷编译；净收益以未来采用此提交的 CD 运行实测为准，不把本次 7 分 35 秒直接承诺为净节省。下一次核对 Go setup 无缓存恢复、无 Post setup-go 缓存保存，并比较 Windows 作业整体耗时与实际构建耗时。若后续冷下载成为瓶颈，再根据日志评估只读恢复模块缓存；本次不新增缓存维护流水线。actionlint v1.7.7 已通过 CD 工作流检查（关闭外部 shellcheck/pyflakes 集成）；本次仅修改 CI 配置，无需重跑 UI、Go 业务测试或生成生产包。修改在专用分支本地提交，不改版本或既有不可变标签；现有 run 使用其原始工作流，新策略需推送并由后续包含该修改的发布运行采用。
