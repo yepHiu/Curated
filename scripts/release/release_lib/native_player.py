@@ -5,8 +5,8 @@ import json
 import os
 from pathlib import Path
 import shutil
-from zipfile import ZipFile
 from .pe_imports import imports
+from .native_materials import read_source_index
 
 WINDOWS_IMPORTS = set(('advapi32 avicap32 avrt bcrypt bcryptprimitives cfgmgr32 crypt32 dnsapi '
     'dwmapi dwrite gdi32 gdiplus imm32 iphlpapi kernel32 msimg32 ncrypt ntdll ole32 oleaut32 '
@@ -66,10 +66,12 @@ def validate_native_bundle(directory: Path) -> dict:
             missing = imports(directory / item['file']) - runtime_names - system
             if missing:
                 raise ValueError(f"Native engine dependency missing for {item['file']}: {sorted(missing)}")
-        with ZipFile(directory / manifest['correspondingSource']['file']) as source:
-            index = json.loads(source.read('source-index.json'))
+        index, cargo = read_source_index(directory / manifest['correspondingSource']['file'])
+        crates = {c['name'] + '-' + c['version'] for c in cargo}
         for component in components:
-            if component['sourcePath'].removeprefix('snapshots/') not in index:
+            source_path = component['sourcePath']
+            if not ((source_path.startswith('snapshots/') and source_path.removeprefix('snapshots/') in index)
+                    or (source_path.startswith('vendor/') and source_path.removeprefix('vendor/') in crates)):
                 raise ValueError('Native engine component has no corresponding source snapshot')
     return manifest
 
