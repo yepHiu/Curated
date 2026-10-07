@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -30,8 +31,9 @@ var (
 
 // Client keeps one browser transport while reading the current proxy for each request.
 type Client struct {
-	http  *req.Client
-	bases map[string]string
+	http    *req.Client
+	bases   map[string]string
+	timeout time.Duration
 }
 
 // NewClient 设置 Chrome TLS/HTTP2 特征、响应上限和动态代理，不依赖浏览器会话。
@@ -40,6 +42,7 @@ func NewClient(timeout time.Duration) *Client {
 		timeout = 20 * time.Second
 	}
 	return &Client{
+		timeout: timeout,
 		http: req.C().ImpersonateChrome().SetTimeout(timeout).SetMaxResponseSize(4<<20).
 			SetProxy(proxyenv.ProxyFromEnvironment).SetRedirectPolicy(req.MaxRedirectPolicy(5), req.SameHostRedirectPolicy()),
 		bases: map[string]string{
@@ -179,8 +182,35 @@ func validateDetailIdentity(doc *goquery.Document, provider, digits, homepage st
 	return nil
 }
 
-// fetch 保留 403/验证页错误，限制读取大小，并使所有请求随任务取消。
+// fetch 对连接提前关闭最多重试一次，两次请求共用时间预算并响应任务取消。
 func (c *Client) fetch(ctx context.Context, provider, target, referer string) (*goquery.Document, string, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	doc, finalURL, err := c.fetchOnce(ctx, provider, target, referer)
+	if ctx.Err() != nil {
+		return nil, "", fmt.Errorf("%s request canceled: %w", provider, ctx.Err())
+	}
+	if err == nil || !retryableConnectionError(err) {
+		return doc, finalURL, err
+	}
+	timer := time.NewTimer(200 * time.Millisecond)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return nil, "", fmt.Errorf("%s request retry canceled: %w", provider, ctx.Err())
+	case <-timer.C:
+	}
+	return c.fetchOnce(ctx, provider, target, referer)
+}
+
+// retryableConnectionError 只重试连接中断，不重试状态码、验证页、解析或身份错误。
+func retryableConnectionError(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNABORTED)
+}
+
+// fetchOnce 保留 403/验证页错误，限制读取大小，并使所有请求随任务取消。
+func (c *Client) fetchOnce(ctx context.Context, provider, target, referer string) (*goquery.Document, string, error) {
 	response, err := c.http.R().SetContext(ctx).SetHeader("Referer", referer).
 		SetHeader("Accept-Language", "ja,zh-TW;q=0.9,en;q=0.8").DisableAutoReadResponse().Get(target)
 	if err != nil {
