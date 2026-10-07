@@ -29,6 +29,8 @@ vi.mock("vue-i18n", () => ({
 }))
 
 vi.mock("lucide-vue-next", () => ({
+  Check: { name: "Check", template: "<span />" },
+  Download: { name: "Download", template: "<span />" },
   BookOpen: { name: "BookOpen", template: "<span />" },
   Database: { name: "Database", template: "<span />" },
   FolderOpen: { name: "FolderOpen", template: "<span />" },
@@ -246,7 +248,7 @@ describe("SettingsComicLibrarySection", () => {
     expect(wrapper.find("[data-comic-auto-watch]").exists()).toBe(true)
     expect(wrapper.find("[data-comic-reader]").exists()).toBe(true)
     expect(wrapper.find("[data-comic-cache]").exists()).toBe(true)
-    expect(wrapper.text()).toContain("settings.comicDefaultImportPath")
+    expect(wrapper.text()).toContain("settings.defaultImportPathLabel")
   })
 
   it("toggles automatic comic library watching independently", async () => {

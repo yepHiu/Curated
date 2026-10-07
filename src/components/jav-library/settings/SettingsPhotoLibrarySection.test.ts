@@ -32,6 +32,8 @@ vi.mock("vue-i18n", () => ({
 }))
 
 vi.mock("lucide-vue-next", () => ({
+  Check: { name: "Check", template: "<span />" },
+  Download: { name: "Download", template: "<span />" },
   FolderArchive: { name: "FolderArchive", template: "<span />" },
   FolderOpen: { name: "FolderOpen", template: "<span />" },
   FolderPlus: { name: "FolderPlus", template: "<span />" },
@@ -239,7 +241,7 @@ describe("SettingsPhotoLibrarySection", () => {
     })
     const wrapper = mount(SettingsPhotoLibrarySection)
 
-    expect(wrapper.text()).toContain("settings.photoDefaultImportPath")
+    expect(wrapper.text()).toContain("settings.defaultImportPathLabel")
     await wrapper.get("[data-remove-photo-path='photo-path-1']").trigger("click")
 
     expect(mockState.photoService?.removePhotoLibraryPath).toHaveBeenCalledWith("photo-path-1")
