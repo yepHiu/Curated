@@ -134,7 +134,12 @@ describe.skipIf(process.platform !== "win32" || !existsSync(hostExe))("real Wind
       await host.command("resize", { width: 700, height: 540 })
       await player.control({ action: "resume" })
       await until(() => { return player!.state.positionSec > 7.3 })
+      const captureStates: string[] = []
+      const observeCapture = (state: { status: string }) => { captureStates.push(state.status) }
+      player.on("state", observeCapture)
       const playingFrame = await player.captureFrame()
+      player.off("state", observeCapture)
+      expect(captureStates).not.toContain("paused")
       expect(playingFrame.positionSec).toBeGreaterThan(7.3)
       await until(() => player!.state.status === "playing" && player!.state.positionSec > playingFrame.positionSec + 0.1)
       expect(await player.playbackPosition()).toBeGreaterThan(playingFrame.positionSec)

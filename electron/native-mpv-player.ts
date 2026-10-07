@@ -135,7 +135,7 @@ export class NativeMpvPlayer extends EventEmitter {
   }
 
   /** 命令以独立 request_id 匹配；错误和超时释放对应槽位。 */
-  private command(command: unknown[], timeoutMs = 2000): Promise<unknown> {
+  private command(command: unknown[], timeoutMs = 2000, async = false): Promise<unknown> {
     if (!this.socket || this.socket.destroyed) return Promise.reject(new Error("MPV_NOT_CONNECTED"))
     const id = ++this.sequence
     return new Promise((resolve, reject) => {
@@ -145,7 +145,7 @@ export class NativeMpvPlayer extends EventEmitter {
         reject(new Error("MPV_COMMAND_TIMEOUT"))
       }, timeoutMs)
       this.pending.set(id, { resolve, reject, timer })
-      this.socket!.write(JSON.stringify({ command, request_id: id }) + "\n")
+      this.socket!.write(JSON.stringify({ command, request_id: id, async }) + "\n")
     })
   }
 
@@ -249,20 +249,19 @@ export class NativeMpvPlayer extends EventEmitter {
     return value
   }
 
-  /** 冻结视频帧后取得准确时间；只输出视频，不包含 HUD、标题栏或字幕。 */
+  /** 读取截图前的媒体时间；保持用户播放状态，只输出视频，不包含 HUD、标题栏或字幕。 */
   async captureFrame(): Promise<{ image: Buffer; positionSec: number; capturedAt: string }> {
     if (!["playing", "paused"].includes(this.state.status) || await this.command(["get_property", "seeking"])) throw new Error("CAPTURE_NOT_READY")
-    const paused = await this.command(["get_property", "pause"])
     const directory = await mkdtemp(path.join(tmpdir(), "curated-native-frame-"))
     const filename = path.join(directory, "frame.png")
     try {
-      if (!paused) await this.command(["set_property", "pause", true])
       const positionSec = await this.command(["get_property", "time-pos"])
       if (typeof positionSec !== "number" || !Number.isFinite(positionSec) || positionSec < 0) throw new Error("CAPTURE_NOT_READY")
       const capturedAt = new Date().toISOString()
       try {
-        // 高分辨率 PNG 编码比播放控制慢，独立给出有界期限。
-        await this.command(["screenshot-to-file", filename, "video"], 10000)
+        // mpv 在工作线程编码 PNG；异步 IPC 允许期间继续接收播放控制和时钟事件。
+        // 仍等待完成响应再读取文件，避免上传尚未写完的图像。
+        await this.command(["screenshot-to-file", filename, "video"], 10000, true)
       } catch (error) {
         // 超时必须先结束本引擎的写入，避免清理后又出现迟到的临时文件。
         if (error instanceof Error && error.message === "MPV_COMMAND_TIMEOUT") {
@@ -278,7 +277,6 @@ export class NativeMpvPlayer extends EventEmitter {
       if (image.readUInt32BE(16) * image.readUInt32BE(20) > 3840 * 2160 * 4) throw new Error("CAPTURE_TOO_LARGE")
       return { image, positionSec, capturedAt }
     } finally {
-      if (!paused && !this.closed) await this.command(["set_property", "pause", false]).catch(() => {})
       await unlink(filename).catch(() => {})
       await rmdir(directory).catch(() => {})
     }
