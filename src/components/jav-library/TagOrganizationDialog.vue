@@ -10,7 +10,7 @@ import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useTagOrganization, isOrganizationActive, organizationProgressText, organizationProgressValue, organizationErrorText } from "@/composables/use-tag-organization"
 
@@ -94,7 +94,7 @@ async function showResults(id: string, more = false) {
 
 <template>
   <Dialog v-model:open="state.dialogOpen.value">
-    <DialogContent class="max-h-[85dvh] overflow-y-auto sm:max-w-xl" :show-close-button="false">
+    <DialogContent class="max-h-[85dvh] overflow-y-auto sm:max-w-xl" :show-close-button="false" :aria-describedby="undefined">
       <DialogClose as-child>
         <Button variant="ghost" size="icon" class="absolute top-3 right-3 size-11 rounded-full lg:size-8" :aria-label="t('common.close')">
           <X aria-hidden="true" />
@@ -102,7 +102,6 @@ async function showResults(id: string, more = false) {
       </DialogClose>
       <DialogHeader class="pr-9">
         <DialogTitle>{{ t("topics.organize") }}</DialogTitle>
-        <DialogDescription>{{ t("topics.explanation") }}</DialogDescription>
       </DialogHeader>
       <p v-if="!state.connected.value" role="status" class="text-sm text-muted-foreground">{{ t("topics.disconnected") }}</p>
       <p v-if="state.error.value" role="alert" class="text-sm text-destructive">{{ state.error.value }}</p>
