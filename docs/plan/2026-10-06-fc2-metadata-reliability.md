@@ -86,6 +86,20 @@ HTTP fixture 覆盖精确搜索链接、跳转/元信息直达、JSON-LD、演�
 
 实现提交：`abb2ffd5`（普通影片详情失败回退）、`f6950253`（FC2 多源获取）。
 
+## 2026-10-07 FC2-3123174 连接中断修复
+
+正式 Server 的 `curated-20261007.log` 记录该番号在 15:02:26、21:26:45 的 PPVDataBank 查询均返回 `Get https://ppvdatabank.com/article/3123174/: EOF`。同一次查询中，官网商品不存在，Javten 为 HTTP 403，JavDB 为 HTTP 200 验证页，因此没有其它成功来源接续。这是读取页面前的连接中断，不能据此判断站点没有该片或页面解析器不支持它。其它番号也出现相同 EOF。
+
+旧代码只请求一次，失败立即返回。来源连续三次失败可进入已有十分钟冷却；验证页有专门的五分钟冷却。此次从正式配置只读取代理配置，在独立进程内测试：修改前已有解析器连续两次成功读取 3123174，说明连接问题并非每次发生；没有在本次在线查询中再次观察到同样 EOF，不能声称已确定是站点、代理或连接复用中的哪一层关闭了连接。
+
+修复：FC2 来源的页面 GET 遇到可识别的 EOF、响应体 unexpected EOF、连接 reset/abort 后，等待 200 毫秒并最多再请求一次。两次尝试共享原单页超时（最多 20 秒），也受原有 45 秒聚合预算约束。等待期间可取消。HTTP 状态错误、验证页、解析失败与身份错配不重试；重复连接失败保留原始错误，不无限请求或绕过验证。不新增 API、配置、迁移或依赖，不改变来源顺序。
+
+本地真实 HTTP 断连 fixture 覆盖：请求头前 EOF 后恢复、响应体截断后恢复、持续断连只重试一次、403/404/200 验证页/错番号不重试、退避等待取消、共享截止时间。
+
+21:31 北京时间，使用正式代理与独立内存 Service.Scrape 自动链，只读聚合约 2.03 秒成功返回 `FC2-3123174`，主来源 PPVDataBank，标题 65 字符、53 分钟、封面与 10 张预览图片链接。Javten/JavDB 仍受访问验证阻断，官网仍缺失。携带原详情 Referer 的封面请求 HTTP 200，`image/webp`、27,660 字节。没有连接生产数据库、刷新生产影片或替换正在运行的 Server；在线成功验证当前可访问及可解析，EOF 的恢复能力由可重复的断连 fixture 验证。
+
+验证结果：从 `backend/` 运行 `go test ./internal/scraper/... ./internal/proxyenv/...`、`go test ./...`、`go vet ./...` 均通过；`go build -tags release -o ../.workspace/fc2-retry-release-check.exe ./cmd/curated` 通过，输出仅用于编译验证。代码与回归提交 `9ba16cdb`。修复需包含此次代码的新 Server 才生效；当前正式进程不会因源码修改自动更新。已有失败任务需在升级后重新刷新元数据。
+
 ## MDCz 参考
 
 - [FC2 official adapter](https://github.com/ShotHeadman/mdcz/blob/295f828c76158c6411b52caf6fba9e7b0ee945ba/packages/runtime/src/crawler/sites/fc2.ts)
