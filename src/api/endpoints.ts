@@ -410,20 +410,22 @@ export const api = {
   },
 
   createBackup(body: BackupCreateBody): Promise<BackupManifestDTO> {
+    // Snapshotting, compression and integrity checks scale with the library size.
+    // Keep waiting for the server result instead of aborting after the normal 30 seconds.
     return httpClient
-      .post<unknown>("/maintenance/backups", body)
+      .post<unknown>("/maintenance/backups", body, undefined, { timeoutMs: 0 })
       .then((value) => assertApiResponse("POST /maintenance/backups", value, isBackupManifestDTO))
   },
 
   verifyBackup(body: BackupPathBody): Promise<BackupVerificationDTO> {
     return httpClient
-      .post<unknown>("/maintenance/backups/verify", body)
+      .post<unknown>("/maintenance/backups/verify", body, undefined, { timeoutMs: 0 })
       .then((value) => assertApiResponse("POST /maintenance/backups/verify", value, isBackupVerificationDTO))
   },
 
   preflightBackupRestore(body: BackupPathBody): Promise<BackupRestorePreflightDTO> {
     return httpClient
-      .post<unknown>("/maintenance/backups/preflight", body)
+      .post<unknown>("/maintenance/backups/preflight", body, undefined, { timeoutMs: 0 })
       .then((value) => assertApiResponse("POST /maintenance/backups/preflight", value, isBackupRestorePreflightDTO))
   },
 

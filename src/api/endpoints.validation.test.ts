@@ -375,13 +375,13 @@ describe("api endpoint response validation", () => {
 
     expect(post).toHaveBeenNthCalledWith(1, "/maintenance/backups", {
       destinationPath: "D:\\Backups\\curated.curated-backup",
-    })
+    }, undefined, { timeoutMs: 0 })
     expect(post).toHaveBeenNthCalledWith(2, "/maintenance/backups/verify", {
       backupPath: "D:\\Backups\\curated.curated-backup",
-    })
+    }, undefined, { timeoutMs: 0 })
     expect(post).toHaveBeenNthCalledWith(3, "/maintenance/backups/preflight", {
       backupPath: "D:\\Backups\\curated.curated-backup",
-    })
+    }, undefined, { timeoutMs: 0 })
   })
 
   it("rejects malformed backup verification responses", async () => {

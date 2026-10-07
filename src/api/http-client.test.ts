@@ -69,6 +69,35 @@ describe("resolveApiBaseUrl", () => {
 })
 
 describe("httpClient", () => {
+  it("waits for a long-running POST when its deadline is disabled", async () => {
+    vi.useFakeTimers()
+    let signal: AbortSignal | null | undefined
+    vi.stubGlobal("fetch", vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+      signal = init?.signal
+      return new Promise<Response>((resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true })
+        setTimeout(() => resolve(new Response(JSON.stringify({ ok: true }))), 120_000)
+      })
+    }))
+
+    const request = httpClient.post("/slow-backup", {}, undefined, { timeoutMs: 0 })
+    const result = expect(request).resolves.toEqual({ ok: true })
+    await vi.advanceTimersByTimeAsync(120_000)
+    await result
+    expect(signal?.aborted).toBe(false)
+  })
+
+  it("still supports explicit cancellation when the POST deadline is disabled", async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal("fetch", abortableNeverFetch())
+    const controller = new AbortController()
+    const request = httpClient.post("/slow-backup", {}, controller.signal, { timeoutMs: 0 })
+    const result = expect(request).rejects.toMatchObject({ name: "AbortError" })
+    await vi.advanceTimersByTimeAsync(60_000)
+    controller.abort()
+    await result
+  })
+
   it("aborts stalled requests and throws a retryable timeout error", async () => {
     vi.useFakeTimers()
     const fetchMock = abortableNeverFetch()

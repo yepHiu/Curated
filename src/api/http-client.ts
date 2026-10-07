@@ -23,6 +23,11 @@ export interface UploadProgress {
   percent: number
 }
 
+interface RequestOptions {
+  /** Milliseconds before aborting; 0 disables the deadline for long-running operations. */
+  timeoutMs?: number
+}
+
 type ApiBaseUrlEnv = Pick<ImportMetaEnv, "VITE_API_BASE_URL" | "VITE_USE_WEB_API"> & {
   DEV?: boolean
 }
@@ -97,13 +102,15 @@ async function monitoredFetch(
   path: string,
   init: RequestInit,
   params?: Record<string, string | number | undefined>,
+  options?: RequestOptions,
 ): Promise<Response> {
   const controller = new AbortController()
   const externalSignal = init.signal
   const abort = () => controller.abort()
   if (externalSignal?.aborted) abort()
   externalSignal?.addEventListener("abort", abort, { once: true })
-  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const timeoutId = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined
   const requestId = DEV_REQUEST_MONITOR_ENABLED
     ? devRequestMonitor.startRequest({
       method,
@@ -218,7 +225,7 @@ export const httpClient = {
     return handleResponse<T>(response)
   },
 
-  async post<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  async post<T>(path: string, body?: unknown, signal?: AbortSignal, options?: RequestOptions): Promise<T> {
     const response = await monitoredFetch("POST", path, {
       headers: {
         "Content-Type": "application/json",
@@ -226,7 +233,7 @@ export const httpClient = {
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal,
-    })
+    }, undefined, options)
     return handleResponse<T>(response)
   },
 
