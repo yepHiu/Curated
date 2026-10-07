@@ -9,7 +9,7 @@ import (
 	"curated-backend/internal/contracts"
 )
 
-const Version = "agent-system-v7"
+const Version = "agent-system-v8"
 const maxMentions = 8
 const maxMentionLabelRunes = 80
 
@@ -17,12 +17,19 @@ const maxMentionLabelRunes = 80
 var systemPromptTemplate = renderPrompt("system.txt", nil)
 
 // SystemPrompt is the versioned base + safety instructions for the experimental agent.
-func SystemPrompt(locale string, page *contracts.AIChatContext) string {
-	page = core.MoviePageContext(page)
+func SystemPrompt(locale string) string {
 	var b strings.Builder
 	b.WriteString(strings.TrimSpace(systemPromptTemplate))
 	b.WriteString("\n\n")
 	b.WriteString(renderPrompt("response-language.txt", map[string]string{"Locale": strings.TrimSpace(locale)}))
+	return b.String()
+}
+
+// PageContextPrompt projects only this request's page data. Keep it after shared
+// rules and history so navigation does not invalidate their cacheable prefix.
+func PageContextPrompt(page *contracts.AIChatContext) string {
+	page = core.MoviePageContext(page)
+	var b strings.Builder
 	if page != nil {
 		parts := make([]string, 0, 7)
 		if page.Route != "" {

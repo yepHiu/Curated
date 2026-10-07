@@ -521,14 +521,28 @@ func buildMessagesWithBudget(history []llm.ChatMessage, page *contracts.AIChatCo
 	}
 	trimmed, omitted := boundedHistoryWithBudget(history, budget.History, budget.Messages)
 	out := make([]llm.ChatMessage, 0, len(trimmed)+1)
-	out = append(out, llm.ChatMessage{Role: "system", Content: prompts.SystemPrompt(locale, page)})
+	out = append(out, llm.ChatMessage{Role: "system", Content: prompts.SystemPrompt(locale)})
 	if memory != nil {
 		out = append(out, *memory)
 	}
+	// Keep request-scoped context after the reusable history prefix, immediately
+	// before the latest user message. System role preserves it during compaction.
+	contextText := prompts.PageContextPrompt(page)
 	if omitted {
-		out[0].Content += "\n" + prompts.HistoryOmittedPrompt()
+		contextText += "\n" + prompts.HistoryOmittedPrompt()
 	}
-	out = append(out, trimmed...)
+	latest := len(trimmed)
+	for i := len(trimmed) - 1; i >= 0; i-- {
+		if trimmed[i].Role == "user" {
+			latest = i
+			break
+		}
+	}
+	out = append(out, trimmed[:latest]...)
+	if strings.TrimSpace(contextText) != "" {
+		out = append(out, llm.ChatMessage{Role: "system", Content: contextText})
+	}
+	out = append(out, trimmed[latest:]...)
 	return out
 }
 

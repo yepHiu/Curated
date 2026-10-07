@@ -15,6 +15,9 @@ type Usage struct {
 	PromptTokens     int64 `json:"prompt_tokens"`
 	CompletionTokens int64 `json:"completion_tokens"`
 	TotalTokens      int64 `json:"total_tokens"`
+	// nil distinguishes an unreported count from a measured cache miss (zero hits).
+	CacheHitTokens  *int64 `json:"prompt_cache_hit_tokens,omitempty"`
+	CacheMissTokens *int64 `json:"prompt_cache_miss_tokens,omitempty"`
 }
 
 type Observation struct {
@@ -97,6 +100,11 @@ type wireUsage struct {
 	Prompt     *int64 `json:"prompt_tokens"`
 	Completion *int64 `json:"completion_tokens"`
 	Total      *int64 `json:"total_tokens"`
+	CacheHit   *int64 `json:"prompt_cache_hit_tokens"`
+	CacheMiss  *int64 `json:"prompt_cache_miss_tokens"`
+	Details    *struct {
+		Cached *int64 `json:"cached_tokens"`
+	} `json:"prompt_tokens_details"`
 }
 
 func (u *wireUsage) measured() *Usage {
@@ -106,5 +114,21 @@ func (u *wireUsage) measured() *Usage {
 	if *u.Prompt < 0 || *u.Completion < 0 || *u.Total < 0 {
 		return nil
 	}
-	return &Usage{*u.Prompt, *u.Completion, *u.Total}
+	usage := &Usage{PromptTokens: *u.Prompt, CompletionTokens: *u.Completion, TotalTokens: *u.Total}
+	hit := u.CacheHit
+	if hit == nil && u.Details != nil {
+		hit = u.Details.Cached
+	}
+	valid := func(count *int64) bool { return count != nil && *count >= 0 && *count <= *u.Prompt }
+	if valid(hit) {
+		usage.CacheHitTokens = hit
+	}
+	if valid(u.CacheMiss) {
+		usage.CacheMissTokens = u.CacheMiss
+	}
+	if usage.CacheHitTokens != nil && usage.CacheMissTokens != nil && *usage.CacheHitTokens != *u.Prompt-*usage.CacheMissTokens {
+		// Keep total usage but discard inconsistent cache statistics.
+		usage.CacheHitTokens, usage.CacheMissTokens = nil, nil
+	}
+	return usage
 }

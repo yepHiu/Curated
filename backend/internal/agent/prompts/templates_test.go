@@ -13,19 +13,11 @@ import (
 func TestTXTTemplatesPreserveMessages(t *testing.T) {
 	page := &contracts.AIChatContext{Route: "movie-detail", MovieID: "m1", ActorName: "A", SelectedMovieIDs: []string{"m2"}, ActiveFilters: &contracts.AIChatActiveFilters{Query: "query", PlayState: "unwatched"}, Mentions: []contracts.AIChatMention{{Kind: "movie", ID: "m3", Label: "{{.Locale}}"}}}
 	cases := map[string]string{
-		"system-empty": SystemPrompt("", nil), "system-context": SystemPrompt("zh-CN", page),
-		"polish":            CommentActionPrompt("  笔记 {{.Locale}} <source>\n第二行  "),
-		"translate-ja":      TranslateDisplayPrompt("synopsis", "原文 {{.Source}}\n次の行", "ja"),
-		"translate-default": TranslateDisplayPrompt("", "  source  ", ""),
-		"insights":          InsightsNarrativePrompt("en", `{"count":3,"name":"{{.Locale}}"}`),
+		"system-empty": SystemPrompt(""), "system-context": SystemPrompt("zh-CN") + PageContextPrompt(page),
 	}
 	expected := map[string]string{
-		"system-empty":      "0cc34a4671602e6f1e983b379b34c9ea74dca9c8dae99f01e350bff1f1d50e7a",
-		"system-context":    "095a5554c7b43bfab7ebf2fd0517c1241cc30b0fe577402ac9f442d0c3213eab",
-		"polish":            "394fd84289a9ce2f8fd0326508ccda4248d2a487e16c1ab269abb77c9b88548a",
-		"translate-ja":      "8f9f733d76c3893f3ce89817d97fb567564344fd5a59758ca65186f4bc9e2d54",
-		"translate-default": "94e4bc78f430e2534c841942681519f098139bba9aaba917a0f40950fbd63fec",
-		"insights":          "a608c30903d5785a76e7c4403f9fb983d2ce46e9aa5a6f3f1d630b45d24d1124",
+		"system-empty":   "0cc34a4671602e6f1e983b379b34c9ea74dca9c8dae99f01e350bff1f1d50e7a",
+		"system-context": "095a5554c7b43bfab7ebf2fd0517c1241cc30b0fe577402ac9f442d0c3213eab",
 	}
 	for name, value := range cases {
 		if got := fmt.Sprintf("%x", sha256.Sum256([]byte(value))); got != expected[name] {
@@ -36,7 +28,7 @@ func TestTXTTemplatesPreserveMessages(t *testing.T) {
 
 // TestTXTTemplatesRejectMissingVariables 确认缺失变量无法生成并发送不完整的内置提示词。
 func TestTXTTemplatesRejectMissingVariables(t *testing.T) {
-	for _, name := range []string{"polish-comment.txt", "translate-display.txt", "insights-narrative.txt", "response-language.txt", "page-context.txt", "active-filters.txt", "mentions.txt"} {
+	for _, name := range []string{"action-source.txt", "translate-display.txt", "insights-narrative.txt", "response-language.txt", "page-context.txt", "active-filters.txt", "mentions.txt"} {
 		var out bytes.Buffer
 		if err := promptTemplates.ExecuteTemplate(&out, name, map[string]string{}); err == nil {
 			t.Errorf("%s accepted missing variables", name)

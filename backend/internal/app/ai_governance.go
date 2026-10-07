@@ -11,6 +11,7 @@ import (
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/llm"
+	"go.uber.org/zap"
 )
 
 func (a *App) AIGovernanceSettings() contracts.AIGovernanceDTO {
@@ -93,18 +94,20 @@ type aiRunContextKey struct{}
 type aiRunObservation struct {
 	started time.Time
 	row     contracts.AIRunDTO
+	logger  *zap.Logger
 }
 
 func (a *App) beginAIRun(ctx context.Context, channel, action string) (context.Context, *aiRunObservation, func(error)) {
 	cfg := a.currentAIProviderConfig()
 	r := &aiRunObservation{started: time.Now(), row: contracts.AIRunDTO{ID: newAgentID("run_"), Channel: channel, Action: action, Provider: config.NormalizeAIProviderKind(cfg.Kind), Model: cfg.Model, PromptVersion: prompts.Version, Status: "completed"}}
 	if channel == "action" {
-		r.row.PromptVersion = "agent-actions-v1"
+		r.row.PromptVersion = "agent-actions-v2"
 	}
 	if channel == "test" {
 		r.row.PromptVersion = "provider-probe-v1"
 	}
 	r.row.StartedAt = r.started.UTC().Format(time.RFC3339Nano)
+	r.logger = a.logger
 	ctx, cancel := context.WithCancel(context.WithValue(ctx, aiRunContextKey{}, r))
 	a.agentRT.runsMu.Lock()
 	if a.agentRT.activeRuns == nil {
@@ -184,6 +187,18 @@ func (r *aiRunObservation) observe(o llm.Observation) {
 		r.row.PromptTokens += o.Usage.PromptTokens
 		r.row.CompletionTokens += o.Usage.CompletionTokens
 		r.row.TotalTokens += o.Usage.TotalTokens
+		if r.logger != nil && o.Usage.CacheHitTokens != nil {
+			fields := []zap.Field{
+				zap.String("runId", r.row.ID), zap.String("channel", r.row.Channel),
+				zap.String("model", r.row.Model), zap.String("promptVersion", r.row.PromptVersion),
+				zap.Int64("promptTokens", o.Usage.PromptTokens),
+				zap.Int64("promptCacheHitTokens", *o.Usage.CacheHitTokens),
+			}
+			if o.Usage.CacheMissTokens != nil {
+				fields = append(fields, zap.Int64("promptCacheMissTokens", *o.Usage.CacheMissTokens))
+			}
+			r.logger.Info("AI prompt cache usage", fields...)
+		}
 	}
 	if o.ErrorCode != "" {
 		r.row.ErrorCode = o.ErrorCode

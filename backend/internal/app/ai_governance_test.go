@@ -11,12 +11,34 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
+
 	"curated-backend/internal/agent/core"
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/llm"
 	"curated-backend/internal/storage"
 )
+
+func TestCacheUsageLogsMeasuredCountsOnly(t *testing.T) {
+	logCore, logs := observer.New(zap.InfoLevel)
+	r := &aiRunObservation{started: time.Now(), logger: zap.New(logCore), row: contracts.AIRunDTO{ID: "run-cache", Channel: "chat", Model: "deepseek-chat"}}
+	hit, miss := int64(8), int64(4)
+	r.observe(llm.Observation{Usage: &llm.Usage{PromptTokens: 12, CompletionTokens: 3, TotalTokens: 15, CacheHitTokens: &hit, CacheMissTokens: &miss}})
+	r.observe(llm.Observation{Usage: &llm.Usage{PromptTokens: 12, CompletionTokens: 3, TotalTokens: 15}})
+	entries := logs.FilterMessage("AI prompt cache usage").All()
+	if len(entries) != 1 {
+		t.Fatalf("unreported cache usage should not be logged as zero: %+v", entries)
+	}
+	fields := entries[0].ContextMap()
+	if fields["promptCacheHitTokens"] != hit || fields["promptCacheMissTokens"] != miss || fields["promptTokens"] != int64(12) || fields["runId"] != "run-cache" {
+		t.Fatalf("wrong cache telemetry: %+v", fields)
+	}
+	if r.row.ModelCalls != 2 || r.row.TotalTokens != 30 {
+		t.Fatal("cache subset was double counted in usage")
+	}
+}
 
 func enabledAITestConfig() config.Config {
 	v := config.DefaultAIGovernance()

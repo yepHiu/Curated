@@ -10,7 +10,7 @@ import (
 // TestSystemPromptGoldenGuards 校验聊天模板的领域、证据和写入边界。
 func TestSystemPromptGoldenGuards(t *testing.T) {
 	t.Parallel()
-	got := SystemPrompt("zh-CN", &contracts.AIChatContext{
+	got := SystemPrompt("zh-CN") + PageContextPrompt(&contracts.AIChatContext{
 		MovieID:          "m1",
 		ActorName:        "A",
 		SelectedMovieIDs: []string{"m3"},
@@ -61,7 +61,7 @@ func TestSystemPromptGoldenGuards(t *testing.T) {
 
 // TestSystemPromptKeepsBookPageData 确保书库页面保留正确上下文且不泄漏错误影片 ID。
 func TestSystemPromptKeepsBookPageData(t *testing.T) {
-	got := SystemPrompt("zh-CN", &contracts.AIChatContext{Route: "photo-detail", MovieID: "private-book-id", PhotoID: "photo-1", Query: "private-book-title"})
+	got := PageContextPrompt(&contracts.AIChatContext{Route: "photo-detail", MovieID: "private-book-id", PhotoID: "photo-1", Query: "private-book-title"})
 	if strings.Contains(got, "private-book-id") {
 		t.Fatal("book page movieId reached model prompt")
 	}
@@ -79,7 +79,7 @@ func TestSystemPromptUsesExternalTemplate(t *testing.T) {
 	if strings.Contains(systemPromptTemplate, "Visible page context") {
 		t.Fatal("request-scoped context must remain outside the static prompt asset")
 	}
-	if Version != "agent-system-v7" {
+	if Version != "agent-system-v8" {
 		t.Fatalf("version = %q", Version)
 	}
 }

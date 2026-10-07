@@ -141,7 +141,7 @@ func (a *App) runCommentAction(ctx context.Context, completer commentCompleter, 
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("comment body too long")
 	}
 	proposed, err := completer.Complete(ctx, []llm.ChatMessage{
-		{Role: "system", Content: prompts.CommentActionPrompt(original)},
+		{Role: "system", Content: prompts.CommentActionPrompt()},
 		{Role: "user", Content: prompts.FormatCommentActionUser(original)},
 	}, 0)
 	if err != nil {
@@ -356,7 +356,7 @@ func (a *App) runMovieDisplayAction(ctx context.Context, completer commentComple
 		if original == "" {
 			return contracts.AIActionPreviewDTO{}, fmt.Errorf("summary is empty")
 		}
-		system = prompts.TranslateSummaryPrompt(original, locale)
+		system = prompts.TranslateSummaryPrompt(locale)
 		userKind = "Synopsis"
 	case prompts.ActionTranslateTitle:
 		original = draft
@@ -366,7 +366,7 @@ func (a *App) runMovieDisplayAction(ctx context.Context, completer commentComple
 		if original == "" {
 			return contracts.AIActionPreviewDTO{}, fmt.Errorf("title is empty")
 		}
-		system = prompts.TranslateTitlePrompt(original, locale)
+		system = prompts.TranslateTitlePrompt(locale)
 		userKind = "Title"
 	default:
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("unknown action")
@@ -453,7 +453,7 @@ func (a *App) runBookTitleAction(ctx context.Context, completer commentCompleter
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("title is empty")
 	}
 	proposed, err := completer.Complete(ctx, []llm.ChatMessage{
-		{Role: "system", Content: prompts.TranslateTitlePrompt(original, locale)},
+		{Role: "system", Content: prompts.TranslateTitlePrompt(locale)},
 		{Role: "user", Content: prompts.FormatPlainUser("Title", original)},
 	}, 0)
 	if err != nil {
@@ -509,8 +509,8 @@ func (a *App) runInsightsNarrative(ctx context.Context, completer commentComplet
 	}
 	locale := strings.TrimSpace(req.Locale)
 	proposed, err := completer.Complete(ctx, []llm.ChatMessage{
-		{Role: "system", Content: prompts.InsightsNarrativePrompt(locale, payload)},
-		{Role: "user", Content: prompts.FormatPlainUser("Insights", rangeValue)},
+		{Role: "system", Content: prompts.InsightsNarrativePrompt(locale)},
+		{Role: "user", Content: prompts.FormatPlainUser("Insights", payload)},
 	}, 0)
 	if err != nil {
 		return contracts.AIActionPreviewDTO{}, err
