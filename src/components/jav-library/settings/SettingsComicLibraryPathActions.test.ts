@@ -15,6 +15,8 @@ vi.mock("vue-i18n", () => ({
 }))
 
 vi.mock("lucide-vue-next", () => ({
+  Check: { name: "Check", template: "<span />" },
+  Download: { name: "Download", template: "<span />" },
   MoreVertical: { name: "MoreVertical", template: "<span />" },
   RefreshCw: { name: "RefreshCw", template: "<span />" },
   Trash2: { name: "Trash2", template: "<span />" },

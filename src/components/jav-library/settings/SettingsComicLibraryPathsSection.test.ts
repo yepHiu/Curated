@@ -17,6 +17,8 @@ vi.mock("vue-i18n", () => ({
 }))
 
 vi.mock("lucide-vue-next", () => ({
+  Check: { name: "Check", template: "<span />" },
+  Download: { name: "Download", template: "<span />" },
   FolderArchive: { name: "FolderArchive", template: "<span />" },
   MoreVertical: { name: "MoreVertical", template: "<span />" },
   RefreshCw: { name: "RefreshCw", template: "<span />" },
@@ -44,24 +46,6 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
     emits: ["click"],
     template:
       "<button v-bind='$attrs' :disabled='disabled' :data-variant='variant' @click=\"$emit('click', $event)\"><slot /></button>",
-  },
-}))
-
-vi.mock("@/components/ui/select", () => ({
-  Select: {
-    name: "Select",
-    props: ["modelValue", "disabled"],
-    emits: ["update:modelValue"],
-    template:
-      "<div class='select-stub' :data-model-value='modelValue' :data-disabled='String(!!disabled)'><slot /></div>",
-  },
-  SelectContent: { name: "SelectContent", template: "<div><slot /></div>" },
-  SelectItem: { name: "SelectItem", props: ["value"], template: "<div><slot /></div>" },
-  SelectTrigger: { name: "SelectTrigger", template: "<div><slot /></div>" },
-  SelectValue: {
-    name: "SelectValue",
-    props: ["placeholder"],
-    template: "<div><slot>{{ placeholder }}</slot></div>",
   },
 }))
 
@@ -130,46 +114,50 @@ const baseProps = {
   dialogContentClass: "dialog-content",
 }
 
-describe("SettingsComicLibraryPathsSection", () => {
+describe.each([
+  ["comic", SettingsComicLibraryPathsSection],
+  ["photo", SettingsPhotoLibraryPathsSection],
+] as const)("%s library paths", (kind, component) => {
   it("uses the shared dialog-style storage path add flow", () => {
-    const wrapper = mount(SettingsComicLibraryPathsSection, {
+    const wrapper = mount(component, {
       props: baseProps,
     })
 
     expect(wrapper.find("[data-add-dialog]").exists()).toBe(true)
     expect(wrapper.findAll("input")).toHaveLength(0)
-    expect(wrapper.get("[data-trigger-label]").text()).toBe("settings.comicLibraryPathAdd")
-    expect(wrapper.get("[data-dialog-title]").text()).toBe("settings.comicLibraryPathDialogTitle")
+    expect(wrapper.get("[data-trigger-label]").text()).toBe(`settings.${kind}LibraryPathAdd`)
+    expect(wrapper.get("[data-dialog-title]").text()).toBe(`settings.${kind}LibraryPathDialogTitle`)
     expect(wrapper.get("[data-dialog-description]").text()).toBe(
-      "settings.comicLibraryPathDialogDesc",
+      `settings.${kind}LibraryPathDialogDesc`,
     )
   })
 
   it("renders the default import path with title and disk path like video storage", () => {
-    const wrapper = mount(SettingsComicLibraryPathsSection, {
+    const wrapper = mount(component, {
       props: baseProps,
     })
 
-    expect(wrapper.text()).toContain("settings.comicDefaultImportPath")
-    expect(wrapper.text()).toContain("Main comics · D:/Comics")
-    expect(wrapper.text()).not.toContain("Main comics 路 D:/Comics")
+    expect(wrapper.find("[role=combobox], .select-stub").exists()).toBe(false)
+    expect(wrapper.findAll("[data-default-import-path]")).toHaveLength(1)
+    expect(wrapper.get("[data-default-import-path]").attributes("data-library-path")).toBe("comic-path-a")
+    expect(wrapper.get("[data-default-import-path]").text()).toContain("settings.defaultImportPathLabel")
     expect(wrapper.text()).toContain("E:/Inbox/Comics")
   })
 
   it("forwards add dialog, default selection, scan, and remove events", async () => {
-    const wrapper = mount(SettingsComicLibraryPathsSection, {
+    const wrapper = mount(component, {
       props: baseProps,
     })
 
-    wrapper.getComponent({ name: "Select" }).vm.$emit("update:modelValue", "comic-path-b")
+    await wrapper.get("[data-library-path='comic-path-b'] [data-set-default-import-path]").trigger("click")
     await wrapper.get("[data-add-open]").trigger("click")
     await wrapper.get("[data-new-path]").trigger("click")
     await wrapper.get("[data-new-title]").trigger("click")
     await wrapper.get("[data-clear-error]").trigger("click")
     await wrapper.get("[data-browse]").trigger("click")
     await wrapper.get("[data-submit]").trigger("click")
-    await wrapper.get("[data-scan-comic-path='comic-path-a']").trigger("click")
-    await wrapper.get("[data-remove-comic-path='comic-path-a']").trigger("click")
+    await wrapper.get(`[data-scan-${kind}-path='comic-path-a']`).trigger("click")
+    await wrapper.get(`[data-remove-${kind}-path='comic-path-a']`).trigger("click")
 
     expect(wrapper.emitted("changeDefaultImportPath")).toEqual([["comic-path-b"]])
     expect(wrapper.emitted("update:addPathDialogOpen")).toEqual([[true]])
@@ -182,14 +170,29 @@ describe("SettingsComicLibraryPathsSection", () => {
     expect(wrapper.emitted("removePath")).toEqual([["comic-path-a"]])
   })
 
+  it("blocks redundant and concurrent default changes and updates the selected row", async () => {
+    const wrapper = mount(component, { props: baseProps })
+    const defaultAction = "[data-library-path='comic-path-a'] [data-set-default-import-path]"
+    const otherAction = "[data-library-path='comic-path-b'] [data-set-default-import-path]"
+    expect(wrapper.get(defaultAction).attributes("disabled")).toBeDefined()
+    await wrapper.setProps({ defaultSaving: true })
+    expect(wrapper.get(otherAction).attributes("disabled")).toBeDefined()
+    await wrapper.get(otherAction).trigger("click")
+    expect(wrapper.emitted("changeDefaultImportPath")).toBeUndefined()
+    await wrapper.setProps({ defaultSaving: false, defaultImportLibraryPathId: "comic-path-b" })
+    expect(wrapper.get("[data-default-import-path]").attributes("data-library-path")).toBe("comic-path-b")
+    expect(wrapper.get(defaultAction).attributes("disabled")).toBeUndefined()
+    wrapper.unmount()
+  })
+
   it("uses the more-actions menu instead of a visible remove button for comic paths", () => {
-    const wrapper = mount(SettingsComicLibraryPathsSection, {
+    const wrapper = mount(component, {
       props: baseProps,
     })
 
     expect(wrapper.find('button[aria-label="settings.moreActions"]').exists()).toBe(true)
-    expect(wrapper.find("[data-scan-comic-path='comic-path-a']").exists()).toBe(true)
-    expect(wrapper.find("[data-remove-comic-path='comic-path-a']").exists()).toBe(true)
+    expect(wrapper.find(`[data-scan-${kind}-path='comic-path-a']`).exists()).toBe(true)
+    expect(wrapper.find(`[data-remove-${kind}-path='comic-path-a']`).exists()).toBe(true)
   })
 })
 
