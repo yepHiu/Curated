@@ -29,6 +29,8 @@ export const webTopicLibrary: TopicLibraryService = {
 }
 
 export const webTagOrganization: TagOrganizationService = {
+  /** Remove saved history without undoing tags or movie analysis. */
+  async deleteTagOrganization(id) { await httpClient.delete(`/ai/tag-organizations/${encodeURIComponent(id)}`) },
   /** Read problems awaiting an explicit retry. */
   async getTagOrganizationIssues(offset = 0) { return (await httpClient.get<{ items: TagOrganizationItem[] }>(`/ai/tag-organizations/issues?limit=25&offset=${offset}`)).items },
   /** Read actual library coverage without starting AI work. */

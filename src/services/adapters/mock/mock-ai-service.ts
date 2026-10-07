@@ -248,6 +248,8 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
 }
 
 export const mockAIService: AIService = {
+  /** Remove organization history without changing movie tags. */
+  async deleteTagOrganization(id) { return (await import("./mock-library-service")).mockTopicServices.deleteTagOrganization(id) },
   /** 按需加载模拟资料库，普通聊天不初始化影片偏好状态。 */
   async getTagOrganizationIssues(offset) { return (await import("./mock-library-service")).mockTopicServices.getTagOrganizationIssues(offset) },
   /** Read organization coverage. */

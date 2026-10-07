@@ -110,7 +110,7 @@ func (s *SQLiteStore) saveTopicVocabulary(ctx context.Context, jobID string, def
 	defer func() { _ = tx.Rollback() }()
 	if jobID != "" {
 		var status string
-		if err = tx.QueryRowContext(ctx, `SELECT status FROM ai_tag_organization_jobs WHERE id=?`, jobID).Scan(&status); err != nil {
+		if err = tx.QueryRowContext(ctx, `SELECT status FROM ai_tag_organization_jobs WHERE id=? AND deleted_at=''`, jobID).Scan(&status); err != nil {
 			return err
 		}
 		if status != "running" {
@@ -351,7 +351,7 @@ func (s *SQLiteStore) UndoTopicOrganization(ctx context.Context, jobID string) (
 	}
 	defer func() { _ = tx.Rollback() }()
 	var status string
-	if err = tx.QueryRowContext(ctx, `SELECT status FROM ai_tag_organization_jobs WHERE id=?`, jobID).Scan(&status); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT status FROM ai_tag_organization_jobs WHERE id=? AND deleted_at=''`, jobID).Scan(&status); err != nil {
 		return out, err
 	}
 	if status == "running" || status == "queued" {

@@ -125,6 +125,17 @@ func (a *App) RetryTagOrganization(ctx context.Context, id string) error {
 	return nil
 }
 
+// DeleteTagOrganization only manages history; AI write permission is not required.
+func (a *App) DeleteTagOrganization(ctx context.Context, id string) error {
+	if err := a.store.DeleteTagOrganization(ctx, id); err != nil {
+		if errors.Is(err, storage.ErrOrganizationActive) {
+			return &core.ToolError{Code: "AI_ORGANIZATION_ACTIVE", Message: "Cancel the task before deleting its record."}
+		}
+		return err
+	}
+	return nil
+}
+
 // UndoTagOrganization 恢复用户标签，不授予源标签修改权限。
 func (a *App) UndoTagOrganization(ctx context.Context, id string) (contracts.TagOrganizationUndoDTO, error) {
 	if err := a.aiPermission(true); err != nil {

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { TagOrganizationJob } from "@/services/contracts/topic-service"
 
-const api = vi.hoisted(() => ({ getTagOrganizationStats: vi.fn(), listTagOrganizations: vi.fn(), startTagOrganization: vi.fn(), reloadMoviesFromApi: vi.fn().mockResolvedValue(undefined) }))
+const api = vi.hoisted(() => ({ deleteTagOrganization: vi.fn().mockResolvedValue(undefined), getTagOrganizationStats: vi.fn(), listTagOrganizations: vi.fn(), startTagOrganization: vi.fn(), reloadMoviesFromApi: vi.fn().mockResolvedValue(undefined) }))
 const toast = vi.hoisted(() => vi.fn())
 const notify = vi.hoisted(() => vi.fn())
 vi.mock("@/services/ai-service", () => ({ useAIService: () => api }))
@@ -153,4 +153,28 @@ describe("organization scope", () => {
   expect(organizationProgressValue({ ...running, total: 0 })).toBe(0)
   expect(organizationProgressValue({ ...running, processed: 200 })).toBe(100)
  })
+})
+
+
+it("removes one history record and refreshes state after successful deletion", async () => {
+ const state = useTagOrganization()
+ api.listTagOrganizations.mockResolvedValueOnce([job("remove", "failed"), job("keep", "completed")]).mockResolvedValueOnce([job("keep", "completed")])
+ await state.refresh()
+ await state.remove("remove")
+ expect(api.deleteTagOrganization).toHaveBeenCalledWith("remove")
+ expect(state.jobs.value.map(item => item.id)).toEqual(["keep"])
+ expect(toast).toHaveBeenCalledWith("topics.recordDeleted", { variant: "success" })
+})
+
+it("does not delete active tasks or hide records when deletion fails", async () => {
+ const state = useTagOrganization()
+ api.listTagOrganizations.mockResolvedValue([job("active", "running"), job("failed", "failed")])
+ await state.refresh()
+ await state.remove("active")
+ expect(api.deleteTagOrganization).not.toHaveBeenCalled()
+ api.deleteTagOrganization.mockRejectedValueOnce(new Error("Delete failed"))
+ await state.remove("failed")
+ expect(state.jobs.value).toHaveLength(2)
+ expect(state.error.value).toBe("Delete failed")
+ expect(toast).not.toHaveBeenCalled()
 })

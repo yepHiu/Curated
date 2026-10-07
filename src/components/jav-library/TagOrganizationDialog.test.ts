@@ -8,7 +8,7 @@ import SidebarTagOrganizationEntry from "./SidebarTagOrganizationEntry.vue"
 import MovieLibraryContextMenu from "./MovieLibraryContextMenu.vue"
 import type { Movie } from "@/domain/movie/types"
 
-const state = vi.hoisted(() => ({ start: vi.fn(), cancel: vi.fn(), retry: vi.fn(), undo: vi.fn(), openSelected: vi.fn(), refreshStats: vi.fn(), refresh: vi.fn(), getIssues: vi.fn(), retryMovie: vi.fn(), retryIssues: vi.fn(), getItems: vi.fn() }))
+const state = vi.hoisted(() => ({ start: vi.fn(), remove: vi.fn(), cancel: vi.fn(), retry: vi.fn(), undo: vi.fn(), openSelected: vi.fn(), refreshStats: vi.fn(), refresh: vi.fn(), getIssues: vi.fn(), retryMovie: vi.fn(), retryIssues: vi.fn(), getItems: vi.fn() }))
 const jobs = ref<TagOrganizationJob[]>([])
 const stats = ref({ total: 10, organized: 4, unorganized: 5, outdated: 1, needsAttention: 0, unresolved: 2 })
 const statsLoading = ref(false)
@@ -136,5 +136,18 @@ it("opens a selected-movie scope from the right-click menu and hides it for tras
  expect(wrapper.emitted("close")).toBeTruthy()
  await wrapper.setProps({ movie: { ...movie, trashedAt: "2026-10-02" } })
  expect(document.querySelector("[data-ai-organize-movie]")).toBeNull()
+ wrapper.unmount()
+})
+
+
+it.each(["failed", "partial_failed", "blocked", "cancelled", "completed"] as const)("deletes only the selected %s history record", async (status) => {
+ jobs.value = [historyJob("one", status), historyJob("two", "running")]
+ const wrapper = mount(TagOrganizationDialog)
+ const buttons = wrapper.findAll("[data-delete-organization-record]")
+ expect(buttons).toHaveLength(1)
+ expect(buttons[0]!.text()).toBe("topics.deleteRecord")
+ expect(state.remove).not.toHaveBeenCalled()
+ await buttons[0]!.trigger("click")
+ expect(state.remove).toHaveBeenCalledWith("one")
  wrapper.unmount()
 })

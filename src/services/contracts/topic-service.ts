@@ -57,6 +57,7 @@ export interface TagOrganizationService {
   listTagOrganizations(): Promise<TagOrganizationJob[]>
   startTagOrganization(scope: TagOrganizationScope, movieIds?: string[]): Promise<TagOrganizationJob>
   cancelTagOrganization(id: string): Promise<TagOrganizationJob>
+  deleteTagOrganization(id: string): Promise<void>
   retryTagOrganization(id: string): Promise<TagOrganizationJob>
   undoTagOrganization(id: string): Promise<{ restored: number; conflicts: number }>
 }

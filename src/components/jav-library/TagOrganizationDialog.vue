@@ -206,6 +206,7 @@ async function showResults(id: string, more = false) {
                     <template v-else>
                       <DropdownMenuItem v-if="['failed', 'partial_failed', 'blocked', 'cancelled'].includes(job.status)" :disabled="state.busy.value || Boolean(state.active.value) || !writeEnabled" @select="state.retry(job.id)">{{ t("topics.retry") }}</DropdownMenuItem>
                       <DropdownMenuItem :disabled="state.busy.value || !writeEnabled" @select="state.undo(job.id)">{{ t("topics.undo") }}</DropdownMenuItem>
+                      <DropdownMenuItem variant="destructive" :disabled="state.busy.value" data-delete-organization-record @select="state.remove(job.id)">{{ t("topics.deleteRecord") }}</DropdownMenuItem>
                     </template>
                   </DropdownMenuGroup>
                 </DropdownMenuContent>

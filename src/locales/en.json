@@ -2385,6 +2385,8 @@
     "retry": "Retry"
   },
   "topics": {
+    "deleteRecord": "Delete this organization record",
+    "recordDeleted": "Organization record deleted",
     "issuesTitle": "Movies needing attention ({count})",
     "viewIssues": "View problem movies",
     "leaveForLater": "Leave for later",
@@ -2470,6 +2472,7 @@
     "waitingQuota": "Waiting for write allowance · {done}/{total} processed",
     "vocabularyHint": "Build shared topics before changing user tags. Completed vocabulary batches are saved for retry.",
     "errors": {
+      "AI_ORGANIZATION_ACTIVE": "Cancel the active organization task before deleting its record.",
       "AI_ORGANIZATION_TIMEOUT": "Model response timed out. Completed batches are saved; retry to continue.",
       "AI_ORGANIZATION_OUTPUT_LIMIT": "Model output was truncated or contained reasoning only. Adjust the model and retry.",
       "AI_ORGANIZATION_INVALID_JSON": "Model returned invalid classification JSON. This batch was not applied.",

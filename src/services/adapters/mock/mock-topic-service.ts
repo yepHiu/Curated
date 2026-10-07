@@ -3,13 +3,13 @@ import type { HomepageTopicGroup, LibraryTopic, TagOrganizationJob, TagOrganizat
 
 interface MockTopicBatch { before: Record<string, string[]>; after: Record<string, string[]>; items: TagOrganizationItem[] }
 interface MockTopicAnalysis { jobId: string; fingerprint: string; unresolved: boolean }
-interface MockTopicState { issues: Record<string, TagOrganizationItem>; analysis: Record<string, MockTopicAnalysis>; jobs: TagOrganizationJob[]; topics: LibraryTopic[]; batches: Record<string, MockTopicBatch> }
+interface MockTopicState { deletedIds: string[]; issues: Record<string, TagOrganizationItem>; analysis: Record<string, MockTopicAnalysis>; jobs: TagOrganizationJob[]; topics: LibraryTopic[]; batches: Record<string, MockTopicBatch> }
 const key = "curated-mock-topic-organization-v2"
 
 /** Mock 状态和真实库分离，刷新后仍可查看结果。 */
 function loadState(): MockTopicState {
-  try { const value = JSON.parse(localStorage.getItem(key) ?? "null"); if (value?.jobs && value?.topics && value?.batches) return { ...value, analysis: value.analysis ?? {}, issues: value.issues ?? {} } } catch { /* 不完整旧数据降级为空。 */ }
-  return { jobs: [], topics: [], batches: {}, analysis: {}, issues: {} }
+  try { const value = JSON.parse(localStorage.getItem(key) ?? "null"); if (value?.jobs && value?.topics && value?.batches) return { ...value, deletedIds: value.deletedIds ?? [], analysis: value.analysis ?? {}, issues: value.issues ?? {} } } catch { /* 不完整旧数据降级为空。 */ }
+  return { deletedIds: [], jobs: [], topics: [], batches: {}, analysis: {}, issues: {} }
 }
 const state = loadState()
 /** 持久化模拟任务，不调用模型。 */
@@ -29,6 +29,13 @@ function analysisStatus(movie: Movie) {
 /** 提供确定性模拟，所有写入均经既有用户标签接口。 */
 export function createMockTopicServices(movies: () => readonly Movie[], patch: (id: string, tags: string[]) => void | Promise<unknown>): TopicLibraryService & TagOrganizationService {
   return {
+    /** Record deletion preserves per-movie coverage and tags. */
+    async deleteTagOrganization(id) {
+      const job = state.jobs.find((item) => item.id === id && !state.deletedIds.includes(id))
+      if (!job) throw new Error("Task not found")
+      if (["queued", "running"].includes(job.status)) throw new Error("AI_ORGANIZATION_ACTIVE")
+      state.deletedIds.push(id); saveState()
+    },
     /** Persisted problem queue is not inferred from the current list page. */
     async getTagOrganizationIssues(offset = 0) {
       return movies().filter((movie) => !movie.trashedAt && state.issues[movie.id]).sort((a,b) => a.id.localeCompare(b.id)).slice(offset,offset+25).map((movie) => ({ ...state.issues[movie.id]!, title: movie.title }))
@@ -47,7 +54,7 @@ export function createMockTopicServices(movies: () => readonly Movie[], patch: (
     /** 主题目录保留隐藏条目。 */
     async listTopics() { return structuredClone(state.topics) },
     /** 结果页只显示模拟证据，分页与 Web 一致。 */
-    async getTagOrganizationItems(id, offset = 0) { return structuredClone(state.batches[id]?.items.slice(offset, offset + 25) ?? []) },
+    async getTagOrganizationItems(id, offset = 0) { if (state.deletedIds.includes(id)) throw new Error("Task not found"); return structuredClone(state.batches[id]?.items.slice(offset, offset + 25) ?? []) },
     /** 从已整理的用户标签生成代表影片。 */
     async getHomepageTopics() {
       const seen = new Set<string>()
@@ -69,7 +76,7 @@ export function createMockTopicServices(movies: () => readonly Movie[], patch: (
     /** 隐藏不改标签。 */
     async setTopicHidden(id, hidden) { const topic = state.topics.find((t) => { /* 精确匹配。 */ return t.id === id }); if (topic) topic.hidden = hidden; saveState() },
     /** 返回副本避免界面误改持久状态。 */
-    async listTagOrganizations() { return state.jobs.map((j) => { /* 拷贝快照。 */ return { ...j } }) },
+    async listTagOrganizations() { return state.jobs.filter((j) => !state.deletedIds.includes(j.id)).map((j) => { /* 拷贝快照。 */ return { ...j } }) },
     /** 模拟任务用源标签作为确定性题材样本，写入仅 userTags。 */
     async startTagOrganization(scope, movieIds) {
       const selected = movies().filter((m) => { /* 模拟范围快照。 */ return !m.trashedAt && (scope === "all" || (scope === "selected" ? movieIds?.includes(m.id) : analysisStatus(m) === scope)) })
@@ -100,12 +107,12 @@ export function createMockTopicServices(movies: () => readonly Movie[], patch: (
       job.status = job.failed ? "partial_failed" : "completed"; job.stage = "finished"; job.revision++; saveState(); return { ...job }
     },
     /** 模拟取消保留已处理结果。 */
-    async cancelTagOrganization(id) { const job = state.jobs.find((j) => { /* 精确匹配。 */ return j.id === id }); if (!job) throw new Error("Task not found"); if (["running", "queued"].includes(job.status)) job.status = "cancelled"; saveState(); return { ...job } },
+    async cancelTagOrganization(id) { const job = state.jobs.find((j) => { /* 精确匹配。 */ return j.id === id && !state.deletedIds.includes(id) }); if (!job) throw new Error("Task not found"); if (["running", "queued"].includes(job.status)) job.status = "cancelled"; saveState(); return { ...job } },
     /** 模拟已完成任务无需重复执行。 */
-    async retryTagOrganization(id) { const job = state.jobs.find((j) => { /* 精确匹配。 */ return j.id === id }); if (!job) throw new Error("Task not found"); return { ...job } },
+    async retryTagOrganization(id) { const job = state.jobs.find((j) => { /* 精确匹配。 */ return j.id === id && !state.deletedIds.includes(id) }); if (!job) throw new Error("Task not found"); return { ...job } },
     /** 并发人工修改优先于模拟撤销。 */
     async undoTagOrganization(id) {
-      const batch = state.batches[id]
+      const batch = state.deletedIds.includes(id) ? undefined : state.batches[id]
       if (!batch) throw new Error("Task not found")
       let restored = 0, conflicts = 0
       for (const movie of movies()) {

@@ -166,6 +166,14 @@ export function useTagOrganization() {
       return operate(() => useAIService().startTagOrganization("issues"))
     },
     cancel: (id: string) => operate(() => { /* 取消保留已写入结果。 */ return useAIService().cancelTagOrganization(id) }),
+    remove: (id: string) => {
+      if (jobs.value.some((job) => job.id === id && isOrganizationActive(job))) return
+      return operate(async () => {
+        await useAIService().deleteTagOrganization(id)
+        jobs.value = jobs.value.filter((job) => job.id !== id)
+        pushAppToast(i18n.global.t("topics.recordDeleted"), { variant: "success" })
+      })
+    },
     retry: (id: string) => operate(() => { /* 只重试后端失败项。 */ return useAIService().retryTagOrganization(id) }),
     undo: (id: string) => operate(async () => { /* 撤销反馈显式报告冲突。 */ const result = await useAIService().undoTagOrganization(id); error.value = i18n.global.t("topics.undoResult", result) }),
   }

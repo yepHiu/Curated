@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"curated-backend/internal/agent/core"
 	"curated-backend/internal/contracts"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,7 +14,8 @@ import (
 // topicHandlerFixture counts mutations to detect method and schema bypasses.
 type topicHandlerFixture struct {
 	TopicOrganizationProvider
-	starts, cancels int
+	starts, cancels, deletes int
+	deleteErr, getErr        error
 }
 
 func (f *topicHandlerFixture) StartTagOrganization(_ context.Context, _ contracts.TagOrganizationRequest) (contracts.TagOrganizationJobDTO, error) {
@@ -20,7 +23,7 @@ func (f *topicHandlerFixture) StartTagOrganization(_ context.Context, _ contract
 	return contracts.TagOrganizationJobDTO{ID: "fixture", Status: "queued"}, nil
 }
 func (f *topicHandlerFixture) GetTagOrganization(_ context.Context, id string) (contracts.TagOrganizationJobDTO, error) {
-	return contracts.TagOrganizationJobDTO{ID: id, Status: "running"}, nil
+	return contracts.TagOrganizationJobDTO{ID: id, Status: "running"}, f.getErr
 }
 func (f *topicHandlerFixture) CancelTagOrganization(_ context.Context, _ string) error {
 	f.cancels++
@@ -94,5 +97,35 @@ func TestTopicRenameSchema(t *testing.T) {
 		if response.Code != 400 {
 			t.Fatalf("invalid rename schema: %d", response.Code)
 		}
+	}
+}
+
+func (f *topicHandlerFixture) DeleteTagOrganization(_ context.Context, _ string) error {
+	f.deletes++
+	return f.deleteErr
+}
+
+func TestDeleteTagOrganizationHTTP(t *testing.T) {
+	for _, tc := range []struct {
+		name, method      string
+		getErr, deleteErr error
+		status, calls     int
+	}{
+		{name: "deleted", method: http.MethodDelete, status: 204, calls: 1},
+		{name: "active", method: http.MethodDelete, deleteErr: &core.ToolError{Code: "AI_ORGANIZATION_ACTIVE", Message: "Cancel first"}, status: 400, calls: 1},
+		{name: "missing", method: http.MethodDelete, getErr: sql.ErrNoRows, status: 404},
+		{name: "wrong method", method: http.MethodPost, status: 405},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := &topicHandlerFixture{getErr: tc.getErr, deleteErr: tc.deleteErr}
+			h := &Handler{topicOrganization: fixture}
+			req := httptest.NewRequest(tc.method, "/api/ai/tag-organizations/fixture", nil)
+			req.SetPathValue("jobId", "fixture")
+			response := httptest.NewRecorder()
+			h.handleTagOrganization(response, req)
+			if response.Code != tc.status || fixture.deletes != tc.calls {
+				t.Fatalf("status=%d deletes=%d body=%s", response.Code, fixture.deletes, response.Body.String())
+			}
+		})
 	}
 }

@@ -22,6 +22,7 @@ type TopicOrganizationProvider interface {
 	GetTagOrganization(context.Context, string) (contracts.TagOrganizationJobDTO, error)
 	TagOrganizationItems(context.Context, string, int, int) ([]contracts.TagOrganizationItemDTO, error)
 	CancelTagOrganization(context.Context, string) error
+	DeleteTagOrganization(context.Context, string) error
 	RetryTagOrganization(context.Context, string) error
 	UndoTagOrganization(context.Context, string) (contracts.TagOrganizationUndoDTO, error)
 }
@@ -193,12 +194,20 @@ func (h *Handler) handleTagOrganization(w http.ResponseWriter, r *http.Request) 
 	}
 	id := r.PathValue("jobId")
 	op := r.PathValue("operation")
-	if (op == "" || op == "items") && r.Method != http.MethodGet || (op == "cancel" || op == "retry" || op == "undo") && r.Method != http.MethodPost {
+	if op == "" && r.Method != http.MethodGet && r.Method != http.MethodDelete || op == "items" && r.Method != http.MethodGet || (op == "cancel" || op == "retry" || op == "undo") && r.Method != http.MethodPost {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
 	if _, err := h.topicOrganization.GetTagOrganization(r.Context(), id); err != nil {
 		topicHTTPError(w, err)
+		return
+	}
+	if op == "" && r.Method == http.MethodDelete {
+		if err := h.topicOrganization.DeleteTagOrganization(r.Context(), id); err != nil {
+			topicHTTPError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	switch r.PathValue("operation") {

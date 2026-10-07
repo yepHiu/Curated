@@ -2385,6 +2385,8 @@
     "retry": "重试"
   },
   "topics": {
+    "deleteRecord": "删除本次整理记录",
+    "recordDeleted": "已删除整理记录",
     "issuesTitle": "待处理影片（{count}）",
     "viewIssues": "查看问题影片",
     "leaveForLater": "暂不处理",
@@ -2470,6 +2472,7 @@
     "waitingQuota": "等待写入额度 · 已处理 {done}/{total} 部",
     "vocabularyHint": "先建立共用题材，再写入用户标签。已完成的归纳批次会保存，重试从断点继续。",
     "errors": {
+      "AI_ORGANIZATION_ACTIVE": "请先取消正在进行的整理，再删除记录。",
       "AI_ORGANIZATION_TIMEOUT": "模型响应超时。已完成批次保留，可重试继续。",
       "AI_ORGANIZATION_OUTPUT_LIMIT": "模型输出达到上限或只有推理内容，未获得完整分类结果。可调整模型后重试。",
       "AI_ORGANIZATION_INVALID_JSON": "模型未返回完整的分类格式，本批次未应用。可重试。",

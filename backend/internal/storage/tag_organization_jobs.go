@@ -10,6 +10,7 @@ import (
 )
 
 var ErrNoOrganizationMovies = errors.New("no eligible movies")
+var ErrOrganizationActive = errors.New("organization is active")
 
 // CreateTagOrganization 固定任务范围并通过唯一约束限制并发；相同请求返回原任务。
 func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, reason, locale string, movieIDs []string) (string, error) {
@@ -89,7 +90,7 @@ func (s *SQLiteStore) createTagOrganization(ctx context.Context, id, requestID, 
 // GetTagOrganization 根据逐项检查点计算真实进度，重启不依赖内存计数。
 func (s *SQLiteStore) GetTagOrganization(ctx context.Context, id string) (contracts.TagOrganizationJobDTO, error) {
 	v := contracts.TagOrganizationJobDTO{}
-	err := s.db.QueryRowContext(ctx, `SELECT id,status,stage,trigger_reason,revision,created_at,updated_at,error,vocabulary_processed,vocabulary_ready,locale FROM ai_tag_organization_jobs WHERE id=?`, id).Scan(&v.ID, &v.Status, &v.Stage, &v.TriggerReason, &v.Revision, &v.CreatedAt, &v.UpdatedAt, &v.Error, &v.VocabularyProcessed, &v.VocabularyReady, &v.Locale)
+	err := s.db.QueryRowContext(ctx, `SELECT id,status,stage,trigger_reason,revision,created_at,updated_at,error,vocabulary_processed,vocabulary_ready,locale FROM ai_tag_organization_jobs WHERE id=? AND deleted_at=''`, id).Scan(&v.ID, &v.Status, &v.Stage, &v.TriggerReason, &v.Revision, &v.CreatedAt, &v.UpdatedAt, &v.Error, &v.VocabularyProcessed, &v.VocabularyReady, &v.Locale)
 	if err != nil {
 		return v, err
 	}
@@ -100,9 +101,9 @@ func (s *SQLiteStore) GetTagOrganization(ctx context.Context, id string) (contra
 
 // ListTagOrganizations 返回持久任务列表，用于首次加载、重连与恢复。
 func (s *SQLiteStore) ListTagOrganizations(ctx context.Context, active bool) ([]contracts.TagOrganizationJobDTO, error) {
-	where := ""
+	where := " WHERE deleted_at=''"
 	if active {
-		where = " WHERE status IN ('queued','running')"
+		where += " AND status IN ('queued','running')"
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT id FROM ai_tag_organization_jobs`+where+` ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
@@ -125,12 +126,35 @@ func (s *SQLiteStore) ListTagOrganizations(ctx context.Context, active bool) ([]
 	out := []contracts.TagOrganizationJobDTO{}
 	for _, id := range ids {
 		v, err := s.GetTagOrganization(ctx, id)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue // A record may have been deleted after the list snapshot.
+		}
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, v)
 	}
 	return out, nil
+}
+
+// DeleteTagOrganization removes history while retaining coverage, issues and tags.
+func (s *SQLiteStore) DeleteTagOrganization(ctx context.Context, id string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var status string
+	if err = tx.QueryRowContext(ctx, `SELECT status FROM ai_tag_organization_jobs WHERE id=? AND deleted_at=''`, id).Scan(&status); err != nil {
+		return err
+	}
+	if status == "queued" || status == "running" {
+		return ErrOrganizationActive
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE ai_tag_organization_jobs SET deleted_at=?,revision=revision+1 WHERE id=?`, nowUTC(), id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // UpdateTagOrganization 推进状态，取消状态不能被迟到的运行结果复活。
@@ -152,7 +176,7 @@ func (s *SQLiteStore) SetTagOrganizationVocabulary(ctx context.Context, id strin
 // GetTagOrganizationVocabulary 读取已冻结词汇以避免恢复时重复归纳。
 func (s *SQLiteStore) GetTagOrganizationVocabulary(ctx context.Context, id string) ([]TopicDefinition, error) {
 	var raw string
-	if err := s.db.QueryRowContext(ctx, `SELECT vocabulary_json FROM ai_tag_organization_jobs WHERE id=?`, id).Scan(&raw); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT vocabulary_json FROM ai_tag_organization_jobs WHERE id=? AND deleted_at=''`, id).Scan(&raw); err != nil {
 		return nil, err
 	}
 	var defs []TopicDefinition
@@ -224,7 +248,7 @@ func (s *SQLiteStore) RetryTagOrganization(ctx context.Context, id string) error
 	}
 	defer func() { _ = tx.Rollback() }()
 	var status string
-	if err = tx.QueryRowContext(ctx, `SELECT status FROM ai_tag_organization_jobs WHERE id=?`, id).Scan(&status); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT status FROM ai_tag_organization_jobs WHERE id=? AND deleted_at=''`, id).Scan(&status); err != nil {
 		return err
 	}
 	var undone int
