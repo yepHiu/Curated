@@ -1,64 +1,64 @@
 {
   "schema": 1,
   "component": "desktop",
-  "version": "0.2.5",
-  "sourceCommit": "3bf7790665ced4a0f6c7d11af88f2b40321c8abd",
+  "version": "0.2.6",
+  "sourceCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
   "artifacts": [
     {
       "component": "desktop",
       "variant": "standalone",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "channel": "stable",
       "platform": "windows",
       "arch": "x64",
       "format": "exe",
-      "fileName": "Curated-Desktop-Setup-0.2.5-windows-x64.exe",
-      "sha256": "916aa94cf3f5464b1b45c86a97fc58004bf6c8ad3e698281c1b651c9864d6614",
-      "sourceCommit": "3bf7790665ced4a0f6c7d11af88f2b40321c8abd",
-      "url": "https://github.com/yepHiu/Curated/releases/download/release-20261007-3/Curated-Desktop-Setup-0.2.5-windows-x64.exe"
+      "fileName": "Curated-Desktop-Setup-0.2.6-windows-x64.exe",
+      "sha256": "ef29447b51d891a12f24c5ef4935e39c6519c408a2828a7026f9f00676fb07b0",
+      "sourceCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+      "url": "https://github.com/yepHiu/Curated/releases/download/release-20261008/Curated-Desktop-Setup-0.2.6-windows-x64.exe"
     },
     {
       "component": "desktop",
       "variant": "standalone",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "channel": "stable",
       "platform": "windows",
       "arch": "x64",
       "format": "zip",
-      "fileName": "Curated-Desktop-0.2.5-windows-x64.zip",
-      "sha256": "dc7a311c872db8fec66de038c062d565c8befeea8f21ef6ea2e27603ed9caf89",
-      "sourceCommit": "3bf7790665ced4a0f6c7d11af88f2b40321c8abd",
-      "url": "https://github.com/yepHiu/Curated/releases/download/release-20261007-3/Curated-Desktop-0.2.5-windows-x64.zip"
+      "fileName": "Curated-Desktop-0.2.6-windows-x64.zip",
+      "sha256": "1ac218d19f121ebb45e9303b175c23ffbf510aa04e680e60371a65b29c4a61ab",
+      "sourceCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+      "url": "https://github.com/yepHiu/Curated/releases/download/release-20261008/Curated-Desktop-0.2.6-windows-x64.zip"
     },
     {
-      "fileName": "Curated-Desktop-0.2.5-macos-arm64.dmg",
-      "sha256": "444f7a1bb4116f47f795b7fee9d01f5ead70a157c10ba6d31a18387126cd41c5",
+      "fileName": "Curated-Desktop-0.2.6-macos-arm64.dmg",
+      "sha256": "ce7c37a111468156277968d398d31f66943bb36a517381b0145995ae318de5c1",
       "component": "desktop",
       "variant": "standalone",
       "channel": "stable",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "platform": "macos",
       "arch": "arm64",
       "format": "dmg",
       "signing": "ad-hoc",
       "notarized": false,
-      "sourceCommit": "3bf7790665ced4a0f6c7d11af88f2b40321c8abd",
-      "url": "https://github.com/yepHiu/Curated/releases/download/release-20261007-3/Curated-Desktop-0.2.5-macos-arm64.dmg"
+      "sourceCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+      "url": "https://github.com/yepHiu/Curated/releases/download/release-20261008/Curated-Desktop-0.2.6-macos-arm64.dmg"
     },
     {
-      "fileName": "Curated-Desktop-0.2.5-macos-arm64.zip",
-      "sha256": "8f3ae6ea8464a6e71f1ef5645851def1a9ee4c9eac86a522116f61d5219b285b",
+      "fileName": "Curated-Desktop-0.2.6-macos-arm64.zip",
+      "sha256": "245703623c14d27af0cef3bb30aa07581a496a670c066119e40fc731d866b20d",
       "component": "desktop",
       "variant": "standalone",
       "channel": "stable",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "platform": "macos",
       "arch": "arm64",
       "format": "zip",
       "signing": "ad-hoc",
       "notarized": false,
-      "sourceCommit": "3bf7790665ced4a0f6c7d11af88f2b40321c8abd",
-      "url": "https://github.com/yepHiu/Curated/releases/download/release-20261007-3/Curated-Desktop-0.2.5-macos-arm64.zip"
+      "sourceCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+      "url": "https://github.com/yepHiu/Curated/releases/download/release-20261008/Curated-Desktop-0.2.6-macos-arm64.zip"
     }
   ]
 }
