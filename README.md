@@ -32,6 +32,7 @@ Browse by subject with [AI user-tag organization](docs/guide.md#ai-user-tags-and
 AI tag organization shows organized, unorganized and changed-source counts, skips problem movies for later review, defaults to unorganized movies, and supports updates, one movie, selected movies or explicit full reorganization. It reuses existing labels and corrects common vocabulary conflicts. See [AI user tags](docs/guide.md#ai-user-tags-and-homepage-topics).
 
 AI prompt text is maintained as [independent TXT resources](docs/guide.md#ai-prompt-txt-resources) embedded in the Server.
+Agent requests keep stable rules/history before current page data, send action source data once, and log provider-reported cache counts; see [prompt caching](docs/guide.md#agent-prompt-caching).
 
 Server uses a dark icon background; Desktop uses soft off-white (`#F5F6F8`), with the same central artwork. See [brand guidelines](docs/reference/curated-brand-guidelines.md) and [asset preview](icon/brand/index.html).
 

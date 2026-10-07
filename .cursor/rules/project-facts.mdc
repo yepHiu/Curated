@@ -3,6 +3,10 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-10-07 Agent 缓存复用（源码已实现）
+
+聊天固定 system / 历史在前，本轮页面 system 在最新 user 前；历史截断说明不再改基础 system。动作规则与源资料分离，源文本/洞察 JSON 只发一次，正文沿用 prompts/*.txt。版本 agent-system-v8 / agent-actions-v2。DeepSeek 缓存自动启用；客户端解析命中/未命中计数，可信计数写 AI prompt cache usage Info 日志，未知不记零，输入总 token 不重复累计命中部分。无新增 API、数据库迁移、library-config 或报表列；需重编译/重启 Server。真实命中率/费用提升待观察，见 docs/plan/2026-10-07-agent-prompt-cache-optimization.md。
+
 ## 2026-10-06 FC2 元数据（源码已实现）
 
 `internal/scraper/fc2` 独立适配 Javten（`fc2hub`）、FC2 官方、PPVDataBank、JavDB；参照 MDCz v0.18.0 的搜索/解析与字段聚合行为。`req/v3` 提供 Chrome 请求特征和动态代理，20 秒请求上限、4 MiB 响应上限、同站最多 5 次跳转。FC2 自动查询最多两路并发、45 秒总预算；按上述顺序保留主标题/来源，补齐缺失字段和更长简介。官方不存在页与 403/HTTP 200 验证页分开处理；访问受阻五分钟冷却，指定单源可重试；全失败保留逐源错误。

@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## Agent prompt cache reuse — 2026-10-07
+
+Chat uses stable base rules/history before current page system context and the latest user input. Actions send source data once in user messages; TXT assets remain embedded. Versions: agent-system-v8 / agent-actions-v2. Measured DeepSeek cache hit/miss counts produce `AI prompt cache usage` Info logs; unknown is distinct from zero. No new API, library configuration or database migration; cache statistics are not added to existing report columns. Rebuild/restart Server; real hit-rate and cost gains remain unmeasured. See guide “Agent prompt caching” and docs/plan/2026-10-07-agent-prompt-cache-optimization.md.
+
 ## FC2 metadata — 2026-10-06
 
 FC2 uses context-aware adapters in `internal/scraper/fc2` for Javten (`fc2hub`), official FC2, PPVDataBank and JavDB. Automatic queries use two concurrent sources within 45 seconds and enrich missing fields in that priority order. Explicit single providers and compatible custom chains keep their scope. Source selection/health includes PPVDataBank and JavDB; JavDB currently supports FC2 only because SDK v1.3.2 has no registered JavDB provider. Images preserve their original provider/Referer; wishlist and Agent FC2 searches reuse the adapters. Access failures retain HTTP status/challenge errors and use a five-minute automatic cooldown; official missing products are distinct. Ordinary provider chains continue after detail failure. No new API, config key or database migration. FC2-3977618 metadata and cover were verified read-only using the current Server proxy; source changes require a new Server build/restart or upgrade. See guide “FC2 metadata sources” and docs/plan/2026-10-06-fc2-metadata-reliability.md.

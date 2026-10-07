@@ -180,6 +180,12 @@ Explicit topic renaming is available through `PATCH /api/library/topics/{topicId
 
 Natural-language chat initiation, automatic incremental organization, detail-page recommendations, automatic bulk topic localization/merge and real-provider classification quality acceptance remain pending. See [implementation and limitations](plan/2026-08-19-agent-user-prd.md#11-2026-10-01-实施记录代码已落地真实模型质量待验收).
 
+### Agent prompt caching
+
+Chat keeps base system rules and admitted history before the current page context and latest question, so navigation does not change the earlier shared prefix. Page projection and working-context compaction still preserve the current selection. Polish, title/synopsis translation and insights send source text/JSON once in a separate user message. Versions are `agent-system-v8` / `agent-actions-v2`. Rebuild and restart the Server to use the changes.
+
+DeepSeek enables caching automatically. Valid reported cache counts produce Server Info logs named `AI prompt cache usage` with `promptTokens`, `promptCacheHitTokens` and, when reported, `promptCacheMissTokens`, plus run/model/version identifiers. Unknown counts are not zero, and cached tokens are not added to total usage again. Cache counts are currently logs only; the existing AI report still shows total measured usage. Divide summed hits by summed input tokens of calls with reported hits. Cold requests, eviction, compaction and model/toolset changes can reduce reuse. Code checks alone do not establish a real hit-rate improvement. See [implementation and observation limits](plan/2026-10-07-agent-prompt-cache-optimization.md) and [DeepSeek documentation](https://api-docs.deepseek.com/guides/kv_cache).
+
 ### AI prompt TXT resources
 
 **Project convention:** all future AI Agent prompt additions and edits must use the independent TXT resources in `backend/internal/agent/prompts/` and the existing loading module. Edit the relevant TXT for an existing purpose; add a clearly named TXT and a prompts-package accessor for a new purpose. Do not introduce inline instruction text in Go/TypeScript business code or a separate Markdown/YAML prompt system. Dynamic request data, message assembly, protocol fields and hard validation remain in code.
@@ -190,7 +196,7 @@ Built-in AI prompt text lives in `backend/internal/agent/prompts/*.txt`, followi
 |---|---|
 | Chat and bounded page context | `system.txt`, `response-language.txt`, `page-context.txt`, `active-filters.txt`, `mentions.txt` |
 | Topic organization | `topic-vocabulary.txt`, `topic-reuse.txt`, `topic-classification.txt` |
-| Polish, display translation, insights | `polish-comment.txt`, `translate-display.txt`, `insights-narrative.txt` |
+| Polish, display translation, insights | `polish-comment.txt`, `translate-display.txt`, `insights-narrative.txt`, `action-source.txt` |
 | Memory and recovery | `memory-checkpoint.txt`, `answer-correction.txt`, `history-omitted.txt` |
 | Provider connectivity probe | `provider-probe.txt` |
 

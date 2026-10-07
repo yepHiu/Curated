@@ -122,6 +122,7 @@
   </style>
 </head>
 <body>
+  <section><h2>Agent 缓存复用 · 2026-10-07</h2><p>固定聊天规则与历史位于本轮页面和最新问题之前。独立动作将规则与源资料分离，原文/统计 JSON 只发送一次，继续使用 embed TXT。版本 agent-system-v8 / agent-actions-v2；重新编译并重启 Server 后生效。</p><table><thead><tr><th>能力</th><th>当前实现</th><th>验收边界</th></tr></thead><tbody><tr><td>前缀复用</td><td>页面切换不改固定规则及前置历史；压缩保留本轮页面</td><td>压缩、工具集变化和服务端淘汰仍影响命中；实际提升待观察</td></tr><tr><td>缓存计数</td><td>DeepSeek 命中/未命中计数解析及 Info 日志；未知与零分开</td><td>无新增 API、数据库字段、配置或报表列；未调用收费模型</td></tr></tbody></table><p>详见 <a href="../plan/2026-10-07-agent-prompt-cache-optimization.md">实现与验证记录</a>。</p></section>
   <section><h2>Desktop 预编译测试运行 · 2026-10-06</h2><p><code>pnpm desktop:test:build</code> 构建一次测试页面与 Electron；<code>pnpm desktop:test</code> 直接复用构建。Electron 主进程在 127.0.0.1:5183 提供静态 SPA，并流式转发 /api 到既有开发 Server 8080。独立测试配置、登录与原生播放入口保留；运行时无独立 Vite/编译器/文件监听，不替换 Server 页面。显式 FRONTEND_DIR 只用于未打包本机测试；正式包与远端保持原页面来源。源码更新后重建，退出回收监听。无新增公共 API 或库配置。</p></section>
 <section id="windows-desktop-native-integration">
   <h2>2026-10-06：正式 Windows Desktop 可选原生播放器（分支源码）</h2>
