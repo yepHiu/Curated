@@ -750,6 +750,7 @@ All endpoints use the existing authenticated/unlocked API boundary. No endpoint 
 | POST | `/api/ai/tag-organizations` | `{scope:"all"|"selected"|"unorganized"|"outdated"|"issues",movieIds?:string[],requestId:string,locale?:"zh-CN"|"en"|"ja"}`; 202 job; selected 1–600 |
 | GET | `/api/ai/tag-organizations/{jobId}` | Persistent progress/counters; frozen `locale` (default zh-CN), `vocabularyProcessed`, `vocabularyReady`; stage includes `vocabulary`, `classifying`, `applying`, `waiting_quota` |
 | GET | `/api/ai/tag-organizations/{jobId}/items?limit=25&offset=0` | Paged result/evidence records `{items}` |
+| DELETE | `/api/ai/tag-organizations/{jobId}` | 204; remove inactive history, preserving tags/coverage/issues; active AI_ORGANIZATION_ACTIVE, missing/deleted 404; migration 0065 tombstone |
 | POST | `/api/ai/tag-organizations/{jobId}/cancel` | Stop and retain committed results |
 | POST | `/api/ai/tag-organizations/{jobId}/retry` | Resume pending/failed/conflicting items |
 | POST | `/api/ai/tag-organizations/{jobId}/undo` | `{restored,conflicts}`; later manual edits are preserved |

@@ -31,6 +31,8 @@ Browse by subject with [AI user-tag organization](docs/guide.md#ai-user-tags-and
 
 AI tag organization shows organized, unorganized and changed-source counts, skips problem movies for later review, defaults to unorganized movies, and supports updates, one movie, selected movies or explicit full reorganization. It reuses existing labels and corrects common vocabulary conflicts. See [AI user tags](docs/guide.md#ai-user-tags-and-homepage-topics).
 
+AI organization history supports deleting finished, failed, paused or cancelled records from the record menu; applied tags and movie coverage stay intact.
+
 AI prompt text is maintained as [independent TXT resources](docs/guide.md#ai-prompt-txt-resources) embedded in the Server.
 Agent requests keep stable rules/history before current page data, send action source data once, and log provider-reported cache counts; see [prompt caching](docs/guide.md#agent-prompt-caching).
 

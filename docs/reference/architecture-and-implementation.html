@@ -517,6 +517,7 @@
   <table>
     <thead><tr><th>功能</th><th>前端</th><th>后端</th></tr></thead>
     <tbody>
+      <tr><td>AI 整理记录删除（2026-10-07）</td><td>历史更多菜单可删除已结束/暂停任务；活动任务先取消</td><td>DELETE /api/ai/tag-organizations/{jobId}；迁移 0065 deleted_at 持久删除历史展示，保留标签、分析覆盖和问题队列，禁用已删记录详情/重试/撤销。Web/Mock 三语，无新配置。</td></tr>
       <tr><td>AI 单片跳过与待处理（2026-10-03）</td><td>输入/结果问题逐片隔离后继续，结束汇总；问题列表分页、原因、逐片/队列重试或暂不处理</td><td>迁移 0063 问题队列与失败检查点原子持久化；stats needsAttention，GET /api/ai/tag-organizations/issues，POST scope issues。默认范围排除问题片，成功清理；归纳临时合并不泄漏失败提案，重试不重写成功片。全局故障仍暂停。</td></tr>
       <tr><td>AI 整理覆盖与冲突纠正（2026-10-03）</td><td>已整理/未整理/待更新统计；默认未整理，已变更资料单独更新，更多菜单保留全库重整；历史及单片/批量入口保留</td><td>迁移 0062 逐片分析指纹，成功/无匹配原子完成并回填历史；GET /api/ai/tag-organizations/stats，POST scope 增加 unorganized/outdated，事务固定范围。撤销不覆盖更晚分析。归纳去重与安全别名处理，非法模型内容最多纠正一次，独立错误码与检查点保留。无新配置，需要更新 Server。</td></tr>
       <tr><td>正式 AI 设置与治理</td><td>SettingsAISection 懒加载，模型、全局开关、只读、隐私、可选调用上限（默认不限）、保留期；用量/速度/失败筛选、分页请求和工具审计</td><td>aiGovernance.stepLimit=0 表示不限，已有 1–30 配置保留；达到用户上限返回 partial/tool_step_limit，写入预览返回 needs_confirmation/confirmation_required。aiGovernance 配置；GET/PATCH /api/ai/settings，GET /api/ai/usage、/api/ai/audit，POST /api/ai/cleanup。迁移 0044 记录实际 usage 和覆盖率、耗时、模型/提示词版本、工具数与错误分类；无 usage 显示未知。权限在后端执行，全局确认速率，保留期清理不撤销业务或删除聊天回执；无账单估价。</td></tr>

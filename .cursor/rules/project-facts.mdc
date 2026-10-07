@@ -520,3 +520,8 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 ## 2026-10-02 AI 独立 TXT 提示词
 
 内置提示词正文统一存于 `backend/internal/agent/prompts/*.txt`（15 个）：聊天主模板/语言/页面/筛选/提及、题材归纳/复用/分类、润色/翻译/洞察、摘要/纠正/历史截断、连接探针。`templates.go` 用 Go embed 一次解析 text/template，严格缺变量、源资料不二次求值，去掉文件末尾一个换行且保留其他空白；不依赖安装目录或工作目录，不热更新，改 TXT 需重编译/重启 Server。模型消息、规则和版本保持原样；题材使用正文+版本对象，不再比较文本识别用途。硬验证/权限仍在 Go。任务级提示词冻结、在线编辑及模型分支尚未实施；无 API/cfg/迁移新增。详见 guide 的 AI prompt TXT resources 和 `docs/plan/2026-10-02-agent-prompt-management-research.md`。
+
+
+## 2026-10-07 AI 整理历史删除
+
+整理记录更多菜单可删除 completed/partial_failed/failed/blocked/cancelled，活动任务先取消。DELETE /api/ai/tag-organizations/{jobId} 返回 204；迁移 0065 deleted_at 持久移除历史，详情/重试/撤销不可访问。保留内部任务关联、已写标签、分析指纹、覆盖统计与问题队列，不调用 AI、不要求 AI 写权限；Web/Mock 三语同步，无 cfg 键。Server 需更新并重启。
