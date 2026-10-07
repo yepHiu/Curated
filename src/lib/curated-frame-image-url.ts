@@ -1,9 +1,7 @@
+import { resolveApiBaseUrl } from "@/api/http-client"
+
 function apiBaseUrl(): string {
-  const base = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "")
-  if (base.startsWith("http://") || base.startsWith("https://")) {
-    return base
-  }
-  return `${window.location.origin}${base}`
+  return new URL(resolveApiBaseUrl(import.meta.env), window.location.origin).href.replace(/\/$/, "")
 }
 
 export function curatedFrameImageUrl(frameId: string): string {
