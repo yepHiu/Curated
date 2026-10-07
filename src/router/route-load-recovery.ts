@@ -17,7 +17,7 @@ export function installRouteLoadRecovery(router: Router) {
     pushAppToast(i18n.global.t("app.routeLoadFailed"), {
       id: toastId,
       variant: "destructive",
-      durationMs: Number.POSITIVE_INFINITY,
+      durationMs: 9000,
       action: {
         label: i18n.global.t("app.reload"),
         onClick: () => reloadRouteDocument(href),

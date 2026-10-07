@@ -31,7 +31,7 @@ describe("route load recovery", () => {
     expect(pushAppToast).toHaveBeenCalledWith("app.routeLoadFailed", expect.objectContaining({
       id: "route-load-failed",
       variant: "destructive",
-      durationMs: Number.POSITIVE_INFINITY,
+      durationMs: 9000,
       action: { label: "app.reload", onClick: expect.any(Function) },
     }))
     expect(dismissAppToast).not.toHaveBeenCalled()

@@ -1,4 +1,6 @@
 import { toast } from "vue-sonner"
+import { h } from "vue"
+import { Loader2Icon } from "lucide-vue-next"
 import type { TaskDTO } from "@/api/types"
 import {
   useNotificationCenter,
@@ -12,6 +14,14 @@ import {
 
 export type AppToastVariant = "default" | "success" | "destructive" | "warning"
 export type AppToastId = string | number
+
+const DEFAULT_TOAST_DURATION_MS = 4500
+
+function toastDuration(durationMs?: number): number {
+  return durationMs !== undefined && Number.isFinite(durationMs) && durationMs > 0 && durationMs <= 2_147_483_647
+    ? durationMs
+    : DEFAULT_TOAST_DURATION_MS
+}
 
 /** Maps terminal task status to toast severity (scan / watch / scrape toasts). */
 export function taskTerminalToastVariant(status: TaskDTO["status"]): AppToastVariant {
@@ -44,8 +54,10 @@ export interface PushAppToastOptions {
 }
 
 export function pushAppToastLoading(message: string): AppToastId {
-  return toast.loading(message, {
-    duration: Number.POSITIVE_INFINITY,
+  // Sonner's loading type never auto-closes, even with a finite duration.
+  return toast(message, {
+    icon: h(Loader2Icon, { class: "size-4 animate-spin", "aria-hidden": "true" }),
+    duration: DEFAULT_TOAST_DURATION_MS,
     closeButton: true,
     dismissible: true,
   })
@@ -57,9 +69,11 @@ export function dismissAppToast(id: AppToastId): void {
 
 export function pushAppToast(message: string, options?: PushAppToastOptions): void {
   const variant = options?.variant ?? "default"
-  const duration = options?.durationMs ?? 4500
+  const duration = toastDuration(options?.durationMs)
   const base = {
     duration,
+    // Sonner merges updates by ID; clear a previous progress indicator.
+    icon: undefined,
     closeButton: true,
     dismissible: true,
     ...(options?.id === undefined ? {} : { id: options.id }),
