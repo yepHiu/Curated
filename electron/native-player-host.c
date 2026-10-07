@@ -256,8 +256,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
     MONITORINFO initial_monitor = { .cbSize = sizeof(MONITORINFO) };
     POINT initial_point = {0, 0};
     GetMonitorInfoW(MonitorFromPoint(initial_point, MONITOR_DEFAULTTOPRIMARY), &initial_monitor);
-    int initial_width = MulDiv(1000, (int)system_dpi, 96);
-    int initial_height = MulDiv(800, (int)system_dpi, 96);
+    int initial_width = MulDiv(1440, (int)system_dpi, 96);
+    int initial_height = MulDiv(900, (int)system_dpi, 96);
     int work_width = initial_monitor.rcWork.right - initial_monitor.rcWork.left;
     int work_height = initial_monitor.rcWork.bottom - initial_monitor.rcWork.top;
     if (initial_width > work_width) initial_width = work_width;
