@@ -749,7 +749,7 @@ watch(
         </div>
 
         <div v-if="props.showActions && !props.readOnly" class="flex flex-wrap items-center gap-3">
-          <MoviePartSelect v-if="(movie.files?.length ?? 0) > 1" v-model="selectedPartId" :files="movie.files!" />
+          <MoviePartSelect v-if="(movie.files?.length ?? 0) > 1" v-model="selectedPartId" :files="movie.files!" wrap-file-name />
           <Button class="rounded-full px-8" @click="emit('openPlayer', movie.id, selectedPartId)">
             <PlayCircle data-icon="inline-start" />
             {{ t("detailPanel.play") }}
