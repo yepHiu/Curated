@@ -8,6 +8,14 @@ const page = path.join(options.directory, "player/index.html")
 const library = "/opt/homebrew/opt/mpv/lib/libmpv.dylib"
 const exists = (files: string[]) => (file: string) => files.includes(file)
 describe("native playback resources", () => {
+  it("uses only its bundled engine on packaged Mac, ignoring Homebrew and overrides", () => {
+    const bundled = path.join(options.appPath, "native-player-macos/libmpv.dylib")
+    const packaged = { ...options, packaged: true }
+    expect(playbackResources(packaged, "darwin", { CURATED_NATIVE_LIBMPV: "/missing/override" }, exists([bundled, library, modulePath, page])))
+      .toMatchObject({ available: true, executable: bundled })
+    expect(playbackResources(packaged, "darwin", {}, exists([library, modulePath, page])))
+      .toMatchObject({ available: false, reason: "engine" })
+  })
   it("enables a Mac with a local libmpv, Cocoa module and bundled controls", () => {
     expect(playbackResources(options, "darwin", {}, exists([library, modulePath, page])))
       .toMatchObject({ available: true, executable: library, helper: modulePath, reason: undefined })

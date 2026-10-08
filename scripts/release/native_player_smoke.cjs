@@ -1,7 +1,7 @@
-/* Exercise the installed Windows player with synthetic authenticated HTTP/Range media. */
+/* Exercise the installed player with synthetic authenticated HTTP/Range media. */
 const { createRequire } = require('node:module')
 const { execFileSync } = require('node:child_process')
-const { existsSync, mkdtempSync, readFileSync, rmSync } = require('node:fs')
+const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync } = require('node:fs')
 const { createServer } = require('node:http')
 const { tmpdir } = require('node:os')
 const path = require('node:path')
@@ -9,15 +9,24 @@ const assert = require('node:assert/strict')
 const { _electron } = createRequire(require.resolve('@playwright/test/package.json'))('playwright')
 
 ;(async () => {
-  assert.equal(process.platform, 'win32')
+  assert.ok(['win32', 'darwin'].includes(process.platform))
+  const mac = process.platform === 'darwin'
   const executable = path.resolve(process.argv[2])
-  // 实际安装目录只能带运行资料；对应源码下载地址必须来自同批官方 Release。
-  const engineDirectory = path.join(path.dirname(executable), 'resources', 'app', 'native-player')
+  // Windows uses a same-Release source asset; Mac currently carries sources in-app.
+  const engineDirectory = mac
+    ? path.resolve(path.dirname(executable), '../Resources/app/native-player-macos')
+    : path.join(path.dirname(executable), 'resources', 'app', 'native-player')
   const engineManifest = JSON.parse(readFileSync(path.join(engineDirectory, 'engine-manifest.json'), 'utf8'))
-  assert.equal(engineManifest.distribution, 'runtime-with-separate-sources')
-  assert.equal(existsSync(path.join(engineDirectory, engineManifest.correspondingSource.file)), false)
-  assert.ok(engineManifest.sourceAsset.url.startsWith('https://github.com/yepHiu/Curated/releases/download/'))
-  assert.ok(readFileSync(path.join(engineDirectory, 'licenses', 'SOURCE-DOWNLOAD.txt'), 'utf8').includes(engineManifest.sourceAsset.url))
+  if (mac) {
+    assert.equal(engineManifest.engine, 'libmpv')
+    assert.ok(existsSync(path.join(engineDirectory, 'libmpv.dylib')))
+    assert.ok(engineManifest.materials.some(item => item.file.startsWith('sources/')))
+  } else {
+    assert.equal(engineManifest.distribution, 'runtime-with-separate-sources')
+    assert.equal(existsSync(path.join(engineDirectory, engineManifest.correspondingSource.file)), false)
+    assert.ok(engineManifest.sourceAsset.url.startsWith('https://github.com/yepHiu/Curated/releases/download/'))
+    assert.ok(readFileSync(path.join(engineDirectory, 'licenses', 'SOURCE-DOWNLOAD.txt'), 'utf8').includes(engineManifest.sourceAsset.url))
+  }
   const temporary = mkdtempSync(path.join(tmpdir(), 'curated-native-package-'))
   const video = path.join(temporary, 'synthetic.mp4')
   execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=30',
@@ -75,8 +84,34 @@ const { _electron } = createRequire(require.resolve('@playwright/test/package.js
   let app
   try {
     const system = process.env.SystemRoot || 'C:\\Windows'
-    app = await _electron.launch({ executablePath: executable, args: ['--user-data-dir=' + path.join(temporary, 'profile')],
-      env: { ...process.env, PATH: `${system}\\System32;${system}`, CURATED_NATIVE_MPV: path.join(temporary, 'missing-development-mpv.exe'), CURATED_ELECTRON_BACKEND_URL: '', CURATED_BACKEND_URL: '' } })
+    const env = { ...process.env, PATH: mac ? '/usr/bin:/bin:/usr/sbin:/sbin' : `${system}\\System32;${system}`,
+      CURATED_NATIVE_MPV: path.join(temporary, 'missing-development-mpv.exe'),
+      CURATED_NATIVE_LIBMPV: path.join(temporary, 'missing-development-libmpv.dylib'),
+      CURATED_ELECTRON_BACKEND_URL: '', CURATED_BACKEND_URL: '' }
+    delete env.ELECTRON_RUN_AS_NODE
+    for (const name of Object.keys(env)) if (name.startsWith('DYLD_')) delete env[name]
+    let launchExecutable = executable
+    if (mac) {
+      // Deny reads of development package managers, not just PATH lookup. This
+      // catches absolute Homebrew install names even on a developer's machine.
+      launchExecutable = path.join(temporary, 'launch-packaged.sh')
+      const quote = value => "'" + value.replaceAll("'", "'\"'\"'") + "'"
+      const helpers = JSON.stringify(path.resolve(path.dirname(executable), '../Frameworks'))
+      const policy = '(version 1)(allow default)(allow process-exec (with no-sandbox) (subpath ' + helpers + '))(deny file-read* (subpath "/opt/homebrew") (subpath "/usr/local"))'
+      writeFileSync(launchExecutable, '#!/bin/sh\nexec /usr/bin/sandbox-exec -p ' + quote(policy) + ' ' + quote(executable) + ' "$@"\n')
+      chmodSync(launchExecutable, 0o755)
+    }
+    app = await _electron.launch({ executablePath: launchExecutable, args: ['--user-data-dir=' + path.join(temporary, 'profile')], env })
+    if (mac) {
+      // Chromium children need to establish their own seatbelt profiles. The
+      // process-exec exception leaves the libmpv-owning main process restricted.
+      assert.equal(await app.evaluate(() => {
+        return ['/opt/homebrew', '/usr/local'].every(directory => {
+          try { process.getBuiltinModule('node:fs').readdirSync(directory); return false }
+          catch (error) { return ['EPERM', 'EACCES', 'ENOENT'].includes(error.code) }
+        })
+      }), true, 'Main process can read Homebrew')
+    }
     const launcher = await app.firstWindow()
     await launcher.locator('#server-address').fill(origin)
     await launcher.locator('form').evaluate(form => form.requestSubmit())
@@ -84,6 +119,7 @@ const { _electron } = createRequire(require.resolve('@playwright/test/package.js
     await page.waitForLoadState()
     const caps = await wait(() => page.evaluate(() => window.javLibrary.playback.capabilities()), value => value.available, 'Packaged native capability missing')
     assert.equal(caps.available, true)
+    if (mac) assert.equal(caps.preferences.preferNative, true)
     await page.evaluate(() => window.javLibrary.playback.open({ movieId: 'fixture', fileId: 'one', startSec: 3, autoplay: false }))
     const snapshot = () => page.evaluate(() => window.javLibrary.playback.snapshot())
     const first = await wait(snapshot, value => value.state.status === 'paused' && value.state.durationSec > 19, 'Bundled player did not load')
@@ -99,12 +135,15 @@ const { _electron } = createRequire(require.resolve('@playwright/test/package.js
       catch (error) { if (String(error).includes('CAPTURE_NOT_READY')) return undefined; throw error }
     }, Boolean, 'Bundled frame capture never became ready')
     assert.equal(captures, 1)
-    const candidates = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-Command',
-      `ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Process -Filter "Name='mpv.exe' OR Name='native-player-host.exe'" | Select-Object ProcessId,ExecutablePath)`], { encoding: 'utf8', windowsHide: true }))
-    const children = candidates.filter(child => child.ExecutablePath?.toLowerCase().startsWith(path.dirname(executable).toLowerCase() + path.sep))
-    assert.equal(children.length, 2)
-    const bundled = path.join(path.dirname(executable), 'resources', 'app', 'native-player', 'mpv.exe')
-    assert.ok(children.some(child => child.ExecutablePath.toLowerCase() === bundled.toLowerCase()), 'Player used an external engine')
+    let children = []
+    if (!mac) {
+      const candidates = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-Command',
+        `ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Process -Filter "Name='mpv.exe' OR Name='native-player-host.exe'" | Select-Object ProcessId,ExecutablePath)`], { encoding: 'utf8', windowsHide: true }))
+      children = candidates.filter(child => child.ExecutablePath?.toLowerCase().startsWith(path.dirname(executable).toLowerCase() + path.sep))
+      assert.equal(children.length, 2)
+      const bundled = path.join(path.dirname(executable), 'resources', 'app', 'native-player', 'mpv.exe')
+      assert.ok(children.some(child => child.ExecutablePath.toLowerCase() === bundled.toLowerCase()), 'Player used an external engine')
+    }
     await command({ action: 'part', fileId: 'two' })
     const second = await wait(snapshot, value => value.state.fileId === 'two' && value.sessionId !== first.sessionId, 'Part replacement failed')
     assert.equal(second.windowOpen, true)
@@ -116,7 +155,7 @@ const { _electron } = createRequire(require.resolve('@playwright/test/package.js
       assert.throws(() => process.kill(child.ProcessId, 0), 'Native child survived close')
     }
     assert.ok(ranges > 0)
-    console.log(JSON.stringify({ packagedNative: 'passed', engineFromInstall: true, isolatedPath: true, authenticatedRanges: ranges, capture: 'passed', seek: 'passed', partReplacement: 'passed', cleanup: 'passed' }))
+    console.log(JSON.stringify({ packagedNative: 'passed', engineFromInstall: true, isolatedPath: true, homebrewDenied: mac, nativeDefault: caps.preferences.preferNative, authenticatedRanges: ranges, capture: 'passed', seek: 'passed', partReplacement: 'passed', cleanup: 'passed' }))
   } finally {
     if (app) await app.close()
     server.closeAllConnections()

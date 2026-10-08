@@ -21,7 +21,7 @@ export interface DesktopPlaybackOptions {
 }
 /** 生产 bridge 只信任已提交的主窗口或本地控制页，候选连接不能启动播放。 */
 export function installDesktopPlayback(options: DesktopPlaybackOptions) {
-  const store = new PlaybackPreferencesStore(options.userData)
+  const store = new PlaybackPreferencesStore(options.userData, options.packaged && process.platform === "darwin")
   let preferences = store.read()
   const resources = playbackResources(options)
   const page = pathToFileURL(resources.page).href

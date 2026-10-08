@@ -9,14 +9,16 @@ export function playbackResources(options: { directory: string; appPath: string;
   const supported = mac || platform === "win32"
   const helper = path.join(options.directory, mac ? "native-player-macos.node" : "native-player-host.exe")
   const page = path.join(options.directory, "player", "index.html")
-  const candidates = mac ? [
+  const candidates = mac ? (options.packaged ? [
+    path.join(options.appPath, "native-player-macos", "libmpv.dylib"),
+  ] : [
     env.CURATED_NATIVE_LIBMPV,
     "/opt/homebrew/opt/mpv/lib/libmpv.dylib",
     "/usr/local/opt/mpv/lib/libmpv.dylib",
-  ] : [options.packaged ? path.join(options.appPath, "native-player", "mpv.exe")
+  ]) : [options.packaged ? path.join(options.appPath, "native-player", "mpv.exe")
     : env.CURATED_NATIVE_MPV || path.join(options.appPath, ".workspace", "native-player", "mpv.exe")]
   // 显式覆盖无效时失败，避免误用其它版本掩盖配置问题。
-  const override = mac ? env.CURATED_NATIVE_LIBMPV : !options.packaged ? env.CURATED_NATIVE_MPV : undefined
+  const override = !options.packaged ? mac ? env.CURATED_NATIVE_LIBMPV : env.CURATED_NATIVE_MPV : undefined
   const executable = override || candidates.find(candidate => candidate && path.isAbsolute(candidate) && exists(candidate)) || ""
   const reason: DesktopPlaybackCapabilities["reason"] = !supported ? "platform" : !path.isAbsolute(executable) || !exists(executable) ? "engine"
     : !exists(helper) ? "host" : !exists(page) ? "page" : undefined

@@ -14,6 +14,7 @@ from .build_steps import _run, utc_build_stamp
 from .components import artifact_name
 from .git_utils import resolve_commit
 from .versioning import format_version, read_version_state
+from .macos_native import LOCK, stage as stage_native, validate_bundle
 
 
 def desktop_version(root: Path) -> str:
@@ -43,6 +44,7 @@ def stage_app(root: Path, app: Path, version: str, stamp: str) -> None:
         if not (compiled / required).is_file():
             raise FileNotFoundError(f'Missing Desktop build asset: {required}')
     shutil.copytree(compiled, payload / 'electron-dist', ignore=shutil.ignore_patterns('*.map'))
+    native = stage_native(payload, root / LOCK)
     metadata = {'schema': 1, 'version': version, 'buildStamp': stamp,
                 'distribution': 'desktop', 'updateFeed': 'https://raw.githubusercontent.com/yepHiu/Curated/release-channels/desktop.json'}
     (payload / 'electron-dist/desktop-release.json').write_text(json.dumps(metadata, indent=2) + '\n')
@@ -67,7 +69,8 @@ def stage_app(root: Path, app: Path, version: str, stamp: str) -> None:
     info.update(CFBundleExecutable='Curated Desktop', CFBundleName='Curated Desktop',
                 CFBundleDisplayName='Curated Desktop', CFBundleIdentifier='com.curated.desktop',
                 CFBundleShortVersionString=version, CFBundleVersion=version,
-                CFBundleIconFile='curated.icns', NSHighResolutionCapable=True)
+                CFBundleIconFile='curated.icns', NSHighResolutionCapable=True,
+                LSMinimumSystemVersion=native['minimumMacOS'])
     with info_path.open('wb') as stream:
         plistlib.dump(info, stream)
 
@@ -177,6 +180,17 @@ def package_macos_desktop(root: Path, output: Path) -> Path:
         # Ad-hoc signing supports arm64 execution; this is not Developer ID signing/notarization.
         _run(['codesign', '--force', '--deep', '--sign', '-', str(app)], cwd=root)
         _run(['codesign', '--verify', '--deep', '--strict', str(app)], cwd=root)
+        # codesign may rewrite Mach-O signatures. Re-seal only runtime hashes after
+        # signing, then sign the outer bundle again to include the final manifest.
+        native_directory = app / 'Contents/Resources/app/native-player-macos'
+        native_manifest = json.loads((native_directory / 'engine-manifest.json').read_text())
+        for item in native_manifest['runtime']:
+            with (native_directory / item['file']).open('rb') as stream:
+                item['sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
+        (native_directory / 'engine-manifest.json').write_text(json.dumps(native_manifest, indent=2) + '\n')
+        _run(['codesign', '--force', '--sign', '-', str(app)], cwd=root)
+        _run(['codesign', '--verify', '--deep', '--strict', str(app)], cwd=root)
+        validate_bundle(native_directory, root / LOCK)
         _run(['ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(app), str(output / names[1])], cwd=root)
         build_styled_dmg(root, app, output / names[0])
         _run(['hdiutil', 'verify', str(output / names[0])], cwd=root)

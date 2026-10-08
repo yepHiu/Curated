@@ -212,7 +212,7 @@ jobs:
     if: needs.prepare.outputs.component != 'server'
     needs: [prepare, quality]
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 60
     outputs:
       artifact_name: ${{ env.RELEASE_ARTIFACT }}
     env:
@@ -240,6 +240,10 @@ jobs:
           node node_modules/electron/install.js
       - name: Install pinned DMG layout tools
         run: python -m pip install -r scripts/release/macos/requirements.txt
+      - name: Prepare pinned self-contained Mac native engine
+        run: |
+          python scripts/release/prepare_macos_native.py
+          echo "CURATED_NATIVE_MAC_BUNDLE=$GITHUB_WORKSPACE/.workspace/native-player-macos-production" >> "$GITHUB_ENV"
       - name: Build standalone Desktop DMG and ZIP
         env:
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
@@ -249,6 +253,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mac-desktop-smoke"
           ditto -x -k release/macos-desktop/Curated-Desktop-*-macos-arm64.zip "$RUNNER_TEMP/mac-desktop-smoke"
           node scripts/release/desktop_smoke.cjs "$RUNNER_TEMP/mac-desktop-smoke/Curated Desktop.app/Contents/MacOS/Curated Desktop"
+      - name: Verify bundled Mac native playback without Homebrew access
+        run: |
+          brew install ffmpeg
+          node scripts/release/native_player_smoke.cjs "$RUNNER_TEMP/mac-desktop-smoke/Curated Desktop.app/Contents/MacOS/Curated Desktop"
       - name: Verify previous Desktop profile and Server compatibility
         run: |
           python scripts/release/download_upgrade_baseline.py --platform macos --output "$RUNNER_TEMP/desktop-baseline"

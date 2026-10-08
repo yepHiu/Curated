@@ -46,6 +46,7 @@ scripts/prd/*
 !scripts/release/component_cd.py
 !scripts/release/prepare_batch.py
 !scripts/release/prepare_native_player.py
+!scripts/release/prepare_macos_native.py
 !scripts/release/batches/
 !scripts/release/batches/*.json
 !scripts/release/recover_release.py

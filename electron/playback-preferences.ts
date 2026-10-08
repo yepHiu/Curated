@@ -10,14 +10,14 @@ export function validatePlaybackPreferences(value: unknown): DesktopPlaybackPref
     || !Number.isFinite(input.speed) || input.speed < 0.25 || input.speed > 4) throw new Error("INVALID_PLAYBACK_PREFERENCES")
   return { preferNative: input.preferNative, volume: input.volume, speed: input.speed }
 }
-/** 本机偏好不进入 Server / library-config。旧安装默认继续 Web。 */
+/** 本机偏好不进入 Server / library-config；已保存的选择优先于安装默认值。 */
 export class PlaybackPreferencesStore {
   private readonly file: string
-  constructor(directory: string) { this.file = path.join(directory, "playback-settings.json") }
+  constructor(directory: string, private readonly preferNativeByDefault = false) { this.file = path.join(directory, "playback-settings.json") }
   read(): DesktopPlaybackPreferences {
     try { return validatePlaybackPreferences(JSON.parse(readFileSync(this.file, "utf8"))) }
     catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return { ...defaultPlaybackPreferences }
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return { ...defaultPlaybackPreferences, preferNative: this.preferNativeByDefault }
       throw error
     }
   }

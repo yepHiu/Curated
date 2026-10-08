@@ -1,0 +1,925 @@
+{
+  "schema": 1,
+  "engine": "libmpv",
+  "platform": "macos",
+  "arch": "arm64",
+  "minimumMacOS": "15.0",
+  "entry": "libmpv.2.dylib",
+  "packages": {
+    "svt-av1": {
+      "url": "https://ghcr.io/v2/homebrew/core/svt-av1/blobs/sha256:2e6f7cbf3ff42f59ca251f3c84d4ad5a3ecfd518340237a6f70a54a428de1676",
+      "sha256": "2e6f7cbf3ff42f59ca251f3c84d4ad5a3ecfd518340237a6f70a54a428de1676",
+      "version": "4.2.0",
+      "license": "BSD-3-Clause",
+      "sources": [
+        {
+          "url": "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v4.2.0/SVT-AV1-v4.2.0.tar.bz2",
+          "sha256": "512f2ea5649e3e76c2dddcc25c2556fb67a9582baaab207c9c96161c94659dad",
+          "id": "SPDXRef-Archive-svt-av1-src"
+        }
+      ],
+      "recipeSha256": "41c026d8329602ecc9de6f581524359836611cab34efa89c2d81ca8b02cf266a"
+    },
+    "libarchive": {
+      "url": "https://ghcr.io/v2/homebrew/core/libarchive/blobs/sha256:0b478eea5f3310c1e3ec4a498e1d57417a59aaa5858e4a878dd0b78fd851aea6",
+      "sha256": "0b478eea5f3310c1e3ec4a498e1d57417a59aaa5858e4a878dd0b78fd851aea6",
+      "version": "3.8.9",
+      "license": "BSD-2-Clause",
+      "sources": [
+        {
+          "url": "https://www.libarchive.org/downloads/libarchive-3.8.9.tar.xz",
+          "sha256": "888c934f9d95648ecb9163dc8e23ab80a476ecb81a8f1154704a227b5b676dde",
+          "id": "SPDXRef-Archive-libarchive-src"
+        }
+      ],
+      "recipeSha256": "e13105c94497458268c28e4f3002ddd9495e1ddd59ccf7a4744880b53d6c9936"
+    },
+    "libass": {
+      "url": "https://ghcr.io/v2/homebrew/core/libass/blobs/sha256:3600420037feb1403141c0f6d07f135dcd79649cafa420ace2750468981664ec",
+      "sha256": "3600420037feb1403141c0f6d07f135dcd79649cafa420ace2750468981664ec",
+      "version": "0.17.5",
+      "license": "ISC",
+      "sources": [
+        {
+          "url": "https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz",
+          "sha256": "2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc",
+          "id": "SPDXRef-Archive-libass-src"
+        }
+      ],
+      "recipeSha256": "fc57ee78fc97f2d39810222e9d8d7cfbdaea9c5c4795e05583624e23ad1a0262"
+    },
+    "ffmpeg": {
+      "url": "https://ghcr.io/v2/homebrew/core/ffmpeg/blobs/sha256:3b1dab25100b79de074463b6b10be1266ed0d5f6eb6409fa53707f49e24bb2a7",
+      "sha256": "3b1dab25100b79de074463b6b10be1266ed0d5f6eb6409fa53707f49e24bb2a7",
+      "version": "8.1.2_1",
+      "license": "GPL-3.0-or-later",
+      "sources": [
+        {
+          "url": "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+          "sha256": "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c",
+          "id": "SPDXRef-Archive-ffmpeg-src"
+        }
+      ],
+      "recipeSha256": "86e90d99ecf2c7ce2d5b51ffc245e073cd2a9cfedd0b9b6cd8dc1ee6d3ceb919"
+    },
+    "libb2": {
+      "url": "https://ghcr.io/v2/homebrew/core/libb2/blobs/sha256:cc4304b760722128b914944f85788795f1f02de3072d1fd8e921b836b508776f",
+      "sha256": "cc4304b760722128b914944f85788795f1f02de3072d1fd8e921b836b508776f",
+      "version": "0.98.1",
+      "license": "CC0-1.0",
+      "sources": [
+        {
+          "url": "https://github.com/BLAKE2/libb2/releases/download/v0.98.1/libb2-0.98.1.tar.gz",
+          "sha256": "53626fddce753c454a3fea581cbbc7fe9bbcf0bc70416d48fdbbf5d87ef6c72e",
+          "id": "SPDXRef-Archive-libb2-src"
+        }
+      ],
+      "recipeSha256": "e0c353e17c03fa5cb4aea32d8ed9cd299d2ee77d950c6a32ccd61082f0f9355c"
+    },
+    "libbluray": {
+      "url": "https://ghcr.io/v2/homebrew/core/libbluray/blobs/sha256:90d5839c5058c8fc7a1b5504a75c350bdd4ee65617a47c02c80d992fd3bba70c",
+      "sha256": "90d5839c5058c8fc7a1b5504a75c350bdd4ee65617a47c02c80d992fd3bba70c",
+      "version": "1.5.0",
+      "license": "LGPL-2.1-or-later",
+      "sources": [
+        {
+          "url": "https://download.videolan.org/videolan/libbluray/1.5.0/libbluray-1.5.0.tar.xz",
+          "sha256": "f676408e91a5d321abf8b8d4dfdae36205c297dab5c54c3ec519639025f474a2",
+          "id": "SPDXRef-Archive-libbluray-src"
+        }
+      ],
+      "recipeSha256": "0880cfce7d8a2cd60511e1cc79c1a404c1b9167903bbef0cce17c7c7e65f328c"
+    },
+    "openssl@3": {
+      "url": "https://ghcr.io/v2/homebrew/core/openssl/3/blobs/sha256:638cbf9a395d2a3e97465c99997705736e228cd4c98db254c108946236c1de29",
+      "sha256": "638cbf9a395d2a3e97465c99997705736e228cd4c98db254c108946236c1de29",
+      "version": "3.6.3",
+      "license": "Apache-2.0",
+      "sources": [
+        {
+          "url": "https://github.com/openssl/openssl/releases/download/openssl-3.6.3/openssl-3.6.3.tar.gz",
+          "sha256": "243a86649cf6f23eeb6a2ff2456e09e5d77dd9018a54d3d96b0c6bdd6ba6c7f1",
+          "id": "SPDXRef-Archive-openssl@3-src"
+        },
+        {
+          "url": "https://github.com/openssl/openssl/commit/9061e9381306a053908177aca8509c262015cdf3.patch?full_index=1",
+          "sha256": "9f68feae9abfaabe65f79d2877f3dde7aa0428c669ed6af45dc193544268438e",
+          "id": "SPDXRef-Patch-openssl@3-0"
+        },
+        {
+          "url": "https://github.com/openssl/openssl/commit/2e2438b494e7f661be5212e4732f7fab86bf6303.patch?full_index=1",
+          "sha256": "543a5998951fe540444642123398ffaa6306938be573f95c0bc915f1e6af7a36",
+          "id": "SPDXRef-Patch-openssl@3-1"
+        },
+        {
+          "url": "https://github.com/openssl/openssl/commit/ea598f5dd23f1d64d8952e20fcf95d9f3a21d654.patch?full_index=1",
+          "sha256": "05bb323a3495d68961fa8cf7a989edfb0fa6e6dcc7ccdcc4e55a4e3f946d2762",
+          "id": "SPDXRef-Patch-openssl@3-2"
+        },
+        {
+          "url": "https://github.com/openssl/openssl/commit/cffb97915813aeeef58ee9a0d33c05d3d45e1fe6.patch?full_index=1",
+          "sha256": "fc34b4bf106c44a89ded746e35d587d73e8485393a93b52110ba95b06717dd69",
+          "id": "SPDXRef-Patch-openssl@3-3"
+        },
+        {
+          "url": "https://cpan.metacpan.org/authors/id/L/LE/LEONT/Test-Harness-3.52.tar.gz",
+          "sha256": "8fe65cfc0261ed3c8a4395f0524286f5719669fe305f9b03b16cf3684d62cd70",
+          "id": "recipe-resource-Test::Harness"
+        },
+        {
+          "url": "https://cpan.metacpan.org/authors/id/E/EX/EXODIST/Test-Simple-1.302222.tar.gz",
+          "sha256": "7cf84a18d6c9450e53ae8b4de5d5fa32c9fe99f3cebbe408fe59433f19921ec2",
+          "id": "recipe-resource-Test::More"
+        },
+        {
+          "url": "https://cpan.metacpan.org/authors/id/B/BI/BINGOS/ExtUtils-MakeMaker-7.78.tar.gz",
+          "sha256": "43b33c20f8d82dba7cc48f8cd702f8fc9811e9d07880886dfd31b7077bd4a3a6",
+          "id": "recipe-resource-ExtUtils::MakeMaker"
+        }
+      ],
+      "recipeSha256": "15b9f2a4faf38f7d338309a90e6889bd1e3aba669cf2f7b91049f7f046728228"
+    },
+    "dav1d": {
+      "url": "https://ghcr.io/v2/homebrew/core/dav1d/blobs/sha256:5f573db161c0685ba7e8d27bd3b6a494e6952e47c7c99355a0d090b253b566af",
+      "sha256": "5f573db161c0685ba7e8d27bd3b6a494e6952e47c7c99355a0d090b253b566af",
+      "version": "1.5.4",
+      "license": "BSD-2-Clause",
+      "sources": [
+        {
+          "url": "https://code.videolan.org/videolan/dav1d/-/archive/1.5.4/dav1d-1.5.4.tar.bz2",
+          "sha256": "2abfb0c89212e6e4733a54e0ae509ec00a5b845a6360946f918806e14aedb011",
+          "id": "SPDXRef-Archive-dav1d-src"
+        }
+      ],
+      "recipeSha256": "3364a5bd9c26e4c9b73d756f8b99944fe3bf74e59e9ded813235c8aeaec63984"
+    },
+    "fontconfig": {
+      "url": "https://ghcr.io/v2/homebrew/core/fontconfig/blobs/sha256:a5f5df5f8d02e8a5b2587cac464c7bd45128447da06b7ab39938a9645982ef49",
+      "sha256": "a5f5df5f8d02e8a5b2587cac464c7bd45128447da06b7ab39938a9645982ef49",
+      "version": "2.18.3",
+      "license": "HPND-sell-variant AND Unicode-3.0 AND MIT-Modern-Variant AND MIT AND LicenseRef-Homebrew-public-domain",
+      "sources": [
+        {
+          "url": "https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/2.18.3/fontconfig-2.18.3.tar.gz",
+          "sha256": "9ae01e1d53acdef56010c5451cd34aa41d325b2faccd8606448d8fa01b2496b3",
+          "id": "SPDXRef-Archive-fontconfig-src"
+        }
+      ],
+      "recipeSha256": "3487cc7274c480e70db8d4e8fee529c53d95da7e905d5f66b90e93d444c37c46"
+    },
+    "freetype": {
+      "url": "https://ghcr.io/v2/homebrew/core/freetype/blobs/sha256:905d44c655367754329e9fcc67630c71c03c527f5ee0d9c89794b21e9708b172",
+      "sha256": "905d44c655367754329e9fcc67630c71c03c527f5ee0d9c89794b21e9708b172",
+      "version": "2.14.3",
+      "license": "FTL",
+      "sources": [
+        {
+          "url": "https://downloads.sourceforge.net/project/freetype/freetype2/2.14.3/freetype-2.14.3.tar.xz",
+          "sha256": "36bc4f1cc413335368ee656c42afca65c5a3987e8768cc28cf11ba775e785a5f",
+          "id": "SPDXRef-Archive-freetype-src"
+        }
+      ],
+      "recipeSha256": "cc500226718264185ecf4b0560e0d9daee933c3e40622dd936b955536d025613"
+    },
+    "fribidi": {
+      "url": "https://ghcr.io/v2/homebrew/core/fribidi/blobs/sha256:4904bb3375c1b1f2539cb657fbf17b0d93c050904febbba51e9dd690f3540e3b",
+      "sha256": "4904bb3375c1b1f2539cb657fbf17b0d93c050904febbba51e9dd690f3540e3b",
+      "version": "1.0.16",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "sources": [
+        {
+          "url": "https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz",
+          "sha256": "1b1cde5b235d40479e91be2f0e88a309e3214c8ab470ec8a2744d82a5a9ea05c",
+          "id": "SPDXRef-Archive-fribidi-src"
+        }
+      ],
+      "recipeSha256": "9f9e6fcf5742521effe5e2eabee49bb37e58b51b0017a6003730b330cbe8efaa"
+    },
+    "glib": {
+      "url": "https://ghcr.io/v2/homebrew/core/glib/blobs/sha256:75a92e360363ebd719c655b3170b084dc3491811188b65fce0d97a45d554414e",
+      "sha256": "75a92e360363ebd719c655b3170b084dc3491811188b65fce0d97a45d554414e",
+      "version": "2.88.3",
+      "license": "LGPL-2.1-or-later",
+      "sources": [
+        {
+          "url": "https://download.gnome.org/sources/glib/2.88/glib-2.88.3.tar.xz",
+          "sha256": "ab24d24e698dfa1e408b7bcdb508f4aafc906185a8b8ce72fdf79bbbdc9b383b",
+          "id": "SPDXRef-Archive-glib-src"
+        },
+        {
+          "url": "https://download.gnome.org/sources/gobject-introspection/1.86/gobject-introspection-1.86.0.tar.xz",
+          "sha256": "920d1a3fcedeadc32acff95c2e203b319039dd4b4a08dd1a2dfd283d19c0b9ae",
+          "id": "recipe-resource-gobject-introspection"
+        }
+      ],
+      "recipeSha256": "d2ebed597d64ab5518ea78604840e28fb9839fa923bd3917bef5f50b76d369be"
+    },
+    "graphite2": {
+      "url": "https://ghcr.io/v2/homebrew/core/graphite2/blobs/sha256:bcbf8282acc59c6ed6a0c9a7cf076935735c21de1495bb4e22c3d6bf32f31ee0",
+      "sha256": "bcbf8282acc59c6ed6a0c9a7cf076935735c21de1495bb4e22c3d6bf32f31ee0",
+      "version": "1.3.15",
+      "license": "GPL-2.0-or-later OR LGPL-2.1-or-later OR MPL-1.1+",
+      "sources": [
+        {
+          "url": "https://github.com/silnrsi/graphite/releases/download/1.3.15/graphite2-1.3.15.tgz",
+          "sha256": "c6bc8b4252724665297f7cad0c55897285c673f9b8e6db3522ace833593fe0b1",
+          "id": "SPDXRef-Archive-graphite2-src"
+        }
+      ],
+      "recipeSha256": "dc60f1784330fbf36c320a92dbf31b0f4f5ed83bab6b252963cdade7b87f6d49"
+    },
+    "harfbuzz": {
+      "url": "https://ghcr.io/v2/homebrew/core/harfbuzz/blobs/sha256:a056c8d6430223a0a1f0a9d31f6b04cd96fdcb88c74da40a61892d18243d347a",
+      "sha256": "a056c8d6430223a0a1f0a9d31f6b04cd96fdcb88c74da40a61892d18243d347a",
+      "version": "14.3.0",
+      "license": "MIT",
+      "sources": [
+        {
+          "url": "https://github.com/harfbuzz/harfbuzz/releases/download/14.3.0/harfbuzz-14.3.0.tar.xz",
+          "sha256": "16070d77cfc4ba1f1e7327e83bf9b3f55898081cabdb94e56a33e04fc8874eae",
+          "id": "SPDXRef-Archive-harfbuzz-src"
+        }
+      ],
+      "recipeSha256": "234ada2664de22ed8797e67d4f51a5b8ae968c2f67b033781e10e4abc5c8e185"
+    },
+    "gettext": {
+      "url": "https://ghcr.io/v2/homebrew/core/gettext/blobs/sha256:982f3a3cc24df4f552efc1b6ed6303d2920b2d5b1c1975fe3d9bd7418b8fa532",
+      "sha256": "982f3a3cc24df4f552efc1b6ed6303d2920b2d5b1c1975fe3d9bd7418b8fa532",
+      "version": "1.0",
+      "license": "GPL-3.0-or-later AND LGPL-2.1-or-later",
+      "sources": [
+        {
+          "url": "https://ftpmirror.gnu.org/gnu/gettext/gettext-1.0.tar.gz",
+          "sha256": "85d99b79c981a404874c02e0342176cf75c7698e2b51fe41031cf6526d974f1a",
+          "id": "SPDXRef-Archive-gettext-src"
+        }
+      ],
+      "recipeSha256": "170f5a29d2eb95b9dd1f1f754c0f9b90692c3d5dcf6db02c199c93e2c445177d"
+    },
+    "jpeg-turbo": {
+      "url": "https://ghcr.io/v2/homebrew/core/jpeg-turbo/blobs/sha256:511445b91fe45351e3f7ae238ee7be0159fe92bb1e240a57489f62ded7fd1632",
+      "sha256": "511445b91fe45351e3f7ae238ee7be0159fe92bb1e240a57489f62ded7fd1632",
+      "version": "3.2.0",
+      "license": "IJG AND Zlib AND BSD-3-Clause",
+      "sources": [
+        {
+          "url": "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.0/libjpeg-turbo-3.2.0.tar.gz",
+          "sha256": "6f30092cef9fb839779646608f4ee14ae3cbac989c47fa05e841b0841f09878e",
+          "id": "SPDXRef-Archive-jpeg-turbo-src"
+        }
+      ],
+      "recipeSha256": "b1937813c7c67fa8a44a7a958f1496e9e237d942052b52d421c41e61df4b526b"
+    },
+    "little-cms2": {
+      "url": "https://ghcr.io/v2/homebrew/core/little-cms2/blobs/sha256:be9135a585a60f84ec283d97e7a89bec9338e525679b637b171092338c5c28a0",
+      "sha256": "be9135a585a60f84ec283d97e7a89bec9338e525679b637b171092338c5c28a0",
+      "version": "2.19",
+      "license": "MIT",
+      "sources": [
+        {
+          "url": "https://downloads.sourceforge.net/project/lcms/lcms/2.19/lcms2-2.19.tar.gz",
+          "sha256": "49e7e134e4299733dd0eda434fa468997a28ab3d33fa397c642b03644f552216",
+          "id": "SPDXRef-Archive-little-cms2-src"
+        }
+      ],
+      "recipeSha256": "5a7ce6ac8ad5c7f3ec86cd513ed1f19e009841f698bc42f5ebdb405f94d38bc3"
+    },
+    "luajit": {
+      "url": "https://ghcr.io/v2/homebrew/core/luajit/blobs/sha256:b7d3472050e37befea8f31e7cef2569ac5a90e4599f990c3fb661a0cd7a01931",
+      "sha256": "b7d3472050e37befea8f31e7cef2569ac5a90e4599f990c3fb661a0cd7a01931",
+      "version": "2.1.1785763465",
+      "license": "MIT",
+      "sources": [
+        {
+          "url": "https://github.com/LuaJIT/LuaJIT/archive/1edc3e52b67eaf6ce5f809be8e17d6862594b8bc.tar.gz",
+          "sha256": "85497ea149d136afbe2d7ef222e08849248e52cecc6dc8deefd8588e551e4e00",
+          "id": "SPDXRef-Archive-luajit-src"
+        }
+      ],
+      "recipeSha256": "b97bd3a9660c01220589e6512fdff2729afbb695afb3d4dc2eb0142fcd46b8e8"
+    },
+    "lz4": {
+      "url": "https://ghcr.io/v2/homebrew/core/lz4/blobs/sha256:6590245dc4a919c46afa16366914cd4b5c0c4a8f4fb35a4f6ab89053f289ae5d",
+      "sha256": "6590245dc4a919c46afa16366914cd4b5c0c4a8f4fb35a4f6ab89053f289ae5d",
+      "version": "1.10.0",
+      "license": "BSD-2-Clause",
+      "sources": [
+        {
+          "url": "https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz",
+          "sha256": "537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b",
+          "id": "SPDXRef-Archive-lz4-src"
+        }
+      ],
+      "recipeSha256": "25463465ff98da6204feebc4aa26a520f2db9e8e25202d38b283ead478d9efbc"
+    },
+    "xz": {
+      "url": "https://ghcr.io/v2/homebrew/core/xz/blobs/sha256:c4be907ac8459f8b3e764c06287cc88b79c1d5c16a2db1c0335e1facf4fd4dbe",
+      "sha256": "c4be907ac8459f8b3e764c06287cc88b79c1d5c16a2db1c0335e1facf4fd4dbe",
+      "version": "5.8.3",
+      "license": "0BSD AND GPL-2.0-or-later",
+      "sources": [
+        {
+          "url": "https://github.com/tukaani-project/xz/releases/download/v5.8.3/xz-5.8.3.tar.gz",
+          "sha256": "3d3a1b973af218114f4f889bbaa2f4c037deaae0c8e815eec381c3d546b974a0",
+          "id": "SPDXRef-Archive-xz-src"
+        }
+      ],
+      "recipeSha256": "0812ffeca3c6631a261e87c76ff26368eee0df6ecedfe0f458d67494fdf6e9cc"
+    },
+    "lame": {
+      "url": "https://ghcr.io/v2/homebrew/core/lame/blobs/sha256:552d24d56ff0d3255e9a3519a368d0ce45de86b5b2967b338209c1a22cd12969",
+      "sha256": "552d24d56ff0d3255e9a3519a368d0ce45de86b5b2967b338209c1a22cd12969",
+      "version": "4.0",
+      "license": "LGPL-2.0-or-later",
+      "sources": [
+        {
+          "url": "https://downloads.sourceforge.net/project/lame/lame/4.0/lame-4.0.tar.gz",
+          "sha256": "3df5124d5ad3a98312ffd7ba6a9b36230e4f8a3e66d3ce0f425e336c32d216eb",
+          "id": "SPDXRef-Archive-lame-src"
+        }
+      ],
+      "recipeSha256": "54e93fd2d82f830c4a53f56f61afb352c465ea96d37f7e34db48257c78bb5478"
+    },
+    "mpg123": {
+      "url": "https://ghcr.io/v2/homebrew/core/mpg123/blobs/sha256:9c77394d85530cafc6a0a753e98fa2a7f00e8df87e3e3c57411a7b896ce2e0f4",
+      "sha256": "9c77394d85530cafc6a0a753e98fa2a7f00e8df87e3e3c57411a7b896ce2e0f4",
+      "version": "1.33.7",
+      "license": "LGPL-2.1-only",
+      "sources": [
+        {
+          "url": "https://www.mpg123.de/download/mpg123-1.33.7.tar.bz2",
+          "sha256": "31d0e35a4ca567ec9b5ebda6c3062bb4435d6d3eacd6ef0d95cadd7854dc03ee",
+          "id": "SPDXRef-Archive-mpg123-src"
+        }
+      ],
+      "recipeSha256": "5ad4b706de97c4879ce5f4971acd1ed6acc2045974fdbc3b29f6feaffe3398be"
+    },
+    "mpv": {
+      "url": "https://ghcr.io/v2/homebrew/core/mpv/blobs/sha256:f59565de86800fbd05cfdb0e3da387c51dc22c2f199f0410a4510c41557d07e0",
+      "sha256": "f59565de86800fbd05cfdb0e3da387c51dc22c2f199f0410a4510c41557d07e0",
+      "version": "0.41.0_7",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "sources": [
+        {
+          "url": "https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz",
+          "sha256": "ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209",
+          "id": "SPDXRef-Archive-mpv-src"
+        },
+        {
+          "url": "https://github.com/mpv-player/mpv/commit/75b2ccfeb1ce4ed5a40ac9860fa74f3d1265e13f.patch?full_index=1",
+          "sha256": "3906b98b02071a0d5747a400406494ca69cef7afd8d3eee4a99fdbe40dc90c1f",
+          "id": "SPDXRef-Patch-mpv-0"
+        }
+      ],
+      "recipeSha256": "c5ebf1db840eba963279b9b5c0cd77e1ad809d80847db3c2ebd904668166bbc2"
+    },
+    "mujs": {
+      "url": "https://ghcr.io/v2/homebrew/core/mujs/blobs/sha256:0b8f0ef456a43755bc65a729760c2033f581db40b9843ac3247ef6aa79a2ddf5",
+      "sha256": "0b8f0ef456a43755bc65a729760c2033f581db40b9843ac3247ef6aa79a2ddf5",
+      "version": "1.3.9",
+      "license": "ISC",
+      "sources": [
+        {
+          "url": "https://mujs.com/downloads/mujs-1.3.9.tar.gz",
+          "sha256": "956d5a20dd4efe5aa58673558787b9e2539255f9bf62585e90e1921fa040d89d",
+          "id": "SPDXRef-Archive-mujs-src"
+        }
+      ],
+      "recipeSha256": "37895f988db244e7649ef654614f4ed17d178e641260f63fadced352fe4a2844"
+    },
+    "opus": {
+      "url": "https://ghcr.io/v2/homebrew/core/opus/blobs/sha256:85d6f1e885117016478e468f92033f648d9bab05210708fe195cacefe5be8266",
+      "sha256": "85d6f1e885117016478e468f92033f648d9bab05210708fe195cacefe5be8266",
+      "version": "1.6.1",
+      "license": "BSD-3-Clause",
+      "sources": [
+        {
+          "url": "https://ftp.osuosl.org/pub/xiph/releases/opus/opus-1.6.1.tar.gz",
+          "sha256": "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1",
+          "id": "SPDXRef-Archive-opus-src"
+        }
+      ],
+      "recipeSha256": "7ebe72e9352ceb9236cfb49c8ba7134556295ca330ea9054135b1401257f03c4"
+    },
+    "pcre2": {
+      "url": "https://ghcr.io/v2/homebrew/core/pcre2/blobs/sha256:a24eb46d4ae083117c3ab683d631b6f510979bda74ee1e82a307e8ebe259904e",
+      "sha256": "a24eb46d4ae083117c3ab683d631b6f510979bda74ee1e82a307e8ebe259904e",
+      "version": "10.48",
+      "license": "BSD-3-Clause",
+      "sources": [
+        {
+          "url": "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.48/pcre2-10.48.tar.bz2",
+          "sha256": "b6c68fdf6f3ac31388b50aa89ff0fc49c00c987c16e7b5146491d12003f2c8ed",
+          "id": "SPDXRef-Archive-pcre2-src"
+        }
+      ],
+      "recipeSha256": "493c6e81fa41064d8cdbb554f0884a9afe856f11c62d250ed747ce5f565a3f0d"
+    },
+    "libplacebo": {
+      "url": "https://ghcr.io/v2/homebrew/core/libplacebo/blobs/sha256:1fd6531a9de50d0121d1ff4ec67163dfb1dcb8c682d96c6587b960f04be0fe34",
+      "sha256": "1fd6531a9de50d0121d1ff4ec67163dfb1dcb8c682d96c6587b960f04be0fe34",
+      "version": "7.360.1",
+      "license": "LGPL-2.1-or-later",
+      "sources": [
+        {
+          "url": "https://code.videolan.org/videolan/libplacebo/-/archive/v7.360.1/libplacebo-v7.360.1.tar.bz2",
+          "sha256": "937aa5eeea596798b3274d362de2e3bd32bc537a66d149dd85043349c74dffb6",
+          "id": "SPDXRef-Archive-libplacebo-src"
+        },
+        {
+          "url": "https://files.pythonhosted.org/packages/6e/5a/d62b24fe1c7c2f34e15c2aa4418a5327a8550fdc272999a59e0dddebc3ee/glad2-2.0.8.tar.gz",
+          "sha256": "b84079b9fa404f37171b961bdd1d8da21370e6c818defb8481c5b3fe3d6436da",
+          "id": "recipe-resource-glad2"
+        },
+        {
+          "url": "https://files.pythonhosted.org/packages/df/bf/f7da0350254c0ed7c72f3e33cef02e048281fec7ecec5f032d4aac52226b/jinja2-3.1.6.tar.gz",
+          "sha256": "0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d",
+          "id": "recipe-resource-jinja2"
+        },
+        {
+          "url": "https://files.pythonhosted.org/packages/7e/99/7690b6d4034fffd95959cbe0c02de8deb3098cc577c67bb6a24fe5d7caa7/markupsafe-3.0.3.tar.gz",
+          "sha256": "722695808f4b6457b320fdc131280796bdceb04ab50fe1795cd540799ebe1698",
+          "id": "recipe-resource-markupsafe"
+        },
+        {
+          "id": "build-header-vulkan-1.4.341.0",
+          "url": "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-1.4.341.0.tar.gz",
+          "sha256": "d73bc5036b6556b741f6985ff600ca720308c5f2850e4a43ceb498bd3de069e7"
+        },
+        {
+          "id": "build-header-fast_float-8.2.4",
+          "url": "https://github.com/fastfloat/fast_float/archive/refs/tags/v8.2.4.tar.gz",
+          "sha256": "b90b3a415e4410822f50c70bd4485cf2c5e6962c2b05cf0dc88045d8af959ccc",
+          "provenance": "Homebrew recipe c78726ac95e9642087de6063a39aac8fbd84f15f current at libplacebo bottle build date; header-only build dependency"
+        }
+      ],
+      "recipeSha256": "f3fdba79e7c81c581d4feda1f62aa2423704371c47055f351f76e29000e34d8f"
+    },
+    "libpng": {
+      "url": "https://ghcr.io/v2/homebrew/core/libpng/blobs/sha256:3d976f549e04ea0695078e5d8a3ae08c62e4dccd2b92f5b83c3ee9f1708c001b",
+      "sha256": "3d976f549e04ea0695078e5d8a3ae08c62e4dccd2b92f5b83c3ee9f1708c001b",
+      "version": "1.6.58",
+      "license": "libpng-2.0",
+      "sources": [
+        {
+          "url": "https://downloads.sourceforge.net/project/libpng/libpng16/1.6.58/libpng-1.6.58.tar.xz",
+          "sha256": "28eb403f51f0f7405249132cecfe82ea5c0ef97f1b32c5a65828814ae0d34775",
+          "id": "SPDXRef-Archive-libpng-src"
+        }
+      ],
+      "recipeSha256": "c125a77d8263e0fb215f8f5d693c53324caabb63801df7093d9f3c8e42f4dd22"
+    },
+    "rubberband": {
+      "url": "https://ghcr.io/v2/homebrew/core/rubberband/blobs/sha256:5ac29718f68b181de61e81dd42bc85cc74cb1fc4ed5fdca541a94224bc43feaa",
+      "sha256": "5ac29718f68b181de61e81dd42bc85cc74cb1fc4ed5fdca541a94224bc43feaa",
+      "version": "4.0.0",
+      "license": "GPL-2.0-or-later",
+      "sources": [
+        {
+          "url": "https://breakfastquay.com/files/releases/rubberband-4.0.0.tar.bz2",
+          "sha256": "af050313ee63bc18b35b2e064e5dce05b276aaf6d1aa2b8a82ced1fe2f8028e9",
+          "id": "SPDXRef-Archive-rubberband-src"
+        }
+      ],
+      "recipeSha256": "a1d22994631250656a964bda9396973e4e796f4f341034af74159ebd94ba230c"
+    },
+    "libsamplerate": {
+      "url": "https://ghcr.io/v2/homebrew/core/libsamplerate/blobs/sha256:d51907988e3ab62f6e49ddd1253a723fd5964b78a0361453e8d9b75a2106b4e7",
+      "sha256": "d51907988e3ab62f6e49ddd1253a723fd5964b78a0361453e8d9b75a2106b4e7",
+      "version": "0.2.2",
+      "license": "BSD-2-Clause",
+      "sources": [
+        {
+          "url": "https://github.com/libsndfile/libsamplerate/archive/refs/tags/0.2.2.tar.gz",
+          "sha256": "16e881487f184250deb4fcb60432d7556ab12cb58caea71ef23960aec6c0405a",
+          "id": "SPDXRef-Archive-libsamplerate-src"
+        }
+      ],
+      "recipeSha256": "962bce9a018554328e010a834e8146c01ef19c656900f89b77b7822ebdbafe92"
+    },
+    "shaderc": {
+      "url": "https://ghcr.io/v2/homebrew/core/shaderc/blobs/sha256:3219fb7fb97e2dc3802876ec60e54dca44087e67baa7b41931362836c1caf55a",
+      "sha256": "3219fb7fb97e2dc3802876ec60e54dca44087e67baa7b41931362836c1caf55a",
+      "version": "2026.3",
+      "license": "Apache-2.0",
+      "sources": [
+        {
+          "url": "https://github.com/google/shaderc/archive/refs/tags/v2026.3.tar.gz",
+          "sha256": "ee493ccf1b3038b4ef2fe024664c5eb2dc4bcc1f6b05b33e3909de0e19c81024",
+          "id": "SPDXRef-Archive-shaderc-src"
+        },
+        {
+          "url": "https://github.com/KhronosGroup/glslang/archive/168d452a4f460d24b588fed08477a81c44ee27a1.tar.gz",
+          "sha256": "c167b2474af06cbab93abae8249efaf88fb79a09f30488e2a24d399e4258ce7a",
+          "revision": "168d452a4f460d24b588fed08477a81c44ee27a1",
+          "repository": "https://github.com/KhronosGroup/glslang.git",
+          "id": "recipe-resource-glslang"
+        },
+        {
+          "url": "https://github.com/KhronosGroup/SPIRV-Headers/archive/29981f65241605e08b0ede4cfeb999fe3b723c6a.tar.gz",
+          "sha256": "232899f1ad4104fb5bc377b94596c7621575eee62ad9a9e8f929b63a7dd8a7ad",
+          "revision": "29981f65241605e08b0ede4cfeb999fe3b723c6a",
+          "repository": "https://github.com/KhronosGroup/SPIRV-Headers.git",
+          "id": "recipe-resource-spirv-headers"
+        },
+        {
+          "url": "https://github.com/KhronosGroup/SPIRV-Tools/archive/b707790a898e44038547df54580022fc1cf89c3d.tar.gz",
+          "sha256": "05d8af89737bde57571c48dbd36714c9f520a69623e14de72c3be6b600e277d6",
+          "revision": "b707790a898e44038547df54580022fc1cf89c3d",
+          "repository": "https://github.com/KhronosGroup/SPIRV-Tools.git",
+          "id": "recipe-resource-spirv-tools"
+        }
+      ],
+      "recipeSha256": "0f9bbc89b0793ba86f7c403af825e04f6bd586313b171c8788a2fd90810dc422"
+    },
+    "uchardet": {
+      "url": "https://ghcr.io/v2/homebrew/core/uchardet/blobs/sha256:171e31b14ade23db98fd45f32cebdd1c278ce5b5d629d4e3be7c81a56bee03a7",
+      "sha256": "171e31b14ade23db98fd45f32cebdd1c278ce5b5d629d4e3be7c81a56bee03a7",
+      "version": "0.0.8",
+      "license": "MPL-1.1 OR GPL-2.0-or-later OR LGPL-2.1-or-later",
+      "sources": [
+        {
+          "url": "https://www.freedesktop.org/software/uchardet/releases/uchardet-0.0.8.tar.xz",
+          "sha256": "e97a60cfc00a1c147a674b097bb1422abd9fa78a2d9ce3f3fdcc2e78a34ac5f0",
+          "id": "SPDXRef-Archive-uchardet-src"
+        }
+      ],
+      "recipeSha256": "8886f635169d69f43745f610567597231ddb3c924bb7e78ffb8d5f32351904a4"
+    },
+    "libudfread": {
+      "url": "https://ghcr.io/v2/homebrew/core/libudfread/blobs/sha256:a563689c17ca21d204a228773ec9380b5b0880bd3b0ab322170f8596be7f844a",
+      "sha256": "a563689c17ca21d204a228773ec9380b5b0880bd3b0ab322170f8596be7f844a",
+      "version": "1.2.0",
+      "license": "LGPL-2.1-or-later",
+      "sources": [
+        {
+          "url": "https://download.videolan.org/videolan/libudfread/libudfread-1.2.0.tar.xz",
+          "sha256": "bb477cbd4cfbfc7787d9d05b71ee5e70430f5cfebf1297497f7e83547958050f",
+          "id": "SPDXRef-Archive-libudfread-src"
+        }
+      ],
+      "recipeSha256": "32c951ebc864c3ecba9a120c62c72dca47eb7bcda9662e412c28afaf524678b7"
+    },
+    "libunibreak": {
+      "url": "https://ghcr.io/v2/homebrew/core/libunibreak/blobs/sha256:820ed99a285c5ebc04c5124dc44a2d4ce61fdb27f1ed5e3429b9c29e767238ef",
+      "sha256": "820ed99a285c5ebc04c5124dc44a2d4ce61fdb27f1ed5e3429b9c29e767238ef",
+      "version": "7.0",
+      "license": "Zlib",
+      "sources": [
+        {
+          "url": "https://github.com/adah1972/libunibreak/releases/download/libunibreak_7_0/libunibreak-7.0.tar.gz",
+          "sha256": "8c9a6e121736cd0d5c890ae3ae96f3f4010a19aa040f1dbded833a62a87717d3",
+          "id": "SPDXRef-Archive-libunibreak-src"
+        }
+      ],
+      "recipeSha256": "2eff3e11aabb53dd7158683822a9c244c23e6a70d850a505b3562e83f155804e"
+    },
+    "libvmaf": {
+      "url": "https://ghcr.io/v2/homebrew/core/libvmaf/blobs/sha256:dbd548d2ba16092e9c88b81cd91d7cbd1ecec84b9bb31e9c196fe3f6658ee6b3",
+      "sha256": "dbd548d2ba16092e9c88b81cd91d7cbd1ecec84b9bb31e9c196fe3f6658ee6b3",
+      "version": "3.2.0",
+      "license": "BSD-2-Clause-Patent",
+      "sources": [
+        {
+          "url": "https://github.com/Netflix/vmaf/archive/refs/tags/v3.2.0.tar.gz",
+          "sha256": "a28f93f3b4fa65601be324587072e32a6a704a304ba7b1aec9b70b3f709bc1dc",
+          "id": "SPDXRef-Archive-libvmaf-src"
+        }
+      ],
+      "recipeSha256": "be78fefc186b3d539e7e3b20c6bbdb0fb12b50a039b15da274101cc0f34a9f79"
+    },
+    "libvpx": {
+      "url": "https://ghcr.io/v2/homebrew/core/libvpx/blobs/sha256:4f72f10109e23239ba65d4e7c1eb9086a4b2cd2875f784c8f9d79d713106675d",
+      "sha256": "4f72f10109e23239ba65d4e7c1eb9086a4b2cd2875f784c8f9d79d713106675d",
+      "version": "1.16.0",
+      "license": "BSD-3-Clause",
+      "sources": [
+        {
+          "url": "https://github.com/webmproject/libvpx/archive/refs/tags/v1.16.0.tar.gz",
+          "sha256": "7a479a3c66b9f5d5542a4c6a1b7d3768a983b1e5c14c60a9396edc9b649e015c",
+          "id": "SPDXRef-Archive-libvpx-src"
+        }
+      ],
+      "recipeSha256": "c221276a228e690c9e97e857e2573e7b4ce4c840b13befdb4283ee22b5c6aefd"
+    },
+    "vulkan-loader": {
+      "url": "https://ghcr.io/v2/homebrew/core/vulkan-loader/blobs/sha256:de7b6b62a8ad6853bad4d8ea7d75f08f41c21ccfc20d9cd62530a56964e8c9b0",
+      "sha256": "de7b6b62a8ad6853bad4d8ea7d75f08f41c21ccfc20d9cd62530a56964e8c9b0",
+      "version": "1.4.357.0",
+      "license": "Apache-2.0",
+      "sources": [
+        {
+          "url": "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/vulkan-sdk-1.4.357.0.tar.gz",
+          "sha256": "54f2537df22313768da0317dda2abdaaab7711b4081c48c869a79db343d0ae70",
+          "id": "SPDXRef-Archive-vulkan-loader-src"
+        },
+        {
+          "id": "build-header-vulkan-1.4.357.0",
+          "url": "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-1.4.357.0.tar.gz",
+          "sha256": "e87dce08116151f6b6d7de6b6faf41498e87e6cf848ff16fa3bd5402190ad4a3"
+        }
+      ],
+      "recipeSha256": "219dfb240665cc6c228107af9d8d6cedf25cb814723521ae4497a5af6a86a057"
+    },
+    "x264": {
+      "url": "https://ghcr.io/v2/homebrew/core/x264/blobs/sha256:a613d44ead5d3999270970f41283eadfad8001061faf063945def6b8fb5145f4",
+      "sha256": "a613d44ead5d3999270970f41283eadfad8001061faf063945def6b8fb5145f4",
+      "version": "r3222",
+      "license": "GPL-2.0-or-later",
+      "sources": [
+        {
+          "url": "https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz",
+          "sha256": "cd71a7515b0e9a012e1ac9b1f8415bebcaf6fc97d4db32286642ac4c0fbe24f9",
+          "id": "SPDXRef-Archive-x264-src",
+          "revision": "b35605ace3ddf7c1a5d67a2eb553f034aef41d55",
+          "repository": "https://code.videolan.org/videolan/x264.git"
+        }
+      ],
+      "recipeSha256": "9165e288b689999b374401c1045a1904102ff279fb534f514d6569fcb608e264"
+    },
+    "x265": {
+      "url": "https://ghcr.io/v2/homebrew/core/x265/blobs/sha256:29300af7c34c7bc5fd84549b2e0173909026c264060d56bf6d35d79da3808506",
+      "sha256": "29300af7c34c7bc5fd84549b2e0173909026c264060d56bf6d35d79da3808506",
+      "version": "4.2",
+      "license": "GPL-2.0-or-later",
+      "sources": [
+        {
+          "url": "https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.2.tar.gz",
+          "sha256": "40b1ea0453e0309f0eba934e0ddf533f8f6295966679e8894e8f1c1c8d5e1210",
+          "id": "SPDXRef-Archive-x265-src"
+        }
+      ],
+      "recipeSha256": "ade84e50acc434797a5902cfb186f5ce65eff5bb7c02d9318739d3b0ca9d175c"
+    },
+    "zimg": {
+      "url": "https://ghcr.io/v2/homebrew/core/zimg/blobs/sha256:ee8314ce01c48102e3f977540d6095a444ceb8bce71f1868199c47cad4ce12e4",
+      "sha256": "ee8314ce01c48102e3f977540d6095a444ceb8bce71f1868199c47cad4ce12e4",
+      "version": "3.0.6",
+      "license": "WTFPL",
+      "sources": [
+        {
+          "url": "https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.6.tar.gz",
+          "sha256": "be89390f13a5c9b2388ce0f44a5e89364a20c1c57ce46d382b1fcc3967057577",
+          "id": "SPDXRef-Archive-zimg-src"
+        }
+      ],
+      "recipeSha256": "ea7f96c5503a87cd9fe38470a518937ad2567a0ea2e81101799b77cb169cbfdb"
+    },
+    "zstd": {
+      "url": "https://ghcr.io/v2/homebrew/core/zstd/blobs/sha256:d72adf48460a8384b256f88061cd7b9df4977df7fa2e0794051d427db754a565",
+      "sha256": "d72adf48460a8384b256f88061cd7b9df4977df7fa2e0794051d427db754a565",
+      "version": "1.5.7_1",
+      "license": "(BSD-3-Clause OR GPL-2.0-only) AND BSD-2-Clause AND MIT",
+      "sources": [
+        {
+          "url": "https://github.com/facebook/zstd/archive/refs/tags/v1.5.7.tar.gz",
+          "sha256": "37d7284556b20954e56e1ca85b80226768902e2edabd3b649e9e72c0c9012ee3",
+          "id": "SPDXRef-Archive-zstd-src"
+        }
+      ],
+      "recipeSha256": "9a9b0183896886e82b915af4db576f27d34d1cee7757d6c5beb0e1eb74c68e0d"
+    }
+  },
+  "runtime": [
+    {
+      "file": "libSvtAv1Enc.4.2.0.dylib",
+      "package": "svt-av1",
+      "path": "lib/libSvtAv1Enc.4.2.0.dylib"
+    },
+    {
+      "file": "libarchive.13.dylib",
+      "package": "libarchive",
+      "path": "lib/libarchive.13.dylib"
+    },
+    {
+      "file": "libass.9.dylib",
+      "package": "libass",
+      "path": "lib/libass.9.dylib"
+    },
+    {
+      "file": "libavcodec.62.28.102.dylib",
+      "package": "ffmpeg",
+      "path": "lib/libavcodec.62.28.102.dylib"
+    },
+    {
+      "file": "libavdevice.62.3.102.dylib",
+      "package": "ffmpeg",
+      "path": "lib/libavdevice.62.3.102.dylib"
+    },
+    {
+      "file": "libavfilter.11.14.102.dylib",
+      "package": "ffmpeg",
+      "path": "lib/libavfilter.11.14.102.dylib"
+    },
+    {
+      "file": "libavformat.62.12.102.dylib",
+      "package": "ffmpeg",
+      "path": "lib/libavformat.62.12.102.dylib"
+    },
+    {
+      "file": "libavutil.60.26.102.dylib",
+      "package": "ffmpeg",
+      "path": "lib/libavutil.60.26.102.dylib"
+    },
+    {
+      "file": "libb2.1.dylib",
+      "package": "libb2",
+      "path": "lib/libb2.1.dylib"
+    },
+    {
+      "file": "libbluray.4.dylib",
+      "package": "libbluray",
+      "path": "lib/libbluray.4.dylib"
+    },
+    {
+      "file": "libcrypto.3.dylib",
+      "package": "openssl@3",
+      "path": "lib/libcrypto.3.dylib"
+    },
+    {
+      "file": "libdav1d.7.dylib",
+      "package": "dav1d",
+      "path": "lib/libdav1d.7.dylib"
+    },
+    {
+      "file": "libfontconfig.1.dylib",
+      "package": "fontconfig",
+      "path": "lib/libfontconfig.1.dylib"
+    },
+    {
+      "file": "libfreetype.6.dylib",
+      "package": "freetype",
+      "path": "lib/libfreetype.6.dylib"
+    },
+    {
+      "file": "libfribidi.0.dylib",
+      "package": "fribidi",
+      "path": "lib/libfribidi.0.dylib"
+    },
+    {
+      "file": "libglib-2.0.0.dylib",
+      "package": "glib",
+      "path": "lib/libglib-2.0.0.dylib"
+    },
+    {
+      "file": "libgraphite2.3.3.1.dylib",
+      "package": "graphite2",
+      "path": "lib/libgraphite2.3.3.1.dylib"
+    },
+    {
+      "file": "libharfbuzz.0.dylib",
+      "package": "harfbuzz",
+      "path": "lib/libharfbuzz.0.dylib"
+    },
+    {
+      "file": "libintl.8.dylib",
+      "package": "gettext",
+      "path": "lib/libintl.8.dylib"
+    },
+    {
+      "file": "libjpeg.8.3.2.dylib",
+      "package": "jpeg-turbo",
+      "path": "lib/libjpeg.8.3.2.dylib"
+    },
+    {
+      "file": "liblcms2.2.dylib",
+      "package": "little-cms2",
+      "path": "lib/liblcms2.2.dylib"
+    },
+    {
+      "file": "libluajit-5.1.2.1.1785763465.dylib",
+      "package": "luajit",
+      "path": "lib/libluajit-5.1.2.1.1785763465.dylib"
+    },
+    {
+      "file": "liblz4.1.10.0.dylib",
+      "package": "lz4",
+      "path": "lib/liblz4.1.10.0.dylib"
+    },
+    {
+      "file": "liblzma.5.dylib",
+      "package": "xz",
+      "path": "lib/liblzma.5.dylib"
+    },
+    {
+      "file": "libmp3lame.0.dylib",
+      "package": "lame",
+      "path": "lib/libmp3lame.0.dylib"
+    },
+    {
+      "file": "libmpg123.0.dylib",
+      "package": "mpg123",
+      "path": "lib/libmpg123.0.dylib"
+    },
+    {
+      "file": "libmpv.2.dylib",
+      "package": "mpv",
+      "path": "lib/libmpv.2.dylib"
+    },
+    {
+      "file": "libmujs.dylib",
+      "package": "mujs",
+      "path": "lib/libmujs.dylib"
+    },
+    {
+      "file": "libopus.0.dylib",
+      "package": "opus",
+      "path": "lib/libopus.0.dylib"
+    },
+    {
+      "file": "libpcre2-8.0.dylib",
+      "package": "pcre2",
+      "path": "lib/libpcre2-8.0.dylib"
+    },
+    {
+      "file": "libplacebo.360.dylib",
+      "package": "libplacebo",
+      "path": "lib/libplacebo.360.dylib"
+    },
+    {
+      "file": "libpng16.16.dylib",
+      "package": "libpng",
+      "path": "lib/libpng16.16.dylib"
+    },
+    {
+      "file": "librubberband.3.dylib",
+      "package": "rubberband",
+      "path": "lib/librubberband.3.dylib"
+    },
+    {
+      "file": "libsamplerate.0.2.2.dylib",
+      "package": "libsamplerate",
+      "path": "lib/libsamplerate.0.2.2.dylib"
+    },
+    {
+      "file": "libshaderc_shared.1.dylib",
+      "package": "shaderc",
+      "path": "lib/libshaderc_shared.1.dylib"
+    },
+    {
+      "file": "libssl.3.dylib",
+      "package": "openssl@3",
+      "path": "lib/libssl.3.dylib"
+    },
+    {
+      "file": "libswresample.6.3.102.dylib",
+      "package": "ffmpeg",
+      "path": "lib/libswresample.6.3.102.dylib"
+    },
+    {
+      "file": "libswscale.9.5.102.dylib",
+      "package": "ffmpeg",
+      "path": "lib/libswscale.9.5.102.dylib"
+    },
+    {
+      "file": "libuchardet.0.0.8.dylib",
+      "package": "uchardet",
+      "path": "lib/libuchardet.0.0.8.dylib"
+    },
+    {
+      "file": "libudfread.3.dylib",
+      "package": "libudfread",
+      "path": "lib/libudfread.3.dylib"
+    },
+    {
+      "file": "libunibreak.7.dylib",
+      "package": "libunibreak",
+      "path": "lib/libunibreak.7.dylib"
+    },
+    {
+      "file": "libvmaf.3.dylib",
+      "package": "libvmaf",
+      "path": "lib/libvmaf.3.dylib"
+    },
+    {
+      "file": "libvpx.12.dylib",
+      "package": "libvpx",
+      "path": "lib/libvpx.12.dylib"
+    },
+    {
+      "file": "libvulkan.1.4.357.dylib",
+      "package": "vulkan-loader",
+      "path": "lib/libvulkan.1.4.357.dylib"
+    },
+    {
+      "file": "libx264.165.dylib",
+      "package": "x264",
+      "path": "lib/libx264.165.dylib"
+    },
+    {
+      "file": "libx265.216.dylib",
+      "package": "x265",
+      "path": "lib/libx265.216.dylib"
+    },
+    {
+      "file": "libzimg.2.dylib",
+      "package": "zimg",
+      "path": "lib/libzimg.2.dylib"
+    },
+    {
+      "file": "libzstd.1.5.7.dylib",
+      "package": "zstd",
+      "path": "lib/libzstd.1.5.7.dylib"
+    }
+  ]
+}

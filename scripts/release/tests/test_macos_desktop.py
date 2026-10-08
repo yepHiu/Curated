@@ -22,7 +22,8 @@ class MacDesktopTests(unittest.TestCase):
         path.write_bytes(data)
         return path
 
-    def test_standalone_bundle_contains_only_client_assets(self):
+    @patch("scripts.release.release_lib.macos_desktop.stage_native", return_value={"minimumMacOS": "15.0"})
+    def test_standalone_bundle_contains_only_client_assets(self, native):
         runtime = 'node_modules/electron/dist/'
         binary = self.write(runtime + 'Electron.app/Contents/MacOS/Electron')
         binary.chmod(0o755)
@@ -57,7 +58,7 @@ class MacDesktopTests(unittest.TestCase):
         self.assertFalse((payload / 'electron-dist/main.js.map').exists())
         self.assertTrue((payload / 'electron-dist/native-player-macos.node').is_file())
         self.assertTrue((payload / 'electron-dist/player/index.html').is_file())
-        self.assertFalse((payload / 'native-player').exists())  # User-provided libmpv is not redistributed.
+        native.assert_called_once_with(payload, self.root / 'scripts/release/native-player/macos-arm64-production.json')
         self.assertFalse((app / 'Contents/Resources/default_app.asar').exists())
         # Windows does not preserve POSIX executable bits in this fixture.
         if os.name != 'nt':
@@ -66,6 +67,7 @@ class MacDesktopTests(unittest.TestCase):
             info = plistlib.load(stream)
         self.assertEqual(info['CFBundleIdentifier'], 'com.curated.desktop')
         self.assertEqual(info['CFBundleExecutable'], 'Curated Desktop')
+        self.assertEqual(info['LSMinimumSystemVersion'], '15.0')
         with self.assertRaises(FileExistsError):
             stage_app(self.root, app, '0.1.0', '20260927.000000')
 
