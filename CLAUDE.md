@@ -2,9 +2,11 @@
 
 ## macOS native playback — 2026-10-09
 
-Formal Desktop playback now supports locally installed libmpv through a main-process Node-API/Cocoa Render API view and private Unix IPC. The existing authenticated Session, proxy, coordinator, file progress and capture APIs remain shared. GPU advanced control makes VideoToolbox screenshots work. Cocoa owns native traffic lights/fullscreen/geometry; the local controller exposes only read-only `windowChrome` in addition to existing bounded playback IPC. No new public HTTP endpoint, migration or library-config field.
+Mac 正式包内置固定版本 libmpv、arm64 dylib 依赖闭包、对应源码/资源、配方/SBOM 与许可；用户无需安装 MPV、Homebrew 或设置环境变量。新 Mac 安装（未保存播放偏好）默认使用原生播放器，已保存选择保留。正式包仅加载 app 内引擎，忽略开发覆盖变量；开发态仍允许 Homebrew/绝对 CURATED_NATIVE_LIBMPV。
 
-Build uses Xcode Command Line Tools and Node include/node (`CURATED_NODE_INCLUDE` override). Runtime uses Homebrew's standard libmpv paths or absolute `CURATED_NATIVE_LIBMPV`; restart after installation. Missing resources keep Web. Mac staging requires the adapter/player page but does not bundle Homebrew libraries. Native faults can affect the main process. See guide “macOS native playback” and `docs/plan/2026-10-09-macos-native-player.md` for tests and pending self-contained distribution. This supersedes earlier non-Windows/Web-only boundaries for new builds.
+维护者先运行 `python3 scripts/release/prepare_macos_native.py`，再设置绝对 `CURATED_NATIVE_MAC_BUNDLE` 后打包。缺资料、SHA 不符、非 arm64、外部 dylib/rpath 或最低系统不符时构建失败。当前目标 Apple Silicon + macOS 15；签名仍为 ad-hoc，未完成 Apple 公证，尚未发布。安装后的合成媒体测试禁止读取 /opt/homebrew 和 /usr/local。无新增公共 HTTP API 或 library-config 字段；详见 guide 与 macOS 计划。
+
+Cocoa Render API + private Unix IPC reuse existing authenticated Session/proxy/progress/capture APIs. Build requires Xcode CLI and Node headers. GPU advanced control supports hardware frame capture. Native faults may affect Desktop main process.
 
 ## Agent prompt cache reuse — 2026-10-07
 

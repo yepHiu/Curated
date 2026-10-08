@@ -122,12 +122,7 @@
   </style>
 </head>
 <body>
-  <section><h2>macOS 原生播放 · 2026-10-09</h2>
-  <p>新增 Cocoa Node-API/libmpv Render API 视图，在透明 Electron 控件下显示原生视频；NSView 不跨进程传递。私有 Unix socket 复用播放命令与状态，当前 Session、媒体代理和协调器继续负责认证、进度及萃取。无新增 HTTP API 或 library-config 字段。</p>
-  <table><thead><tr><th>能力</th><th>当前实现</th><th>验收边界</th></tr></thead><tbody>
-  <tr><td>Mac 窗口与渲染</td><td>红黄绿、拖动、全屏、Retina backing pixels、VideoToolbox、GPU 原图截图</td><td>Apple Silicon 同窗/全屏已目视验证；真实 Electron 合成媒体控制、截图、分片及清理测试通过</td></tr>
-  <tr><td>运行与分发</td><td>自有适配层随 Mac 构建；Homebrew libmpv 或绝对 CURATED_NATIVE_LIBMPV；缺资源继续 Web</td><td>未内置引擎、未发布；Intel、完整片源/多屏与生产安装验收待完成。原生引擎位于主进程</td></tr>
-  </tbody></table><p>见 <a href="../guide.md#macos-native-playback">运行说明</a>、<a href="../plan/2026-10-09-macos-native-player.md">适配记录</a>。旧章节中的 macOS/Web-only 说明属于此前阶段。</p></section>
+  <section><h2>macOS 原生播放 · 2026-10-09</h2><p>Cocoa/libmpv Render API 与透明 Electron 控件同窗，复用认证、Unix IPC、分片进度、VideoToolbox 原图捕获与萃取业务；保留系统按钮、Retina 和全屏。</p><table><tr><th>能力</th><th>当前实现</th><th>边界</th></tr><tr><td>免装 MPV</td><td>包内固定 libmpv/dylib 闭包；新 Mac 偏好默认 native，旧偏好保留；源码/许可/配方随包</td><td>Apple Silicon、macOS 15+；缺资料或外部依赖拒绝出包</td></tr><tr><td>安装验收</td><td>禁止读取 Homebrew 路径的真实播放、控制、截图、分片测试</td><td>ad-hoc 签名，Apple 公证与公开发布未完成；Intel/HDR/多屏/整片验收仍待推进</td></tr></table><p>无新增 HTTP API 或库配置。详见 <a href="../guide.md#macos-native-playback">操作说明</a>、<a href="../plan/2026-10-09-macos-native-player.md">验证记录</a>。</p></section>
   <section><h2>Agent 缓存复用 · 2026-10-07</h2><p>固定聊天规则与历史位于本轮页面和最新问题之前。独立动作将规则与源资料分离，原文/统计 JSON 只发送一次，继续使用 embed TXT。版本 agent-system-v8 / agent-actions-v2；重新编译并重启 Server 后生效。</p><table><thead><tr><th>能力</th><th>当前实现</th><th>验收边界</th></tr></thead><tbody><tr><td>前缀复用</td><td>页面切换不改固定规则及前置历史；压缩保留本轮页面</td><td>压缩、工具集变化和服务端淘汰仍影响命中；实际提升待观察</td></tr><tr><td>缓存计数</td><td>DeepSeek 命中/未命中计数解析及 Info 日志；未知与零分开</td><td>无新增 API、数据库字段、配置或报表列；未调用收费模型</td></tr></tbody></table><p>详见 <a href="../plan/2026-10-07-agent-prompt-cache-optimization.md">实现与验证记录</a>。</p></section>
   <section><h2>Desktop 预编译测试运行 · 2026-10-06</h2><p><code>pnpm desktop:test:build</code> 构建一次测试页面与 Electron；<code>pnpm desktop:test</code> 直接复用构建。Electron 主进程在 127.0.0.1:5183 提供静态 SPA，并流式转发 /api 到既有开发 Server 8080。独立测试配置、登录与原生播放入口保留；运行时无独立 Vite/编译器/文件监听，不替换 Server 页面。显式 FRONTEND_DIR 只用于未打包本机测试；正式包与远端保持原页面来源。源码更新后重建，退出回收监听。无新增公共 API 或库配置。</p></section>
 <section id="windows-desktop-native-integration">

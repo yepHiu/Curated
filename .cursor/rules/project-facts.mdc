@@ -5,10 +5,11 @@ alwaysApply: true
 
 ## macOS Desktop 原生播放 — 2026-10-09
 
-正式 playback bridge 现在支持 macOS 本机 libmpv：自有 Node-API/Cocoa NSOpenGLView 通过 Render API 在透明 Electron 控件下方渲染；macOS 不使用跨进程 wid。命令沿用私有临时目录内 Unix socket 与 NativeMpvPlayer；Windows 继续独立进程/Win32 helper。GPU advanced control 处理 VideoToolbox 原图截图；复用当前 Session、代理、进度/时长、分片及萃取协调器。Cocoa 红黄绿、拖动、Retina backing pixels、系统全屏与最小化恢复已适配。
+Mac 正式包内置固定版本 libmpv、arm64 dylib 依赖闭包、对应源码/资源、配方/SBOM 与许可；用户无需安装 MPV、Homebrew 或设置环境变量。新 Mac 安装（未保存播放偏好）默认使用原生播放器，已保存选择保留。正式包仅加载 app 内引擎，忽略开发覆盖变量；开发态仍允许 Homebrew/绝对 CURATED_NATIVE_LIBMPV。
 
-`pnpm build:electron:main` 在 Mac 通过 Xcode CLI + Node include/node 编译 `native-player-macos.node`，只编入 ISC 的 mpv v0.41.0 API 声明；不链接或复制 Homebrew 引擎。运行需要本机 Homebrew mpv，或绝对 `CURATED_NATIVE_LIBMPV` 指向 dylib；缺引擎/模块/页面继续 Web，偏好仍默认关闭。Mac 包要求包含适配层与播放器页面，但没有内置 libmpv，完整自包含引擎分发尚未完成。无新增 HTTP API / library-config 字段；详见 guide 的 macOS native playback 与 `docs/plan/2026-10-09-macos-native-player.md`。
+维护者先运行 `python3 scripts/release/prepare_macos_native.py`，再设置绝对 `CURATED_NATIVE_MAC_BUNDLE` 后打包。缺资料、SHA 不符、非 arm64、外部 dylib/rpath 或最低系统不符时构建失败。当前目标 Apple Silicon + macOS 15；签名仍为 ad-hoc，未完成 Apple 公证，尚未发布。安装后的合成媒体测试禁止读取 /opt/homebrew 和 /usr/local。无新增公共 HTTP API 或 library-config 字段；详见 guide 与 macOS 计划。
 
+实现使用 Node-API/Cocoa NSOpenGLView + libmpv Render API，透明 Electron 控件同窗叠加。VideoToolbox/advanced control 支持 GPU 原图截图；Unix IPC 复用现有 Session、代理、协调器、分片进度和萃取。系统按钮、Retina、系统全屏和最小化恢复已适配；引擎仍在主进程中。
 
 ## 2026-10-07 Agent 缓存复用（源码已实现）
 

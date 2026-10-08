@@ -14,6 +14,8 @@ From the repository root on Apple Silicon macOS:
 ```sh
 python3 -m venv .workspace/dmg-tools
 .workspace/dmg-tools/bin/python -m pip install -r scripts/release/macos/requirements.txt
+python3 scripts/release/prepare_macos_native.py
+export CURATED_NATIVE_MAC_BUNDLE="$PWD/.workspace/native-player-macos-production"
 .workspace/dmg-tools/bin/python scripts/release/release_cli.py package-macos-desktop --output-dir release/macos-desktop
 ```
 

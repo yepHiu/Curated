@@ -19,7 +19,7 @@
 
 # Curated
 
-macOS source builds now support same-window native playback using a locally installed libmpv, with Mac window controls and hardware decoding. The Mac package does not yet bundle the engine; see the [setup and limitations](docs/guide.md#macos-native-playback).
+New macOS packages bundle the native MPV engine and dependencies; users need no MPV or Homebrew installation. New Mac profiles default to native playback (Apple Silicon, macOS 15+). Apple signing/notarization remains pending; see the [setup and delivery boundaries](docs/guide.md#macos-native-playback).
 
 For daily Desktop testing, build once with `pnpm desktop:test:build`, then run `pnpm desktop:test`. Electron serves the compiled test pages without a Vite process; see the [test-run guide](docs/guide.md#desktop-test-runs-with-prebuilt-pages).
 

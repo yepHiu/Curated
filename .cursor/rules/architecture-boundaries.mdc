@@ -5,10 +5,11 @@ alwaysApply: true
 
 ## macOS native playback — 2026-10-09
 
-The formal playback surface now has a macOS implementation. A main-process Node-API module loads a user-supplied libmpv and renders into its own Cocoa NSOpenGLView beneath transparent Electron controls. It uses the Render API rather than passing NSView pointers across processes. Private Unix sockets reuse the bounded JSON command/state layer; current Electron Session/proxy/coordinator retain sole ownership of authenticated business writes. Render advanced control services GPU screenshots, including VideoToolbox frames. Cocoa owns traffic lights, window geometry and native fullscreen; backing pixels handle Retina. Local-player preload adds only read-only windowChrome metadata.
+Mac 正式包内置固定版本 libmpv、arm64 dylib 依赖闭包、对应源码/资源、配方/SBOM 与许可；用户无需安装 MPV、Homebrew 或设置环境变量。新 Mac 安装（未保存播放偏好）默认使用原生播放器，已保存选择保留。正式包仅加载 app 内引擎，忽略开发覆盖变量；开发态仍允许 Homebrew/绝对 CURATED_NATIVE_LIBMPV。
 
-Unlike Windows's separate mpv process, the Mac engine runs in the Desktop main process; native-engine faults can terminate Desktop. No crash isolation or HDR/track/PiP guarantee is implied. Missing runtime/resources retain Web. Packaging includes the adapter and controls but does not redistribute local Homebrew libraries. Self-contained runtime/source/license packaging and production installer acceptance remain separate work. No public HTTP API or library-config key changes. See the macOS plan and guide; older “macOS remains Web” statements describe preceding builds.
+维护者先运行 `python3 scripts/release/prepare_macos_native.py`，再设置绝对 `CURATED_NATIVE_MAC_BUNDLE` 后打包。缺资料、SHA 不符、非 arm64、外部 dylib/rpath 或最低系统不符时构建失败。当前目标 Apple Silicon + macOS 15；签名仍为 ad-hoc，未完成 Apple 公证，尚未发布。安装后的合成媒体测试禁止读取 /opt/homebrew 和 /usr/local。无新增公共 HTTP API 或 library-config 字段；详见 guide 与 macOS 计划。
 
+A main-process Node-API module renders through libmpv into a Cocoa NSOpenGLView beneath transparent Electron controls. Private Unix IPC reuses the authenticated coordinator. Native-engine faults can terminate Desktop; broader HDR/tracks/PiP/Intel and full-film acceptance remain outside the validated scope.
 
 ## Desktop test page hosting — 2026-10-06
 

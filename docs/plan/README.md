@@ -2,7 +2,7 @@
 
 ## macOS 原生播放器适配（2026-10-09）
 
-[适配与验证记录](2026-10-09-macos-native-player.md) 关联 REQ-0061。Cocoa/libmpv 同窗视频、系统窗口、Unix IPC 与现有播放业务已完成本机验证；Mac 包暂不内置引擎，完整分发与扩展实机验收仍在后续范围。
+[适配与验证记录](2026-10-09-macos-native-player.md) 关联 REQ-0061。Cocoa/libmpv 同窗视频、系统窗口、Unix IPC 与现有播放业务已完成本机验证；Mac 自包含引擎与安装验收链路已实现；Apple 签名/公证、公开发布与扩展实机验收仍待完成。
 
 `docs/plan/` 保存研究、方案、路线图与实施计划，但“存在一个文件”不等于该方向已经获批或正在执行。当前需求状态的唯一台账是 `docs/prd/requirements.csv`；当前实现事实以源码、测试和 `.cursor/rules/project-facts.mdc` 为准。
 

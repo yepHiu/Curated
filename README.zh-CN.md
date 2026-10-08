@@ -19,7 +19,7 @@
 
 # Curated
 
-macOS 新版源码已支持原生视频与 Curated 控件同窗播放，保留 Mac 窗口按钮与硬件解码。当前需要本机安装 libmpv，Mac 包尚未内置引擎；见[安装与使用说明](docs/guide.md#macos-native-playback)。
+新版 Mac 包内置 MPV 引擎及依赖，用户无需安装 MPV 或 Homebrew；新 Mac 播放配置默认使用原生播放器（Apple Silicon、macOS 15+）。Apple 签名/公证仍待完成，见[使用与交付边界](docs/guide.md#macos-native-playback)。
 
 日常 Desktop 测试先运行 `pnpm desktop:test:build` 构建一次，再用 `pnpm desktop:test` 启动。Electron 直接托管已编译页面，运行期间无需 Vite；见[测试运行说明](docs/guide.md#desktop-test-runs-with-prebuilt-pages)。
 

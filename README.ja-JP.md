@@ -19,7 +19,7 @@
 
 # Curated
 
-macOS の新しいソースは、ローカルの libmpv による同一ウィンドウ再生、Mac のウィンドウ操作とハードウェアデコードに対応します。Mac パッケージにはまだエンジンを同梱していません。[設定と制限](docs/guide.md#macos-native-playback)をご覧ください。
+新しい Mac パッケージには MPV と依存ライブラリが同梱され、ユーザーによる MPV/Homebrew の導入は不要です。新規 Mac 設定ではネイティブ再生が既定です（Apple Silicon、macOS 15+）。Apple 署名・公証は未完了です。[利用と配布の制限](docs/guide.md#macos-native-playback)を参照してください。
 
 Desktop テストは `pnpm desktop:test:build` で一度ビルドし、`pnpm desktop:test` で起動します。Electron がビルド済みページを配信するため、実行中に Vite は不要です。[実行ガイド](docs/guide.md#desktop-test-runs-with-prebuilt-pages)を参照してください。
 
