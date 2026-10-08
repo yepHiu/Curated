@@ -1,5 +1,4 @@
 import { BrowserWindow, ipcMain, clipboard, dialog } from "electron"
-import { existsSync } from "node:fs"
 import { writeFile } from "node:fs/promises"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -9,6 +8,8 @@ import { NativePlayerWindow, type NativeWindowState } from "./native-player-wind
 import { PlaybackPreferencesStore, validatePlaybackPreferences } from "./playback-preferences.js"
 import type { DesktopPlaybackCapabilities, DesktopPlaybackCommand, DesktopPlaybackSnapshot } from "./playback-contract.js"
 import { isTrustedDesktopSender } from "./desktop-updates.js"
+import { playbackResources } from "./playback-resources.js"
+import { macNativeLauncher } from "./native-player-macos.js"
 
 export interface DesktopPlaybackOptions {
   directory: string
@@ -22,21 +23,19 @@ export interface DesktopPlaybackOptions {
 export function installDesktopPlayback(options: DesktopPlaybackOptions) {
   const store = new PlaybackPreferencesStore(options.userData)
   let preferences = store.read()
-  const page = pathToFileURL(path.join(options.directory, "player", "index.html")).href
-  const helper = path.join(options.directory, "native-player-host.exe")
-  const executable = options.packaged ? path.join(options.appPath, "native-player", "mpv.exe")
-    : process.env.CURATED_NATIVE_MPV || path.join(options.appPath, ".workspace", "native-player", "mpv.exe")
+  const resources = playbackResources(options)
+  const page = pathToFileURL(resources.page).href
+  const { helper, executable } = resources
   let overlay: BrowserWindow | undefined
   const capabilities = (): DesktopPlaybackCapabilities => ({
-    protocol: 1, available: process.platform === "win32" && existsSync(executable) && existsSync(helper) && existsSync(path.join(options.directory, "player", "index.html")),
-    reason: process.platform !== "win32" ? "platform" : !existsSync(executable) ? "engine" : !existsSync(helper) ? "host"
-      : !existsSync(path.join(options.directory, "player", "index.html")) ? "page" : undefined,
+    protocol: 1, available: resources.available, reason: resources.reason,
     preferences: { ...preferences },
   })
   const coordinator = new NativePlaybackCoordinator(executable, createSurface, () => preferences, value => {
     store.write(value); preferences = value
   })
   async function createSurface(): Promise<PlaybackSurface> {
+    if (process.platform === "darwin") return createMacSurface()
     const host = new NativePlayerWindow()
     let window: BrowserWindow | undefined
     let ready = false
@@ -93,6 +92,52 @@ export function installDesktopPlayback(options: DesktopPlaybackOptions) {
       if (overlay === window) overlay = undefined
       window?.destroy()
       await host.dispose()
+      throw error
+    }
+  }
+  async function createMacSurface(): Promise<PlaybackSurface> {
+    let disposing = false
+    const window = new BrowserWindow({ width: 1000, height: 720, minWidth: 720, minHeight: 480,
+      title: "Curated", show: false, transparent: true, backgroundColor: "#00000000",
+      titleBarStyle: "hidden", trafficLightPosition: { x: 14, y: 12 },
+      // Cocoa 红黄绿覆盖透明内容区，HTML 顶部仅提供拖动留白。
+      webPreferences: { preload: path.join(options.directory, "playback-preload.cjs"), sandbox: true,
+        contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
+    overlay = window
+    window.setWindowButtonVisibility(true)
+    try {
+      const launch = macNativeLauncher(helper, window.getNativeWindowHandle())
+      window.webContents.setWindowOpenHandler(() => ({ action: "deny" }))
+      window.webContents.on("will-navigate", event => event.preventDefault())
+      window.on("page-title-updated", event => event.preventDefault())
+      window.webContents.on("will-attach-webview", event => event.preventDefault())
+      window.webContents.on("render-process-gone", () => { if (!disposing) void coordinator.stop("PLAYER_UI_FAILED") })
+      window.webContents.session.setPermissionCheckHandler(() => false)
+      window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+      window.on("close", event => { if (!disposing) { event.preventDefault(); void coordinator.stop().then(options.focusMain) } })
+      const changed = () => coordinator.windowStateChanged()
+      window.on("enter-full-screen", changed)
+      window.on("leave-full-screen", changed)
+      window.on("maximize", changed)
+      window.on("unmaximize", changed)
+      await window.loadURL(page)
+      return {
+        createPlayer: () => new NativeMpvPlayer(undefined, launch),
+        setTitle: async title => { if (!window.isDestroyed()) window.setTitle(title) },
+        focus: async () => { if (!window.isDestroyed()) { if (window.isMinimized()) window.restore(); window.show(); window.focus() } },
+        action: async action => {
+          if (window.isDestroyed()) return
+          if (action === "minimize") window.minimize()
+          else window.setFullScreen(!window.isFullScreen())
+        },
+        fullscreen: () => !window.isDestroyed() && window.isFullScreen(),
+        maximized: () => !window.isDestroyed() && window.isMaximized(),
+        dispose: async () => { disposing = true; if (overlay === window) overlay = undefined; window.destroy() },
+      }
+    } catch (error) {
+      disposing = true
+      if (overlay === window) overlay = undefined
+      window.destroy()
       throw error
     }
   }

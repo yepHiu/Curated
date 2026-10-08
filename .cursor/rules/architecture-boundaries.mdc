@@ -3,6 +3,13 @@ description: Current implementation vs target desktop architecture boundaries
 alwaysApply: true
 ---
 
+## macOS native playback — 2026-10-09
+
+The formal playback surface now has a macOS implementation. A main-process Node-API module loads a user-supplied libmpv and renders into its own Cocoa NSOpenGLView beneath transparent Electron controls. It uses the Render API rather than passing NSView pointers across processes. Private Unix sockets reuse the bounded JSON command/state layer; current Electron Session/proxy/coordinator retain sole ownership of authenticated business writes. Render advanced control services GPU screenshots, including VideoToolbox frames. Cocoa owns traffic lights, window geometry and native fullscreen; backing pixels handle Retina. Local-player preload adds only read-only windowChrome metadata.
+
+Unlike Windows's separate mpv process, the Mac engine runs in the Desktop main process; native-engine faults can terminate Desktop. No crash isolation or HDR/track/PiP guarantee is implied. Missing runtime/resources retain Web. Packaging includes the adapter and controls but does not redistribute local Homebrew libraries. Self-contained runtime/source/license packaging and production installer acceptance remain separate work. No public HTTP API or library-config key changes. See the macOS plan and guide; older “macOS remains Web” statements describe preceding builds.
+
+
 ## Desktop test page hosting — 2026-10-06
 
 Explicit unpackaged local test runs use prebuilt pages through `CURATED_ELECTRON_FRONTEND_DIR`. Electron serves only the selected build directory on loopback and streams same-origin API traffic to the development Server; no compiler or watcher runs. This preserves the separate worktree UI/profile without replacing the shared Server frontend. Packaged/remote page selection and business HTTP contracts remain unchanged. Commands and rebuild requirements are in guide “Desktop test runs with prebuilt pages”.

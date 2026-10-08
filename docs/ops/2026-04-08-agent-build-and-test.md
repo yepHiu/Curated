@@ -1,5 +1,11 @@
 # Agent 构建 / 编译 / 测试范式（Curated）
 
+## macOS 原生播放（2026-10-09）
+
+根目录 `pnpm build:electron:main` 自动编译 Cocoa Node-API 适配层，依赖 Xcode Command Line Tools 与 Node include/node（非标准安装可设置 `CURATED_NODE_INCLUDE`）。只使用仓库内固定的 ISC mpv API 头文件，不要求构建机安装或链接 libmpv。运行使用本机 Homebrew mpv / 绝对 `CURATED_NATIVE_LIBMPV`，不在 Mac 包中分发引擎。
+
+编译后执行 `CURATED_NATIVE_MAC_TEST=1 CURATED_NATIVE_MPV=/opt/homebrew/bin/mpv NODE_OPTIONS=--no-experimental-webstorage pnpm test:electron`，验证真实 Electron/Cocoa/libmpv 和独立 CLI 引擎；ffmpeg 需可执行（可设 `CURATED_NATIVE_FFMPEG`）。Intel/自定义安装调整路径。未显式启用 Mac 集成时跳过该项；Windows 窗口项在 Mac 跳过。不要将这些跳过视为验收。发布 staging 检查 `native-player-macos.node`、`playback-preload.cjs` 与 `player/index.html`；Python Mac 打包测试沿用 `python3 -m unittest scripts.release.tests.test_macos_desktop`。详见 guide 的 macOS native playback。
+
 ## Desktop 日常测试：构建一次，直接运行
 
 先停止该分支的原生播放并完全退出测试 Desktop，再于根目录运行 `pnpm desktop:test:build`，构建 Web API 页面到 `.workspace/desktop-test-ui` 并构建 Electron 壳和本地播放器，避免 Windows 正在运行的宿主 EXE 锁定输出。后续 `pnpm desktop:test` 只启动已有产物，不自动编译，不需要 `pnpm dev`。需保持开发 Server `127.0.0.1:8080` 在线。源码变化后先退出、重建再启动。Electron 内托管复用 `5183`；首次切换应结束旧测试 Vite，保留其它开发服务。详见 guide。

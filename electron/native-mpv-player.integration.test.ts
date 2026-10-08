@@ -19,7 +19,7 @@ async function until(predicate: () => boolean, timeout = 6000): Promise<void> {
   }
 }
 
-describe.skipIf(process.platform !== "win32" || !executable)("real Windows mpv", () => {
+describe.skipIf(!["win32", "darwin"].includes(process.platform) || !executable)("real native mpv", () => {
   // 使用合成视频与受保护 Range fixture，验证真实原生链路，不声称问题影片观感已验收。
   it("plays authenticated raw MP4 through proxy and handles pause seek speed volume and cleanup", async () => {
     const temp = mkdtempSync(path.join(tmpdir(), "curated-native-mpv-"))

@@ -3,6 +3,13 @@ description: 日常开发速记（启动、联调、根目录政策）
 alwaysApply: true
 ---
 
+## macOS 原生播放 — 2026-10-09
+
+本机安装 Homebrew mpv 后，运行 `pnpm dev:electron`，连接现有 Server，在设置 → 播放启用本机原生偏好。Mac 编译需要 Xcode Command Line Tools 和 Node 的 include/node（可用绝对 `CURATED_NODE_INCLUDE` 指定）。运行自动探测 `/opt/homebrew/opt/mpv/lib/libmpv.dylib` 或 `/usr/local/opt/mpv/lib/libmpv.dylib`；可用绝对 `CURATED_NATIVE_LIBMPV` 覆盖，安装/变更引擎后重启 Desktop。无需运行 Windows 的 native-player:prepare。
+
+Mac 使用 Cocoa/libmpv 同窗显示、VideoToolbox 和 Unix socket；`CURATED_NATIVE_MAC_TEST=1 CURATED_NATIVE_MPV=/opt/homebrew/bin/mpv NODE_OPTIONS=--no-experimental-webstorage pnpm test:electron` 启用真实 Mac 集成和 CLI 引擎测试，先运行 `pnpm build:electron:main` 并确保 ffmpeg 可用。Windows 专属用例在 Mac 上跳过。Mac 包暂不内置 libmpv，缺运行库时继续 Web。详见 guide。
+
+
 ## Desktop 日常测试启动 — 2026-10-06
 
 日常试用使用已编译页面：根目录 `pnpm desktop:test:build` 更新一次前端/Electron 产物，随后 `pnpm desktop:test` 启动独立测试 profile。需既有开发 Server `127.0.0.1:8080`；页面由 Electron 在 `127.0.0.1:5183` 托管，不启动或复用 Vite。不要再运行 `.workspace/start-desktop-test-vite.ps1`。源码更新后重建；`pnpm dev` / `pnpm dev:electron` 继续用于热更新开发。详见 guide。

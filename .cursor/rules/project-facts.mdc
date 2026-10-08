@@ -3,6 +3,13 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## macOS Desktop 原生播放 — 2026-10-09
+
+正式 playback bridge 现在支持 macOS 本机 libmpv：自有 Node-API/Cocoa NSOpenGLView 通过 Render API 在透明 Electron 控件下方渲染；macOS 不使用跨进程 wid。命令沿用私有临时目录内 Unix socket 与 NativeMpvPlayer；Windows 继续独立进程/Win32 helper。GPU advanced control 处理 VideoToolbox 原图截图；复用当前 Session、代理、进度/时长、分片及萃取协调器。Cocoa 红黄绿、拖动、Retina backing pixels、系统全屏与最小化恢复已适配。
+
+`pnpm build:electron:main` 在 Mac 通过 Xcode CLI + Node include/node 编译 `native-player-macos.node`，只编入 ISC 的 mpv v0.41.0 API 声明；不链接或复制 Homebrew 引擎。运行需要本机 Homebrew mpv，或绝对 `CURATED_NATIVE_LIBMPV` 指向 dylib；缺引擎/模块/页面继续 Web，偏好仍默认关闭。Mac 包要求包含适配层与播放器页面，但没有内置 libmpv，完整自包含引擎分发尚未完成。无新增 HTTP API / library-config 字段；详见 guide 的 macOS native playback 与 `docs/plan/2026-10-09-macos-native-player.md`。
+
+
 ## 2026-10-07 Agent 缓存复用（源码已实现）
 
 聊天固定 system / 历史在前，本轮页面 system 在最新 user 前；历史截断说明不再改基础 system。动作规则与源资料分离，源文本/洞察 JSON 只发一次，正文沿用 prompts/*.txt。版本 agent-system-v8 / agent-actions-v2。DeepSeek 缓存自动启用；客户端解析命中/未命中计数，可信计数写 AI prompt cache usage Info 日志，未知不记零，输入总 token 不重复累计命中部分。无新增 API、数据库迁移、library-config 或报表列；需重编译/重启 Server。真实命中率/费用提升待观察，见 docs/plan/2026-10-07-agent-prompt-cache-optimization.md。

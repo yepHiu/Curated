@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron")
 // 本地控件只操作已有 session；没有连接、PIN、检索、文件选择或任意命令能力。
 contextBridge.exposeInMainWorld("curatedPlayer", {
+  windowChrome: process.platform === "darwin" ? "macos" : "native",
   snapshot: () => ipcRenderer.invoke("curated:playback-snapshot"),
   copyDiagnostics: sessionId => ipcRenderer.invoke("curated:playback-copy-diagnostics", sessionId),
   saveDiagnostics: sessionId => ipcRenderer.invoke("curated:playback-save-diagnostics", sessionId),

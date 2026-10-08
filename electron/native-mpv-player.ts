@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process"
+import { spawn } from "node:child_process"
 import { createConnection, type Socket } from "node:net"
 import { randomUUID } from "node:crypto"
 import { EventEmitter } from "node:events"
@@ -12,9 +12,15 @@ interface PendingCommand { resolve(value: unknown): void; reject(error: Error): 
 const properties = ["time-pos", "duration", "pause", "speed", "volume", "frame-drop-count",
   "decoder-frame-drop-count", "video-codec", "hwdec-current"]
 
-/** 一次会话对应一个 mpv 子进程；命令关联和状态事件均局限在该实例。 */
+/** macOS 可在自有 NSView 内启动 libmpv；生命周期与独立 mpv 进程一致。 */
+export interface NativeEngine extends EventEmitter { kill(): unknown }
+export type NativeEngineLauncher = (executable: string, args: string[]) => NativeEngine
+
+/** 一次会话对应一个 mpv 引擎实例；命令关联和状态事件不跨会话。 */
 export class NativeMpvPlayer extends EventEmitter {
-  private child?: ChildProcess
+  private child?: NativeEngine
+  private ipcDirectory?: string
+  private ipcCleanup?: Promise<void>
   private socket?: Socket
   private sequence = 0
   private text = ""
@@ -27,7 +33,8 @@ export class NativeMpvPlayer extends EventEmitter {
   state: NativePlayerState = emptyNativePlayerState()
 
   /** 嵌入句柄只能由受信任的主进程宿主提供，不能由媒体请求设置。 */
-  constructor(private readonly windowId?: string) {
+  constructor(private readonly windowId?: string, private readonly launch: NativeEngineLauncher = (executable, args) =>
+    spawn(executable, args, { shell: false, windowsHide: true, stdio: "ignore" })) {
     super()
     if (windowId !== undefined && !/^[1-9]\d{0,19}$/.test(windowId)) throw new Error("INVALID_NATIVE_WINDOW")
   }
@@ -35,15 +42,19 @@ export class NativeMpvPlayer extends EventEmitter {
   /** 通过观察状态即可验证播放效果；headless 仅供合成媒体集成测试。 */
   async start(executable: string, url: string, startSec: number, headless = false, initiallyPaused = false): Promise<void> {
     if (this.child || this.closed) throw new Error("PLAYER_ALREADY_STARTED")
-    if (process.platform !== "win32") throw new Error("WINDOWS_REQUIRED")
-    const pipe = `\\\\.\\pipe\\curated-native-${randomUUID()}`
+    if (!["win32", "darwin"].includes(process.platform)) throw new Error("NATIVE_PLATFORM_UNSUPPORTED")
+    // /tmp 保持低于 macOS sockaddr_un 的 104-byte 限制；mkdtemp 的 0700 隔离其它用户。
+    if (process.platform === "darwin") this.ipcDirectory = await mkdtemp(`/tmp/curated-mpv-${process.pid}-`)
+    const pipe = this.ipcDirectory ? path.join(this.ipcDirectory, "ipc") : `\\\\.\\pipe\\curated-native-${randomUUID()}`
     this.state.status = "starting"
     const args = ["--no-config", "--idle=yes", "--keep-open=no", "--terminal=no", "--ytdl=no",
       "--hwdec=auto-safe", "--screenshot-format=png", `--input-ipc-server=${pipe}`, `--start=${startSec}`,
       ...(initiallyPaused ? ["--pause=yes"] : []),
       ...(this.windowId && !headless ? [`--wid=${this.windowId}`, "--osc=no", "--input-default-bindings=no", "--input-vo-keyboard=no", "--input-cursor=no"] : []),
-      ...(headless ? ["--vo=null", "--ao=null"] : ["--force-window=yes", "--title=Curated · Windows 原生播放原型"])]
-    const child = spawn(executable, args, { shell: false, windowsHide: true, stdio: "ignore" })
+      ...(headless ? ["--vo=null", "--ao=null"] : ["--force-window=yes", "--title=Curated"])]
+    let child: NativeEngine
+    try { child = this.launch(executable, args) }
+    catch { await this.cleanupIpc(); this.fail("MPV_START_FAILED"); throw new Error("MPV_START_FAILED") }
     this.child = child
     child.on("error", () => { // 启动错误不得包含可执行参数或媒体能力地址。
       this.fail("MPV_START_FAILED")
@@ -59,6 +70,7 @@ export class NativeMpvPlayer extends EventEmitter {
         this.publish()
       }
       this.emit("exit")
+      void this.cleanupIpc()
     })
     try {
       await this.connect(pipe)
@@ -110,7 +122,7 @@ export class NativeMpvPlayer extends EventEmitter {
     })
   }
 
-  /** 仅在有界期限内等待自己创建的 Windows named pipe。 */
+  /** 仅在有界期限内等待自己创建的 named pipe / Unix socket。 */
   private async connect(pipe: string): Promise<void> {
     const deadline = Date.now() + 8000
     while (Date.now() < deadline && this.child && this.state.status !== "error") {
@@ -297,6 +309,17 @@ export class NativeMpvPlayer extends EventEmitter {
     this.pending.clear()
   }
 
+  private cleanupIpc(): Promise<void> {
+    const directory = this.ipcDirectory
+    this.ipcDirectory = undefined
+    if (!directory) return this.ipcCleanup ?? Promise.resolve()
+    this.ipcCleanup = (async () => {
+      await unlink(path.join(directory, "ipc")).catch(() => {})
+      await rmdir(directory).catch(() => {})
+    })()
+    return this.ipcCleanup
+  }
+
   /** 优先退出本次 mpv，超过期限只终止自己创建的子进程。 */
   async stop(): Promise<void> {
     if (this.closed) return
@@ -316,6 +339,7 @@ export class NativeMpvPlayer extends EventEmitter {
       clearTimeout(timer)
     }
     this.socket?.destroy()
+    await this.cleanupIpc()
     this.rejectPending("MPV_STOPPED")
     if (this.state.status !== "error" && this.state.status !== "ended") this.state.status = "stopped"
     this.publish()

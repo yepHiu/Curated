@@ -23,6 +23,7 @@ import { nativeMessages, type NativeMessage } from "../native-player-prototype/m
 
 const bridge = window.curatedPlayer
 const snapshot = ref<DesktopPlaybackSnapshot>()
+const macChrome = computed(() => bridge?.windowChrome === "macos" && !snapshot.value?.fullscreen)
 const busy = ref(false)
 const error = ref("")
 const diagnostics = ref(false)
@@ -195,8 +196,9 @@ onBeforeUnmount(() => {
 
 <template>
   <main ref="surface" class="native-player-surface dark relative h-screen overflow-hidden text-white" @pointermove="immersive.revealChrome" @focusin="focusIn" @focusout="focusOut">
+    <div v-if="macChrome" class="mac-player-drag absolute inset-x-0 top-0 z-20 h-9" aria-hidden="true" />
     <button type="button" tabindex="-1" class="absolute inset-0 outline-none" :aria-label="playing ? t('pause') : t('resume')" @click="click" @dblclick="doubleClick" />
-    <header class="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between gap-4 bg-gradient-to-b from-black/80 to-transparent p-4 pb-12 transition-opacity sm:p-5 sm:pb-12" :class="chromeShown ? 'opacity-100' : 'opacity-0 focus-within:opacity-100'">
+    <header class="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between gap-4 bg-gradient-to-b from-black/80 to-transparent p-4 pb-12 transition-opacity sm:p-5 sm:pb-12" :class="[chromeShown ? 'opacity-100' : 'opacity-0 focus-within:opacity-100', macChrome && 'pt-12 sm:pt-12']">
       <div class="min-w-0"><p class="truncate text-lg font-medium">{{ snapshot?.movie?.title || snapshot?.movie?.code || 'Curated' }}</p><p class="truncate text-sm text-white/60">{{ snapshot?.movie?.code }}</p></div>
       <div class="pointer-events-auto flex shrink-0 items-center">
         <MoviePartSelect v-if="files.length > 1" :files="files" :model-value="state?.fileId" :disabled="busy" @update:model-value="command({ action: 'part', fileId: $event })" />
@@ -244,6 +246,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.mac-player-drag { -webkit-app-region: drag; }
 /* 原生 HUD 局部表面：沿用应用语义色，不改变共享 Web 控件。 */
 :deep([data-movie-part-select]) {
   background-color: var(--surface-muted);

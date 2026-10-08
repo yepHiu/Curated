@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+## macOS native playback — 2026-10-09
+
+Formal Desktop playback now supports locally installed libmpv through a main-process Node-API/Cocoa Render API view and private Unix IPC. The existing authenticated Session, proxy, coordinator, file progress and capture APIs remain shared. GPU advanced control makes VideoToolbox screenshots work. Cocoa owns native traffic lights/fullscreen/geometry; the local controller exposes only read-only `windowChrome` in addition to existing bounded playback IPC. No new public HTTP endpoint, migration or library-config field.
+
+Build uses Xcode Command Line Tools and Node include/node (`CURATED_NODE_INCLUDE` override). Runtime uses Homebrew's standard libmpv paths or absolute `CURATED_NATIVE_LIBMPV`; restart after installation. Missing resources keep Web. Mac staging requires the adapter/player page but does not bundle Homebrew libraries. Native faults can affect the main process. See guide “macOS native playback” and `docs/plan/2026-10-09-macos-native-player.md` for tests and pending self-contained distribution. This supersedes earlier non-Windows/Web-only boundaries for new builds.
+
 ## Agent prompt cache reuse — 2026-10-07
 
 Chat uses stable base rules/history before current page system context and the latest user input. Actions send source data once in user messages; TXT assets remain embedded. Versions: agent-system-v8 / agent-actions-v2. Measured DeepSeek cache hit/miss counts produce `AI prompt cache usage` Info logs; unknown is distinct from zero. No new API, library configuration or database migration; cache statistics are not added to existing report columns. Rebuild/restart Server; real hit-rate and cost gains remain unmeasured. See guide “Agent prompt caching” and docs/plan/2026-10-07-agent-prompt-cache-optimization.md.

@@ -19,6 +19,8 @@
 
 # Curated
 
+macOS 新版源码已支持原生视频与 Curated 控件同窗播放，保留 Mac 窗口按钮与硬件解码。当前需要本机安装 libmpv，Mac 包尚未内置引擎；见[安装与使用说明](docs/guide.md#macos-native-playback)。
+
 日常 Desktop 测试先运行 `pnpm desktop:test:build` 构建一次，再用 `pnpm desktop:test` 启动。Electron 直接托管已编译页面，运行期间无需 Vite；见[测试运行说明](docs/guide.md#desktop-test-runs-with-prebuilt-pages)。
 
 Windows Desktop 已接入可选 mpv 原生窗口，复用现有播放入口、登录和圆形控件，支持逐文件进度、静态萃取帧、GIF 与播放诊断。生产流水线必须带固定引擎、完整离线对应源码和许可，并验证安装目录中的播放器。设置 → 播放开启本机原生偏好；见[使用与分发说明](docs/guide.md#windows-desktop-native-playback-integration)和[实施及验收记录](docs/plan/2026-10-05-windows-native-player-prototype.md)。安装/发布的实际状态和更多片源、DPI 等边界以记录为准。

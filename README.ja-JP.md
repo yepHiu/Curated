@@ -19,6 +19,8 @@
 
 # Curated
 
+macOS の新しいソースは、ローカルの libmpv による同一ウィンドウ再生、Mac のウィンドウ操作とハードウェアデコードに対応します。Mac パッケージにはまだエンジンを同梱していません。[設定と制限](docs/guide.md#macos-native-playback)をご覧ください。
+
 Desktop テストは `pnpm desktop:test:build` で一度ビルドし、`pnpm desktop:test` で起動します。Electron がビルド済みページを配信するため、実行中に Vite は不要です。[実行ガイド](docs/guide.md#desktop-test-runs-with-prebuilt-pages)を参照してください。
 
 Windows Desktop は任意の mpv 再生ウィンドウに対応し、既存の再生入口・認証・丸型操作 UI、ファイル別進捗、静止画/GIF と再生情報を共有します。Windows 本番ビルドには固定エンジン、完全なオフライン対応ソースとライセンスが必須で、インストール先の再生を検証します。設定の再生ページで有効にできます。[使用・配布ガイド](docs/guide.md#windows-desktop-native-playback-integration)と[実装・検証記録](docs/plan/2026-10-05-windows-native-player-prototype.md)に、インストール/公開の状態と残る検証範囲を記載しています。

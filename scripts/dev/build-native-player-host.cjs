@@ -2,6 +2,22 @@ const { spawnSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
 const root = path.resolve(__dirname, "..", "..")
+// Cocoa 适配层只使用稳定 Node-API；libmpv 在运行时从本机绝对路径加载。
+if (process.platform === "darwin") {
+  const output = process.argv[2] ? path.resolve(root, process.argv[2]) : path.join(root, ".workspace", "native-player-dist")
+  fs.mkdirSync(output, { recursive: true })
+  const headers = [process.env.CURATED_NODE_INCLUDE,
+    path.resolve(path.dirname(fs.realpathSync(process.execPath)), "../include/node"),
+    "/opt/homebrew/include/node", "/usr/local/include/node"].find(candidate => candidate && fs.existsSync(path.join(candidate, "node_api.h")))
+  if (!headers) throw new Error("MAC_NATIVE_NODE_HEADERS_MISSING: set CURATED_NODE_INCLUDE to the Node include/node directory")
+  const result = spawnSync("xcrun", ["clang++", "-std=c++17", "-O2", "-Wall", "-Wextra", "-Werror",
+    "-Wno-deprecated-declarations", "-mmacosx-version-min=12.0", "-fobjc-arc", "-bundle", "-undefined", "dynamic_lookup",
+    "-DNAPI_VERSION=8", "-I", headers, "-I", path.join(root, "electron/native/include"),
+    "-framework", "Cocoa", "-framework", "OpenGL",
+    path.join(root, "electron/native-player-macos.mm"), "-o", path.join(output, "native-player-macos.node"),
+  ], { cwd: root, stdio: "inherit" })
+  if (result.error || result.status !== 0) throw new Error("MAC_NATIVE_HOST_BUILD_FAILED: Xcode Command Line Tools are required")
+}
 // 非 Windows 不调用 Win32 编译器。正式入口可显式指定输出目录。
 if (process.platform === "win32") {
   const output = process.argv[2] ? path.resolve(root, process.argv[2]) : path.join(root, ".workspace", "native-player-dist")

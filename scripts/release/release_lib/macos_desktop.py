@@ -38,7 +38,8 @@ def stage_app(root: Path, app: Path, version: str, stamp: str) -> None:
     payload.mkdir()
     compiled = root / 'electron-dist'
     for required in ('launcher/index.html', 'launcher-preload.cjs', 'main.js', 'preload.cjs', 'connections.html', 'connections-preload.cjs',
-                     'connections-ui.js', 'connections.css', 'connections-tokens.css'):
+                     'connections-ui.js', 'connections.css', 'connections-tokens.css',
+                     'native-player-macos.node', 'playback-preload.cjs', 'player/index.html'):
         if not (compiled / required).is_file():
             raise FileNotFoundError(f'Missing Desktop build asset: {required}')
     shutil.copytree(compiled, payload / 'electron-dist', ignore=shutil.ignore_patterns('*.map'))

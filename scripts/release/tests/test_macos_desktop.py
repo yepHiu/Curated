@@ -30,7 +30,8 @@ class MacDesktopTests(unittest.TestCase):
         self.write(runtime + 'Electron.app/Contents/Resources/default_app.asar')
         self.write(runtime + 'LICENSE')
         self.write(runtime + 'LICENSES.chromium.html')
-        for name in ('launcher/index.html', 'launcher-preload.cjs', 'main.js', 'preload.cjs', 'connections.html', 'connections-preload.cjs', 'connections-ui.js', 'connections.css', 'connections-tokens.css'):
+        for name in ('launcher/index.html', 'launcher-preload.cjs', 'main.js', 'preload.cjs', 'connections.html', 'connections-preload.cjs', 'connections-ui.js', 'connections.css', 'connections-tokens.css',
+                     'native-player-macos.node', 'playback-preload.cjs', 'player/index.html'):
             self.write('electron-dist/' + name)
         self.write('electron-dist/main.js.map')
         self.write('electron-dist/desktop-release.json', b'{"distribution":"legacy"}')
@@ -54,6 +55,9 @@ class MacDesktopTests(unittest.TestCase):
         self.assertEqual(json.loads((self.root / 'electron-dist/desktop-release.json').read_text())['distribution'], 'legacy')
         self.assertEqual({p.name for p in payload.iterdir()}, {'package.json', 'electron-dist', 'public'})
         self.assertFalse((payload / 'electron-dist/main.js.map').exists())
+        self.assertTrue((payload / 'electron-dist/native-player-macos.node').is_file())
+        self.assertTrue((payload / 'electron-dist/player/index.html').is_file())
+        self.assertFalse((payload / 'native-player').exists())  # User-provided libmpv is not redistributed.
         self.assertFalse((app / 'Contents/Resources/default_app.asar').exists())
         # Windows does not preserve POSIX executable bits in this fixture.
         if os.name != 'nt':

@@ -55,6 +55,7 @@ export interface DesktopPlaybackClip {
   error?: "CLIP_FAILED" | "CLIP_TIMED_OUT" | "CLIP_STATUS_UNAVAILABLE" | "CLIP_CANCEL_FAILED"
 }
 export interface DesktopPlayerBridge extends Pick<DesktopPlaybackBridge, "snapshot" | "command" | "subscribe"> {
+  readonly windowChrome?: "macos" | "native"
   copyDiagnostics(sessionId: string): Promise<void>
   saveDiagnostics(sessionId: string): Promise<"saved" | "cancelled">
   capture(sessionId: string, retryId?: string): Promise<DesktopPlaybackCapture>

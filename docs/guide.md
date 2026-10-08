@@ -1,5 +1,24 @@
 # Curated Handbook
 
+## macOS native playback
+
+macOS Desktop 的新版源码支持原生视频与 Curated 控件同窗显示。暂停、跳转、倍速、音量、分片续播、截图/萃取入口共用现有播放业务；窗口保留 Mac 红黄绿按钮、顶部拖动区域、Retina 缩放和系统全屏。默认仍使用 Web，需要在设置 → 播放开启「优先使用桌面原生播放器」。
+
+本阶段使用用户本机的 libmpv。若已安装 Homebrew，可用 `brew install mpv` 安装；自动探测 Apple Silicon 的 `/opt/homebrew/opt/mpv/lib/libmpv.dylib` 与 Intel 的 `/usr/local/opt/mpv/lib/libmpv.dylib`。自定义安装可在启动 Desktop 的进程环境中设置绝对 `CURATED_NATIVE_LIBMPV`；显式路径无效时不会偷偷改用其它库。安装或更换库后完全退出并重启 Desktop。找不到引擎、适配层或本地页面时，设置开关不可用，继续 Web。
+
+开发构建需要 Xcode Command Line Tools（`xcode-select --install`）及当前 Node 安装的 `include/node` 头文件；非标准 Node 安装用 `CURATED_NODE_INCLUDE` 指定头文件目录。根目录执行 `pnpm dev:electron` 即编译 Cocoa 适配层和本地控件，再连接既有 Server。不需要 Windows 的 `native-player:prepare`，也不需要重新选择视频磁盘路径或再次输入 PIN。
+
+专项验证（合成媒体，独立临时 profile/HTTP fixture，不访问生产库）：
+
+```bash
+pnpm build:electron:main
+CURATED_NATIVE_MAC_TEST=1 CURATED_NATIVE_MPV=/opt/homebrew/bin/mpv NODE_OPTIONS=--no-experimental-webstorage pnpm test:electron
+```
+
+Intel 或自定义安装相应调整 CLI mpv 路径；ffmpeg 需在 PATH，或设置 `CURATED_NATIVE_FFMPEG`。Mac 专项验证覆盖当前认证 Session、Range、控制、原图截图、全屏、缩放、最小化恢复、分片切换、关闭保存与 socket 清理。未设置 `CURATED_NATIVE_MAC_TEST=1` 时，真实 Cocoa 集成测试明确跳过；Windows 窗口测试不会在 Mac 执行。
+
+Mac 包包含自有适配层和播放器页面，**尚未内置 libmpv**；Homebrew 库不会自动复制进包。本轮已在 Apple Silicon 本机验证，不代表 Intel、HDR、混合 DPI 多屏、整片音画同步或安装包升级已验收。libmpv 位于主进程，原生引擎崩溃可能影响整个 Desktop。无新增 Server API 或 library-config 字段。实现、验证与分发边界见 [macOS 适配记录](plan/2026-10-09-macos-native-player.md)。
+
 ## Desktop test runs with prebuilt pages
 
 日常测试 Desktop 使用已编译页面。先停止该分支的原生播放并完全退出测试 Desktop，再在当前测试分支根目录运行 `pnpm desktop:test:build`，一次构建 Web API 前端到 `.workspace/desktop-test-ui`，并构建 Electron 壳、连接页和本地播放器。随后 `pnpm desktop:test` 只读取这些产物；缺失产物会提示先构建。源码更新后同样先退出、重新构建再启动；Windows 无法覆盖正在运行的原生宿主 EXE。
