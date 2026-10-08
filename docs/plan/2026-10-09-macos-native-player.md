@@ -59,3 +59,14 @@ Mac 包现已自包含引擎，不需要用户本机 libmpv。尚未验收 Devel
 本机证据证明无需另装 MPV；不是完全干净物理机/所有系统与所有影片的保证。包目前仍是 ad-hoc 签名，未持有并执行 Apple Developer ID 签名/公证，互联网下载后可能被 Gatekeeper 拦截；这是达到新用户“下载即开”的剩余发布条件。未推送、未公开发布。
 
 来源资料包含固定主源码、补丁、构建资源与配方。libplacebo 的 header-only fast_float 版本依据原 bottle 构建日期的 Homebrew 配方追溯，原 SBOM 没有记录该构建依赖；具体依据与重构限制写入随包 MACOS-SOURCES/BUILDING。没有声称字节级复现原 Homebrew 编译环境。
+
+## Safe Storage 钥匙串提示 — 2026-10-09
+
+用户询问能否不显示 Safe Storage 密码弹窗。本轮只核实原因与可选方式，没有修改生产凭据保护、钥匙串权限或删除现有登录数据。
+
+- 本地验证包的 `codesign -d -r-` 显示 designated requirement 为 cdhash；临时签名构建身份会变化，可能触发旧钥匙串项目重新授权。没有读取用户钥匙串，因此不能把所有重复提示都归因于签名；钥匙串锁定、访问控制和用户此前选择也可能影响提示。
+- 正式发行推荐保持同一 Developer ID 签名身份、bundle ID 与稳定的钥匙串命名，以减少更新后的重新授权。签名不保证所有机器永远零弹窗，现有项目迁移或锁定状态仍可能要求一次授权；Apple 公证主要处理 Gatekeeper，不能代替钥匙串授权。
+- Chromium 提供 `--use-mock-keychain` 测试开关，当前锁定 Electron 二进制包含该开关。上游 keychain key provider 在该模式使用 FakeKeychain；它绕过真实钥匙串及其隔离保护，不应作为正式版默认。切换存储密钥还可能使旧 Cookie 无法解密并要求重新登录。若用于自动测试，应采用独立临时 profile；本轮未为用户配置启用，也未将其作为当前版本全链路无弹窗的验收结论。
+- 不建议通过允许所有应用访问钥匙串项目、关闭系统保护或删除钥匙串内容来消除提示。保留加密与稳定签名是面向新用户的发行方向。
+
+依据：[Electron safeStorage](https://github.com/electron/electron/blob/v42.0.1/docs/api/safe-storage.md)、[Chromium KeychainKeyProvider](https://github.com/chromium/chromium/blob/main/components/os_crypt/async/browser/keychain_key_provider.mm)。上游 main 仅用于机制解释，实际是否覆盖所有请求仍应在锁定版本、独立测试 profile 验证。
