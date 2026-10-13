@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "id": "20261014",
+  "tag": "release-20261014",
+  "serverBridge": false,
+  "modules": {
+    "server": {
+      "before": "1.7.11",
+      "after": "1.7.12",
+      "changed": true,
+      "baselineCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+      "paths": [
+        "scripts/dev/build-native-player-host.cjs",
+        "scripts/release/native-player/macos-arm64-production.json",
+        "scripts/release/prepare_macos_native.py",
+        "scripts/release/release_lib/macos_desktop.py",
+        "scripts/release/release_lib/macos_native.py",
+        "src/desktop-player/DesktopPlayer.vue"
+      ],
+      "inputDigest": "257989b37edc72bbb993bfc13133dbfeaba6b1ab01a72bef3ab8bd20e5a7228d",
+      "previousArtifacts": [
+        {
+          "component": "server",
+          "variant": "standalone",
+          "version": "1.7.11",
+          "channel": "stable",
+          "platform": "windows",
+          "arch": "x64",
+          "format": "exe",
+          "fileName": "Curated-Server-Setup-1.7.11-windows-x64.exe",
+          "sha256": "87d98a2a64e76899e85b457b4a81a7d52eb66c0ff10dc428ca996fe17f650ee2",
+          "sourceCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+          "url": "https://github.com/yepHiu/Curated/releases/download/release-20261008/Curated-Server-Setup-1.7.11-windows-x64.exe"
+        },
+        {
+          "component": "server",
+          "variant": "standalone",
+          "version": "1.7.11",
+          "channel": "stable",
+          "platform": "windows",
+          "arch": "x64",
+          "format": "zip",
+          "fileName": "Curated-Server-1.7.11-windows-x64.zip",
+          "sha256": "59d8f524a9fbad968664ddada670b4a71359369de19cb90891538dfd8bb4d2f8",
+          "sourceCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+          "url": "https://github.com/yepHiu/Curated/releases/download/release-20261008/Curated-Server-1.7.11-windows-x64.zip"
+        }
+      ]
+    },
+    "desktop": {
+      "before": "0.2.6",
+      "after": "0.2.7",
+      "changed": true,
+      "baselineCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+      "paths": [
+        "electron/fixtures/macos-native-playback.cjs",
+        "electron/native-mpv-player.ts",
+        "electron/native-player-macos.mm",
+        "electron/native-player-macos.ts",
+        "electron/native/include/mpv/client.h",
+        "electron/native/include/mpv/render.h",
+        "electron/native/include/mpv/render_gl.h",
+        "electron/playback-contract.ts",
+        "electron/playback-desktop.ts",
+        "electron/playback-preferences.ts",
+        "electron/playback-preload.cjs",
+        "electron/playback-resources.ts",
+        "scripts/dev/build-native-player-host.cjs",
+        "scripts/release/native-player/macos-arm64-production.json",
+        "scripts/release/prepare_macos_native.py",
+        "scripts/release/release_lib/macos_desktop.py",
+        "scripts/release/release_lib/macos_native.py",
+        "src/desktop-player/DesktopPlayer.vue"
+      ],
+      "inputDigest": "132d9e89c11798e5ed4987c4a6f7c906b1b77531237a35b91ffda43509e5ce08",
+      "previousArtifacts": [
+        {
+          "component": "desktop",
+          "variant": "standalone",
+          "version": "0.2.6",
+          "channel": "stable",
+          "platform": "windows",
+          "arch": "x64",
+          "format": "exe",
+          "fileName": "Curated-Desktop-Setup-0.2.6-windows-x64.exe",
+          "sha256": "ef29447b51d891a12f24c5ef4935e39c6519c408a2828a7026f9f00676fb07b0",
+          "sourceCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+          "url": "https://github.com/yepHiu/Curated/releases/download/release-20261008/Curated-Desktop-Setup-0.2.6-windows-x64.exe"
+        },
+        {
+          "component": "desktop",
+          "variant": "standalone",
+          "version": "0.2.6",
+          "channel": "stable",
+          "platform": "windows",
+          "arch": "x64",
+          "format": "zip",
+          "fileName": "Curated-Desktop-0.2.6-windows-x64.zip",
+          "sha256": "1ac218d19f121ebb45e9303b175c23ffbf510aa04e680e60371a65b29c4a61ab",
+          "sourceCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+          "url": "https://github.com/yepHiu/Curated/releases/download/release-20261008/Curated-Desktop-0.2.6-windows-x64.zip"
+        },
+        {
+          "fileName": "Curated-Desktop-0.2.6-macos-arm64.dmg",
+          "sha256": "ce7c37a111468156277968d398d31f66943bb36a517381b0145995ae318de5c1",
+          "component": "desktop",
+          "variant": "standalone",
+          "channel": "stable",
+          "version": "0.2.6",
+          "platform": "macos",
+          "arch": "arm64",
+          "format": "dmg",
+          "signing": "ad-hoc",
+          "notarized": false,
+          "sourceCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+          "url": "https://github.com/yepHiu/Curated/releases/download/release-20261008/Curated-Desktop-0.2.6-macos-arm64.dmg"
+        },
+        {
+          "fileName": "Curated-Desktop-0.2.6-macos-arm64.zip",
+          "sha256": "245703623c14d27af0cef3bb30aa07581a496a670c066119e40fc731d866b20d",
+          "component": "desktop",
+          "variant": "standalone",
+          "channel": "stable",
+          "version": "0.2.6",
+          "platform": "macos",
+          "arch": "arm64",
+          "format": "zip",
+          "signing": "ad-hoc",
+          "notarized": false,
+          "sourceCommit": "2073c24a05637a208dd2bb2bffba36cf067d5ebc",
+          "url": "https://github.com/yepHiu/Curated/releases/download/release-20261008/Curated-Desktop-0.2.6-macos-arm64.zip"
+        }
+      ]
+    }
+  },
+  "desktopNativeSources": true
+}
