@@ -8,9 +8,33 @@ const mocks = vi.hoisted(() => ({ capture: vi.fn(), save: vi.fn(), export: vi.fn
 vi.mock('@/lib/curated-frames/save-capture', () => ({ captureCuratedFrameCandidate: mocks.capture, saveCuratedFrameCandidate: mocks.save, exportCuratedFrameCandidate: mocks.export }))
 vi.mock('@/lib/curated-frames/db', () => ({ deleteCuratedFrame: vi.fn() }))
 vi.mock('@/i18n', () => ({ i18n: { global: { t: (key: string) => key } } }))
-afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks() })
+afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); vi.unstubAllGlobals() })
 
 describe('capture queue', () => {
+  it('prepares and saves screenshots and source frames on LAN HTTP without randomUUID', async () => {
+    const source = globalThis.crypto
+    vi.stubGlobal('crypto', { getRandomValues: source.getRandomValues.bind(source) })
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:test'), revokeObjectURL: vi.fn() })
+    const candidate = { id: 'capture-http', blob: new Blob(['png']), positionSec: 12, capturedAt: 'now' }
+    mocks.capture.mockResolvedValue({ ok: true, candidate })
+    mocks.save.mockResolvedValue({ ok: true, id: candidate.id, positionSec: 12 })
+    mocks.export.mockResolvedValue(undefined)
+    let queue!: ReturnType<typeof useCuratedCaptureQueue>
+    const wrapper = mount(defineComponent({ setup() { queue = useCuratedCaptureQueue(); return () => null } }))
+    try {
+      const movie = { id: 'movie-http', actors: [] } as unknown as Movie
+      const video = { videoWidth: 1920, videoHeight: 1080 } as HTMLVideoElement
+      const screenshot = queue.prepare(video, movie, 12)!
+      const frame = queue.prepareSource(movie, 13, async () => candidate.blob)!
+      expect(screenshot.key).not.toBe(frame.key)
+      await expect(queue.submit(screenshot)).resolves.toMatchObject({ ok: true })
+      await expect(queue.submit(frame)).resolves.toMatchObject({ ok: true })
+      expect(mocks.save.mock.calls[1]?.[0]).toMatchObject({ id: frame.key, positionSec: 13 })
+      expect(screenshot.committed).toBe(true)
+      expect(frame.committed).toBe(true)
+    } finally { wrapper.unmount() }
+  })
+
   it('serializes writes, freezes movie data, and retries the same candidate', async () => {
     vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:test'), revokeObjectURL: vi.fn() })
     let queue!: ReturnType<typeof useCuratedCaptureQueue>

@@ -6,6 +6,7 @@ import { getStoredDirectoryHandle, putCuratedFrame } from "@/lib/curated-frames/
 import { triggerDownloadBlob, writeBlobToDirectory } from "@/lib/curated-frames/export-file"
 import { bumpCuratedFramesRevision } from "@/lib/curated-frames/revision"
 import { getCuratedFrameSaveMode } from "@/lib/curated-frames/settings-storage"
+import { randomUuid } from "@/lib/random-uuid"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 
@@ -49,7 +50,7 @@ export async function captureCuratedFrameCandidate(
   return {
     ok: true,
     candidate: {
-      id: crypto.randomUUID(),
+      id: randomUuid(),
       blob: cap.blob,
       positionSec,
       capturedAt,

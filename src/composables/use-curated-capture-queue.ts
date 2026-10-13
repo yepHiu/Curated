@@ -4,6 +4,7 @@ import { captureCuratedFrameCandidate, exportCuratedFrameCandidate, saveCuratedF
 import { i18n } from '@/i18n'
 import { triggerDownloadBlob } from '@/lib/curated-frames/export-file'
 import { formatFrameFilename } from '@/lib/curated-frames/capture'
+import { randomUuid } from '@/lib/random-uuid'
 
 export interface CaptureJob {
   key: string
@@ -56,7 +57,7 @@ export function useCuratedCaptureQueue() {
     const bytes = video.videoWidth * video.videoHeight * 4
     if (disposed || jobs.value.length >= 4 || jobs.value.reduce((n, j) => n + j.bytes, 0) + bytes > 128 * 1024 * 1024) return
     const job = shallowReactive<CaptureJob>({
-      key: crypto.randomUUID(), movie: { ...movie, actors: [...movie.actors] }, positionSec,
+      key: randomUuid(), movie: { ...movie, actors: [...movie.actors] }, positionSec,
       phase: 'capturing', preview: '', error: '', bytes, committed: false, exporting: false, capture: Promise.resolve(),
     })
     jobs.value.push(job)
@@ -113,7 +114,7 @@ export function useCuratedCaptureQueue() {
     for (const old of [...jobs.value]) if (old.phase === 'saved' && !old.exporting) dismiss(old)
     const bytes = 32 * 1024 * 1024
     if (disposed || jobs.value.length >= 4 || jobs.value.reduce((n,j) => n + j.bytes,0) + bytes > 128 * 1024 * 1024) return
-    const job = shallowReactive<CaptureJob>({ key:crypto.randomUUID(), movie:{...movie, actors:[...movie.actors]}, positionSec, phase:'capturing',preview:'',error:'',bytes,committed:false,exporting:false,capture:Promise.resolve() })
+    const job = shallowReactive<CaptureJob>({ key:randomUuid(), movie:{...movie, actors:[...movie.actors]}, positionSec, phase:'capturing',preview:'',error:'',bytes,committed:false,exporting:false,capture:Promise.resolve() })
     jobs.value.push(job)
     job.capture = load().then(blob => {
       if (disposed || !jobs.value.includes(job)) return

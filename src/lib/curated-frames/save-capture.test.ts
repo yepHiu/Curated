@@ -21,17 +21,21 @@ describe("saveCuratedCaptureFromVideo", () => {
     vi.resetModules()
     vi.restoreAllMocks()
     vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
   })
 
-  it("does not block local capture when a nearby curated frame already exists", async () => {
-    vi.stubEnv("VITE_USE_WEB_API", "false")
+  it.each(["false", "true"])("captures and saves without randomUUID (Web API %s), including nearby frames", async (webApi) => {
+    const source = globalThis.crypto
+    vi.stubGlobal("crypto", { getRandomValues: source.getRandomValues.bind(source) })
+    vi.stubEnv("VITE_USE_WEB_API", webApi)
     const blob = new Blob(["png"], { type: "image/png" })
     const findNearbyCuratedFrame = vi.fn().mockResolvedValue({ id: "near-frame" })
     const putCuratedFrame = vi.fn().mockResolvedValue(undefined)
+    const createCuratedFrameUpload = vi.fn().mockResolvedValue(undefined)
 
     vi.doMock("@/api/endpoints", () => ({
       api: {
-        createCuratedFrameUpload: vi.fn(),
+        createCuratedFrameUpload,
       },
     }))
     vi.doMock("@/i18n", () => ({
@@ -68,7 +72,14 @@ describe("saveCuratedCaptureFromVideo", () => {
     )
 
     expect(result).toMatchObject({ ok: true, id: expect.any(String) })
+    if (result.ok) expect(result.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(findNearbyCuratedFrame).not.toHaveBeenCalled()
-    expect(putCuratedFrame).toHaveBeenCalled()
+    if (webApi === "true") {
+      expect(createCuratedFrameUpload).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: result.ok ? result.id : "", movieId: "movie-1", positionSec: 42 }), blob)
+      expect(putCuratedFrame).not.toHaveBeenCalled()
+    } else {
+      expect(putCuratedFrame).toHaveBeenCalled()
+      expect(createCuratedFrameUpload).not.toHaveBeenCalled()
+    }
   })
 })
