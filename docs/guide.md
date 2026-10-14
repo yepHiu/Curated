@@ -664,6 +664,7 @@ Use this table as the citation hub. Dated `docs/plan/*.md` files are working pap
 | [Project overview dashboard](../project-overview-dashboard.html) | Static snapshot of current delivery, active requirements, Git branches, and worktrees |
 | [PRD workflow](prd/README.md) | How to add or update requirements |
 | [Plan status rules](plan/README.md) | How to read `docs/plan/` |
+| [Offline transcoding tool — proposed](plan/2026-10-05-offline-video-transcoding-tool.md) | Confirmed SSD work-only storage with copies published into a separate library directory, source retention, and proposed per-file renditions/detail hints; no runtime implementation yet |
 | [Compliance and Film/TV separation research — paused](plan/2026-07-18-curated-compliance-and-metadata-source-decoupling.md#当前决定本仓库暂缓2026-10-04) | Paused here by the October 4 decision: compliance work now belongs to a separate project; earlier proposals remain historical reference, with no runtime changes |
 | [Multipart movies and dedicated FC2 browsing](plan/2026-10-04-multipart-movies-and-fc2-library.md) | Locally verified support for same-code video parts, separate Movies/FC2 browsing and shared Watch History; storage and tags remain shared |
 | [FC2 metadata reliability](plan/2026-10-06-fc2-metadata-reliability.md) | Dedicated sources, bounded field enrichment, access errors and image provenance; live FC2-3977618 metadata and cover verification |
