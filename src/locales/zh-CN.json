@@ -1,5 +1,8 @@
 {
   "desktopPlayback": {
+  "choosePlayer": "选择播放方式",
+  "nativePlayer": "原生播放器",
+  "webPlayer": "Web 播放器",
   "title": "Desktop 播放器",
   "saveFailed": "无法保存 Desktop 播放设置。",
   "localPreference": "试用 · 仅影响此 Desktop，使用当前登录会话。",

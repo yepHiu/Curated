@@ -88,6 +88,13 @@ vi.mock("@/components/jav-library/MediaStill.vue", () => ({
 }))
 
 describe("DetailPage", () => {
+  it("forwards the selected file and player from the detail panel", async () => {
+    const wrapper = mount(DetailPage, { props: { movie: makeMovie(), relatedMovies: [] } })
+    wrapper.getComponent({ name: "DetailPanel" }).vm.$emit("openPlayer", "movie-1", "part-2", "native")
+    expect(wrapper.emitted("openPlayer")).toEqual([["movie-1", "part-2", "native"]])
+    wrapper.unmount()
+  })
+
   it("reuses the gallery but never mounts movie comments for metadata-only entries", () => {
     const wrapper = mount(DetailPage, {
       props: { movie: makeMovie(), relatedMovies: [], readOnly: true },

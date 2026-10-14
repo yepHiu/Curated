@@ -72,6 +72,7 @@ vi.mock("vue-router", () => ({
   useRoute: () => routeState,
   useRouter: () => ({
     push: routerPushMock,
+    resolve: (target: unknown) => target,
     replace: routerReplaceMock,
   }),
 }))
@@ -81,6 +82,7 @@ vi.mock("@/components/jav-library/DetailPage.vue", () => ({
     name: "DetailPage",
     props: ["movie"],
     emits: [
+      "openPlayer",
       "toggleFavorite",
       "updateUserRating",
       "browseByActor",
@@ -176,6 +178,21 @@ describe("DetailView", () => {
     pushAppToastLoadingMock.mockReturnValue("loading-toast-1")
     routerPushMock.mockReset()
     routerReplaceMock.mockReset()
+  })
+
+  it("carries an explicit player choice with the part and browse context", async () => {
+    const wrapper = mount(DetailView)
+    await flushPromises()
+    wrapper.getComponent({ name: "DetailPage" }).vm.$emit("openPlayer", "movie-1", "part-2", "web")
+    await flushPromises()
+    expect(routerPushMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      name: "player", params: { id: "movie-1" },
+      query: expect.objectContaining({ engine: "web", fileId: "part-2", browse: "favorites", q: "star", autoplay: "1", back: "detail" }),
+    }))
+    wrapper.getComponent({ name: "DetailPage" }).vm.$emit("openPlayer", "movie-1", "part-2")
+    await flushPromises()
+    expect(routerPushMock.mock.lastCall?.[0].query.engine).toBeUndefined()
+    wrapper.unmount()
   })
 
   it("loads the detail movie and renders the detail page", async () => {

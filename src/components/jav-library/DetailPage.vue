@@ -44,7 +44,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   openDetails: [movieId: string]
-  openPlayer: [movieId: string, fileId?: string]
+  openPlayer: [movieId: string, fileId?: string, engine?: "native" | "web"]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
   updateUserRating: [payload: { movieId: string; value: number | null }]
   updateUserTags: [payload: { movieId: string; tags: string[] }]
@@ -185,7 +185,7 @@ function openPosterInViewer() {
       :show-actions="!props.readOnly"
       :user-tag-suggestions="props.userTagSuggestions"
       :metadata-refresh-busy="props.metadataRefreshBusy"
-      @open-player="(id, fileId) => emit('openPlayer', id, fileId)"
+      @open-player="(id, fileId, engine) => emit('openPlayer', id, fileId, engine)"
       @update-user-rating="emit('updateUserRating', $event)"
       @update-user-tags="emit('updateUserTags', $event)"
       @browse-by-tag="emit('browseByTag', $event)"

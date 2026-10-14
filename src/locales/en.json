@@ -1,5 +1,8 @@
 {
   "desktopPlayback": {
+  "choosePlayer": "Choose player",
+  "nativePlayer": "Native player",
+  "webPlayer": "Web player",
   "title": "Desktop player",
   "saveFailed": "Unable to save Desktop playback settings.",
   "localPreference": "Preview · Applies to this Desktop, using the current login session.",

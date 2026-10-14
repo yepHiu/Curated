@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import MoviePartSelect from "@/components/jav-library/MoviePartSelect.vue"
-import { computed, ref, watch } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import {
   AlertTriangle,
+  ChevronDown,
   FolderOpen,
   Languages,
   Loader2,
@@ -51,6 +52,7 @@ import { AIServiceError } from "@/services/contracts/ai-service"
 import { getMovieImageVersion } from "@/lib/image-version"
 import { sourcePageLink } from "@/lib/source-page-link"
 import DetailTagAddControl from "./DetailTagAddControl.vue"
+import { cn } from "@/lib/utils"
 
 const { t, locale } = useI18n()
 
@@ -143,6 +145,12 @@ async function translateField(field: "title" | "summary") {
 }
 
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
+const desktopPlaybackAvailable = ref(false)
+onMounted(async () => {
+  if (!useWebApi) return
+  const capability = await window.javLibrary?.playback?.capabilities().catch(() => undefined)
+  desktopPlaybackAvailable.value = capability?.protocol === 1 && capability.available
+})
 const canRevealInFileManager = computed(
   () => useWebApi && Boolean(props.movie.location?.trim()) && !isTrashed.value,
 )
@@ -157,7 +165,7 @@ const javdbSearchUrl = computed(
 
 const movieEditOpen = ref(false)
 const emit = defineEmits<{
-  openPlayer: [movieId: string, fileId?: string]
+  openPlayer: [movieId: string, fileId?: string, engine?: "native" | "web"]
   /** 用户评分：null 表示清除本地评分，恢复为站点评分 */
   updateUserRating: [payload: { movieId: string; value: number | null }]
   /** 整表替换用户标签（与元数据 tags 独立） */
@@ -750,10 +758,32 @@ watch(
 
         <div v-if="props.showActions && !props.readOnly" class="flex flex-wrap items-center gap-3">
           <MoviePartSelect v-if="(movie.files?.length ?? 0) > 1" v-model="selectedPartId" :files="movie.files!" wrap-file-name />
-          <Button class="rounded-full px-8" @click="emit('openPlayer', movie.id, selectedPartId)">
-            <PlayCircle data-icon="inline-start" />
-            {{ t("detailPanel.play") }}
-          </Button>
+          <div class="inline-flex items-center" role="group" :aria-label="t('detailPanel.play')">
+            <Button
+              :class="cn('rounded-full px-8', desktopPlaybackAvailable && 'rounded-r-none')"
+              @click="emit('openPlayer', movie.id, selectedPartId)"
+            >
+              <PlayCircle data-icon="inline-start" />
+              {{ t("detailPanel.play") }}
+            </Button>
+            <DropdownMenu v-if="desktopPlaybackAvailable">
+              <DropdownMenuTrigger as-child>
+                <Button size="icon" class="rounded-l-none rounded-r-full border-l border-primary-foreground/20" :aria-label="t('desktopPlayback.choosePlayer')">
+                  <ChevronDown aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuGroup>
+                  <DropdownMenuItem @select="emit('openPlayer', movie.id, selectedPartId, 'native')">
+                    {{ t("desktopPlayback.nativePlayer") }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @select="emit('openPlayer', movie.id, selectedPartId, 'web')">
+                    {{ t("desktopPlayback.webPlayer") }}
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
     </CardContent>

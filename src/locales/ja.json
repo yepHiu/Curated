@@ -1,5 +1,8 @@
 {
   "desktopPlayback": {
+  "choosePlayer": "再生方法を選択",
+  "nativePlayer": "ネイティブプレイヤー",
+  "webPlayer": "Web プレイヤー",
   "title": "Desktop プレイヤー",
   "saveFailed": "Desktop の再生設定を保存できません。",
   "localPreference": "試用 · この Desktop のみに適用し、現在のログインを使用します。",

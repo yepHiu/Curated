@@ -56,6 +56,21 @@ describe("Desktop playback routing", () => {
     expect(open).not.toHaveBeenCalled()
     expect(libraryModuleLoaded).not.toHaveBeenCalled()
   })
+  it("honors explicit engine choices without changing the default preference", async () => {
+    const open = vi.fn().mockResolvedValue({ sessionId: "s", revision: 1, windowOpen: false })
+    const command = vi.fn()
+    const preferences = { preferNative: false }
+    window.javLibrary = { playback: { open, command, capabilities: async () => ({ protocol: 1, available: true, preferences }) } as unknown as DesktopPlaybackBridge }
+    const { desktopPlaybackService: service } = await import("./desktop-playback-service")
+    expect(await service.intercept(router.resolve("/player/a?engine=native&fileId=p2&t=42&autoplay=1"), router.resolve("/library"))).toBe("/library")
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ fileId: "p2", startSec: 42, autoplay: true }))
+    expect(preferences.preferNative).toBe(false)
+    preferences.preferNative = true
+    open.mockClear()
+    expect(await service.intercept(router.resolve("/player/a?engine=web"), router.resolve("/library"))).toBe(true)
+    expect(open).not.toHaveBeenCalled()
+    expect(preferences.preferNative).toBe(true)
+  })
   it("falls back once on ordinary engine failure and sends auth failure to unlock", async () => {
     const open = vi.fn().mockRejectedValue(new Error("MPV_START_FAILED"))
     window.javLibrary = { playback: { open, capabilities: async () => ({ protocol: 1, available: true, preferences: { preferNative: true } }) } as unknown as NonNullable<Window["javLibrary"]>["playback"] }

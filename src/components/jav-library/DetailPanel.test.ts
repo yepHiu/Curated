@@ -160,6 +160,29 @@ describe("DetailPanel", () => {
     { id: "part-2", partIndex: 2, fileName: "CODE-1-2.mp4", location: "D:/Library/CODE-1-2.mp4" },
   ]
 
+  it("offers per-playback engine choices on capable Desktop and preserves the selected part", async () => {
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    window.javLibrary = { playback: { capabilities: async () => ({ protocol: 1, available: true }) } as unknown as NonNullable<Window["javLibrary"]>["playback"] }
+    const wrapper = mount(DetailPanel, { props: { movie: makeMovie({ files: multipartFiles }) } })
+    try {
+      await flushPromises()
+      expect(wrapper.find('[aria-label="desktopPlayback.choosePlayer"]').exists()).toBe(true)
+      wrapper.getComponent({ name: "MoviePartSelect" }).vm.$emit("update:modelValue", "part-2")
+      await flushPromises()
+      const choices = wrapper.findAllComponents({ name: "DropdownMenuItem" })
+      choices.find(item => item.text() === "desktopPlayback.webPlayer")!.vm.$emit("select")
+      choices.find(item => item.text() === "desktopPlayback.nativePlayer")!.vm.$emit("select")
+      await wrapper.findAll("button").find(button => button.text() === "detailPanel.play")!.trigger("click")
+      expect(wrapper.emitted("openPlayer")).toEqual([
+        ["movie-1", "part-2", "web"], ["movie-1", "part-2", "native"], ["movie-1", "part-2"],
+      ])
+    } finally {
+      wrapper.unmount()
+      delete window.javLibrary
+      vi.unstubAllEnvs()
+    }
+  })
+
   it("selects and plays part one on entering details even when another file was last played", async () => {
     // 未编号文件或后续分部排在前面，也应默认选择明确的第 1 部。
     const wrapper = mount(DetailPanel, {

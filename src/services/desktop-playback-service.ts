@@ -58,7 +58,7 @@ export const desktopPlaybackService = {
     const bridge = window.javLibrary?.playback
     if (to.name !== "player" || typeof to.params.id !== "string" || !bridge || import.meta.env.VITE_USE_WEB_API !== "true") return true
     const capability = await bridge.capabilities().catch(() => undefined)
-    if (capability?.protocol !== 1 || !capability.available || !capability.preferences.preferNative || to.query.engine === "web") {
+    if (capability?.protocol !== 1 || !capability.available || (!capability.preferences.preferNative && to.query.engine !== "native") || to.query.engine === "web") {
       const current = snapshot.value
       if (current?.windowOpen) await bridge.command(current.sessionId, { action: "stop" })
       return true
