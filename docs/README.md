@@ -20,6 +20,7 @@
 | **`prd/`** | 需求表与 PRD 材料（`requirements.csv`、消息政策台账 `message-catalog.csv`） |
 | **`release-notes/`** | 发版说明 |
 | **`features/`** | 已实现功能目录 |
+| **`demos/`** | 可随仓库提交的独立演示。密钥、音视频和转写成品仍留在 `.workspace/` |
 
 `docs/film-scanner/` 若存在，为**参考/实验**材料，不视为生产运行时代码树的一部分。
 
