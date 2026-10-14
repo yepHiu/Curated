@@ -18,6 +18,7 @@ import { nativePlaybackInfoMessages } from "@/lib/native-playback-info"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
 import { formatCuratedCaptureKeyLabel, shouldIgnoreGlobalPlaybackHotkeysForTarget } from "@/lib/player-shortcuts"
 import { useNativeFrameCapture } from "./use-native-frame-capture"
+import { useNativeVolume } from "./use-native-volume"
 import type { DesktopPlaybackCommand, DesktopPlaybackSnapshot } from "../../electron/playback-contract"
 import { nativeMessages, type NativeMessage } from "../native-player-prototype/messages"
 
@@ -64,8 +65,8 @@ const labels = computed(() => ({ play: t("resume"), pause: t("pause"), seekBack:
   volume: t("volume"), mute: t("mute"), unmute: t("unmute") }))
 let unsubscribe: (() => void) | undefined
 let clickTimer: ReturnType<typeof setTimeout> | undefined
-let volumeTimer: ReturnType<typeof setTimeout> | undefined
 let unmutedVolume = 100
+const nativeVolume = useNativeVolume(bridge, snapshot, receive, () => { error.value = t("failure") })
 function receive(next: DesktopPlaybackSnapshot) {
   if (snapshot.value && snapshot.value.revision > next.revision) return
   const previous = snapshot.value
@@ -112,20 +113,9 @@ async function seek(delta: number) {
   await command({ action: "seek", value: Math.max(0, Math.min(state.value?.durationSec ?? 0, (state.value?.positionSec ?? 0) + delta)) })
   immersive.showSeekFeedback(delta)
 }
-function volume(values?: number[]) {
-  const value = values?.[0]
-  if (value === undefined) return
-  clearTimeout(volumeTimer)
-  volumeTimer = setTimeout(() => {
-    const current = snapshot.value
-    if (!bridge || !current) return
-    // 尾端值必须入 main 的串行队列，不能因另一个 UI 动作 busy 而丢弃。
-    void bridge.command(current.sessionId, { action: "volume", value }).then(async () => receive(await bridge.snapshot()))
-      .catch(() => { error.value = t("failure") })
-  }, 120)
-}
 async function mute() {
-  const value = state.value?.volume ?? 100
+  const value = nativeVolume.percent.value
+  nativeVolume.cancel()
   if (value > 0) unmutedVolume = value
   await command({ action: "volume", value: value > 0 ? 0 : unmutedVolume })
 }
@@ -185,7 +175,7 @@ onMounted(async () => {
   window.addEventListener("focus", capture.preferences)
 })
 onBeforeUnmount(() => {
-  unsubscribe?.(); clearTimeout(clickTimer); clearTimeout(volumeTimer)
+  unsubscribe?.(); clearTimeout(clickTimer)
   immersive.dispose()
   window.removeEventListener("keydown", keydown)
   window.removeEventListener("keyup", keyup)
@@ -229,7 +219,7 @@ onBeforeUnmount(() => {
       <div class="flex items-center justify-between gap-3 text-sm text-white/80 tabular-nums"><span>{{ time(draft ?? state?.positionSec ?? 0) }} / {{ time(state?.durationSec ?? 0) }}</span><span class="max-w-[55%] truncate">{{ currentFile?.fileName }}</span></div>
       <div ref="playbackControls" class="flex flex-col gap-3">
         <Slider :model-value="[draft ?? state?.positionSec ?? 0]" :max="Math.max(1, state?.durationSec ?? 0)" :step="0.1" :disabled="!active || busy" :aria-label="t('time')" @update:model-value="draft = $event?.[0]" @value-commit="command({ action: 'seek', value: $event?.[0] }); draft = undefined" />
-        <PlayerTransportControls :playing="playing" :disabled="!active || busy" :volume-values="[state?.volume ?? 100]" :volume-percent="state?.volume ?? 100" :muted="state?.volume === 0" :labels="labels" @toggle="toggle" @seek-back="seek(-10)" @seek-forward="seek(10)" @mute="mute" @volume="volume">
+        <PlayerTransportControls follow-volume-pointer :playing="playing" :disabled="!active || busy" :volume-values="[nativeVolume.percent.value]" :volume-percent="nativeVolume.percent.value" :muted="nativeVolume.percent.value === 0" :labels="labels" @toggle="toggle" @seek-back="seek(-10)" @seek-forward="seek(10)" @mute="mute" @volume="nativeVolume.update">
         <Button variant="ghost" size="icon" class="rounded-full" :disabled="!capture.available.value || busy" :aria-label="captureLabel" :title="captureLabel" @pointerdown="startCapture" @pointerup="capture.finishPress" @pointercancel="capture.cancelPress" @click="captureClick"><Loader2 v-if="capture.busy.value" class="animate-spin motion-reduce:animate-none" /><Camera v-else /></Button>
         <Button variant="ghost" size="icon" class="rounded-full" :disabled="((!playing || !capture.available.value) && !capture.recording.value) || busy" :aria-label="capture.recording.value ? uiT('curated.stopClip') : 'GIF'" :title="capture.recording.value ? uiT('curated.stopClip') : 'GIF'" :aria-pressed="capture.recording.value" @click="toggleGif"><Film /></Button>
         <Button variant="ghost" size="icon" class="rounded-full" :disabled="queueIndex <= 0 || busy" :aria-label="extra.previous" @click="command({ action: 'movie', movieId: snapshot!.queue[queueIndex - 1]! })"><SkipBack /></Button>
