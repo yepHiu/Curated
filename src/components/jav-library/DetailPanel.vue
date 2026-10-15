@@ -760,7 +760,7 @@ watch(
         </div>
 
         <div v-if="props.showActions && !props.readOnly" class="flex flex-wrap items-center gap-3">
-          <MoviePartSelect v-if="(movie.files?.length ?? 0) > 1" v-model="selectedPartId" :files="movie.files!" wrap-file-name />
+          <MoviePartSelect v-if="(movie.files?.length ?? 0) > 1" v-model="selectedPartId" :files="movie.files!" />
           <div class="inline-flex items-center" role="group" :aria-label="t('detailPanel.play')">
             <Button
               :class="cn('rounded-full px-8', desktopPlaybackAvailable && 'rounded-r-none')"
