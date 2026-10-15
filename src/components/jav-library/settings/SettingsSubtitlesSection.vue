@@ -61,35 +61,37 @@ async function save() {
     </CardHeader>
     <CardContent class="flex min-w-0 flex-col gap-3 pt-0">
       <Alert v-if="error" variant="destructive"><AlertDescription>{{ error }}</AlertDescription></Alert>
-      <section v-if="cfg" class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-        <FieldGroup class="gap-3">
-          <Field orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2" :data-disabled="!cfg.canManage || busy || undefined">
-            <SettingsHint :text="t('subtitles.cloudNotice')"><FieldLabel for="subtitle-enabled">{{ t('subtitles.enable') }}</FieldLabel></SettingsHint>
-            <Switch id="subtitle-enabled" v-model="cfg.enabled" :disabled="!cfg.canManage || busy" />
-          </Field>
-          <Field class="rounded-lg border border-border/40 bg-background/30 p-3" :data-disabled="!cfg.canManage || busy || undefined">
-            <FieldLabel>{{ t('subtitles.recognitionModel') }}</FieldLabel>
-            <p class="break-words text-sm text-muted-foreground">{{ t('subtitles.providerDescription') }}</p>
-          </Field>
-          <FieldGroup class="gap-3">
-            <Field class="rounded-lg border border-border/40 bg-background/30 p-3" :data-disabled="!cfg.canManage || busy || clearKey || undefined">
-              <SettingsHint :text="t('subtitles.keyHint')"><FieldLabel for="subtitle-key">{{ t('subtitles.apiKey') }}</FieldLabel></SettingsHint>
-              <div class="flex min-w-0 items-center gap-2">
-                <Input id="subtitle-key" :model-value="key || (keyVisible ? revealedKey : '')" :type="keyVisible ? 'text' : 'password'" autocomplete="new-password" :disabled="!cfg.canManage || busy || clearKey" :placeholder="cfg.apiKeyConfigured ? '••••••••••••••••' : t('subtitles.enterKey')" @update:model-value="editKey" />
-                <Button type="button" variant="ghost" size="icon" class="shrink-0 rounded-full" :disabled="!cfg.canManage || busy || clearKey" :aria-label="t(keyVisible ? 'subtitles.hideKey' : 'subtitles.showKey')" :aria-pressed="keyVisible" @click="toggleKey"><EyeOff v-if="keyVisible" aria-hidden="true" /><Eye v-else aria-hidden="true" /></Button>
-              </div>
-            </Field>
-            <Field class="rounded-lg border border-border/40 bg-background/30 p-3" :data-disabled="!cfg.canManage || busy || undefined">
-              <SettingsHint :text="t('subtitles.modelHint')"><FieldLabel for="subtitle-model">{{ t('subtitles.translationModel') }}</FieldLabel></SettingsHint>
-              <SubtitleModelSelect id="subtitle-model" v-model="cfg.translationModel" :configured-model="cfg.configuredModel" :disabled="!cfg.canManage || busy" />
-            </Field>
-          </FieldGroup>
-          <Field v-if="cfg.apiKeyConfigured" orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2" :data-disabled="!cfg.canManage || busy || undefined">
-            <FieldLabel for="subtitle-clear">{{ t('subtitles.clearKey') }}</FieldLabel>
-            <Switch id="subtitle-clear" v-model="clearKey" :disabled="!cfg.canManage || busy" />
-          </Field>
-        </FieldGroup>
-      </section>
+      <FieldGroup v-if="cfg" class="gap-3">
+        <Field orientation="horizontal" class="items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" :data-disabled="!cfg.canManage || busy || undefined">
+          <SettingsHint :text="t('subtitles.cloudNotice')"><FieldLabel for="subtitle-enabled" class="text-sm font-semibold text-foreground">{{ t('subtitles.enable') }}</FieldLabel></SettingsHint>
+          <Switch id="subtitle-enabled" v-model="cfg.enabled" :disabled="!cfg.canManage || busy" />
+        </Field>
+        <Field class="min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <FieldLabel class="min-w-0 flex-1 text-sm font-semibold text-foreground">{{ t('subtitles.recognitionModel') }}</FieldLabel>
+          <p class="min-w-0 text-sm text-muted-foreground sm:max-w-[60%] sm:text-right">{{ t('subtitles.providerDescription') }}</p>
+        </Field>
+        <Field class="min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4" :data-disabled="!cfg.canManage || busy || clearKey || undefined">
+          <div class="min-w-0 flex-1">
+            <SettingsHint :text="t('subtitles.keyHint')"><FieldLabel for="subtitle-key" class="text-sm font-semibold text-foreground">{{ t('subtitles.apiKey') }}</FieldLabel></SettingsHint>
+          </div>
+          <div class="flex w-full min-w-0 items-center gap-2 sm:w-80 sm:max-w-[60%] sm:shrink-0">
+            <Input id="subtitle-key" :model-value="key || (keyVisible ? revealedKey : '')" :type="keyVisible ? 'text' : 'password'" autocomplete="new-password" :disabled="!cfg.canManage || busy || clearKey" :placeholder="cfg.apiKeyConfigured ? '••••••••••••••••' : t('subtitles.enterKey')" @update:model-value="editKey" />
+            <Button type="button" variant="ghost" size="icon" class="shrink-0 rounded-full" :disabled="!cfg.canManage || busy || clearKey" :aria-label="t(keyVisible ? 'subtitles.hideKey' : 'subtitles.showKey')" :aria-pressed="keyVisible" @click="toggleKey"><EyeOff v-if="keyVisible" aria-hidden="true" /><Eye v-else aria-hidden="true" /></Button>
+          </div>
+        </Field>
+        <Field class="min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4" :data-disabled="!cfg.canManage || busy || undefined">
+          <div class="min-w-0 flex-1">
+            <SettingsHint :text="t('subtitles.modelHint')"><FieldLabel for="subtitle-model" class="text-sm font-semibold text-foreground">{{ t('subtitles.translationModel') }}</FieldLabel></SettingsHint>
+          </div>
+          <div class="w-full min-w-0 sm:w-80 sm:max-w-[60%] sm:shrink-0">
+            <SubtitleModelSelect id="subtitle-model" v-model="cfg.translationModel" :configured-model="cfg.configuredModel" :disabled="!cfg.canManage || busy" />
+          </div>
+        </Field>
+        <Field v-if="cfg.apiKeyConfigured" orientation="horizontal" class="items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" :data-disabled="!cfg.canManage || busy || undefined">
+          <FieldLabel for="subtitle-clear" class="text-sm font-semibold text-foreground">{{ t('subtitles.clearKey') }}</FieldLabel>
+          <Switch id="subtitle-clear" v-model="clearKey" :disabled="!cfg.canManage || busy" />
+        </Field>
+      </FieldGroup>
       <p v-if="cfg && !cfg.canManage" class="text-sm text-muted-foreground">{{ t('subtitles.localOnly') }}</p>
       <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0 flex-1 text-xs text-muted-foreground" role="status">
