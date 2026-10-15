@@ -292,7 +292,7 @@ function auditLine(entry: AIAuditEntry) {
               </FieldGroup>
             </FieldGroup>
           </section>
-          <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/40 bg-background/30 p-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex min-h-8 min-w-0 flex-1 flex-wrap items-center gap-2 text-xs" data-ai-policy-save-status>
               <p v-if="!validSettings" role="alert" class="text-destructive">{{ t('aiSettings.invalidLimits') }}</p>
               <template v-else-if="settingsAutosave.error.value">
@@ -301,7 +301,7 @@ function auditLine(entry: AIAuditEntry) {
               </template>
               <p v-else-if="settingsAutosave.saving.value || settingsAutosave.dirty.value || settingsAutosave.saved.value" role="status" class="text-muted-foreground">{{ settingsAutosave.saving.value || settingsAutosave.dirty.value ? t('common.saving') : t('settings.autoPersistSaved') }}</p>
             </div>
-            <Button variant="outline" size="sm" class="ml-auto" :disabled="busy" data-ai-cleanup @click="cleanup">{{ t('aiSettings.cleanup') }}</Button>
+            <Button variant="outline" size="sm" class="ml-auto rounded-full" :disabled="busy" data-ai-cleanup @click="cleanup">{{ t('aiSettings.cleanup') }}</Button>
           </div>
         </CardContent>
       </Card>
@@ -345,8 +345,8 @@ function auditLine(entry: AIAuditEntry) {
             </template>
             <p v-else-if="providerAutosave.saving.value || providerAutosave.dirty.value || providerAutosave.saved.value" role="status" class="text-muted-foreground">{{ providerAutosave.saving.value || providerAutosave.dirty.value ? t('common.saving') : t('settings.autoPersistSaved') }}</p>
           </div>
-          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end"><div class="flex shrink-0 flex-wrap justify-end gap-2"><SettingsHint :text="[t('aiSettings.providerHint'), t('aiSettings.autoSaveHint')].join('\n\n')">
-                  <Button variant="outline" size="sm" :disabled="busy" data-ai-provider-test @click="testProvider">{{ testingProvider ? t('settings.experimentalTestTesting') : t('settings.experimentalTest') }}</Button>
+          <div class="flex flex-col gap-3"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end"><div class="flex shrink-0 flex-wrap justify-end gap-2"><SettingsHint :text="[t('aiSettings.providerHint'), t('aiSettings.autoSaveHint')].join('\n\n')">
+                  <Button variant="outline" size="sm" class="rounded-full" :disabled="busy" data-ai-provider-test @click="testProvider">{{ testingProvider ? t('settings.experimentalTestTesting') : t('settings.experimentalTest') }}</Button>
                 </SettingsHint></div></div><p v-if="providerTestResult" :role="providerTestResult.ok ? 'status' : 'alert'" aria-live="polite" :class="['rounded-md border px-3 py-2 text-sm', providerTestResult.ok ? 'border-success/30 bg-success/10 text-success' : 'border-destructive/30 bg-destructive/10 text-destructive']" :data-status="providerTestResult.ok ? 'success' : 'failed'" data-ai-provider-test-result>{{ providerTestResult.text }}</p></div>
         </CardContent>
       </Card>
