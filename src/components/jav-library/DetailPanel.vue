@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SubtitleJobDialog from "./SubtitleJobDialog.vue"
 import MoviePartSelect from "@/components/jav-library/MoviePartSelect.vue"
 import { computed, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
@@ -287,6 +288,7 @@ function removeMetadataTag(tag: string) {
   })
 }
 /** 进入详情默认选择第一部，手动选择仅在当前作品内保留。 */
+const subtitleOpen = ref(false)
 const selectedPartId = ref<string>()
 watch(
   [
@@ -459,6 +461,7 @@ watch(
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" class="min-w-[11rem]">
               <DropdownMenuGroup>
+                <DropdownMenuItem data-ai-subtitles @select="subtitleOpen = true"><Languages />{{ t("subtitles.title") }}</DropdownMenuItem>
                 <DropdownMenuItem v-if="agentEnabled" data-ai-organize-movie :disabled="tagOrganization.busy.value || Boolean(tagOrganization.active.value)" @click="tagOrganization.openSelected([movie.id], movie.title)">
                   <Sparkles aria-hidden="true" />
                   {{ t("topics.action") }}
@@ -788,4 +791,5 @@ watch(
       </div>
     </CardContent>
   </Card>
+  <SubtitleJobDialog v-if="subtitleOpen" v-model:open="subtitleOpen" :movie="movie" :initial-file-id="selectedPartId" />
 </template>

@@ -217,6 +217,15 @@ function formatUploadDiagnosticContext(context?: UploadDiagnosticContext): strin
 }
 
 export const httpClient = {
+  async getText(path: string): Promise<string> {
+    const response = await monitoredFetch("GET", path, { headers: { Accept: "text/plain" } })
+    if (!response.ok) await handleErrorResponse(response)
+    const length = Number(response.headers.get("Content-Length"))
+    if (length > 16 * 1024 * 1024) throw new Error("Subtitle file exceeds size limit")
+    const text = await response.text()
+    if (text.length > 16 * 1024 * 1024) throw new Error("Subtitle file exceeds size limit")
+    return text
+  },
   async get<T>(path: string, params?: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<T> {
     const response = await monitoredFetch("GET", path, {
       headers: { "Accept": "application/json" },
