@@ -2163,7 +2163,7 @@
     "cleaned": "Removed {count} expired records",
     "saved": "Settings saved",
     "retry": "Reload",
-    "provider": "Model provider",
+    "provider": "Agent model settings",
     "providerHint": "Use an OpenAI-compatible service. The key is stored in local library configuration. Connection tests send a real request and may incur charges.",
     "statistics": "Usage, speed and failures",
     "mockHint": "Mock mode has no real model calls and does not invent usage statistics.",

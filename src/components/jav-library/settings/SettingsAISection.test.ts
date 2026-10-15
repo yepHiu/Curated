@@ -118,9 +118,14 @@ describe("SettingsAISection", () => {
     expect(wrapper.find("[data-ai-settings-block=audit]").exists()).toBe(true)
     wrapper.unmount()
   })
-  it("keeps limit fields wide enough for their labels at intermediate settings widths", async () => {
+  it("keeps governance and provider controls in separate responsive settings rows", async () => {
     const wrapper = await setup()
-    expect(wrapper.get("[data-ai-limit-fields]").classes()).toContain("grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))]")
+    for (const id of ["ai-privacy", "ai-rate", "ai-retention", "ai-base", "ai-key", "ai-model", "ai-context-window", "ai-context-preset"]) {
+      const row = wrapper.get(`#${id}`).element.closest('[data-slot="field"]')!
+      expect(row.classList.contains("sm:flex-row")).toBe(true)
+      expect(row.classList.contains("p-4")).toBe(true)
+      expect(row.querySelector(`label[for="${id}"]`)).not.toBeNull()
+    }
     wrapper.unmount()
   })
   it("loads five recent requests and ten audit records per page", async () => {

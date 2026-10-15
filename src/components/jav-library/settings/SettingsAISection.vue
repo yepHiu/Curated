@@ -259,36 +259,36 @@ function auditLine(entry: AIAuditEntry) {
           </CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
-          <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" data-ai-settings-block="policy">
+          <section class="flex min-w-0 flex-col gap-3" data-ai-settings-block="policy">
             <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.policy') }}</h3>
             <FieldGroup class="gap-3">
-              <Field orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2"><FieldLabel for="ai-enabled">{{ t('aiSettings.enabled') }}</FieldLabel><Switch id="ai-enabled" v-model="settings.enabled" :disabled="busy" data-ai-enabled /></Field>
-              <Field orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2"><SettingsHint :text="[t('aiSettings.confirmationHint'), t('aiSettings.autoSaveHint')].join('\n\n')">
+              <Field orientation="horizontal" class="min-w-0 justify-between rounded-lg border border-border/50 bg-muted/5 p-4"><FieldLabel for="ai-enabled">{{ t('aiSettings.enabled') }}</FieldLabel><Switch id="ai-enabled" v-model="settings.enabled" :disabled="busy" data-ai-enabled /></Field>
+              <Field orientation="horizontal" class="min-w-0 justify-between rounded-lg border border-border/50 bg-muted/5 p-4"><SettingsHint :text="[t('aiSettings.confirmationHint'), t('aiSettings.autoSaveHint')].join('\n\n')">
                   <FieldLabel for="ai-readonly">{{ t('aiSettings.readOnly') }}</FieldLabel>
                 </SettingsHint><Switch id="ai-readonly" v-model="settings.readOnly" :disabled="busy" data-ai-readonly /></Field>
             </FieldGroup>
           </section>
-          <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" data-ai-settings-block="limits">
+          <section class="flex min-w-0 flex-col gap-3" data-ai-settings-block="limits">
             <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.limits') }}</h3>
             <FieldGroup class="gap-3">
-              <Field><SettingsHint :text="t('aiSettings.privacyHint')">
+              <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><SettingsHint :text="t('aiSettings.privacyHint')">
                   <FieldLabel for="ai-privacy">{{ t('aiSettings.privacy') }}</FieldLabel>
                 </SettingsHint>
-                <Select v-model="settings.privacy" :disabled="busy"><SelectTrigger id="ai-privacy"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="auto">{{ t('aiSettings.privacyAuto') }}</SelectItem><SelectItem value="minimal">{{ t('aiSettings.privacyMinimal') }}</SelectItem></SelectGroup></SelectContent></Select>
+                <Select v-model="settings.privacy" :disabled="busy"><SelectTrigger id="ai-privacy" class="w-full min-w-0 sm:w-52 sm:shrink-0"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="auto">{{ t('aiSettings.privacyAuto') }}</SelectItem><SelectItem value="minimal">{{ t('aiSettings.privacyMinimal') }}</SelectItem></SelectGroup></SelectContent></Select>
               </Field>
-              <Field orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2">
+              <Field orientation="horizontal" class="min-w-0 justify-between rounded-lg border border-border/50 bg-muted/5 p-4">
                 <SettingsHint :text="t('aiSettings.stepLimitHint')">
                   <FieldLabel for="ai-step-limit-enabled">{{ t('aiSettings.stepLimitEnabled') }}</FieldLabel>
                 </SettingsHint>
                 <Switch id="ai-step-limit-enabled" v-model="stepLimitEnabled" :disabled="busy" aria-describedby="ai-step-limit-hint" />
               </Field>
               <span id="ai-step-limit-hint" class="sr-only">{{ t('aiSettings.stepLimitHint') }}</span>
-              <FieldGroup class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-3" data-ai-limit-fields>
-                <Field v-if="stepLimitEnabled" :data-invalid="!validSettings"><FieldLabel for="ai-steps">{{ t('aiSettings.stepLimit') }}</FieldLabel><Input id="ai-steps" v-model.number="settings.stepLimit" :aria-invalid="!Number.isInteger(settings.stepLimit) || settings.stepLimit < 1 || settings.stepLimit > 30" @blur="settingsAutosave.flush()" type="number" min="1" max="30" :disabled="busy" /></Field>
-                <Field><FieldLabel for="ai-rate">{{ t('aiSettings.writeLimit') }}</FieldLabel><Input id="ai-rate" v-model.number="settings.writePerMinute" :aria-invalid="!Number.isInteger(settings.writePerMinute) || settings.writePerMinute < 1 || settings.writePerMinute > 60" @blur="settingsAutosave.flush()" type="number" min="1" max="60" :disabled="busy" /></Field>
-                <Field><SettingsHint :text="t('aiSettings.retentionHint')">
+              <FieldGroup class="gap-3" data-ai-limit-fields>
+                <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4" v-if="stepLimitEnabled" :data-invalid="!validSettings"><FieldLabel for="ai-steps">{{ t('aiSettings.stepLimit') }}</FieldLabel><Input class="w-full min-w-0 sm:w-52 sm:shrink-0" id="ai-steps" v-model.number="settings.stepLimit" :aria-invalid="!Number.isInteger(settings.stepLimit) || settings.stepLimit < 1 || settings.stepLimit > 30" @blur="settingsAutosave.flush()" type="number" min="1" max="30" :disabled="busy" /></Field>
+                <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><FieldLabel for="ai-rate">{{ t('aiSettings.writeLimit') }}</FieldLabel><Input class="w-full min-w-0 sm:w-52 sm:shrink-0" id="ai-rate" v-model.number="settings.writePerMinute" :aria-invalid="!Number.isInteger(settings.writePerMinute) || settings.writePerMinute < 1 || settings.writePerMinute > 60" @blur="settingsAutosave.flush()" type="number" min="1" max="60" :disabled="busy" /></Field>
+                <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><SettingsHint :text="t('aiSettings.retentionHint')">
                   <FieldLabel for="ai-retention">{{ t('aiSettings.retention') }}</FieldLabel>
-                </SettingsHint><Input id="ai-retention" v-model.number="settings.retentionDays" :aria-invalid="!Number.isInteger(settings.retentionDays) || settings.retentionDays < 7 || settings.retentionDays > 365" @blur="settingsAutosave.flush()" type="number" min="7" max="365" :disabled="busy" /></Field>
+                </SettingsHint><Input class="w-full min-w-0 sm:w-52 sm:shrink-0" id="ai-retention" v-model.number="settings.retentionDays" :aria-invalid="!Number.isInteger(settings.retentionDays) || settings.retentionDays < 7 || settings.retentionDays > 365" @blur="settingsAutosave.flush()" type="number" min="7" max="365" :disabled="busy" /></Field>
               </FieldGroup>
             </FieldGroup>
           </section>
@@ -311,22 +311,22 @@ function auditLine(entry: AIAuditEntry) {
             <SettingsScopeBadge scope="server" />
           </CardTitle></CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
-          <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-            <FieldGroup class="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field class="md:col-span-2"><FieldLabel for="ai-base">{{ t('settings.experimentalBaseUrl') }}</FieldLabel><Input id="ai-base" v-model="baseUrl" @blur="providerAutosave.flush()" autocomplete="off" :disabled="busy" /></Field>
-              <Field><FieldLabel for="ai-key">{{ t('settings.experimentalApiKey') }}</FieldLabel><Input id="ai-key" v-model="apiKey" @blur="providerAutosave.flush()" type="password" autocomplete="new-password" :disabled="busy" /></Field>
-              <Field><FieldLabel for="ai-model">{{ t('settings.experimentalModel') }}</FieldLabel><Input id="ai-model" v-model="model" @blur="providerAutosave.flush()" autocomplete="off" :disabled="busy" /></Field>
-              <Field :data-invalid="!validContext || undefined">
+          <section class="flex min-w-0 flex-col gap-3">
+            <FieldGroup class="gap-3">
+              <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><FieldLabel for="ai-base">{{ t('settings.experimentalBaseUrl') }}</FieldLabel><Input class="w-full min-w-0 sm:w-72 sm:shrink-0" id="ai-base" v-model="baseUrl" @blur="providerAutosave.flush()" autocomplete="off" :disabled="busy" /></Field>
+              <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><FieldLabel for="ai-key">{{ t('settings.experimentalApiKey') }}</FieldLabel><Input class="w-full min-w-0 sm:w-72 sm:shrink-0" id="ai-key" v-model="apiKey" @blur="providerAutosave.flush()" type="password" autocomplete="new-password" :disabled="busy" /></Field>
+              <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><FieldLabel for="ai-model">{{ t('settings.experimentalModel') }}</FieldLabel><Input class="w-full min-w-0 sm:w-72 sm:shrink-0" id="ai-model" v-model="model" @blur="providerAutosave.flush()" autocomplete="off" :disabled="busy" /></Field>
+              <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4" :data-invalid="!validContext || undefined">
                 <SettingsHint :text="t('aiSettings.contextHint')">
                   <FieldLabel for="ai-context-window">{{ t('aiSettings.contextWindow') }}</FieldLabel>
                   <template #extra><a v-if="selectedContextPreset" :href="selectedContextPreset.source" target="_blank" rel="noopener noreferrer" class="underline underline-offset-4">{{ t('aiSettings.contextSource') }}</a></template>
                 </SettingsHint>
-                <Input id="ai-context-window" v-model="contextWindow" type="number" inputmode="numeric" :min="MIN_AI_CONTEXT_WINDOW" :max="MAX_AI_CONTEXT_WINDOW" :step="1" :disabled="busy" :aria-invalid="!validContext" :aria-describedby="validContext ? 'ai-context-help' : 'ai-context-help ai-context-validation'" @blur="providerAutosave.flush()" />
+                <Input class="w-full min-w-0 sm:w-72 sm:shrink-0" id="ai-context-window" v-model="contextWindow" type="number" inputmode="numeric" :min="MIN_AI_CONTEXT_WINDOW" :max="MAX_AI_CONTEXT_WINDOW" :step="1" :disabled="busy" :aria-invalid="!validContext" :aria-describedby="validContext ? 'ai-context-help' : 'ai-context-help ai-context-validation'" @blur="providerAutosave.flush()" />
               </Field>
-              <Field>
+              <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <FieldLabel for="ai-context-preset">{{ t('aiSettings.contextPreset') }}</FieldLabel>
                 <Select :model-value="contextPreset" :disabled="busy" @update:model-value="applyContextPreset">
-                  <SelectTrigger id="ai-context-preset"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="ai-context-preset" class="w-full min-w-0 sm:w-72 sm:shrink-0"><SelectValue /></SelectTrigger>
                   <SelectContent><SelectGroup>
                     <SelectItem value="custom">{{ t('aiSettings.contextCustom') }}</SelectItem>
                     <SelectItem v-for="preset in AI_CONTEXT_PRESETS" :key="preset.id" :value="preset.id">{{ preset.label }} · {{ preset.tokens.toLocaleString(locale) }}</SelectItem>
@@ -334,7 +334,7 @@ function auditLine(entry: AIAuditEntry) {
                 </Select>
               </Field>
               <span id="ai-context-help" class="sr-only">{{ t('aiSettings.contextHint') }}</span>
-              <p v-if="!validContext" id="ai-context-validation" role="alert" class="text-sm text-destructive md:col-span-2">{{ t('aiSettings.contextInvalid', { min: MIN_AI_CONTEXT_WINDOW.toLocaleString(locale), max: MAX_AI_CONTEXT_WINDOW.toLocaleString(locale) }) }}</p>
+              <p v-if="!validContext" id="ai-context-validation" role="alert" class="text-sm text-destructive">{{ t('aiSettings.contextInvalid', { min: MIN_AI_CONTEXT_WINDOW.toLocaleString(locale), max: MAX_AI_CONTEXT_WINDOW.toLocaleString(locale) }) }}</p>
             </FieldGroup>
           </section>
           <div v-if="!validContext || providerAutosave.error.value || providerAutosave.saving.value || providerAutosave.dirty.value || providerAutosave.saved.value" class="flex min-h-8 min-w-0 flex-wrap items-center gap-2 text-xs" data-ai-provider-save-status>
