@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"curated-backend/internal/contracts"
+	"curated-backend/internal/executil"
 	"curated-backend/internal/llm"
 	"curated-backend/internal/storage"
 )
@@ -38,15 +40,21 @@ func TestSignedTranscriptRequestHasNoCredentialOrContentType(t *testing.T) {
 	}
 }
 
-type fakeProvider struct{ calls int }
+type fakeProvider struct {
+	calls    int
+	uploaded func(string)
+}
 
-func (p *fakeProvider) Upload(context.Context, string, string) (string, error) {
+func (p *fakeProvider) Upload(_ context.Context, _ string, path string) (string, error) {
 	p.calls++
-	return "", nil
+	if p.uploaded != nil {
+		p.uploaded(path)
+	}
+	return "oss://fixture", nil
 }
 func (p *fakeProvider) Submit(context.Context, string, string) (string, error) {
 	p.calls++
-	return "", nil
+	return "fixture-task", nil
 }
 func (p *fakeProvider) Result(context.Context, string, string) ([]Cue, bool, error) {
 	p.calls++
@@ -215,6 +223,73 @@ func TestSaveRetryNeedsNoProviderAndKeepsOldOutputs(t *testing.T) {
 	_ = os.WriteFile(path, b, 0600)
 	if _, e = s.AssetPath(context.Background(), j.Assets[1].ID); e == nil {
 		t.Fatal("same-size modified output accepted as original")
+	}
+}
+
+func TestFullExtractionPipelineWithSyntheticMedia(t *testing.T) {
+	command, e := exec.LookPath("ffmpeg")
+	if e != nil {
+		t.Skip("FFmpeg not installed")
+	}
+	opt, r := fixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if e = executil.CommandContext(ctx, command, "-nostdin", "-v", "error", "-y", "-f", "lavfi", "-i", "color=size=160x90:rate=10", "-f", "lavfi", "-i", "sine=frequency=500:sample_rate=48000", "-t", "2", "-c:v", "libx264", "-c:a", "aac", r.SourcePath).Run(); e != nil {
+		t.Fatal(e)
+	}
+	r.Revision, e = revision(r.SourcePath)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = opt.Store.SaveSubtitleRecord(ctx, r); e != nil {
+		t.Fatal(e)
+	}
+	opt.FFmpeg = command
+	opt.Provider.(*fakeProvider).uploaded = func(path string) {
+		if info, e := os.Stat(path); e != nil || info.Size() == 0 || filepath.Ext(path) != ".flac" {
+			t.Error("missing extracted audio")
+		}
+	}
+	s := New(ctx, opt)
+	defer s.Close()
+	j := waitJob(t, s, r.Job.ID, "completed")
+	if len(j.Assets) != 3 || opt.Provider.(*fakeProvider).calls != 3 {
+		t.Fatalf("pipeline output=%+v provider calls=%d", j, opt.Provider.(*fakeProvider).calls)
+	}
+}
+func TestBlockedSaveRetryAndRelocationKeepOutputs(t *testing.T) {
+	opt, r := fixture(t)
+	cp := checkpoint{Version: 1, Duration: 10, Parts: []part{{Recognized: true, Cues: []Cue{{ID: 1, Begin: 0, End: 1000, Text: "原文", Translation: "译文"}}}}}
+	_ = writeJSON(filepath.Join(opt.Root, r.Job.ID, "checkpoint.json"), cp)
+	sub := filepath.Join(filepath.Dir(r.SourcePath), "sub")
+	if e := os.WriteFile(sub, []byte("occupied"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	s := New(context.Background(), opt)
+	defer s.Close()
+	waitJob(t, s, r.Job.ID, "blocked")
+	_ = os.Remove(sub)
+	if _, e := s.Action(context.Background(), r.Job.ID, "retry"); e != nil {
+		t.Fatal(e)
+	}
+	j := waitJob(t, s, r.Job.ID, "completed")
+	newPath := filepath.Join(filepath.Dir(r.SourcePath), "organized", "DEMO-001.mp4")
+	_ = os.MkdirAll(filepath.Dir(newPath), 0755)
+	if e := os.Rename(r.SourcePath, newPath); e != nil {
+		t.Fatal(e)
+	}
+	if e := s.RelocateAssets(context.Background(), r.SourcePath, newPath); e != nil {
+		t.Fatal(e)
+	}
+	if e := opt.Store.RelocateMovieFile(context.Background(), r.SourcePath, newPath); e != nil {
+		t.Fatal(e)
+	}
+	path, e := s.AssetPath(context.Background(), j.Assets[1].ID)
+	if e != nil || filepath.Dir(path) != filepath.Join(filepath.Dir(newPath), "sub") {
+		t.Fatalf("relocated asset path=%s err=%v", path, e)
+	}
+	if opt.Provider.(*fakeProvider).calls != 0 {
+		t.Fatal("save retry made provider calls")
 	}
 }
 func TestBailianSubmissionProtocol(t *testing.T) {
