@@ -99,7 +99,7 @@ async function save() {
         </template>
       </FieldGroup>
       <p v-if="cfg && !cfg.canManage" class="text-sm text-muted-foreground">{{ t('subtitles.localOnly') }}</p>
-      <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0 flex-1 text-xs text-muted-foreground" role="status">
           <p v-if="cfg?.enabled && tested">{{ t('subtitles.testPassed') }}</p>
           <p v-else-if="saved">{{ t('subtitles.saved') }}</p>
