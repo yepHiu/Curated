@@ -361,7 +361,7 @@ function auditLine(entry: AIAuditEntry) {
               <Button
                 variant="outline"
                 size="sm"
-                class="rounded-full data-[status=success]:border-success data-[status=success]:bg-success data-[status=success]:text-success-foreground data-[status=success]:hover:bg-success/90 data-[status=success]:hover:text-success-foreground"
+                class="rounded-full data-[status=success]:border-success/35 data-[status=success]:bg-success/10 data-[status=success]:text-success data-[status=success]:hover:bg-success/20 data-[status=success]:hover:text-success dark:data-[status=success]:border-success/35 dark:data-[status=success]:bg-success/10 dark:data-[status=success]:hover:bg-success/20"
                 :disabled="busy"
                 :aria-busy="testingProvider"
                 :aria-label="providerTestResult ? `${t('settings.experimentalTest')}: ${providerTestResult.text}` : undefined"
