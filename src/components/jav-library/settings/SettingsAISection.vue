@@ -261,6 +261,19 @@ function auditLine(entry: AIAuditEntry) {
     <p v-if="message" role="status" class="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{{ message }}</p>
     <Button v-if="!ready" variant="outline" size="sm" class="self-end" @click="initialize">{{ t('aiSettings.retry') }}</Button>
     <template v-if="ready">
+      <section class="rounded-xl border border-border bg-card p-6 shadow-sm" data-ai-enable-section>
+        <FieldGroup>
+          <Field orientation="horizontal" class="items-center justify-between">
+            <FieldLabel for="ai-enabled" class="text-lg font-semibold">{{ t('aiSettings.enabled') }}</FieldLabel>
+            <Switch id="ai-enabled" v-model="settings.enabled" :disabled="busy" data-ai-enabled />
+          </Field>
+        </FieldGroup>
+        <div v-if="!settings.enabled && settingsAutosave.error.value" class="mt-3 flex flex-wrap items-center justify-end gap-2 text-xs">
+          <p role="alert" class="text-destructive">{{ t('aiSettings.autoSaveFailed', { message: settingsAutosave.error.value }) }}</p>
+          <Button variant="outline" size="sm" class="rounded-full" data-ai-policy-retry @click="settingsAutosave.flush()">{{ t('aiSettings.retry') }}</Button>
+        </div>
+      </section>
+      <div v-show="settings.enabled" class="flex min-w-0 flex-col gap-6" data-ai-dependent-settings>
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-governance-card>
         <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0">
           <span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><ShieldCheck class="size-4" /></span>
@@ -273,7 +286,6 @@ function auditLine(entry: AIAuditEntry) {
           <section class="flex min-w-0 flex-col gap-3" data-ai-settings-block="policy">
             <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.policy') }}</h3>
             <FieldGroup class="gap-3">
-              <Field orientation="horizontal" class="min-w-0 justify-between rounded-lg border border-border/50 bg-muted/5 p-4"><FieldLabel for="ai-enabled">{{ t('aiSettings.enabled') }}</FieldLabel><Switch id="ai-enabled" v-model="settings.enabled" :disabled="busy" data-ai-enabled /></Field>
               <Field orientation="horizontal" class="min-w-0 justify-between rounded-lg border border-border/50 bg-muted/5 p-4"><SettingsHint :text="[t('aiSettings.confirmationHint'), t('aiSettings.autoSaveHint')].join('\n\n')">
                   <FieldLabel for="ai-readonly">{{ t('aiSettings.readOnly') }}</FieldLabel>
                 </SettingsHint><Switch id="ai-readonly" v-model="settings.readOnly" :disabled="busy" data-ai-readonly /></Field>
@@ -431,7 +443,8 @@ function auditLine(entry: AIAuditEntry) {
           </section>
         </CardContent>
       </Card>
+      <SettingsSubtitlesSection />
+      </div>
     </template>
-    <SettingsSubtitlesSection />
   </div>
 </template>
