@@ -1925,14 +1925,14 @@ async function runFullScan() {
     v-model="activeSlug"
     :class="
       cn(
-        'mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col gap-6 pb-2 lg:flex-row lg:items-stretch lg:gap-6',
+        'flex h-full min-h-0 w-full flex-col gap-6 pb-2 pl-[var(--app-page-px)] sm:pl-[var(--app-page-px-sm)] lg:flex-row lg:items-stretch lg:gap-6 lg:pl-[max(var(--app-page-px-lg),calc((100%-80rem)/2))] xl:pl-[max(var(--app-page-px-xl),calc((100%-80rem)/2))]',
         SETTINGS_CONTROL_H32_CLASS,
         SETTINGS_LIBRARY_PATH_ACTION_ICONS_CLASS,
       )
     "
   >
     <nav
-      class="w-full shrink-0 lg:max-h-[calc(100dvh-10.5rem)] lg:w-56 lg:overflow-y-auto lg:overscroll-contain lg:self-start lg:rounded-xl lg:border lg:border-border lg:bg-card lg:p-2"
+      class="w-full shrink-0 pr-[var(--app-page-px)] sm:pr-[var(--app-page-px-sm)] lg:max-h-[calc(100dvh-10.5rem)] lg:w-56 lg:overflow-y-auto lg:overscroll-contain lg:self-start lg:rounded-xl lg:border lg:border-border lg:bg-card lg:p-2"
       :aria-label="t('settings.navAriaLabel')"
     >
       <div class="lg:hidden">
@@ -1985,6 +1985,7 @@ async function runFullScan() {
       :ref="bindSettingsScrollRoot"
       class="min-h-0 min-w-0 flex flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none] [scrollbar-gutter:stable]"
     >
+    <div class="w-full min-w-0 max-w-[64.5rem] pr-[var(--app-page-px)] sm:pr-[var(--app-page-px-sm)] lg:pr-[var(--app-page-px-lg)] xl:pr-[var(--app-page-px-xl)]">
     <TabsContent
       v-if="shouldRenderSettingsSection('overview')"
       value="overview"
@@ -2358,6 +2359,7 @@ async function runFullScan() {
     </SettingsAboutSection>
     </section>
     </TabsContent>
+    </div>
     </div>
   </Tabs>
 </template>

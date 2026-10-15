@@ -232,6 +232,8 @@ const showHeaderBack = computed(
 const routerViewFrameClass = computed(() =>
   useFlushWorkspaceFrame.value
     ? "flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
+    : route.name === "settings"
+      ? "flex h-full min-h-0 min-w-0 flex-col overflow-hidden py-[var(--app-page-py)] lg:py-[var(--app-page-py-lg)]"
     : "flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-[var(--app-page-px)] py-[var(--app-page-py)] sm:px-[var(--app-page-px-sm)] lg:px-[var(--app-page-px-lg)] lg:py-[var(--app-page-py-lg)] xl:px-[var(--app-page-px-xl)]",
 )
 
