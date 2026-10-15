@@ -320,3 +320,9 @@ backend/ 目录：
 ### 移除清除密钥开关（2026-10-16）
 
 按用户反馈移除“清除已保存的密钥”设置行及前端状态。保留四个主要设置项；留空保存不提交apiKey，保留已存密钥，输入新密钥则替换。眼睛显示/隐藏行为保持。
+
+### 可选字幕识别模型（2026-10-16）
+
+字幕识别模型改为右侧下拉：千问3.1文件转写 `qwen-audio-3.1-asr-flash-filetrans`（默认）和千问3文件转写 `qwen3-asr-flash-filetrans`。`subtitleProvider.recognitionModel`随设置保存；旧配置缺失默认3.1。任务创建时冻结recognitionModel，重试/恢复继续使用原模型，旧任务缺失仍按3.1处理。上传授权使用对应模型；3.1提交file_urls/language_hints并解析results，3提交file_url/language并解析result。测试密钥按当前已保存的识别模型检查上传授权。无新增端点/数据表，识别模型进入任务JSON元数据。
+
+配置校验、两代协议分支（含千问3单结果）、字幕/Server测试通过；38项相关前端测试、typecheck、定向ESLint通过。浏览器确认两个选项及切换；未进行本轮付费云调用，两代模型既有真实demo记录见2026-10-15调研。

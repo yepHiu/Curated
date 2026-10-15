@@ -803,3 +803,5 @@ Job states: queued; running; completed; failed; partial_failed; blocked; cancell
 Migration 0066 stores metadata in subtitle_jobs; cues/audio are temporary cache checkpoints. Final files are next to the video under sub/. See the handbook and implementation record for recovery/retention and validation limits.
 
 2026-10-16: `POST /api/subtitles/provider/key` explicitly reveals the saved subtitle provider API key to a direct Server-local authenticated settings client only; response `{apiKey: string}` with `Cache-Control: no-store`. Ordinary settings GET remains redacted. Remote calls return 403.
+
+2026-10-16: subtitleProvider settings add recognitionModel: qwen-audio-3.1-asr-flash-filetrans (default) or qwen3-asr-flash-filetrans. GET returns it; PATCH validates/persists it. Each new job freezes the selected recognitionModel in metadata; old jobs default to 3.1 on resume.

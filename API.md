@@ -3695,3 +3695,5 @@ All endpoints use the existing authenticated/unlocked API boundary. No endpoint 
 Unknown input fields/trailing JSON return 400; disabled/read-only AI returns 403; missing job/topic 404; unavailable operation/state returns 409; GET never mutates tasks. No automatic schedule/config fields are added. AI task writes use an internal job-bound gateway, shared write budget and audit; ordinary chat/MCP cannot invoke this apply capability. Invalid or unsupported evidence does not clear user tags.
 
 2026-10-16: `POST /api/subtitles/provider/key` explicitly reveals the saved subtitle provider API key to a direct Server-local authenticated settings client only; response `{apiKey: string}` with `Cache-Control: no-store`. Ordinary settings GET remains redacted. Remote calls return 403.
+
+2026-10-16: subtitleProvider settings add recognitionModel: qwen-audio-3.1-asr-flash-filetrans (default) or qwen3-asr-flash-filetrans. GET returns it; PATCH validates/persists it. Each new job freezes the selected recognitionModel in metadata; old jobs default to 3.1 on resume.

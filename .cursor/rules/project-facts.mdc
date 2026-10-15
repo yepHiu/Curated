@@ -545,3 +545,9 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 ### 字幕设置逐项排列与密钥显示（2026-10-16）
 
 启用云识别、固定识别模型、百炼密钥、翻译模型改为四个独立纵向设置行，取消桌面双列。密钥默认password，眼睛切换显示/隐藏；已保存密钥仅在点击显示时通过新增本机限定POST /api/subtitles/provider/key按需读取，响应no-store，普通GET仍脱敏。隐藏时释放读取的密钥，保存后重置显示状态；远端不可调用。沿用现有认证/本机管理边界，不在Mock保存密钥。
+
+### 可选字幕识别模型（2026-10-16）
+
+字幕识别模型改为右侧下拉：千问3.1文件转写 `qwen-audio-3.1-asr-flash-filetrans`（默认）和千问3文件转写 `qwen3-asr-flash-filetrans`。`subtitleProvider.recognitionModel`随设置保存；旧配置缺失默认3.1。任务创建时冻结recognitionModel，重试/恢复继续使用原模型，旧任务缺失仍按3.1处理。上传授权使用对应模型；3.1提交file_urls/language_hints并解析results，3提交file_url/language并解析result。测试密钥按当前已保存的识别模型检查上传授权。无新增端点/数据表，识别模型进入任务JSON元数据。
+
+配置校验、两代协议分支（含千问3单结果）、字幕/Server测试通过；38项相关前端测试、typecheck、定向ESLint通过。浏览器确认两个选项及切换；未进行本轮付费云调用，两代模型既有真实demo记录见2026-10-15调研。
