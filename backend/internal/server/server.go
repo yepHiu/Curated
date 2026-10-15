@@ -33,6 +33,7 @@ import (
 	"curated-backend/internal/scraper/metatube"
 	"curated-backend/internal/shellopen"
 	"curated-backend/internal/storage"
+	"curated-backend/internal/subtitles"
 	"curated-backend/internal/tasks"
 	"curated-backend/internal/version"
 )
@@ -315,6 +316,8 @@ type BackupProvider interface {
 
 // Handler holds all HTTP handler dependencies and implements the API route handlers.
 type Handler struct {
+	subtitles                      *subtitles.Service
+	subtitleSettingsCtl            SubtitleSettingsController
 	runtimeContext                 context.Context
 	cfg                            config.Config
 	logger                         *zap.Logger
@@ -372,6 +375,8 @@ type Handler struct {
 
 // Deps bundles all dependencies needed to construct a Handler.
 type Deps struct {
+	Subtitles                        *subtitles.Service
+	SubtitleSettingsCtl              SubtitleSettingsController
 	RuntimeContext                   context.Context
 	Cfg                              config.Config
 	Logger                           *zap.Logger
@@ -479,6 +484,8 @@ func NewHandler(deps Deps) *Handler {
 		backendLogCtl:                  deps.BackendLogCtl,
 		playerSettingsCtl:              deps.PlayerSettingsCtl,
 		aiSettingsCtl:                  deps.AISettingsCtl,
+		subtitles:                      deps.Subtitles,
+		subtitleSettingsCtl:            deps.SubtitleSettingsCtl,
 		aiChatProvider:                 deps.AIChatProvider,
 		movieMetadataRefresher:         deps.MovieMetadataRefresher,
 		actorProfileRefresher:          deps.ActorProfileRefresher,
@@ -681,6 +688,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/proxy/ping-javbus", localServerManagement(h.handleProxyPingJavbus))
 	mux.HandleFunc("POST /api/proxy/ping-google", localServerManagement(h.handleProxyPingGoogle))
 
+	h.registerSubtitleRoutes(mux)
 	mux.HandleFunc("POST /api/ai/provider/test", localServerManagement(h.handleAIProviderTest))
 	mux.HandleFunc("POST /api/ai/chat", h.handleAIChat)
 	mux.HandleFunc("GET /api/ai/sessions", h.handleListAIChatSessions)
@@ -2147,6 +2155,9 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if h.aiSettingsCtl != nil {
 		dto.AIProvider = h.aiSettingsCtl.AIProviderSettings()
 	}
+	if h.subtitleSettingsCtl != nil {
+		dto.SubtitleProvider = h.subtitleSettingsCtl.SubtitleSettings()
+	}
 	if p, ok := h.aiChatProvider.(AIGovernanceProvider); ok {
 		settings := p.AIGovernanceSettings()
 		dto.AIGovernance = &settings
@@ -2340,7 +2351,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.DiscoveryEnabled == nil && body.BrowserPluginEnabled == nil && body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.LANEnabled == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && body.AIProvider == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil && body.ComicLibraryEnabled == nil && body.AutoComicLibraryWatch == nil && body.DefaultComicImportLibraryPathID == nil && body.ComicReader == nil && body.ComicCache == nil && body.PhotoLibraryEnabled == nil && body.AutoPhotoLibraryWatch == nil && body.DefaultPhotoImportLibraryPathID == nil && body.PhotoViewer == nil && body.PhotoCache == nil {
+	if body.SubtitleProvider == nil && body.DiscoveryEnabled == nil && body.BrowserPluginEnabled == nil && body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.LANEnabled == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && body.AIProvider == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil && body.ComicLibraryEnabled == nil && body.AutoComicLibraryWatch == nil && body.DefaultComicImportLibraryPathID == nil && body.ComicReader == nil && body.ComicCache == nil && body.PhotoLibraryEnabled == nil && body.AutoPhotoLibraryWatch == nil && body.DefaultPhotoImportLibraryPathID == nil && body.PhotoViewer == nil && body.PhotoCache == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -2951,6 +2962,17 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	if body.SubtitleProvider != nil {
+		if h.subtitleSettingsCtl == nil {
+			writeAppError(w, 503, contracts.ErrorCodeInternal, "subtitle settings unavailable")
+			return
+		}
+		prev := h.subtitleSettingsCtl.SubtitleConfig()
+		target := *body.SubtitleProvider
+		ops = append(ops, settingsPatchOperation{name: "subtitleProvider", apply: func() error { return h.subtitleSettingsCtl.SetSubtitleSettings(target) }, rollback: func() error {
+			return h.subtitleSettingsCtl.SetSubtitleSettings(contracts.SubtitleSettingsPatch{Enabled: &prev.Enabled, APIKey: &prev.APIKey, TranslationModel: &prev.TranslationModel})
+		}, failure: settingsPatchFailure{status: 400, code: contracts.ErrorCodeBadRequest, message: func(e error) string { return e.Error() }}})
+	}
 	if body.AIProvider != nil {
 		if h.aiSettingsCtl == nil {
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "ai provider settings not available")

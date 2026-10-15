@@ -87,3 +87,7 @@ func HistoryOmittedPrompt() string {
 func ProviderProbePrompt() string {
 	return renderPrompt("provider-probe.txt", nil)
 }
+
+func SubtitleTranslationPrompt() Definition {
+	return Definition{Text: renderPrompt("subtitle-translation.txt", nil), Version: "subtitle-translation-v2"}
+}

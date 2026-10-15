@@ -910,6 +910,7 @@ type UpdateLibraryPathRequest struct {
 
 // SettingsDTO carries all application settings exposed to the frontend.
 type SettingsDTO struct {
+	SubtitleProvider                SubtitleSettings       `json:"subtitleProvider"`
 	DiscoveryEnabled                bool                   `json:"discoveryEnabled"`
 	LibraryPaths                    []LibraryPathDTO       `json:"libraryPaths"`
 	DefaultImportLibraryPathID      string                 `json:"defaultImportLibraryPathId,omitempty"`
@@ -1295,6 +1296,7 @@ type AIChatSSEEvent struct {
 
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
 type PatchSettingsRequest struct {
+	SubtitleProvider                *SubtitleSettingsPatch  `json:"subtitleProvider,omitempty"`
 	OrganizeLibrary                 *bool                   `json:"organizeLibrary,omitempty"`
 	AutoLibraryWatch                *bool                   `json:"autoLibraryWatch,omitempty"`
 	AutoActorProfileScrape          *bool                   `json:"autoActorProfileScrape,omitempty"`

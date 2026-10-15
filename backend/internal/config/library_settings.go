@@ -227,6 +227,18 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 			return fmt.Errorf("library settings %q: %w", path, err)
 		}
 	}
+	if v, ok := m["subtitleProvider"]; ok {
+		raw, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		if err = json.Unmarshal(raw, &cfg.SubtitleProvider); err != nil {
+			return err
+		}
+		if err = cfg.SubtitleProvider.Validate(); err != nil {
+			return err
+		}
+	}
 	if v, ok := m["aiProvider"]; ok {
 		if err := parseAIProviderConfig(v, &cfg.AIProvider); err != nil {
 			return fmt.Errorf("library settings %q: %w", path, err)

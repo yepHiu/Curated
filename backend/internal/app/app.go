@@ -44,6 +44,7 @@ import (
 	"curated-backend/internal/server"
 	"curated-backend/internal/storage"
 	"curated-backend/internal/storagehealth"
+	"curated-backend/internal/subtitles"
 	"curated-backend/internal/tasks"
 	"curated-backend/internal/version"
 	"curated-backend/internal/webui"
@@ -135,6 +136,7 @@ type App struct {
 	playerSettingsMu sync.RWMutex
 	// aiProviderMu protects cfg.AIProvider (library-config.cfg) for the experimental agent.
 	aiProviderMu sync.RWMutex
+	subtitles    *subtitles.Service
 	agentRT      agentRuntime
 	tagRT        tagOrganizationRuntime
 	// metadataMovieMu protects cfg.MetadataMovieProvider/ProviderChain (library-config.cfg) during concurrent scrapes.
@@ -277,6 +279,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		}
 	}
 
+	app.startSubtitles()
 	app.startWishlistWorker()
 	// 无待恢复任务时不创建常驻整理 goroutine；首次显式请求再启动。
 	if jobs, err := store.ListTagOrganizations(ctx, true); err == nil && len(jobs) > 0 {
@@ -289,6 +292,9 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 func (a *App) Close() {
 	if a == nil {
 		return
+	}
+	if a.subtitles != nil {
+		a.subtitles.Close()
 	}
 	if a.tagRT.cancel != nil {
 		a.tagRT.cancel()
@@ -2250,6 +2256,11 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 				}
 				if orgErr == nil {
 					// 已登记文件整理改名时保留稳定 ID 和分片进度。
+					if a.subtitles != nil {
+						if err := a.subtitles.RelocateAssets(ctx, result.Path, newPath); err != nil {
+							a.logger.Warn("subtitle relocation incomplete", zap.Error(err))
+						}
+					}
 					if err := a.store.RelocateMovieFile(ctx, result.Path, newPath); err != nil {
 						return err
 					}
@@ -3780,6 +3791,8 @@ func (a *App) HTTPHandler() http.Handler {
 	a.httpHandlerOnce.Do(func() {
 		apiHandler := server.NewHandler(server.Deps{
 			RuntimeContext:                   a.appCtx,
+			Subtitles:                        a.subtitles,
+			SubtitleSettingsCtl:              a,
 			Cfg:                              a.cfg,
 			Logger:                           a.logger,
 			Store:                            a.store,

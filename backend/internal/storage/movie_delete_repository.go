@@ -66,6 +66,11 @@ func deleteMovieDatabaseTx(ctx context.Context, tx *sql.Tx, movieID string) (dis
 		return nil, err
 	}
 	fileRows.Close()
+	subtitlePaths, err := subtitleCleanupPathsTx(ctx, tx, movieID)
+	if err != nil {
+		return nil, err
+	}
+	assetPaths = append(assetPaths, subtitlePaths...)
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM movie_actors WHERE movie_id = ?`, movieID); err != nil {
 		return nil, err

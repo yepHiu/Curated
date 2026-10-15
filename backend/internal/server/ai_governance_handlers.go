@@ -63,7 +63,7 @@ func parseAIReportQuery(r *http.Request, audit bool) (contracts.AIReportQuery, e
 		}
 	}
 	switch q.Channel {
-	case "", "chat", "action", "test":
+	case "", "chat", "action", "test", "subtitle":
 	default:
 		return q, fmt.Errorf("invalid channel")
 	}
