@@ -17,6 +17,7 @@ import (
 )
 
 const ASRModel = "qwen-audio-3.1-asr-flash-filetrans"
+const ASRModel3 = "qwen3-asr-flash-filetrans"
 const bailianBase = "https://dashscope.aliyuncs.com/api/v1"
 
 type Cue struct {
@@ -27,8 +28,8 @@ type Cue struct {
 	Translation string `json:"translation,omitempty"`
 }
 type Provider interface {
-	Upload(context.Context, string, string) (string, error)
-	Submit(context.Context, string, string) (string, error)
+	Upload(context.Context, string, string, ...string) (string, error)
+	Submit(context.Context, string, string, ...string) (string, error)
 	Result(context.Context, string, string) ([]Cue, bool, error)
 }
 type RecognitionTaskFailed struct{ Status string }
@@ -41,7 +42,11 @@ type Bailian struct {
 }
 
 // TestPolicy validates the saved key's permission for this ASR model without uploading audio.
-func (p *Bailian) TestPolicy(ctx context.Context, key string) error {
+func (p *Bailian) TestPolicy(ctx context.Context, key string, models ...string) error {
+	model, err := recognitionModel(models)
+	if err != nil {
+		return err
+	}
 	var result struct {
 		Data struct {
 			Host string `json:"upload_host"`
@@ -50,7 +55,7 @@ func (p *Bailian) TestPolicy(ctx context.Context, key string) error {
 	if key == "" {
 		return fmt.Errorf("Bailian API key is not configured")
 	}
-	if e := p.json(ctx, "GET", p.base()+"/uploads?action=getPolicy&model="+ASRModel, key, nil, &result, false); e != nil {
+	if e := p.json(ctx, "GET", p.base()+"/uploads?action=getPolicy&model="+model, key, nil, &result, false); e != nil {
 		return e
 	}
 	if !supplierURL(result.Data.Host) {
@@ -141,7 +146,11 @@ func (p *Bailian) json(ctx context.Context, method, raw, key string, body any, o
 	}
 	return json.Unmarshal(b, out)
 }
-func (p *Bailian) Upload(ctx context.Context, key, path string) (string, error) {
+func (p *Bailian) Upload(ctx context.Context, key, path string, models ...string) (string, error) {
+	model, err := recognitionModel(models)
+	if err != nil {
+		return "", err
+	}
 	var policy struct {
 		Data struct {
 			Dir       string `json:"upload_dir"`
@@ -153,7 +162,7 @@ func (p *Bailian) Upload(ctx context.Context, key, path string) (string, error) 
 			Host      string `json:"upload_host"`
 		} `json:"data"`
 	}
-	if e := p.json(ctx, "GET", p.base()+"/uploads?action=getPolicy&model="+ASRModel, key, nil, &policy, false); e != nil {
+	if e := p.json(ctx, "GET", p.base()+"/uploads?action=getPolicy&model="+model, key, nil, &policy, false); e != nil {
 		return "", e
 	}
 	d := policy.Data
@@ -210,13 +219,21 @@ func (p *Bailian) Upload(ctx context.Context, key, path string) (string, error) 
 	}
 	return "oss://" + object, nil
 }
-func (p *Bailian) Submit(ctx context.Context, key, uploaded string) (string, error) {
+func (p *Bailian) Submit(ctx context.Context, key, uploaded string, models ...string) (string, error) {
+	model, err := recognitionModel(models)
+	if err != nil {
+		return "", err
+	}
 	var result struct {
 		Output struct {
 			ID string `json:"task_id"`
 		} `json:"output"`
 	}
-	body := map[string]any{"model": ASRModel, "input": map[string]any{"file_urls": []string{uploaded}}, "parameters": map[string]any{"channel_id": []int{0}, "language_hints": []string{"ja"}}}
+	body := map[string]any{"model": model, "input": map[string]any{"file_urls": []string{uploaded}}, "parameters": map[string]any{"channel_id": []int{0}, "language_hints": []string{"ja"}}}
+	if model == ASRModel3 {
+		body["input"] = map[string]any{"file_url": uploaded}
+		body["parameters"] = map[string]any{"channel_id": []int{0}, "language": "ja", "enable_words": false}
+	}
 	e := p.json(ctx, "POST", p.base()+"/services/audio/asr/transcription", key, body, &result, true)
 	if e != nil {
 		return "", e
@@ -229,7 +246,10 @@ func (p *Bailian) Submit(ctx context.Context, key, uploaded string) (string, err
 func (p *Bailian) Result(ctx context.Context, key, id string) ([]Cue, bool, error) {
 	var result struct {
 		Output struct {
-			Status  string `json:"task_status"`
+			Status string `json:"task_status"`
+			Result struct {
+				URL string `json:"transcription_url"`
+			} `json:"result"`
 			Results []struct {
 				Status string `json:"subtask_status"`
 				URL    string `json:"transcription_url"`
@@ -247,6 +267,12 @@ func (p *Bailian) Result(ctx context.Context, key, id string) ([]Cue, bool, erro
 		return nil, false, &RecognitionTaskFailed{Status: result.Output.Status}
 	default:
 		return nil, false, fmt.Errorf("recognition task %s", result.Output.Status)
+	}
+	if result.Output.Result.URL != "" {
+		result.Output.Results = append(result.Output.Results, struct {
+			Status string `json:"subtask_status"`
+			URL    string `json:"transcription_url"`
+		}{Status: "SUCCEEDED", URL: result.Output.Result.URL})
 	}
 	cues := []Cue{}
 	for _, r := range result.Output.Results {
@@ -274,4 +300,15 @@ func (p *Bailian) Result(ctx context.Context, key, id string) ([]Cue, bool, erro
 		}
 	}
 	return cues, true, nil
+}
+
+func recognitionModel(models []string) (string, error) {
+	model := ASRModel
+	if len(models) > 0 && models[0] != "" {
+		model = models[0]
+	}
+	if model != ASRModel && model != ASRModel3 {
+		return "", fmt.Errorf("unsupported recognition model")
+	}
+	return model, nil
 }

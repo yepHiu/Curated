@@ -26,3 +26,16 @@ func TestSubtitleConfigMergeAndModels(t *testing.T) {
 		t.Fatalf("config not restored: %+v", cfg.SubtitleProvider)
 	}
 }
+
+func TestRecognitionModelDefaultsAndValidation(t *testing.T) {
+	for _, model := range []string{"", "qwen-audio-3.1-asr-flash-filetrans", "qwen3-asr-flash-filetrans", "invalid"} {
+		cfg := SubtitleConfig{RecognitionModel: model}
+		err := cfg.Validate()
+		if (model == "invalid") != (err != nil) {
+			t.Fatalf("model=%q error=%v", model, err)
+		}
+		if model == "" && cfg.RecognitionModel != "qwen-audio-3.1-asr-flash-filetrans" {
+			t.Fatal("legacy settings changed default")
+		}
+	}
+}

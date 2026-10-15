@@ -10,6 +10,7 @@ type SubtitleAudioTrack struct {
 
 // SubtitleSettings never returns the provider credential.
 type SubtitleSettings struct {
+	RecognitionModel string `json:"recognitionModel"`
 	CanManage        bool   `json:"canManage"`
 	Enabled          bool   `json:"enabled"`
 	APIKeyConfigured bool   `json:"apiKeyConfigured"`
@@ -17,6 +18,7 @@ type SubtitleSettings struct {
 	ConfiguredModel  string `json:"configuredModel"`
 }
 type SubtitleSettingsPatch struct {
+	RecognitionModel *string `json:"recognitionModel,omitempty"`
 	Enabled          *bool   `json:"enabled,omitempty"`
 	APIKey           *string `json:"apiKey,omitempty"`
 	TranslationModel *string `json:"translationModel,omitempty"`
@@ -38,6 +40,7 @@ type SubtitleAsset struct {
 	Missing  bool   `json:"missing"`
 }
 type SubtitleJob struct {
+	RecognitionModel string          `json:"recognitionModel"`
 	ID               string          `json:"id"`
 	MovieID          string          `json:"movieId"`
 	FileID           string          `json:"fileId"`

@@ -45,14 +45,14 @@ type fakeProvider struct {
 	uploaded func(string)
 }
 
-func (p *fakeProvider) Upload(_ context.Context, _ string, path string) (string, error) {
+func (p *fakeProvider) Upload(_ context.Context, _ string, path string, _ ...string) (string, error) {
 	p.calls++
 	if p.uploaded != nil {
 		p.uploaded(path)
 	}
 	return "oss://fixture", nil
 }
-func (p *fakeProvider) Submit(context.Context, string, string) (string, error) {
+func (p *fakeProvider) Submit(context.Context, string, string, ...string) (string, error) {
 	p.calls++
 	return "fixture-task", nil
 }
@@ -316,5 +316,47 @@ func TestBailianSubmissionProtocol(t *testing.T) {
 		if supplierURL(u) {
 			t.Error("unsafe result URL accepted", u)
 		}
+	}
+}
+
+func TestQwen3ProtocolUsesSingularFileAndResult(t *testing.T) {
+	client := &http.Client{Transport: testTransport(func(r *http.Request) (*http.Response, error) {
+		body := ""
+		switch {
+		case strings.Contains(r.URL.Path, "uploads"):
+			if r.URL.Query().Get("model") != ASRModel3 {
+				t.Error("upload authorization uses wrong model")
+			}
+			body = `{"data":{"upload_host":"https://upload.test.aliyuncs.com"}}`
+		case r.Method == "POST":
+			var req struct {
+				Model      string         `json:"model"`
+				Input      map[string]any `json:"input"`
+				Parameters map[string]any `json:"parameters"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Fatal(err)
+			}
+			if req.Model != ASRModel3 || req.Input["file_url"] != "oss://fixture" || req.Input["file_urls"] != nil || req.Parameters["language"] != "ja" || req.Parameters["language_hints"] != nil {
+				t.Fatalf("wrong Qwen3 protocol: %+v", req)
+			}
+			body = `{"output":{"task_id":"qwen3-task"}}`
+		case r.URL.Host == "results.test.aliyuncs.com":
+			body = `{"transcripts":[{"sentences":[{"begin_time":100,"end_time":900,"text":"fixture"}]}]}`
+		default:
+			body = `{"output":{"task_status":"SUCCEEDED","result":{"transcription_url":"https://results.test.aliyuncs.com/result"}}}`
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+	})}
+	p := Bailian{Client: client}
+	if err := p.TestPolicy(context.Background(), "secret", ASRModel3); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Submit(context.Background(), "secret", "oss://fixture", ASRModel3); err != nil {
+		t.Fatal(err)
+	}
+	cues, done, err := p.Result(context.Background(), "secret", "qwen3-task")
+	if err != nil || !done || len(cues) != 1 || cues[0].Begin != 100 {
+		t.Fatalf("cues=%+v done=%v err=%v", cues, done, err)
 	}
 }

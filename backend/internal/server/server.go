@@ -2970,7 +2970,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		prev := h.subtitleSettingsCtl.SubtitleConfig()
 		target := *body.SubtitleProvider
 		ops = append(ops, settingsPatchOperation{name: "subtitleProvider", apply: func() error { return h.subtitleSettingsCtl.SetSubtitleSettings(target) }, rollback: func() error {
-			return h.subtitleSettingsCtl.SetSubtitleSettings(contracts.SubtitleSettingsPatch{Enabled: &prev.Enabled, APIKey: &prev.APIKey, TranslationModel: &prev.TranslationModel})
+			return h.subtitleSettingsCtl.SetSubtitleSettings(contracts.SubtitleSettingsPatch{RecognitionModel: &prev.RecognitionModel, Enabled: &prev.Enabled, APIKey: &prev.APIKey, TranslationModel: &prev.TranslationModel})
 		}, failure: settingsPatchFailure{status: 400, code: contracts.ErrorCodeBadRequest, message: func(e error) string { return e.Error() }}})
 	}
 	if body.AIProvider != nil {

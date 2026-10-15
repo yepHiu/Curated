@@ -2507,6 +2507,8 @@
     "enterKey": "输入百炼 API Key",
     "keyHint": "识别与千问翻译共用此密钥，密钥仅保存在 Server。",
     "clearKey": "清除已保存的密钥",
+    "asr31": "千问 3.1 · 文件转写",
+    "asr3": "千问 3 · 文件转写",
     "recognitionModel": "字幕识别模型",
     "translationModel": "字幕翻译模型",
     "configuredModel": "用户配置的 AI 模型",

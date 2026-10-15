@@ -25,10 +25,11 @@ import (
 )
 
 type RuntimeConfig struct {
-	Enabled      bool
-	APIKey       string
-	Text         llm.ClientConfig
-	DefaultModel string
+	RecognitionModel string
+	Enabled          bool
+	APIKey           string
+	Text             llm.ClientConfig
+	DefaultModel     string
 }
 type Options struct {
 	Store     *storage.SQLiteStore
@@ -150,7 +151,7 @@ func (s *Service) Create(ctx context.Context, movieID string, req contracts.Subt
 	if model == "" {
 		model = cfg.DefaultModel
 	}
-	r := storage.SubtitleRecord{RequestID: req.RequestID, SourcePath: detail.Location, Revision: rev, AudioTrack: req.AudioTrack, TextBaseURL: cfg.Text.BaseURL, TextModel: cfg.Text.Model, PromptVersion: prompts.SubtitleTranslationPrompt().Version, Job: contracts.SubtitleJob{ID: newID(), MovieID: movieID, FileID: detail.SelectedFileID, FileName: filepath.Base(detail.Location), State: "queued", Stage: "preparing", TranslationModel: model, CreatedAt: now, UpdatedAt: now, Assets: []contracts.SubtitleAsset{}}}
+	r := storage.SubtitleRecord{RequestID: req.RequestID, SourcePath: detail.Location, Revision: rev, AudioTrack: req.AudioTrack, TextBaseURL: cfg.Text.BaseURL, TextModel: cfg.Text.Model, PromptVersion: prompts.SubtitleTranslationPrompt().Version, Job: contracts.SubtitleJob{ID: newID(), MovieID: movieID, FileID: detail.SelectedFileID, FileName: filepath.Base(detail.Location), State: "queued", Stage: "preparing", RecognitionModel: cfg.RecognitionModel, TranslationModel: model, CreatedAt: now, UpdatedAt: now, Assets: []contracts.SubtitleAsset{}}}
 	if e = s.opt.Store.SaveSubtitleRecord(ctx, r); e != nil {
 		return r.Job, e
 	}
@@ -450,7 +451,7 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 				if e = s.update(ctx, r, "uploading", i, len(cp.Parts)); e != nil {
 					return e
 				}
-				uploaded, err := s.opt.Provider.Upload(ctx, cfg.APIKey, audio)
+				uploaded, err := s.opt.Provider.Upload(ctx, cfg.APIKey, audio, r.Job.RecognitionModel)
 				if err != nil {
 					return err
 				}
@@ -461,7 +462,7 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 				if ctx.Err() != nil {
 					return ctx.Err()
 				}
-				p.TaskID, e = s.opt.Provider.Submit(ctx, cfg.APIKey, uploaded)
+				p.TaskID, e = s.opt.Provider.Submit(ctx, cfg.APIKey, uploaded, r.Job.RecognitionModel)
 				if e != nil {
 					return e
 				}

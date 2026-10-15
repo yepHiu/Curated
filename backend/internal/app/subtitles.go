@@ -24,12 +24,15 @@ func (a *App) SubtitleConfig() config.SubtitleConfig {
 func (a *App) SubtitleSettings() contracts.SubtitleSettings {
 	c := a.SubtitleConfig()
 	_ = c.Validate()
-	return contracts.SubtitleSettings{Enabled: c.Enabled, APIKeyConfigured: c.APIKey != "", TranslationModel: c.TranslationModel, ConfiguredModel: a.currentAIProviderConfig().Model}
+	return contracts.SubtitleSettings{RecognitionModel: c.RecognitionModel, Enabled: c.Enabled, APIKeyConfigured: c.APIKey != "", TranslationModel: c.TranslationModel, ConfiguredModel: a.currentAIProviderConfig().Model}
 }
 func (a *App) SetSubtitleSettings(p contracts.SubtitleSettingsPatch) error {
 	a.aiProviderMu.Lock()
 	defer a.aiProviderMu.Unlock()
 	c := a.cfg.SubtitleProvider
+	if p.RecognitionModel != nil {
+		c.RecognitionModel = *p.RecognitionModel
+	}
 	if p.Enabled != nil {
 		c.Enabled = *p.Enabled
 	}
@@ -57,7 +60,7 @@ func (a *App) subtitleRuntime(model string) (subtitles.RuntimeConfig, error) {
 	if model == "" {
 		model = c.TranslationModel
 	}
-	r := subtitles.RuntimeConfig{Enabled: c.Enabled, APIKey: c.APIKey, DefaultModel: c.TranslationModel}
+	r := subtitles.RuntimeConfig{RecognitionModel: c.RecognitionModel, Enabled: c.Enabled, APIKey: c.APIKey, DefaultModel: c.TranslationModel}
 	switch model {
 	case "configured-ai":
 		p := a.currentAIProviderConfig()
@@ -85,7 +88,7 @@ func (a *App) TestSubtitleProvider(ctx context.Context) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	return (&subtitles.Bailian{Client: client}).TestPolicy(ctx, a.SubtitleConfig().APIKey)
+	return (&subtitles.Bailian{Client: client}).TestPolicy(ctx, a.SubtitleConfig().APIKey, a.SubtitleConfig().RecognitionModel)
 }
 func (a *App) translateSubtitleCues(ctx context.Context, r storage.SubtitleRecord, cues []subtitles.Cue) (result []subtitles.Cue, err error) {
 	cfg, err := a.subtitleRuntime(r.Job.TranslationModel)

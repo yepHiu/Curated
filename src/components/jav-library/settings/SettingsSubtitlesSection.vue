@@ -6,6 +6,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Captions, Eye, EyeOff } from "lucide-vue-next"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
@@ -40,11 +41,11 @@ async function testProvider() {
   catch (e) { error.value = e instanceof Error ? e.message : String(e) }
   finally { busy.value = false }
 }
-onMounted(async () => { try { cfg.value = await service.settings() } catch (e) { error.value = String(e) } })
+onMounted(async () => { try { cfg.value = await service.settings(); cfg.value.recognitionModel ??= "qwen-audio-3.1-asr-flash-filetrans" } catch (e) { error.value = String(e) } })
 async function save() {
   if (!cfg.value) return
   busy.value = true; error.value = ""; saved.value = false
-  try { cfg.value = await service.saveSettings({ enabled: cfg.value.enabled, translationModel: cfg.value.translationModel, ...(key.value ? { apiKey: key.value } : {}) }); key.value = ""; revealedKey.value = ""; keyVisible.value = false; saved.value = true }
+  try { cfg.value = await service.saveSettings({ recognitionModel: cfg.value.recognitionModel, enabled: cfg.value.enabled, translationModel: cfg.value.translationModel, ...(key.value ? { apiKey: key.value } : {}) }); key.value = ""; revealedKey.value = ""; keyVisible.value = false; saved.value = true }
   catch (e) { error.value = e instanceof Error ? e.message : String(e) }
   finally { busy.value = false }
 }
@@ -66,8 +67,16 @@ async function save() {
           <Switch id="subtitle-enabled" v-model="cfg.enabled" :disabled="!cfg.canManage || busy" />
         </Field>
         <Field class="min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <FieldLabel class="min-w-0 flex-1 text-sm font-semibold text-foreground">{{ t('subtitles.recognitionModel') }}</FieldLabel>
-          <p class="min-w-0 text-sm text-muted-foreground sm:max-w-[60%] sm:text-right">{{ t('subtitles.providerDescription') }}</p>
+          <FieldLabel for="subtitle-recognition-model" class="min-w-0 flex-1 text-sm font-semibold text-foreground">{{ t('subtitles.recognitionModel') }}</FieldLabel>
+          <div class="w-full min-w-0 sm:w-80 sm:max-w-[60%] sm:shrink-0">
+            <Select v-model="cfg.recognitionModel" :disabled="!cfg.canManage || busy">
+              <SelectTrigger id="subtitle-recognition-model" class="w-full min-w-0" :aria-label="t('subtitles.recognitionModel')"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectGroup>
+                <SelectItem value="qwen-audio-3.1-asr-flash-filetrans">{{ t('subtitles.asr31') }}</SelectItem>
+                <SelectItem value="qwen3-asr-flash-filetrans">{{ t('subtitles.asr3') }}</SelectItem>
+              </SelectGroup></SelectContent>
+            </Select>
+          </div>
         </Field>
         <Field class="min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4" :data-disabled="!cfg.canManage || busy || undefined">
           <div class="min-w-0 flex-1">
