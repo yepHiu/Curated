@@ -127,3 +127,15 @@ Web 模式的开关和偏好由 `PATCH /api/settings` 原子持久化。写真�
 ### 1.7.0 discovery preference
 
 `library-config.cfg` additionally persists `discoveryEnabled` (default true). It only advertises when LAN is enabled and actually listening; restart Server after changing. This setting does not grant access or replace PIN authentication. Desktop proxy/login preferences are separate local settings.
+
+## AI subtitle settings and files — 2026-10-16
+
+`library-config.cfg` 新增 `subtitleProvider`：
+
+```json
+{"subtitleProvider":{"enabled":false,"apiKey":"","translationModel":"configured-ai"}}
+```
+
+`translationModel` 仅支持 configured-ai、qwen-flash、qwen-plus；密钥保存在 Server 配置，读取设置只返回 apiKeyConfigured，不回显。PATCH 省略 apiKey 保留，空字符串清除。配置操作仅 Server 本机可用，与 Agent 工具权限独立。
+
+每个视频的最终字幕与阅读文本在同目录 `sub/` 中，以视频stem命名；冲突使用任务后缀，保留原文件。临时音频和JSON对白在cacheDir/subtitle-jobs，不进入媒体目录。扫描仍仅识别已有媒体扩展名，sub中的SRT/TXT不作为影片导入。普通整理在移动视频后只复制登记且hash匹配的成品并更新索引，旧文件保留；复制失败保留旧资产以便恢复，不删除用户或其他影片字幕。记录删除保留磁盘成品，永久删除只删除已登记且内容未变化的字幕。离线路径迁移同一事务同步字幕源路径，需将sub随媒体搬迁，跨平台真实恢复仍待验收；不要以整目录递归删除sub处理字幕生命周期。

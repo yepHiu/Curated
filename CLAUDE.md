@@ -779,3 +779,25 @@ Migration 0062 persists per-movie successful/no-match analysis and backfills eli
 ### AI per-movie skip policy (2026-10-03)
 
 Migration 0063 stores pending user decisions in movie_topic_issues; failed/conflict checkpoints and problem records commit atomically, success/no-match clears the queue in the same transaction. Issues take priority over older analysis and are excluded from default unorganized/outdated scopes. Vocabulary response errors shrink to single-movie scope before skipping; staged definitions cannot leak from rejected pages. Explicit task retry re-prepares pending vocabulary failures while preserving completed items. Global outages, permissions/settings and checkpoint failures remain task blockers. Completion summarizes skipped count; users inspect, individually retry, retry scope issues, or leave for later. No configuration changes.
+
+## AI subtitles — 2026-10-16
+
+All business calls use existing authentication/PIN rules. The write/test/reveal operations below require direct Server-local access; remote authenticated clients can read and download. `fileId` always belongs to the selected movie. Models: `configured-ai`, `qwen-flash`, `qwen-plus`.
+
+| Method / path | Contract |
+|---|---|
+| `GET /api/subtitles/settings` | Redacted settings: enabled; apiKeyConfigured; translationModel; configuredModel; request-specific canManage. Never returns the key. |
+| `PATCH /api/settings` | Optional subtitleProvider: enabled; apiKey; translationModel. Omit apiKey to retain it; explicit empty string clears it. Local only. |
+| `POST /api/subtitles/provider/test` | Local; checks saved-key temporary upload authorization only. Does not upload audio or call ASR. |
+| `GET /api/library/movies/{movieId}/subtitle-audio-tracks?fileId=…` | Audio-relative index; language/title/codec/channels. |
+| `POST /api/library/movies/{movieId}/subtitle-jobs` | Local; JSON requestId (8–128 chars); fileId; translationModel; audioTrack (audio-relative index). Returns 202 job; same request/file reuses existing job. |
+| `GET /api/library/movies/{movieId}/subtitle-jobs` | Persisted jobs and validated output metadata. |
+| `GET /api/subtitle-jobs/{jobId}` | State; stage; completed/total for that stage; error; timestamps; assets. |
+| `POST /api/subtitle-jobs/{jobId}/{cancel or retry}` | Local; durable cancellation or retry from checkpoints. |
+| `GET /api/library/movies/{movieId}/subtitles?fileId=…` | Latest usable completed generation for selected file. |
+| `GET /api/subtitles/{assetId}/content` | UTF-8 subtitle/text body; optional download=1 attachment. Metadata-backed ID only; size/hash/source validated. |
+| `POST /api/subtitles/{assetId}/reveal` | Local; system file browser for registered output, no path input. |
+
+Job states: queued; running; completed; failed; partial_failed; blocked; cancelled. Stages: preparing; extracting; uploading; recognizing; translating; saving; done. Counts belong to the current stage, rather than an invented whole-job percentage. Closing a dialog does not cancel work. Subtitle jobs are not projected to the generic task-center SSE stream; clients poll persisted metadata (UI every two seconds).
+
+Migration 0066 stores metadata in subtitle_jobs; cues/audio are temporary cache checkpoints. Final files are next to the video under sub/. See the handbook and implementation record for recovery/retention and validation limits.

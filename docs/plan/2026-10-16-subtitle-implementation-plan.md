@@ -4,6 +4,54 @@
 状态：in-progress
 关联需求：REQ-0062；用户于 2026-10-16 授权开始实施
 
+## 实施记录（2026-10-16，源码集成完成；完整实机验收待补）
+
+用户已授权实施。本节记录最终实现；下文设计目标在冲突处以本节和源码为准。REQ-0062 登记 implemented / 90，尚未标记 verified。
+
+| 阶段 | 当前结果 | 证据与限制 |
+|---|---|---|
+| P0 | 供应商短样和 Windows 引擎通过 | 千问3.1真实约25秒音频；Flash/Plus各两句ID严格对齐；Windows mpv真实加载双语、样式/延时/关闭命令通过。macOS字幕实机未测。 |
+| P1/P2 | 后端生成链路已集成 | 迁移0066、密钥脱敏、本机管理、幂等队列、10分钟FLAC分片、临时上传、异步识别、严格翻译、检查点恢复、保存三件套及清理。合成媒体真实FFmpeg提取+fake provider端到端通过。 |
+| P3 | 设置与详情弹窗已集成 | 单一模型选择、视频/CD与音轨选择、明确开始、真实阶段数量、取消/重试、关闭继续、成品下载/定位、中英日；Mock不伪造云端成功。390px弹窗与1440px设置截图已检查。 |
+| P4 | Web字幕源码已集成 | 有界SRT解析、绝对时间、重叠cue、正延时、纯文本、共享样式；用例覆盖非零时间/换片/迟到响应隔离。真实整片直连/HLS视觉矩阵待补。 |
+| P5 | 原生字幕源码已集成 | main按当前Session下载受管资产、私有临时SRT、mpv调度、退出清理、受控命令、截图video-only。Windows真实引擎通过，macOS视觉待补。 |
+| P6 | 生命周期和文档已集成 | 整理复制受管字幕、永久删除保护用户修改、离线路径迁移同事务同步源路径、文档更新。跨平台恢复、整片质量及磁盘满/NAS等硬件故障验收待补。 |
+
+实际存储与恢复：
+
+- SQLite `subtitle_jobs` 一张元数据表；不永久保存对白。供应商taskId、识别cue和翻译进度集中在 `<cacheDir>/subtitle-jobs/<id>/checkpoint.json`，持久写入后才继续；音频同工作区。成功清理，失败/取消约24小时清理。
+- requestId幂等、同文件单一活动任务，最多排队8个文件、串行worker。提交意图在付费提交前持久化，未知提交响应不盲目重发；已保存taskId继续轮询。
+- 成品三件套独占创建/fsync，同名加任务后缀；旧成品保留。译文已齐的保存重试不要求密钥、不调用模型；失败翻译保留识别及已译句子。
+- 固定10分钟分片，无重叠切片。翻译每批30句，使用 `subtitle-translation-v2` 独立TXT；模型/endpoint/提示词版本冻结。原文与译文共用时间边界。字幕翻译token进入现有AI用量报表subtitle渠道；ASR金额没有虚构估算。
+- 百炼临时上传继续使用，每个云端文件48小时；「验证密钥」只读上传授权，不上传、不调用ASR，界面明确说明测试范围。
+- 任务由App生命周期管理，弹窗每2秒轮询元数据；**当前未投影通用任务中心或SSE**。不把阶段数量换算为虚假的整体百分比。
+- 播放器样式按设备存储；模式/偏移按Server origin、fileId和资产版本隔离。Web与原生均在打开时读取成品，**同一播放会话重新生成后需重新打开播放器加载新版**；自动热更新留待补充。
+- 整理时复制已登记/hash匹配的成品并保留原件；不是递归移动整个sub。离线路径迁移在更新movie_files的同一事务中同步字幕JSON sourcePath；不复制媒体，也不重新计算资产哈希，备份恢复必须包括媒体sub。
+
+验证记录（日志为忽略的本地工作区资料，不含密钥/对白）：
+
+| 检查 | 结果 |
+|---|---|
+| `go test ./...` | 全部通过；`.workspace/subtitle-go-all.log` |
+| `go vet ./...` | 通过；`.workspace/subtitle-go-vet.log` |
+| 字幕/Server/config/prompts定向测试 | 通过；`.workspace/subtitle-backend-final.log` |
+| 前端全量 `VITE_USE_WEB_API=false pnpm test --maxWorkers=4` | 318文件、1747测试全部通过；`.workspace/subtitle-front-all-mock.log` |
+| storage/maintenance/subtitles生命周期定向测试 | 通过；`.workspace/subtitle-lifecycle-final.log` |
+| 新增Web时间轴/版本隔离测试 | 3项通过；`.workspace/subtitle-playback-web-final.log` |
+| Electron全量 | 151通过、5跳过；`.workspace/subtitle-electron-final.log` |
+| Windows真实mpv集成 | 2通过（headless命令验证，不等同视觉验收）；`.workspace/subtitle-native-final.log` |
+| `pnpm test:e2e` | 9通过；`.workspace/subtitle-e2e.log` |
+| typecheck / lint / Web build / Electron main build | 通过；`.workspace/subtitle-*-final.log`及`subtitle-web-build.log` |
+| 真实千问短样 | 上传→异步识别→签名结果下载，Flash/Plus非空译文及句子ID对齐通过；`.workspace/subtitle-live-provider.log` |
+
+测试环境说明：根目录开发 `.env` 开启Web API时，全量单元测试中原有设置测试没有模拟本机权限探测，出现25项设置断言失败，以及2项并行播放器超时。未改开发配置；按Mock单元环境全量重跑全部通过，两个播放器文件单独重跑也通过。不能把默认Web环境的失败记录抹去。新增测试随后定向复核通过。未运行需单独授权的display suite。
+
+真实短样验证修复了两个实际兼容问题：签名OSS结果GET不可带JSON Content-Type，否则签名403；翻译提示词须精确约束输出translation字段，避免Flash返回text。供应商调用已付少量短样费用，没有进行整片付费生成；未更改运行Server的密钥、业务库或服务配置。
+
+已完成的本地提交：c106ef2b（计划/原型）；b5dfc569（非思考参数）；9d270370（后端生成）；cbcc9fa7（共享SRT）；22c049eb（设置/弹窗）。e911a819（Web/原生播放器）；16c3a4eb（路径迁移）；bc567c70（合成媒体/保存重试/整理测试）。文档独立提交，未推送。
+
+交付边界：源码集成与自动检查完成，未构建发布安装包、未替换当前Server。用户体验需重建/重启Server，原生控制需更新Desktop。剩余实机验收包括macOS字幕视觉、整片Flash/Plus质量与真实用量比较、全量播放/故障矩阵和跨平台媒体恢复；不得宣称这些已经通过。
+
 ## 1. 范围、依据与当前状态
 
 本计划把已讨论的产品行为拆成可执行工作。需求背景、价格核对及实验记录见 [ASR 调研与集成讨论](2026-10-15-realtime-translation-asr.md)，界面基准见 [HTML 交互原型](2026-10-16-subtitle-ui-prototype.html)。本计划是后续实施入口；旧调研中「永久保存结构化对白」「成品放 Server 资产目录」「先选服务再选模型」的早期建议不再适用。

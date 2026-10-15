@@ -3,6 +3,14 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-10-16 AI 字幕（源码已实现，完整实机验收待补）
+
+详情 More / SubtitleJobDialog 显式发起；SettingsSubtitlesSection 配置 subtitleProvider（enabled/apiKey/translationModel），本机写入 library-config.cfg，GET 只返回密钥已配置状态。识别固定北京 qwen-audio-3.1-asr-flash-filetrans；翻译 configured-ai / qwen-flash / qwen-plus，千问使用非思考请求。内部字幕服务独立串行 worker，迁移0066 subtitle_jobs 仅元数据；每10分钟音频一片，cacheDir/subtitle-jobs/<id> JSON检查点，成功清理、失败/取消约24h清理。成品在影片旁 sub/，ja.srt/zh-CN.srt/zh-CN.txt，不覆盖旧文件。
+
+新增 API：GET /api/subtitles/settings；POST /api/subtitles/provider/test；GET /api/library/movies/{movieId}/subtitle-audio-tracks；POST/GET .../subtitle-jobs；GET /api/subtitle-jobs/{jobId}；POST .../{cancel|retry}；GET .../movies/{movieId}/subtitles；GET /api/subtitles/{assetId}/content；POST .../reveal。写入/测试/定位仅本机，远端认证只读/下载。弹窗每2秒读取持久化进度，未接通用任务中心/SSE。测试密钥只验证上传授权。正文提示词 subtitle-translation-v2；翻译 token 沿用AI usage的subtitle渠道。
+
+Web使用绝对媒体时间的纯文本字幕层；原生由main认证下载到私有临时文件并控制mpv，renderer不传路径或URL；四种语言模式、样式和正值延后偏移，截图维持video-only。样式按设备；偏移按Server/file/资产版本。当前会话生成新版后需重开播放器。普通整理复制受管字幕并更新索引；永久删除只删登记且hash未变化文件。离线路径迁移同一事务更新字幕源路径，成品仍需随媒体搬迁。短音频真实供应商及Windows mpv命令验证通过，macOS字幕画面和整片质量未验收。详见docs/guide.md和字幕实施计划。
+
 ## macOS Desktop 原生播放 — 2026-10-09
 
 Mac 正式包内置固定版本 libmpv、arm64 dylib 依赖闭包、对应源码/资源、配方/SBOM 与许可；用户无需安装 MPV、Homebrew 或设置环境变量。新 Mac 安装（未保存播放偏好）默认使用原生播放器，已保存选择保留。正式包仅加载 app 内引擎，忽略开发覆盖变量；开发态仍允许 Homebrew/绝对 CURATED_NATIVE_LIBMPV。
