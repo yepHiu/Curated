@@ -403,6 +403,6 @@ function auditLine(entry: AIAuditEntry) {
         </CardContent>
       </Card>
     </template>
+    <SettingsSubtitlesSection />
   </div>
-  <SettingsSubtitlesSection />
 </template>

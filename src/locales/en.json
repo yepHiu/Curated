@@ -2505,6 +2505,7 @@
     "enterKey": "Enter Bailian API key",
     "keyHint": "Recognition and Qwen translation share this key, stored only on Server.",
     "clearKey": "Clear saved key",
+    "recognitionModel": "Transcription model",
     "translationModel": "Subtitle translation model",
     "configuredModel": "Your configured AI model",
     "economic": "Economical",

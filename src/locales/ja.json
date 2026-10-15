@@ -2505,6 +2505,7 @@
     "enterKey": "百錬 API キーを入力",
     "keyHint": "認識と Qwen 翻訳で共通。キーは Server のみに保存します。",
     "clearKey": "保存したキーを削除",
+    "recognitionModel": "字幕認識モデル",
     "translationModel": "字幕翻訳モデル",
     "configuredModel": "設定済みの AI モデル",
     "economic": "低コスト",
