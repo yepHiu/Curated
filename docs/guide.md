@@ -936,3 +936,5 @@ New releases display `Curated YYYYMMDD` with `-2`, `-3`, etc. for later same-day
 字幕识别模型改为右侧下拉：千问3.1文件转写 `qwen-audio-3.1-asr-flash-filetrans`（默认）和千问3文件转写 `qwen3-asr-flash-filetrans`。`subtitleProvider.recognitionModel`随设置保存；旧配置缺失默认3.1。任务创建时冻结recognitionModel，重试/恢复继续使用原模型，旧任务缺失仍按3.1处理。上传授权使用对应模型；3.1提交file_urls/language_hints并解析results，3提交file_url/language并解析result。测试密钥按当前已保存的识别模型检查上传授权。无新增端点/数据表，识别模型进入任务JSON元数据。
 
 配置校验、两代协议分支（含千问3单结果）、字幕/Server测试通过；38项相关前端测试、typecheck、定向ESLint通过。浏览器确认两个选项及切换；未进行本轮付费云调用，两代模型既有真实demo记录见2026-10-15调研。
+
+字幕设置现采用自动保存：开关/模型变更立即保存，API Key输入结束稍后或失焦保存。按钮“测试”会先保存当前输入，再测试所选识别模型的上传权限；完整识别与翻译以任务结果为准。关闭功能保留配置。
