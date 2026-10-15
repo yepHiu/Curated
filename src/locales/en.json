@@ -2132,6 +2132,8 @@
     "coverViewerAria": "Open {code} poster in viewer"
   },
   "aiSettings": {
+    "connectivityPassed": "Connected",
+    "connectivityFailed": "Connection failed",
     "contextCustom": "Custom capacity",
     "contextHint": "Enter the total context capacity your provider enables for this model. Presets fill capacity only and remain editable. Space is reserved for replies, with older context compacted automatically.",
     "contextInvalid": "Enter a whole number between {min} and {max}.",

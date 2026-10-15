@@ -4,7 +4,7 @@ import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { BarChart3, RefreshCw, Server, ShieldCheck } from "lucide-vue-next"
+import { BarChart3, Check, Loader2, RefreshCw, Server, ShieldCheck, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -345,9 +345,27 @@ function auditLine(entry: AIAuditEntry) {
             </template>
             <p v-else-if="providerAutosave.saving.value || providerAutosave.dirty.value || providerAutosave.saved.value" role="status" class="text-muted-foreground">{{ providerAutosave.saving.value || providerAutosave.dirty.value ? t('common.saving') : t('settings.autoPersistSaved') }}</p>
           </div>
-          <div class="flex flex-col gap-3"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end"><div class="flex shrink-0 flex-wrap justify-end gap-2"><SettingsHint :text="[t('aiSettings.providerHint'), t('aiSettings.autoSaveHint')].join('\n\n')">
-                  <Button variant="outline" size="sm" class="rounded-full" :disabled="busy" data-ai-provider-test @click="testProvider">{{ testingProvider ? t('settings.experimentalTestTesting') : t('settings.experimentalTest') }}</Button>
-                </SettingsHint></div></div><p v-if="providerTestResult" :role="providerTestResult.ok ? 'status' : 'alert'" aria-live="polite" :class="['rounded-md border px-3 py-2 text-sm', providerTestResult.ok ? 'border-success/30 bg-success/10 text-success' : 'border-destructive/30 bg-destructive/10 text-destructive']" :data-status="providerTestResult.ok ? 'success' : 'failed'" data-ai-provider-test-result>{{ providerTestResult.text }}</p></div>
+          <div class="flex justify-end">
+            <SettingsHint :text="providerTestResult?.text || [t('aiSettings.providerHint'), t('aiSettings.autoSaveHint')].join('\n\n')">
+              <Button
+                variant="outline"
+                size="sm"
+                class="rounded-full"
+                :disabled="busy"
+                :aria-busy="testingProvider"
+                :aria-label="providerTestResult ? `${t('settings.experimentalTest')}: ${providerTestResult.text}` : undefined"
+                aria-live="polite"
+                :data-status="testingProvider ? 'testing' : providerTestResult ? (providerTestResult.ok ? 'success' : 'failed') : undefined"
+                data-ai-provider-test
+                @click="testProvider"
+              >
+                <Loader2 v-if="testingProvider" data-icon="inline-start" class="motion-safe:animate-spin" aria-hidden="true" />
+                <Check v-else-if="providerTestResult?.ok" data-icon="inline-start" aria-hidden="true" />
+                <X v-else-if="providerTestResult" data-icon="inline-start" aria-hidden="true" />
+                {{ testingProvider ? t('settings.experimentalTestTesting') : providerTestResult ? t(providerTestResult.ok ? 'aiSettings.connectivityPassed' : 'aiSettings.connectivityFailed') : t('settings.experimentalTest') }}
+              </Button>
+            </SettingsHint>
+          </div>
         </CardContent>
       </Card>
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-statistics-card>

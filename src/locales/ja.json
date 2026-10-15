@@ -2132,6 +2132,8 @@
     "coverViewerAria": "{code} のポスターをビューアで開く"
   },
   "aiSettings": {
+    "connectivityPassed": "接続成功",
+    "connectivityFailed": "接続失敗",
     "contextCustom": "カスタム容量",
     "contextHint": "プロバイダーがこのモデルに提供する文脈の総容量を入力してください。プリセットは容量のみを入力し、変更も可能です。回答用の領域を確保し、古い文脈を自動整理します。",
     "contextInvalid": "{min} から {max} までの整数を入力してください。",
