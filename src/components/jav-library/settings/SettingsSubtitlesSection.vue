@@ -66,6 +66,7 @@ async function save() {
           <SettingsHint :text="t('subtitles.cloudNotice')"><FieldLabel for="subtitle-enabled" class="text-sm font-semibold text-foreground">{{ t('subtitles.enable') }}</FieldLabel></SettingsHint>
           <Switch id="subtitle-enabled" v-model="cfg.enabled" :disabled="!cfg.canManage || busy" />
         </Field>
+        <template v-if="cfg.enabled">
         <Field class="min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <FieldLabel for="subtitle-recognition-model" class="min-w-0 flex-1 text-sm font-semibold text-foreground">{{ t('subtitles.recognitionModel') }}</FieldLabel>
           <div class="w-full min-w-0 sm:w-80 sm:max-w-[60%] sm:shrink-0">
@@ -95,15 +96,16 @@ async function save() {
             <SubtitleModelSelect id="subtitle-model" v-model="cfg.translationModel" :configured-model="cfg.configuredModel" :disabled="!cfg.canManage || busy" />
           </div>
         </Field>
+        </template>
       </FieldGroup>
       <p v-if="cfg && !cfg.canManage" class="text-sm text-muted-foreground">{{ t('subtitles.localOnly') }}</p>
       <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0 flex-1 text-xs text-muted-foreground" role="status">
-          <p v-if="tested">{{ t('subtitles.testPassed') }}</p>
+          <p v-if="cfg?.enabled && tested">{{ t('subtitles.testPassed') }}</p>
           <p v-else-if="saved">{{ t('subtitles.saved') }}</p>
         </div>
         <div class="flex flex-wrap justify-end gap-2">
-          <Button variant="outline" size="sm" class="rounded-full" :disabled="!cfg?.canManage || !cfg.apiKeyConfigured || !!key || busy" @click="testProvider">{{ t('subtitles.testProvider') }}</Button>
+          <Button v-if="cfg?.enabled" variant="outline" size="sm" class="rounded-full" :disabled="!cfg?.canManage || !cfg.apiKeyConfigured || !!key || busy" @click="testProvider">{{ t('subtitles.testProvider') }}</Button>
           <Button size="sm" class="rounded-full" :disabled="!cfg?.canManage || busy" @click="save">{{ busy ? t('common.loading') : t('subtitles.save') }}</Button>
         </div>
       </div>
