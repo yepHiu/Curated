@@ -131,32 +131,61 @@ onScopeDispose(releaseVolumePointerDrag)
 </script>
 
 <template>
-  <!-- 保留既有播放页的形状和密度；不同引擎只绑定状态与业务动作。 -->
-  <div class="grid w-full items-center gap-x-3 gap-y-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:gap-x-4">
-    <div class="flex items-center justify-center gap-2 sm:justify-start">
-      <slot name="previous" />
-      <Button variant="secondary" size="icon" class="rounded-full bg-white/10 text-white hover:bg-white/20" :disabled="disabled" :aria-label="labels.seekBack" @click="emit('seekBack')">
-        <Rewind />
-      </Button>
-      <Button size="icon-lg" class="rounded-full" :disabled="disabled" :aria-label="playing ? labels.pause : labels.play" @click="emit('toggle')">
-        <Pause v-if="playing" />
-        <Play v-else />
-      </Button>
-      <Button variant="secondary" size="icon" class="rounded-full bg-white/10 text-white hover:bg-white/20" :disabled="disabled" :aria-label="labels.seekForward" @click="emit('seekForward')">
-        <FastForward />
-      </Button>
-      <slot name="next" />
-    </div>
-    <div class="flex flex-wrap items-center justify-center gap-3 sm:col-start-2 sm:justify-end">
-      <div ref="volumeGroup" class="flex h-9 min-w-[min(100%,14rem)] max-w-full flex-1 items-center gap-2 rounded-full bg-white/8 px-3 text-white/80 backdrop-blur sm:min-w-[14rem] sm:flex-initial sm:gap-3 sm:px-4" role="group" :aria-label="labels.volume" @pointerdown.capture="beginVolumePointerDrag">
-        <Button type="button" variant="ghost" size="icon" class="size-9 shrink-0 rounded-full text-white hover:bg-white/15" :disabled="disabled" :aria-pressed="muted" :aria-label="muted ? labels.unmute : labels.mute" @click="emit('mute')">
-          <VolumeX v-if="muted" aria-hidden="true" />
-          <Volume2 v-else aria-hidden="true" />
+  <!-- Web 与原生共用容器断点，以播放器可用宽度决定按钮密度。 -->
+  <div class="player-transport w-full min-w-0">
+    <div class="flex min-w-0 items-center justify-between gap-2">
+      <div class="flex shrink-0 items-center gap-2">
+        <span class="player-queue-control contents"><slot name="previous" /></span>
+        <Button variant="secondary" size="icon" data-player-seek class="shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20" :disabled="disabled" :aria-label="labels.seekBack" @click="emit('seekBack')">
+          <Rewind />
         </Button>
-        <Slider :model-value="volumeValues" :max="100" :step="1" class="flex-1" :disabled="disabled" :aria-label="labels.volume" @update:model-value="emit('volume', $event)" />
-        <span class="w-10 shrink-0 text-right text-sm leading-none tabular-nums">{{ volumePercent }}%</span>
+        <Button size="icon-lg" class="rounded-full" :disabled="disabled" :aria-label="playing ? labels.pause : labels.play" @click="emit('toggle')">
+          <Pause v-if="playing" />
+          <Play v-else />
+        </Button>
+        <Button variant="secondary" size="icon" data-player-seek class="shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20" :disabled="disabled" :aria-label="labels.seekForward" @click="emit('seekForward')">
+          <FastForward />
+        </Button>
+        <span class="player-queue-control contents"><slot name="next" /></span>
       </div>
-      <slot />
+      <div class="player-actions flex min-w-0 items-center justify-end gap-2">
+        <div ref="volumeGroup" class="player-volume flex h-9 w-48 shrink-0 items-center gap-2 rounded-full bg-white/8 px-2 text-white/80 backdrop-blur" role="group" :aria-label="labels.volume" @pointerdown.capture="beginVolumePointerDrag">
+          <Button type="button" variant="ghost" size="icon" class="size-9 shrink-0 rounded-full text-white hover:bg-white/15" :disabled="disabled" :aria-pressed="muted" :aria-label="muted ? labels.unmute : labels.mute" @click="emit('mute')">
+            <VolumeX v-if="muted" aria-hidden="true" />
+            <Volume2 v-else aria-hidden="true" />
+          </Button>
+          <Slider :model-value="volumeValues" :max="100" :step="1" class="player-volume-slider min-w-0 flex-1" :disabled="disabled" :aria-label="labels.volume" @update:model-value="emit('volume', $event)" />
+          <span class="player-volume-percent w-10 shrink-0 text-right text-sm leading-none tabular-nums">{{ volumePercent }}%</span>
+        </div>
+        <slot />
+      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.player-transport { container: player-transport / inline-size; }
+.player-actions :deep(button) { flex-shrink: 0; }
+.player-actions :deep(button[aria-pressed="true"]),
+.player-actions :deep(button[data-state="open"]) {
+  background-color: color-mix(in srgb, var(--primary) 18%, transparent);
+  color: var(--primary);
+}
+@container player-transport (max-width: 960px) {
+  :deep([data-player-secondary]) { display: none; }
+}
+@container player-transport (max-width: 760px) {
+  .player-volume { width: 2.25rem; padding: 0; background: transparent; }
+  .player-volume-slider, .player-volume-percent { display: none; }
+}
+@container player-transport (max-width: 640px) {
+  :deep([data-player-auxiliary]) { display: none; }
+}
+@container player-transport (max-width: 480px) {
+  :deep([data-player-capture]:not([aria-pressed="true"])) { display: none; }
+  .player-queue-control { display: none; }
+}
+@container player-transport (max-width: 360px) {
+  [data-player-seek] { display: none; }
+}
+</style>

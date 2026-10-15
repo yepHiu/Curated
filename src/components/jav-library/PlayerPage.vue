@@ -16,6 +16,7 @@ import {
   Pause,
   PictureInPicture2,
   Play,
+  Repeat2,
   SkipBack,
   SkipForward,
 } from "lucide-vue-next"
@@ -28,7 +29,7 @@ import PlayerPlaylistPanel from "@/components/jav-library/PlayerPlaylistPanel.vu
 import PlayerPlaylistRevealTab from "@/components/jav-library/PlayerPlaylistRevealTab.vue"
 import PlayerProgressFrameMarkers from "@/components/jav-library/PlayerProgressFrameMarkers.vue"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu'
 import { Slider } from "@/components/ui/slider"
 import {
   clearActivePlaybackSession,
@@ -3065,23 +3066,6 @@ const videoPreloadMode = computed(() =>
           </p>
         </div>
         <MoviePartSelect v-if="(movie.files?.length ?? 0) > 1" :files="movie.files!" :model-value="selectedFileId" :portal-to="surfaceRef ?? undefined" :disabled="isResolvingPlayback" @update:model-value="openMoviePart" />
-        <div v-if="playbackSrc && chromeVisible" data-player-capture-toolbar class="flex max-w-full shrink-0 flex-wrap gap-1 rounded-lg bg-background/90 p-1 text-foreground max-sm:[&_button]:min-h-11" @click.stop @pointerdown.stop>
-          <Button size="sm" variant="ghost" @click="stepFrame(-1)" :aria-label="t('curated.previousFrame')"><SkipBack /></Button>
-          <Button size="sm" variant="ghost" @click="captureSingleFrame"><Camera />{{ t('curated.captureAction') }}</Button>
-          <Button v-if="libraryService.supportsSourceFrame" size="sm" variant="ghost" @click="extractSourceFrame">{{ t('curated.captureSource') }}</Button>
-          <Button size="sm" variant="ghost" @click="toggleClipRecording" :disabled="clipCapturePhase === 'processing'">{{ clipCaptureIsRecording ? t('curated.stopClip') : clipFormat.toUpperCase() }}</Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger as-child><Button size="icon-sm" variant="ghost" :disabled="clipCapturePhase !== 'idle'" :aria-label="t('curated.clipFormat')"><ChevronDown /></Button></DropdownMenuTrigger>
-            <DropdownMenuContent :portal-to="surfaceRef ?? undefined">
-              <DropdownMenuRadioGroup v-model="clipFormat">
-                <DropdownMenuRadioItem value="gif">GIF</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="mp4">MP4</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="webm">WebM</DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button size="sm" variant="ghost" @click="stepFrame(1)" :aria-label="t('curated.nextFrame')"><SkipForward /></Button>
-        </div>
       </div>
 
       <Transition
@@ -3416,7 +3400,7 @@ const videoPreloadMode = computed(() =>
             <template #previous>
               <Button
                 v-if="playlistActive"
-                variant="secondary"
+                variant="ghost"
                 size="icon"
                 class="rounded-full bg-white/10 text-white hover:bg-white/20"
                 :disabled="!playlistPrevious"
@@ -3430,7 +3414,7 @@ const videoPreloadMode = computed(() =>
             <template #next>
               <Button
                 v-if="playlistActive"
-                variant="secondary"
+                variant="ghost"
                 size="icon"
                 class="rounded-full bg-white/10 text-white hover:bg-white/20"
                 :disabled="!playlistNext"
@@ -3441,6 +3425,27 @@ const videoPreloadMode = computed(() =>
                 <SkipForward />
               </Button>
             </template>
+            <Button data-player-capture variant="ghost" size="icon" class="rounded-full" :disabled="!playbackSrc" :aria-label="t('curated.captureAction')" :title="t('curated.captureAction')" @click="captureSingleFrame"><Camera /></Button>
+            <Button data-player-capture variant="ghost" size="icon" class="rounded-full" :disabled="!playbackSrc || clipCapturePhase === 'processing'" :aria-label="clipCaptureIsRecording ? t('curated.stopClip') : clipFormat.toUpperCase()" :title="clipCaptureIsRecording ? t('curated.stopClip') : clipFormat.toUpperCase()" :aria-pressed="clipCaptureIsRecording" @click="toggleClipRecording"><Film /></Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child><Button data-player-secondary variant="ghost" size="icon" class="rounded-full" :disabled="!playbackSrc" :aria-label="t('curated.clipFormat')"><ChevronDown /></Button></DropdownMenuTrigger>
+              <DropdownMenuContent :portal-to="surfaceRef ?? undefined" align="end" @click.stop @pointerdown.stop>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem @select="stepFrame(-1)">{{ t('curated.previousFrame') }}</DropdownMenuItem>
+                  <DropdownMenuItem @select="stepFrame(1)">{{ t('curated.nextFrame') }}</DropdownMenuItem>
+                  <DropdownMenuItem v-if="libraryService.supportsSourceFrame" @select="extractSourceFrame">{{ t('curated.captureSource') }}</DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuRadioGroup v-model="clipFormat">
+                    <DropdownMenuRadioItem value="gif" :disabled="clipCapturePhase !== 'idle'">GIF</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="mp4" :disabled="clipCapturePhase !== 'idle'">MP4</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="webm" :disabled="clipCapturePhase !== 'idle'">WebM</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button v-if="playlistActive" data-player-auxiliary variant="ghost" size="icon" class="rounded-full" :aria-label="t('player.playlistAutoAdvanceAria')" :aria-pressed="playlistAutoAdvance" @click="setPlaylistAutoAdvance(!playlistAutoAdvance)"><Repeat2 /></Button>
             <PlayerPlaybackSettingsMenu
               :disabled="!playbackSrc"
               :playback-rate="playbackRate"
@@ -3453,10 +3458,11 @@ const videoPreloadMode = computed(() =>
 
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               size="icon"
-              class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
+              class="shrink-0 rounded-full"
               :disabled="!playbackSrc"
+              data-player-auxiliary
               :aria-label="nativePlayerLabel"
               @click="openNativePlayer"
             >
@@ -3464,11 +3470,12 @@ const videoPreloadMode = computed(() =>
             </Button>
 
             <Button
+              data-player-secondary
               v-if="pipSupported"
               type="button"
-              variant="secondary"
+              variant="ghost"
               size="icon"
-              class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
+              class="shrink-0 rounded-full"
               :disabled="!canTogglePip"
               :aria-busy="pipPending"
               :aria-pressed="isPipActive"
@@ -3479,11 +3486,13 @@ const videoPreloadMode = computed(() =>
               <PictureInPicture2 v-else class="size-4 shrink-0" aria-hidden="true" />
             </Button>
 
+            <Button data-player-auxiliary variant="ghost" size="icon" class="rounded-full" :disabled="!playbackSrc" :aria-label="detailedStatsVisible ? t('player.hideStats') : t('player.showStats')" :aria-pressed="detailedStatsVisible" @click="toggleDetailedStats"><Info /></Button>
+
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               size="icon"
-              class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
+              class="shrink-0 rounded-full"
               :disabled="!playbackSrc"
               :aria-pressed="isSurfaceFullscreen"
               :aria-label="
