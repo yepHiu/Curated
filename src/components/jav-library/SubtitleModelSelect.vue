@@ -11,8 +11,8 @@ const { t } = useI18n()
     <SelectTrigger :id="id" class="w-full min-w-0" :aria-label="t('subtitles.translationModel')"><SelectValue /></SelectTrigger>
     <SelectContent><SelectGroup>
       <SelectItem value="configured-ai">{{ t('subtitles.configuredModel') }}{{ configuredModel ? ` · ${configuredModel}` : '' }}</SelectItem>
-      <SelectItem value="qwen-flash">Qwen Flash · {{ t('subtitles.economic') }}</SelectItem>
-      <SelectItem value="qwen-plus">Qwen Plus · {{ t('subtitles.balanced') }}</SelectItem>
+      <SelectItem value="qwen-flash">{{ t('subtitles.flashOption') }}</SelectItem>
+      <SelectItem value="qwen-plus">{{ t('subtitles.plusOption') }}</SelectItem>
     </SelectGroup></SelectContent>
   </Select>
 </template>

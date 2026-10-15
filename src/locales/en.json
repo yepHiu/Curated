@@ -2512,6 +2512,8 @@
     "recognitionModel": "Transcription model",
     "translationModel": "Subtitle translation model",
     "configuredModel": "Your configured AI model",
+    "flashOption": "Qwen Flash (more economical)",
+    "plusOption": "Qwen Plus (balanced)",
     "economic": "Economical",
     "balanced": "Balanced",
     "modelHint": "Flash costs less; Plus suits dialogue translation. Configured AI uses the model above.",

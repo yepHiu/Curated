@@ -2512,6 +2512,8 @@
     "recognitionModel": "字幕認識モデル",
     "translationModel": "字幕翻訳モデル",
     "configuredModel": "設定済みの AI モデル",
+    "flashOption": "Qwen Flash（低コスト）",
+    "plusOption": "Qwen Plus（バランス）",
     "economic": "低コスト",
     "balanced": "バランス",
     "modelHint": "Flash は低価格、Plus は会話の翻訳向け。設定済み AI は上のモデルを使用。",

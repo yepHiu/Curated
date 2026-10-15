@@ -92,7 +92,7 @@ async function save() {
           <div class="min-w-0 flex-1">
             <SettingsHint :text="t('subtitles.modelHint')"><FieldLabel for="subtitle-model" class="text-sm font-semibold text-foreground">{{ t('subtitles.translationModel') }}</FieldLabel></SettingsHint>
           </div>
-          <div class="w-full min-w-0 sm:w-80 sm:max-w-[60%] sm:shrink-0">
+          <div class="w-full min-w-0 sm:w-60 sm:max-w-60 sm:shrink-0">
             <SubtitleModelSelect id="subtitle-model" v-model="cfg.translationModel" :configured-model="cfg.configuredModel" :disabled="!cfg.canManage || busy" />
           </div>
         </Field>
