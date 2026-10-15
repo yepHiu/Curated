@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"curated-backend/internal/contracts"
 	"curated-backend/internal/pathmigration"
 )
 
@@ -19,6 +20,13 @@ func TestPlanAndApplyPathMigrationCoverWhitelistedColumns(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	paths := seedAllPathMigrationColumns(t, store, sourceRoot, targetRoot)
+	var fileID, oldPath string
+	if err := store.db.QueryRow(`SELECT id, location FROM movie_files WHERE movie_id='movie-1'`).Scan(&fileID, &oldPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveSubtitleRecord(ctx, SubtitleRecord{SourcePath: oldPath, Revision: "original-revision", RequestID: "migration-request", Job: contracts.SubtitleJob{ID: "subtitle-job", MovieID: "movie-1", FileID: fileID, State: "completed", Assets: []contracts.SubtitleAsset{{ID: "asset", Name: "CODE-1.zh-CN.srt", Hash: "original-hash"}}}}); err != nil {
+		t.Fatal(err)
+	}
 	mapping := mustPathMapping(t, sourceRoot, targetRoot)
 	plan, err := store.PlanPathMigration(ctx, PathMigrationOptions{Mapping: mapping})
 	if err != nil {
@@ -60,6 +68,10 @@ func TestPlanAndApplyPathMigrationCoverWhitelistedColumns(t *testing.T) {
 
 	assertStoredPath(t, store, `SELECT path FROM library_paths WHERE id = 'library-1'`, paths["library_paths"])
 	assertStoredPath(t, store, `SELECT location FROM movies WHERE id = 'movie-1'`, paths["movies"])
+	record, err := store.SubtitleRecord(ctx, "subtitle-job")
+	if err != nil || record.SourcePath != paths["movies"] || record.Revision != "original-revision" || record.Job.Assets[0].Hash != "original-hash" {
+		t.Fatalf("subtitle metadata did not migrate with its file: %+v, %v", record, err)
+	}
 	assertStoredPath(t, store, `SELECT path FROM scan_items WHERE task_id = 'scan-1'`, paths["scan_items"])
 	assertStoredPath(t, store, `SELECT local_path FROM media_assets WHERE id = 'asset-1'`, paths["media_assets"])
 	assertStoredPath(t, store, `SELECT avatar_local_path FROM actors WHERE name = 'Actor 1'`, paths["actors"])

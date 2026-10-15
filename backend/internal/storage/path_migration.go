@@ -171,6 +171,17 @@ func (s *SQLiteStore) ApplyPathMigration(ctx context.Context, options PathMigrat
 		if rowsAffected != 1 {
 			return result, fmt.Errorf("apply %s.%s rowid=%d affected %d rows", spec.table, spec.column, change.rowID, rowsAffected)
 		}
+		// Subtitle paths are derived from the owning movie file, not independent
+		// migration targets. Keep their JSON metadata in this same transaction.
+		if spec.table == "movie_files" && spec.column == "location" {
+			_, err = tx.ExecContext(ctx, `UPDATE subtitle_jobs
+				SET payload=json_set(payload, '$.sourcePath', ?)
+				WHERE file_id=(SELECT id FROM movie_files WHERE rowid=?)
+				AND json_extract(payload, '$.sourcePath')=?`, change.newPath, change.rowID, change.oldPath)
+			if err != nil {
+				return result, fmt.Errorf("migrate subtitle file ownership: %w", err)
+			}
+		}
 	}
 	if err := verifyQuickCheckQuery(ctx, tx); err != nil {
 		return result, err
