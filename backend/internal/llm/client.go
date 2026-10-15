@@ -68,6 +68,8 @@ type TurnRequest struct {
 
 // ClientConfig describes one OpenAI-compatible endpoint.
 type ClientConfig struct {
+	EnableThinking *bool
+
 	// BaseURL is the API root, e.g. http://127.0.0.1:11434/v1.
 	BaseURL string
 	// APIKey is sent as a bearer token; empty for local servers without auth.
@@ -114,6 +116,8 @@ func NewClient(cfg ClientConfig, httpClient *http.Client) *Client {
 }
 
 type chatCompletionRequest struct {
+	EnableThinking *bool `json:"enable_thinking,omitempty"`
+
 	Model      string        `json:"model"`
 	Messages   []ChatMessage `json:"messages"`
 	Stream     bool          `json:"stream,omitempty"`
@@ -270,9 +274,10 @@ func (c *Client) Complete(ctx context.Context, messages []ChatMessage, maxTokens
 	observation := Observation{}
 	defer func() { c.observe(started, observation, retErr) }()
 	body := chatCompletionRequest{
-		Model:     strings.TrimSpace(c.cfg.Model),
-		Messages:  messages,
-		MaxTokens: maxTokens,
+		EnableThinking: c.cfg.EnableThinking,
+		Model:          strings.TrimSpace(c.cfg.Model),
+		Messages:       messages,
+		MaxTokens:      maxTokens,
 	}
 	resp, err := c.do(ctx, body)
 	if err != nil {
@@ -354,12 +359,13 @@ func (c *Client) StreamTurn(ctx context.Context, req TurnRequest, onDelta func(s
 	observation := Observation{}
 	defer func() { c.observe(started, observation, retErr) }()
 	body := chatCompletionRequest{
-		Model:      strings.TrimSpace(c.cfg.Model),
-		Messages:   req.Messages,
-		Stream:     true,
-		MaxTokens:  req.MaxTokens,
-		Tools:      encodeTools(req.Tools),
-		StreamOpts: &streamOpts{IncludeUsage: true},
+		EnableThinking: c.cfg.EnableThinking,
+		Model:          strings.TrimSpace(c.cfg.Model),
+		Messages:       req.Messages,
+		Stream:         true,
+		MaxTokens:      req.MaxTokens,
+		Tools:          encodeTools(req.Tools),
+		StreamOpts:     &streamOpts{IncludeUsage: true},
 	}
 	if choice := strings.TrimSpace(req.ToolChoice); choice != "" {
 		body.ToolChoice = choice
