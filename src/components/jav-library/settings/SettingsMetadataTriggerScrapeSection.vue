@@ -32,7 +32,7 @@ const { t } = useI18n()
       <Button
         type="button"
         variant="default"
-        class="h-11 shrink-0 rounded-2xl px-5 font-medium"
+        class="h-11 self-end shrink-0 rounded-2xl px-5 font-medium"
         :disabled="busy"
         data-trigger-scrape-run
         @click="emit('run')"

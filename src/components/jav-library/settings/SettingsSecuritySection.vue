@@ -397,12 +397,12 @@ async function confirmTrustedSessionRevoke() {
             </div>
             <div
               v-if="!status.pinEnabled"
-              class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center"
+              class="flex shrink-0 flex-wrap justify-end gap-2"
             >
               <Button
                 data-setup-pin-trigger
                 type="button"
-                class="shrink-0 rounded-xl"
+                class="self-end shrink-0 rounded-xl"
                 :disabled="!authEnabled"
                 @click="openSetupDialog"
               >
@@ -411,13 +411,13 @@ async function confirmTrustedSessionRevoke() {
             </div>
             <div
               v-else
-              class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center"
+              class="flex shrink-0 flex-wrap justify-end gap-2"
             >
               <Button
                 data-change-pin-trigger
                 type="button"
                 variant="outline"
-                class="shrink-0 rounded-xl"
+                class="self-end shrink-0 rounded-xl"
                 :disabled="!authEnabled"
                 @click="openChangeDialog"
               >
@@ -427,7 +427,7 @@ async function confirmTrustedSessionRevoke() {
                 data-disable-pin-trigger
                 type="button"
                 variant="outline"
-                class="shrink-0 rounded-xl"
+                class="self-end shrink-0 rounded-xl"
                 :disabled="!authEnabled || settingsBusy"
                 @click="openDisableDialog"
               >
@@ -584,12 +584,12 @@ async function confirmTrustedSessionRevoke() {
             </DialogContent>
           </Dialog>
 
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex flex-wrap justify-end gap-3">
             <SettingsHint :text="t('settings.securityLockNowHint')">
               <Button
                 variant="outline"
                 size="sm"
-                class="shrink-0 rounded-xl"
+                class="self-end shrink-0 rounded-xl"
                 :disabled="!status.pinEnabled || lockBusy"
                 @click="lockNow"
               >
@@ -672,7 +672,7 @@ async function confirmTrustedSessionRevoke() {
               type="button"
               variant="outline"
               size="sm"
-              class="shrink-0 rounded-xl"
+              class="self-end shrink-0 rounded-xl"
               :disabled="!status.pinEnabled || trustedSessionsLoading"
               @click="refreshTrustedSessions"
             >
@@ -717,7 +717,7 @@ async function confirmTrustedSessionRevoke() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  class="shrink-0 rounded-xl"
+                  class="self-end shrink-0 rounded-xl"
                   :disabled="trustedSessionActionBusy"
                   @click="requestTrustedSessionRevoke(session)"
                 >

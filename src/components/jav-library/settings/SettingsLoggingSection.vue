@@ -264,7 +264,7 @@ onBeforeUnmount(() => {
             <Button
               type="button"
               variant="secondary"
-              class="w-fit shrink-0 rounded-full"
+              class="w-fit self-end shrink-0 rounded-full"
               :disabled="!autoSaveReady || openingLogDirectory"
               @click="openLogDirectory"
             >

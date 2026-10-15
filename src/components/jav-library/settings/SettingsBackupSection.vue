@@ -239,7 +239,7 @@ function formatBytes(value: number): string {
           <SettingsHint :text="t('settings.backupDirectoryHint')">
             <FieldLabel for="settings-backup-directory">{{ t("settings.backupDirectoryLabel") }}</FieldLabel>
           </SettingsHint>
-          <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
             <Input
               id="settings-backup-directory"
               v-model="backupDirectoryDraft"
@@ -301,7 +301,7 @@ function formatBytes(value: number): string {
     <Separator />
     <Collapsible v-model:open="restoreOpen" class="flex min-w-0 flex-col gap-3">
       <CollapsibleTrigger as-child>
-        <Button type="button" variant="ghost" size="sm" class="h-auto min-h-11 self-start rounded-full sm:h-8 sm:min-h-8" data-settings-comfortable-control data-settings-backup-existing>
+        <Button type="button" variant="ghost" size="sm" class="h-auto min-h-11 self-end rounded-full sm:h-8 sm:min-h-8" data-settings-comfortable-control data-settings-backup-existing>
           <ChevronDown data-icon="inline-start" :class="{ 'rotate-180': restoreOpen }" />
           {{ t("settings.backupExistingTitle") }}
         </Button>
@@ -315,7 +315,7 @@ function formatBytes(value: number): string {
                 <FieldLabel for="settings-backup-path">{{ t("settings.backupPathLabel") }}</FieldLabel>
               </SettingsHint>
               <input ref="fileInput" type="file" accept=".curated-backup" class="hidden" tabindex="-1" aria-hidden="true" :disabled="!supported || busy" data-settings-backup-file-input @change="selectBackupFile" />
-              <div class="flex min-w-0 flex-wrap items-center gap-2" data-settings-backup-restore-row>
+              <div class="flex min-w-0 flex-wrap items-center justify-end gap-2" data-settings-backup-restore-row>
                 <Input
                   id="settings-backup-path" :model-value="backupPathDraft" readonly :disabled="!supported || busy"
                   :title="backupPathDraft" class="min-w-0 basis-full sm:basis-0 sm:flex-1"

@@ -248,7 +248,7 @@ function auditLine(entry: AIAuditEntry) {
   <div class="flex min-w-0 flex-col gap-6" data-ai-settings>
     <p v-if="error" role="alert" class="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" data-ai-settings-error>{{ error }}</p>
     <p v-if="message" role="status" class="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{{ message }}</p>
-    <Button v-if="!ready" variant="outline" size="sm" class="self-start" @click="initialize">{{ t('aiSettings.retry') }}</Button>
+    <Button v-if="!ready" variant="outline" size="sm" class="self-end" @click="initialize">{{ t('aiSettings.retry') }}</Button>
     <template v-if="ready">
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-governance-card>
         <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0">
@@ -301,7 +301,7 @@ function auditLine(entry: AIAuditEntry) {
               </template>
               <p v-else-if="settingsAutosave.saving.value || settingsAutosave.dirty.value || settingsAutosave.saved.value" role="status" class="text-muted-foreground">{{ settingsAutosave.saving.value || settingsAutosave.dirty.value ? t('common.saving') : t('settings.autoPersistSaved') }}</p>
             </div>
-            <Button variant="outline" size="sm" :disabled="busy" data-ai-cleanup @click="cleanup">{{ t('aiSettings.cleanup') }}</Button>
+            <Button variant="outline" size="sm" class="ml-auto" :disabled="busy" data-ai-cleanup @click="cleanup">{{ t('aiSettings.cleanup') }}</Button>
           </div>
         </CardContent>
       </Card>
@@ -345,7 +345,7 @@ function auditLine(entry: AIAuditEntry) {
             </template>
             <p v-else-if="providerAutosave.saving.value || providerAutosave.dirty.value || providerAutosave.saved.value" role="status" class="text-muted-foreground">{{ providerAutosave.saving.value || providerAutosave.dirty.value ? t('common.saving') : t('settings.autoPersistSaved') }}</p>
           </div>
-          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div class="flex shrink-0 flex-wrap gap-2"><SettingsHint :text="[t('aiSettings.providerHint'), t('aiSettings.autoSaveHint')].join('\n\n')">
+          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end"><div class="flex shrink-0 flex-wrap justify-end gap-2"><SettingsHint :text="[t('aiSettings.providerHint'), t('aiSettings.autoSaveHint')].join('\n\n')">
                   <Button variant="outline" size="sm" :disabled="busy" data-ai-provider-test @click="testProvider">{{ testingProvider ? t('settings.experimentalTestTesting') : t('settings.experimentalTest') }}</Button>
                 </SettingsHint></div></div><p v-if="providerTestResult" :role="providerTestResult.ok ? 'status' : 'alert'" aria-live="polite" :class="['rounded-md border px-3 py-2 text-sm', providerTestResult.ok ? 'border-success/30 bg-success/10 text-success' : 'border-destructive/30 bg-destructive/10 text-destructive']" :data-status="providerTestResult.ok ? 'success' : 'failed'" data-ai-provider-test-result>{{ providerTestResult.text }}</p></div>
         </CardContent>

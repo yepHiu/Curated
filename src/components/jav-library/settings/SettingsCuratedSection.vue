@@ -308,7 +308,7 @@ const { isServerLocal } = useServerLocalAccess()
                   : t("settings.exportNone")
               }}
             </p>
-            <div class="flex flex-wrap gap-3">
+            <div class="flex flex-wrap justify-end gap-3">
               <Button
                 type="button"
                 variant="secondary"
@@ -340,7 +340,7 @@ const { isServerLocal } = useServerLocalAccess()
             </div>
             <div
               v-if="curatedExportDirLabel"
-              class="flex flex-col gap-3 rounded-xl border border-dashed border-border/60 bg-background/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+              class="flex flex-wrap items-center justify-end gap-3 rounded-xl border border-dashed border-border/60 bg-background/40 px-3 py-2.5"
             >
               <SettingsHint :text="t('settings.curatedReauthorizeHelp')">
                 <Button

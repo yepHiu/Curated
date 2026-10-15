@@ -109,7 +109,7 @@ function onPreset(value: unknown) {
         type="button"
         size="sm"
         variant="outline"
-        class="h-8 shrink-0"
+        class="h-8 self-end shrink-0"
         :disabled="cleanupBusy"
         @click="emit('cleanup')"
       >

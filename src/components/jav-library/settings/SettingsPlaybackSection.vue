@@ -568,7 +568,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-3">
+          <div class="flex flex-wrap items-center justify-end gap-3">
             <Button
               v-if="!useWebApi"
               type="button"
