@@ -326,3 +326,7 @@ backend/ 目录：
 字幕识别模型改为右侧下拉：千问3.1文件转写 `qwen-audio-3.1-asr-flash-filetrans`（默认）和千问3文件转写 `qwen3-asr-flash-filetrans`。`subtitleProvider.recognitionModel`随设置保存；旧配置缺失默认3.1。任务创建时冻结recognitionModel，重试/恢复继续使用原模型，旧任务缺失仍按3.1处理。上传授权使用对应模型；3.1提交file_urls/language_hints并解析results，3提交file_url/language并解析result。测试密钥按当前已保存的识别模型检查上传授权。无新增端点/数据表，识别模型进入任务JSON元数据。
 
 配置校验、两代协议分支（含千问3单结果）、字幕/Server测试通过；38项相关前端测试、typecheck、定向ESLint通过。浏览器确认两个选项及切换；未进行本轮付费云调用，两代模型既有真实demo记录见2026-10-15调研。
+
+### 关闭时收起配置并保留原值（2026-10-16）
+
+云端字幕识别关闭时隐藏识别模型、密钥、翻译模型及密钥验证按钮，保留开关与保存操作。仅条件渲染控件，不重置配置或密钥草稿；重新打开恢复原选项。保存关闭状态不提交空apiKey，因此保留Server已有密钥。专项交互测试覆盖隐藏/恢复、草稿保留和关闭保存不清密钥，通过；typecheck和组件ESLint通过。
