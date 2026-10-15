@@ -12,6 +12,8 @@ import { Captions, Eye, EyeOff } from "lucide-vue-next"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import SettingsHint from "./SettingsHint.vue"
 import SubtitleModelSelect from "../SubtitleModelSelect.vue"
+import { useAISettingsAutosave } from "@/composables/use-ai-settings-autosave"
+import { pushAppToast } from "@/composables/use-app-toast"
 import { useSubtitleService } from "@/services/subtitle-service"
 import type { SubtitleSettings } from "@/services/contracts/subtitle-service"
 const { t } = useI18n()
@@ -33,22 +35,38 @@ async function toggleKey() {
 function editKey(value: string | number) { key.value = String(value); revealedKey.value = "" }
 const busy = ref(false)
 const error = ref("")
-const saved = ref(false)
+const ready = ref(false)
 const tested = ref(false)
+function draft() {
+  return { enabled: cfg.value?.enabled ?? false, recognitionModel: cfg.value?.recognitionModel, translationModel: cfg.value?.translationModel ?? "configured-ai", ...(key.value ? { apiKey: key.value } : {}) }
+}
+const autosave = useAISettingsAutosave({
+  read: draft,
+  enabled: () => ready.value && cfg.value?.canManage === true,
+  valid: () => true,
+  delay: (next, previous) => next.apiKey !== previous.apiKey ? 700 : 0,
+  save: async value => {
+    const result = await service.saveSettings(value)
+    if (cfg.value) cfg.value.apiKeyConfigured = result.apiKeyConfigured
+    tested.value = false
+  },
+  onDetachedError: detail => pushAppToast(t("aiSettings.autoSaveFailed", { message: detail }), { variant: "destructive" }),
+})
 async function testProvider() {
-  busy.value = true; error.value = ""; tested.value = false
+  error.value = ""; tested.value = false
+  if (!await autosave.flush()) return
+  busy.value = true
   try { await service.testProvider(); tested.value = true }
   catch (e) { error.value = e instanceof Error ? e.message : String(e) }
   finally { busy.value = false }
 }
-onMounted(async () => { try { cfg.value = await service.settings(); cfg.value.recognitionModel ??= "qwen-audio-3.1-asr-flash-filetrans" } catch (e) { error.value = String(e) } })
-async function save() {
-  if (!cfg.value) return
-  busy.value = true; error.value = ""; saved.value = false
-  try { cfg.value = await service.saveSettings({ recognitionModel: cfg.value.recognitionModel, enabled: cfg.value.enabled, translationModel: cfg.value.translationModel, ...(key.value ? { apiKey: key.value } : {}) }); key.value = ""; revealedKey.value = ""; keyVisible.value = false; saved.value = true }
-  catch (e) { error.value = e instanceof Error ? e.message : String(e) }
-  finally { busy.value = false }
-}
+onMounted(async () => {
+  try {
+    cfg.value = await service.settings()
+    cfg.value.recognitionModel ??= "qwen-audio-3.1-asr-flash-filetrans"
+    autosave.initialize(draft()); ready.value = true
+  } catch (e) { error.value = String(e) }
+})
 </script>
 <template>
   <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-subtitle-settings-card>
@@ -60,7 +78,7 @@ async function save() {
       </CardTitle>
     </CardHeader>
     <CardContent class="flex min-w-0 flex-col gap-3 pt-0">
-      <Alert v-if="error" variant="destructive"><AlertDescription>{{ error }}</AlertDescription></Alert>
+      <Alert v-if="error || autosave.error.value" variant="destructive"><AlertDescription>{{ error || autosave.error.value }}</AlertDescription></Alert>
       <FieldGroup v-if="cfg" class="gap-3">
         <Field orientation="horizontal" class="items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" :data-disabled="!cfg.canManage || busy || undefined">
           <SettingsHint :text="t('subtitles.cloudNotice')"><FieldLabel for="subtitle-enabled" class="text-sm font-semibold text-foreground">{{ t('subtitles.enable') }}</FieldLabel></SettingsHint>
@@ -84,7 +102,7 @@ async function save() {
             <SettingsHint :text="t('subtitles.keyHint')"><FieldLabel for="subtitle-key" class="text-sm font-semibold text-foreground">{{ t('subtitles.apiKey') }}</FieldLabel></SettingsHint>
           </div>
           <div class="flex w-full min-w-0 items-center gap-2 sm:w-80 sm:max-w-[60%] sm:shrink-0">
-            <Input id="subtitle-key" :model-value="key || (keyVisible ? revealedKey : '')" :type="keyVisible ? 'text' : 'password'" autocomplete="new-password" :disabled="!cfg.canManage || busy" :placeholder="cfg.apiKeyConfigured ? '••••••••••••••••' : t('subtitles.enterKey')" @update:model-value="editKey" />
+            <Input id="subtitle-key" :model-value="key || (keyVisible ? revealedKey : '')" :type="keyVisible ? 'text' : 'password'" autocomplete="new-password" :disabled="!cfg.canManage || busy" :placeholder="cfg.apiKeyConfigured ? '••••••••••••••••' : t('subtitles.enterKey')" @update:model-value="editKey" @blur="autosave.flush()" />
             <Button type="button" variant="ghost" size="icon" class="shrink-0 rounded-full" :disabled="!cfg.canManage || busy" :aria-label="t(keyVisible ? 'subtitles.hideKey' : 'subtitles.showKey')" :aria-pressed="keyVisible" @click="toggleKey"><EyeOff v-if="keyVisible" aria-hidden="true" /><Eye v-else aria-hidden="true" /></Button>
           </div>
         </Field>
@@ -102,11 +120,12 @@ async function save() {
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0 flex-1 text-xs text-muted-foreground" role="status">
           <p v-if="cfg?.enabled && tested">{{ t('subtitles.testPassed') }}</p>
-          <p v-else-if="saved">{{ t('subtitles.saved') }}</p>
+          <p v-else-if="autosave.saving.value || autosave.dirty.value">{{ t('common.saving') }}</p>
+          <p v-else-if="autosave.saved.value">{{ t('settings.autoPersistSaved') }}</p>
         </div>
         <div class="flex flex-wrap justify-end gap-2">
-          <Button v-if="cfg?.enabled" variant="outline" size="sm" class="rounded-full" :disabled="!cfg?.canManage || !cfg.apiKeyConfigured || !!key || busy" @click="testProvider">{{ t('subtitles.testProvider') }}</Button>
-          <Button size="sm" class="rounded-full" :disabled="!cfg?.canManage || busy" @click="save">{{ busy ? t('common.loading') : t('subtitles.save') }}</Button>
+          <Button v-if="cfg?.enabled" variant="outline" size="sm" class="rounded-full" :disabled="!cfg?.canManage || (!cfg.apiKeyConfigured && !key.trim()) || busy" @click="testProvider">{{ t('subtitles.testProvider') }}</Button>
+          <Button v-if="autosave.error.value" variant="outline" size="sm" class="rounded-full" @click="autosave.flush()">{{ t('aiSettings.retry') }}</Button>
         </div>
       </div>
     </CardContent>

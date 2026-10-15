@@ -2567,8 +2567,8 @@
       "saving": "Saving outputs",
       "done": "Outputs saved"
     },
-    "testProvider": "Test saved key",
-    "testPassed": "Qwen 3.1 temporary upload permission verified. No audio was uploaded; this does not validate the full recognition and translation pipeline.",
+    "testProvider": "Test",
+    "testPassed": "Test passed. The API key can upload audio for the selected recognition model. Recognition and translation are checked when a task runs.",
     "audioTrack": "Audio track",
     "noAudio": "This video has no audio track to recognize."
   }
