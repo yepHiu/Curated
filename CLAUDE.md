@@ -792,6 +792,7 @@ All business calls use existing authentication/PIN rules. The write/test/reveal 
 | `GET /api/library/movies/{movieId}/subtitle-audio-tracks?fileId=…` | Audio-relative index; language/title/codec/channels. |
 | `POST /api/library/movies/{movieId}/subtitle-jobs` | Local; JSON requestId (8–128 chars); fileId; translationModel; audioTrack (audio-relative index). Returns 202 job; same request/file reuses existing job. |
 | `GET /api/library/movies/{movieId}/subtitle-jobs` | Persisted jobs and validated output metadata. |
+| `GET /api/subtitle-jobs` | All persisted subtitle jobs for global sidebar tracking; authenticated read, no task creation. |
 | `GET /api/subtitle-jobs/{jobId}` | State; stage; completed/total for that stage; error; timestamps; assets. |
 | `POST /api/subtitle-jobs/{jobId}/{cancel or retry}` | Local; durable cancellation or retry from checkpoints. |
 | `GET /api/library/movies/{movieId}/subtitles?fileId=…` | Latest usable completed generation for selected file. |

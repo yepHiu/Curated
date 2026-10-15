@@ -154,3 +154,5 @@ When a later large language model takes over work in this repository, add its na
 - Grok 4.6
 
 Server identity and LAN discovery, Desktop device settings, upgrade compatibility and release packaging: [guide](docs/guide.md).
+
+AI 字幕任务支持侧栏进度与恢复弹窗，成品按历史记录展示；操作见 [使用手册](docs/guide.md)。

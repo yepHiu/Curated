@@ -647,5 +647,6 @@
 </tbody></table><p><a href="../plan/2026-10-16-subtitle-implementation-plan.md">实施计划与验证记录</a></p></section>
 <section><h2>字幕设置密钥显示</h2><p>四项独立纵向设置；密钥默认隐藏，眼睛按需调用本机限定POST /api/subtitles/provider/key，no-store响应；普通读取保持脱敏，远端禁止。</p></section>
 <section><h2>字幕识别模型选择</h2><p>设置右侧下拉提供千问3.1和千问3文件转写。subtitleProvider.recognitionModel持久化并在任务创建时冻结，上传授权及提交协议分别适配，旧任务默认3.1。协议回归通过，本轮无新增付费调用。</p></section>
+<section><h2>字幕任务侧栏进度</h2><p>GET /api/subtitle-jobs 提供认证后的全局只读持久任务快照；AppShell 持有观察器和恢复弹窗，侧栏支持展开/折叠显示，关闭弹窗后继续观察。成品使用可展开历史列表，无新配置或迁移。</p></section>
 </body>
 </html>
