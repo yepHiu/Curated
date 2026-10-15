@@ -541,3 +541,7 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 ## 2026-10-07 AI 整理历史删除
 
 整理记录更多菜单可删除 completed/partial_failed/failed/blocked/cancelled，活动任务先取消。DELETE /api/ai/tag-organizations/{jobId} 返回 204；迁移 0065 deleted_at 持久移除历史，详情/重试/撤销不可访问。保留内部任务关联、已写标签、分析指纹、覆盖统计与问题队列，不调用 AI、不要求 AI 写权限；Web/Mock 三语同步，无 cfg 键。Server 需更新并重启。
+
+### 字幕设置逐项排列与密钥显示（2026-10-16）
+
+启用云识别、固定识别模型、百炼密钥、翻译模型改为四个独立纵向设置行，取消桌面双列。密钥默认password，眼睛切换显示/隐藏；已保存密钥仅在点击显示时通过新增本机限定POST /api/subtitles/provider/key按需读取，响应no-store，普通GET仍脱敏。隐藏时释放读取的密钥，保存后重置显示状态；远端不可调用。沿用现有认证/本机管理边界，不在Mock保存密钥。

@@ -926,3 +926,7 @@ CD uses independent versions and immutable component tags. `package.yml` delegat
 ### Release display names (2026-09-29)
 
 New releases display `Curated YYYYMMDD` with `-2`, `-3`, etc. for later same-day batches. One Release can contain either or both components; package versions remain independent. Notes synchronization preserves the immutable batch identity and prior download links for unchanged components. See §8 for preparation, Server bridge and Latest behavior.
+
+### 字幕设置逐项排列与密钥显示（2026-10-16）
+
+启用云识别、固定识别模型、百炼密钥、翻译模型改为四个独立纵向设置行，取消桌面双列。密钥默认password，眼睛切换显示/隐藏；已保存密钥仅在点击显示时通过新增本机限定POST /api/subtitles/provider/key按需读取，响应no-store，普通GET仍脱敏。隐藏时释放读取的密钥，保存后重置显示状态；远端不可调用。沿用现有认证/本机管理边界，不在Mock保存密钥。

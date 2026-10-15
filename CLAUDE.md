@@ -801,3 +801,5 @@ All business calls use existing authentication/PIN rules. The write/test/reveal 
 Job states: queued; running; completed; failed; partial_failed; blocked; cancelled. Stages: preparing; extracting; uploading; recognizing; translating; saving; done. Counts belong to the current stage, rather than an invented whole-job percentage. Closing a dialog does not cancel work. Subtitle jobs are not projected to the generic task-center SSE stream; clients poll persisted metadata (UI every two seconds).
 
 Migration 0066 stores metadata in subtitle_jobs; cues/audio are temporary cache checkpoints. Final files are next to the video under sub/. See the handbook and implementation record for recovery/retention and validation limits.
+
+2026-10-16: `POST /api/subtitles/provider/key` explicitly reveals the saved subtitle provider API key to a direct Server-local authenticated settings client only; response `{apiKey: string}` with `Cache-Control: no-store`. Ordinary settings GET remains redacted. Remote calls return 403.

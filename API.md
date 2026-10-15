@@ -3693,3 +3693,5 @@ All endpoints use the existing authenticated/unlocked API boundary. No endpoint 
 | POST | `/api/ai/tag-organizations/{jobId}/undo` | `{restored,conflicts}`; later manual edits are preserved |
 
 Unknown input fields/trailing JSON return 400; disabled/read-only AI returns 403; missing job/topic 404; unavailable operation/state returns 409; GET never mutates tasks. No automatic schedule/config fields are added. AI task writes use an internal job-bound gateway, shared write budget and audit; ordinary chat/MCP cannot invoke this apply capability. Invalid or unsupported evidence does not clear user tags.
+
+2026-10-16: `POST /api/subtitles/provider/key` explicitly reveals the saved subtitle provider API key to a direct Server-local authenticated settings client only; response `{apiKey: string}` with `Cache-Control: no-store`. Ordinary settings GET remains redacted. Remote calls return 403.
