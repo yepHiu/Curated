@@ -48,6 +48,17 @@ watch(contextWindow, value => {
 })
 const testingProvider = ref(false)
 const providerTestResult = ref<{ ok: boolean; text: string } | null>(null)
+let providerTestResetTimer: ReturnType<typeof setTimeout> | undefined
+function clearProviderTestResetTimer() {
+  if (providerTestResetTimer !== undefined) clearTimeout(providerTestResetTimer)
+  providerTestResetTimer = undefined
+}
+watch(providerTestResult, result => {
+  clearProviderTestResetTimer()
+  if (result?.ok) {
+    providerTestResetTimer = setTimeout(() => { providerTestResult.value = null }, 3000)
+  }
+})
 const days = ref("30")
 const channel = ref("all")
 const status = ref("all")
@@ -123,7 +134,7 @@ async function initialize() {
   } catch (err) { if (!disposed) error.value = (err as Error).message }
 }
 onMounted(() => { syncProvider(); void initialize() })
-onBeforeUnmount(() => { disposed = true; requestId++ })
+onBeforeUnmount(() => { disposed = true; requestId++; clearProviderTestResetTimer() })
 
 async function refresh() {
   const id = ++requestId
@@ -350,7 +361,7 @@ function auditLine(entry: AIAuditEntry) {
               <Button
                 variant="outline"
                 size="sm"
-                class="rounded-full"
+                class="rounded-full data-[status=success]:border-success data-[status=success]:bg-success data-[status=success]:text-success-foreground data-[status=success]:hover:bg-success/90 data-[status=success]:hover:text-success-foreground"
                 :disabled="busy"
                 :aria-busy="testingProvider"
                 :aria-label="providerTestResult ? `${t('settings.experimentalTest')}: ${providerTestResult.text}` : undefined"

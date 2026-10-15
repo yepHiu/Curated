@@ -328,7 +328,7 @@ describe("SettingsAISection", () => {
     expect(mocks.getUsage).toHaveBeenCalledTimes(2)
     wrapper.unmount()
   })
-  it("renders a successful connectivity test inside the model provider section", async () => {
+  it("shows connectivity success for three seconds before restoring the test button", async () => {
     const wrapper = await setup()
     await wrapper.get("[data-ai-provider-test]").trigger("click"); await flushPromises()
     const provider = wrapper.get("[data-ai-provider-card]")
@@ -336,6 +336,13 @@ describe("SettingsAISection", () => {
     expect(result.text()).toBe("aiSettings.connectivityPassed")
     expect(result.attributes("data-status")).toBe("success")
     expect(provider.find("[data-ai-provider-test-result]").exists()).toBe(false)
+    await vi.advanceTimersByTimeAsync(2999)
+    expect(result.attributes("data-status")).toBe("success")
+    await vi.advanceTimersByTimeAsync(1)
+    expect(result.text()).toBe("settings.experimentalTest")
+    expect(result.attributes("data-status")).toBeUndefined()
+    await result.trigger("click"); await flushPromises()
+    expect(result.attributes("data-status")).toBe("success")
     await wrapper.get("#ai-model").setValue("another-model")
     expect(result.text()).toBe("settings.experimentalTest")
     expect(result.attributes("data-status")).toBeUndefined()
