@@ -7,7 +7,7 @@ export const webSubtitleService: SubtitleService = {
   testProvider: async () => { await httpClient.post("/subtitles/provider/test", {}) },
   settings: () => httpClient.get("/subtitles/settings"),
   async saveSettings(patch) { await httpClient.patch("/settings", { subtitleProvider: patch }); return this.settings() },
-  jobs: movieId => httpClient.get(`/library/movies/${encoded(movieId)}/subtitle-jobs`),
+  jobs: movieId => httpClient.get(movieId ? `/library/movies/${encoded(movieId)}/subtitle-jobs` : "/subtitle-jobs"),
   create: (movieId, request) => httpClient.post(`/library/movies/${encoded(movieId)}/subtitle-jobs`, request),
   action: (id, action) => httpClient.post(`/subtitle-jobs/${encoded(id)}/${action}`, {}),
   assets: (movieId, fileId) => httpClient.get(`/library/movies/${encoded(movieId)}/subtitles`, { fileId }),

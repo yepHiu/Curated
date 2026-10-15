@@ -9,6 +9,8 @@ import AppSidebar from "@/components/jav-library/AppSidebar.vue"
 import ImportMenu from "@/components/jav-library/ImportMenu.vue"
 import DevEnvironmentBadge from "@/components/dev/DevEnvironmentBadge.vue"
 import DevPerformanceBar from "@/components/dev/DevPerformanceBar.vue"
+import SubtitleJobDialog from "@/components/jav-library/SubtitleJobDialog.vue"
+import { useSubtitleJobs, startSubtitleTracking, stopSubtitleTracking } from "@/composables/use-subtitle-jobs"
 import TagOrganizationDialog from "@/components/jav-library/TagOrganizationDialog.vue"
 import { useTagOrganization, startTagOrganizationTracking, stopTagOrganizationTracking } from "@/composables/use-tag-organization"
 import ScanProgressDock from "@/components/jav-library/ScanProgressDock.vue"
@@ -780,6 +782,9 @@ function clearActorsSearch() {
     }),
   })
 }
+const subtitleJobs = useSubtitleJobs()
+onMounted(startSubtitleTracking)
+onBeforeUnmount(stopSubtitleTracking)
 const tagOrganization = useTagOrganization()
 const { isFullscreen: topicFullscreen } = useFullscreen()
 watch([() => route.name, topicFullscreen], ([name, fullscreen]) => { /* 播放和全屏只留结果记录。 */ tagOrganization.quiet.value = name === "player" || fullscreen }, { immediate: true })
@@ -1061,6 +1066,7 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
     </div>
 
     <TagOrganizationDialog />
+    <SubtitleJobDialog v-if="subtitleJobs.movie.value && subtitleJobs.dialogOpen.value" v-model:open="subtitleJobs.dialogOpen.value" :movie="subtitleJobs.movie.value" :initial-file-id="subtitleJobs.fileId.value" />
     <ScanProgressDock />
     <DevPerformanceBar v-if="isDev" v-model:debug-open="debugOpen" />
 

@@ -63,6 +63,7 @@ func (h *Handler) registerSubtitleRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("POST /api/library/movies/{movieId}/subtitle-jobs", localServerManagement(h.handleCreateSubtitleJob))
 	mux.HandleFunc("GET /api/library/movies/{movieId}/subtitle-jobs", h.handleListSubtitleJobs)
+	mux.HandleFunc("GET /api/subtitle-jobs", h.handleListSubtitleJobs)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/subtitles", h.handleListSubtitleAssets)
 	mux.HandleFunc("GET /api/subtitle-jobs/{jobId}", h.handleGetSubtitleJob)
 	mux.HandleFunc("POST /api/subtitle-jobs/{jobId}/{action}", localServerManagement(h.handleSubtitleAction))

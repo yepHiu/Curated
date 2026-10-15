@@ -35,6 +35,20 @@ describe("subtitle dialog owns interaction while Server owns execution", () => {
     expect(wrapper.getComponent(SubtitleModelSelect).props()).toMatchObject({ modelValue: "qwen-plus", disabled: true })
     expect(wrapper.text()).toContain("10 / 30"); expect(mocks.create).not.toHaveBeenCalled(); wrapper.unmount()
   })
+  it("keeps every saved generation in expandable history while another task runs", async () => {
+    const asset = { id: "asset", fileId: "part-1", name: "subtitle.srt", language: "ja", format: "srt", size: 12, hash: "hash", missing: true }
+    mocks.jobs.mockResolvedValue([running, { ...running, id: "old-1", state: "completed", createdAt: "2026-10-15T12:00:00Z", assets: [asset] }, { ...running, id: "old-2", state: "completed", createdAt: "2026-10-14T12:00:00Z", assets: [{ ...asset, id: "asset-2" }] }])
+    const wrapper = mount(SubtitleJobDialog, { props: { open: true, movie } }); await flushPromises()
+    const rows = wrapper.get('[data-subtitle-history]').findAll('li > button')
+    expect(rows).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('subtitle.srt')
+    await rows[0]!.trigger('click')
+    expect(rows[0]!.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.text()).toContain('subtitle.srt')
+    expect(wrapper.findAll('button').find(button => button.attributes('aria-label') === 'subtitles.download')?.attributes('disabled')).toBeDefined()
+    expect(wrapper.findAll('button').some(button => button.text() === 'subtitles.close')).toBe(false)
+    wrapper.unmount()
+  })
   it("disables remote task creation", async () => {
     mocks.settings.mockResolvedValue({ enabled: true, canManage: false, apiKeyConfigured: true, translationModel: "qwen-plus", configuredModel: "custom" })
     const wrapper = mount(SubtitleJobDialog, { props: { open: true, movie } }); await flushPromises()
