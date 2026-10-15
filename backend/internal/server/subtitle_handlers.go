@@ -21,6 +21,14 @@ type SubtitleSettingsController interface {
 }
 
 func (h *Handler) registerSubtitleRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/subtitles/provider/key", localServerManagement(func(w http.ResponseWriter, r *http.Request) {
+		if h.subtitleSettingsCtl == nil {
+			writeAppError(w, 503, contracts.ErrorCodeInternal, "subtitle settings unavailable")
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, 200, map[string]string{"apiKey": h.subtitleSettingsCtl.SubtitleConfig().APIKey})
+	}))
 	mux.HandleFunc("GET /api/library/movies/{movieId}/subtitle-audio-tracks", func(w http.ResponseWriter, r *http.Request) {
 		if !h.subtitleAvailable(w) {
 			return

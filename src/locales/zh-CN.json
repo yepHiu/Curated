@@ -2500,6 +2500,8 @@
     "title": "AI 字幕识别与翻译",
     "providerDescription": "千问 3.1 文件转写 · 日语识别 / 简体中文翻译",
     "enable": "启用云端字幕识别",
+    "showKey": "显示 API Key",
+    "hideKey": "隐藏 API Key",
     "apiKey": "百炼 API Key（北京）",
     "keyConfigured": "已配置；留空保留现有密钥",
     "enterKey": "输入百炼 API Key",

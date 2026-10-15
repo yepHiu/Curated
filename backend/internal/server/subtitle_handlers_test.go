@@ -46,7 +46,14 @@ func TestSubtitleSettingsNeverExposeCredentialsAndRemoteCannotWrite(t *testing.T
 			t.Fatalf("settings=%+v remote=%v", cfg, remote)
 		}
 	}
-	for _, path := range []string{"/api/subtitles/provider/test", "/api/library/movies/movie/subtitle-jobs", "/api/subtitle-jobs/job/retry", "/api/subtitle-jobs/job/cancel", "/api/subtitles/asset/reveal"} {
+	reveal := httptest.NewRequest("POST", "http://127.0.0.1:8080/api/subtitles/provider/key", strings.NewReader("{}"))
+	reveal.RemoteAddr = "127.0.0.1:1000"
+	revealed := httptest.NewRecorder()
+	mux.ServeHTTP(revealed, reveal)
+	if revealed.Code != 200 || revealed.Header().Get("Cache-Control") != "no-store" || !strings.Contains(revealed.Body.String(), "secret-not-for-client") {
+		t.Fatal("explicit local key reveal failed")
+	}
+	for _, path := range []string{"/api/subtitles/provider/key", "/api/subtitles/provider/test", "/api/library/movies/movie/subtitle-jobs", "/api/subtitle-jobs/job/retry", "/api/subtitle-jobs/job/cancel", "/api/subtitles/asset/reveal"} {
 		req := httptest.NewRequest("POST", "http://127.0.0.1:8080"+path, strings.NewReader("{}"))
 		req.RemoteAddr = "192.168.1.2:1000"
 		w := httptest.NewRecorder()

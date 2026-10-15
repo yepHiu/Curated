@@ -2500,6 +2500,8 @@
     "title": "AI subtitle recognition & translation",
     "providerDescription": "Qwen 3.1 file transcription · Japanese to Simplified Chinese",
     "enable": "Enable cloud subtitles",
+    "showKey": "Show API key",
+    "hideKey": "Hide API key",
     "apiKey": "Bailian API key (Beijing)",
     "keyConfigured": "Configured; leave blank to keep the current key",
     "enterKey": "Enter Bailian API key",

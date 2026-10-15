@@ -2,6 +2,7 @@ import { httpClient } from "@/api/http-client"
 import type { SubtitleService } from "@/services/contracts/subtitle-service"
 const encoded = encodeURIComponent
 export const webSubtitleService: SubtitleService = {
+  revealKey: async () => (await httpClient.post<{ apiKey: string }>("/subtitles/provider/key", {})).apiKey,
   audioTracks: (movieId, fileId) => httpClient.get(`/library/movies/${encoded(movieId)}/subtitle-audio-tracks`, { fileId }),
   testProvider: async () => { await httpClient.post("/subtitles/provider/test", {}) },
   settings: () => httpClient.get("/subtitles/settings"),

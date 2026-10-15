@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Captions } from "lucide-vue-next"
+import { Captions, Eye, EyeOff } from "lucide-vue-next"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import SettingsHint from "./SettingsHint.vue"
 import SubtitleModelSelect from "../SubtitleModelSelect.vue"
@@ -18,6 +18,19 @@ const service = useSubtitleService()
 const cfg = ref<SubtitleSettings>()
 const key = ref("")
 const clearKey = ref(false)
+const keyVisible = ref(false)
+const revealedKey = ref("")
+async function toggleKey() {
+  if (keyVisible.value) { keyVisible.value = false; revealedKey.value = ""; return }
+  if (!key.value && cfg.value?.apiKeyConfigured) {
+    busy.value = true; error.value = ""
+    try { revealedKey.value = await service.revealKey() }
+    catch (e) { error.value = e instanceof Error ? e.message : String(e); return }
+    finally { busy.value = false }
+  }
+  keyVisible.value = true
+}
+function editKey(value: string | number) { key.value = String(value); revealedKey.value = "" }
 const busy = ref(false)
 const error = ref("")
 const saved = ref(false)
@@ -32,7 +45,7 @@ onMounted(async () => { try { cfg.value = await service.settings() } catch (e) {
 async function save() {
   if (!cfg.value) return
   busy.value = true; error.value = ""; saved.value = false
-  try { cfg.value = await service.saveSettings({ enabled: cfg.value.enabled, translationModel: cfg.value.translationModel, ...(key.value || clearKey.value ? { apiKey: clearKey.value ? "" : key.value } : {}) }); key.value = ""; clearKey.value = false; saved.value = true }
+  try { cfg.value = await service.saveSettings({ enabled: cfg.value.enabled, translationModel: cfg.value.translationModel, ...(key.value || clearKey.value ? { apiKey: clearKey.value ? "" : key.value } : {}) }); key.value = ""; revealedKey.value = ""; keyVisible.value = false; clearKey.value = false; saved.value = true }
   catch (e) { error.value = e instanceof Error ? e.message : String(e) }
   finally { busy.value = false }
 }
@@ -54,16 +67,19 @@ async function save() {
             <SettingsHint :text="t('subtitles.cloudNotice')"><FieldLabel for="subtitle-enabled">{{ t('subtitles.enable') }}</FieldLabel></SettingsHint>
             <Switch id="subtitle-enabled" v-model="cfg.enabled" :disabled="!cfg.canManage || busy" />
           </Field>
-          <Field :data-disabled="!cfg.canManage || busy || undefined">
+          <Field class="rounded-lg border border-border/40 bg-background/30 p-3" :data-disabled="!cfg.canManage || busy || undefined">
             <FieldLabel>{{ t('subtitles.recognitionModel') }}</FieldLabel>
             <p class="break-words text-sm text-muted-foreground">{{ t('subtitles.providerDescription') }}</p>
           </Field>
-          <FieldGroup class="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Field :data-disabled="!cfg.canManage || busy || clearKey || undefined">
+          <FieldGroup class="gap-3">
+            <Field class="rounded-lg border border-border/40 bg-background/30 p-3" :data-disabled="!cfg.canManage || busy || clearKey || undefined">
               <SettingsHint :text="t('subtitles.keyHint')"><FieldLabel for="subtitle-key">{{ t('subtitles.apiKey') }}</FieldLabel></SettingsHint>
-              <Input id="subtitle-key" v-model="key" type="password" autocomplete="new-password" :disabled="!cfg.canManage || busy || clearKey" :placeholder="cfg.apiKeyConfigured ? t('subtitles.keyConfigured') : t('subtitles.enterKey')" />
+              <div class="flex min-w-0 items-center gap-2">
+                <Input id="subtitle-key" :model-value="key || (keyVisible ? revealedKey : '')" :type="keyVisible ? 'text' : 'password'" autocomplete="new-password" :disabled="!cfg.canManage || busy || clearKey" :placeholder="cfg.apiKeyConfigured ? '••••••••••••••••' : t('subtitles.enterKey')" @update:model-value="editKey" />
+                <Button type="button" variant="ghost" size="icon" class="shrink-0 rounded-full" :disabled="!cfg.canManage || busy || clearKey" :aria-label="t(keyVisible ? 'subtitles.hideKey' : 'subtitles.showKey')" :aria-pressed="keyVisible" @click="toggleKey"><EyeOff v-if="keyVisible" aria-hidden="true" /><Eye v-else aria-hidden="true" /></Button>
+              </div>
             </Field>
-            <Field :data-disabled="!cfg.canManage || busy || undefined">
+            <Field class="rounded-lg border border-border/40 bg-background/30 p-3" :data-disabled="!cfg.canManage || busy || undefined">
               <SettingsHint :text="t('subtitles.modelHint')"><FieldLabel for="subtitle-model">{{ t('subtitles.translationModel') }}</FieldLabel></SettingsHint>
               <SubtitleModelSelect id="subtitle-model" v-model="cfg.translationModel" :configured-model="cfg.configuredModel" :disabled="!cfg.canManage || busy" />
             </Field>

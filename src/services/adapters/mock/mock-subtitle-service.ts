@@ -2,6 +2,7 @@ import type { SubtitleService, SubtitleSettings } from "@/services/contracts/sub
 let settings: SubtitleSettings = { enabled: false, apiKeyConfigured: false, translationModel: "configured-ai", configuredModel: "", canManage: true }
 /** Mock never fabricates cloud progress or retains an entered credential. */
 export const mockSubtitleService: SubtitleService = {
+  async revealKey() { throw new Error("Mock mode: no saved credential") },
   async audioTracks() { return [{ index: 0, language: "ja", title: "", codec: "aac", channels: 2 }] },
   async testProvider() { throw new Error("Mock mode: connect to Server to test credentials") },
   async settings() { return { ...settings } },

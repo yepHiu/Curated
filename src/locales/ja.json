@@ -2500,6 +2500,8 @@
     "title": "AI 字幕認識・翻訳",
     "providerDescription": "Qwen 3.1 ファイル文字起こし · 日本語から簡体字中国語",
     "enable": "クラウド字幕認識を有効化",
+    "showKey": "APIキーを表示",
+    "hideKey": "APIキーを隠す",
     "apiKey": "百錬 API キー（北京）",
     "keyConfigured": "設定済み。空欄で現在のキーを保持",
     "enterKey": "百錬 API キーを入力",

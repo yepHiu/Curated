@@ -16,6 +16,7 @@ export interface SubtitleJob {
 }
 export interface SubtitlePreferences { mode: SubtitleMode; size: number; background: boolean; position: number; offset: number }
 export interface SubtitleService {
+  revealKey(): Promise<string>
   audioTracks(movieId: string, fileId?: string): Promise<{ index: number; language: string; title: string; codec: string; channels: number }[]>
   testProvider(): Promise<void>
   settings(): Promise<SubtitleSettings>
