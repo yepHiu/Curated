@@ -1,4 +1,5 @@
 import type { NativeLabControl, NativeLabMovie, NativePlayerState } from "./native-player-contract.js"
+import type { SubtitleDisplay } from "./subtitle-format.js"
 
 export interface DesktopPlaybackPreferences { preferNative: boolean; volume: number; speed: number }
 export interface DesktopPlaybackCapabilities {
@@ -20,6 +21,7 @@ export interface DesktopPlaybackOpen {
   sourceQuery?: DesktopPlaybackSourceQuery
 }
 export interface DesktopPlaybackSnapshot {
+  subtitles?: { available: string[]; display: SubtitleDisplay; preferenceScope?: string; error?: string }
   captureRevision?: number
   clip?: DesktopPlaybackClip
   sessionId: string
@@ -67,6 +69,7 @@ export interface DesktopPlayerBridge extends Pick<DesktopPlaybackBridge, "snapsh
   capturePreferences(): Promise<{ keyCode: string; feedbackSoundEnabled: boolean }>
 }
 export type DesktopPlaybackCommand =
+  | { action: "subtitles"; display: SubtitleDisplay }
   | NativeLabControl
   | { [Action in "focus" | "fullscreen" | "minimize" | "close" | "web" | "replay"]: { action: Action } }["focus" | "fullscreen" | "minimize" | "close" | "web" | "replay"]
   | { action: "part"; fileId: string }

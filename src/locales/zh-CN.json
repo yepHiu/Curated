@@ -2535,6 +2535,7 @@
     "chinese": "中文",
     "japanese": "日文",
     "bilingual": "中日双语",
+    "loadFailed": "字幕加载失败，请检查 Server 连接后重新打开播放器。",
     "noSubtitles": "当前文件还没有生成字幕，请在影片详情中开始生成。",
     "fontSize": "字号",
     "background": "字幕背景",

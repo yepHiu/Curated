@@ -8,6 +8,8 @@ import { NativeMpvPlayer } from "./native-mpv-player"
 import { NativeMediaProxy } from "./native-media-proxy"
 import { createServer } from "node:http"
 import { readFileSync } from "node:fs"
+import { writeFileSync } from "node:fs"
+import { defaultSubtitleDisplay } from "./subtitle-format"
 
 const executable = process.env.CURATED_NATIVE_MPV
 /** 等到真实引擎满足状态条件，有界期限内失败而不是固定长等待。 */
@@ -50,6 +52,15 @@ describe.skipIf(!["win32", "darwin"].includes(process.platform) || !executable)(
     try {
       await player.start(executable!, await proxy.start(), 1, true, true)
       await until(() => player.state.status === "paused" && player.state.positionSec >= 1 && player.state.durationSec > 14)
+      const subtitles = path.join(temp, "bilingual.srt")
+      writeFileSync(subtitles,"1\n00:00:00,000 --> 00:00:15,000\n你好\nこんにちは\n", "utf8")
+      await player.subtitles(subtitles,{ ...defaultSubtitleDisplay,mode:"bilingual",offset:0.5 })
+      const query = player as unknown as { command(input: unknown[]): Promise<unknown> }
+      expect(await query.command(["get_property","sub-delay"])).toBe(0.5)
+      expect(await query.command(["get_property","sub-pos"])).toBe(92)
+      expect(await query.command(["get_property","sub-font-size"])).toBe(28)
+      await player.subtitles(undefined,{ ...defaultSubtitleDisplay,mode:"off" })
+      expect(await query.command(["get_property","sid"])).toBe(false)
       const loadedPosition = player.state.positionSec
       await new Promise<void>(resolve => { setTimeout(resolve, 250) })
       expect(player.state.positionSec).toBeCloseTo(loadedPosition, 1)

@@ -2535,6 +2535,7 @@
     "chinese": "中国語",
     "japanese": "日本語",
     "bilingual": "中国語＋日本語",
+    "loadFailed": "字幕を読み込めませんでした。Server の接続を確認し、プレーヤーを開き直してください。",
     "noSubtitles": "このファイルには生成済み字幕がありません。作品の詳細から生成してください。",
     "fontSize": "文字サイズ",
     "background": "字幕の背景",

@@ -2535,6 +2535,7 @@
     "chinese": "Chinese",
     "japanese": "Japanese",
     "bilingual": "Chinese + Japanese",
+    "loadFailed": "Subtitles could not be loaded. Check the Server connection and reopen the player.",
     "noSubtitles": "No generated subtitles for this file. Start from the movie details menu.",
     "fontSize": "Font size",
     "background": "Subtitle background",

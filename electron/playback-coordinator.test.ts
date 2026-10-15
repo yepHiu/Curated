@@ -3,8 +3,12 @@ import { NativePlaybackCoordinator, validatePlaybackOpen, type PlaybackContext, 
 import { NativeMpvPlayer } from "./native-mpv-player"
 import type { NativeLabControl } from "./native-player-contract"
 import { defaultPlaybackPreferences } from "./playback-preferences"
+import { readFile, stat } from "node:fs/promises"
+import { defaultSubtitleDisplay, type SubtitleDisplay } from "./subtitle-format"
 
 class Player extends NativeMpvPlayer {
+  subtitleLoads: { filename?: string; display: SubtitleDisplay }[] = []
+  override async subtitles(filename: string | undefined, display: SubtitleDisplay) { this.subtitleLoads.push({ filename, display }) }
   stopped = false
   captures = 0
   override async captureFrame() {
@@ -407,5 +411,32 @@ describe("production native coordinator", () => {
     expect(() => validatePlaybackOpen({ movieId: "a", autoplay: true, sourceQuery: { q: { invalid: true } } })).toThrow()
     expect(() => validatePlaybackOpen({ movieId: "a", autoplay: true, sourceQuery: { q: "x".repeat(2049) } })).toThrow()
     expect(validatePlaybackOpen({ movieId: "a", autoplay: true, sourceQuery: { back: "browse", url: "https://untrusted", engine: "web" } }).sourceQuery).toEqual({ back: "browse" })
+  })
+})
+
+describe("authenticated session-bound subtitles", () => {
+  it("fetches only the current file's registered assets and cleans local subtitles when switching parts", async () => {
+    const f = fixture()
+    const fetch = f.context.fetch
+    const asset = "a".repeat(32) + "-1"
+    const contentRequests: string[] = []
+    f.context.fetch = async (url, init) => {
+      const route = new URL(url)
+      if (route.pathname.endsWith("/subtitles")) return Response.json([{ id: asset, fileId: route.searchParams.get("fileId"), language: "zh-CN", format: "srt" }])
+      if (route.pathname === `/api/subtitles/${asset}/content`) { contentRequests.push(url); return new Response("1\n00:00:00,000 --> 00:00:02,000\n你好\n") }
+      return fetch(url, init)
+    }
+    try {
+      const first = await f.coordinator.open(f.context, { movieId: "a", fileId: "p1", autoplay: true })
+      await f.coordinator.command(first.sessionId, { action: "subtitles", display: { ...defaultSubtitleDisplay, offset: 1.25 } })
+      const file = f.players[0]!.subtitleLoads.at(-1)?.filename
+      expect(file).toBeTruthy()
+      expect(await readFile(file!, "utf8")).toContain("你好")
+      expect(contentRequests).toEqual([`${f.context.origin}/api/subtitles/${asset}/content`])
+      await f.coordinator.command(first.sessionId, { action: "part", fileId: "p2" })
+      await expect(stat(file!)).rejects.toThrow()
+      await expect(f.coordinator.command(first.sessionId, { action: "subtitles", display: defaultSubtitleDisplay })).rejects.toThrow("STALE_PLAYBACK_SESSION")
+      expect(f.players[1]!.subtitleLoads).toHaveLength(0)
+    } finally { await f.coordinator.stop() }
   })
 })

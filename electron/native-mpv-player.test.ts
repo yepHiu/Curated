@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises"
 import { describe, expect, it } from "vitest"
 import { NativeMpvPlayer } from "./native-mpv-player"
+import { defaultSubtitleDisplay } from "./subtitle-format"
 
 /** 模拟 IPC 的迟到截图响应，验证编码期间的控制和文件完成边界。 */
 function fixture(status: "playing" | "paused") {
@@ -45,6 +46,17 @@ function fixture(status: "playing" | "paused") {
 }
 
 describe("native frame capture during playback", () => {
+  it("loads a main-resolved subtitle once, applies positive delay and keeps captures video-only", async () => {
+    const f = fixture("paused")
+    await f.player.subtitles("/main-owned/chinese.srt", { ...defaultSubtitleDisplay, offset: 1.5 })
+    await f.player.subtitles("/main-owned/chinese.srt", { ...defaultSubtitleDisplay, size: 32 })
+    await f.player.subtitles(undefined, { ...defaultSubtitleDisplay, mode: "off" })
+    expect(f.commands.filter(item => item.command[0] === "sub-add")).toHaveLength(1)
+    expect(f.commands.some(item => JSON.stringify(item.command) === JSON.stringify(["set_property", "sub-delay", 1.5]))).toBe(true)
+    expect(f.commands.at(-1)?.command).toEqual(["set_property", "sid", "no"])
+    const frame = f.player.captureFrame(); await f.writing; f.finish(); await frame
+    expect(f.commands.find(item => item.command[0] === "screenshot-to-file")?.command[2]).toBe("video")
+  })
   it.each(["playing", "paused"] as const)("keeps %s state while waiting for PNG completion", async status => {
     const f = fixture(status)
     let completed = false

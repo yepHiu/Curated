@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { emptyNativePlayerState, type NativeLabControl, type NativePlayerState } from "./native-player-contract.js"
 import { diagnosticProperties, projectPlaybackDiagnostics } from "./native-playback-diagnostics.js"
+import { validateSubtitleDisplay, type SubtitleDisplay } from "./subtitle-format.js"
 
 interface PendingCommand { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
 const properties = ["time-pos", "duration", "pause", "speed", "volume", "frame-drop-count",
@@ -18,6 +19,7 @@ export type NativeEngineLauncher = (executable: string, args: string[]) => Nativ
 
 /** 一次会话对应一个 mpv 引擎实例；命令关联和状态事件不跨会话。 */
 export class NativeMpvPlayer extends EventEmitter {
+  private subtitleFile?: string
   private child?: NativeEngine
   private ipcDirectory?: string
   private ipcCleanup?: Promise<void>
@@ -47,7 +49,7 @@ export class NativeMpvPlayer extends EventEmitter {
     if (process.platform === "darwin") this.ipcDirectory = await mkdtemp(`/tmp/curated-mpv-${process.pid}-`)
     const pipe = this.ipcDirectory ? path.join(this.ipcDirectory, "ipc") : `\\\\.\\pipe\\curated-native-${randomUUID()}`
     this.state.status = "starting"
-    const args = ["--no-config", "--idle=yes", "--keep-open=no", "--terminal=no", "--ytdl=no",
+    const args = ["--no-config", "--idle=yes", "--keep-open=no", "--terminal=no", "--ytdl=no", "--sid=no", "--sub-auto=no",
       "--hwdec=auto-safe", "--screenshot-format=png", `--input-ipc-server=${pipe}`, `--start=${startSec}`,
       ...(initiallyPaused ? ["--pause=yes"] : []),
       ...(this.windowId && !headless ? [`--wid=${this.windowId}`, "--osc=no", "--input-default-bindings=no", "--input-vo-keyboard=no", "--input-cursor=no"] : []),
@@ -233,6 +235,19 @@ export class NativeMpvPlayer extends EventEmitter {
   }
 
   /** 显式枚举控制映射，不把 renderer 内容作为任意 mpv 命令执行。 */
+  /** Only main-process resolved files reach this method; the renderer never passes a path. */
+  async subtitles(filename: string | undefined, input: SubtitleDisplay): Promise<void> {
+    const display = validateSubtitleDisplay(input)
+    if (display.mode === "off" || !filename) { await this.command(["set_property", "sid", "no"]); return }
+    if (this.subtitleFile !== filename) { await this.command(["sub-add", filename, "select"]); this.subtitleFile = filename }
+    else await this.command(["set_property", "sid", "auto"])
+    await this.command(["set_property", "sub-font-size", display.size])
+    await this.command(["set_property", "sub-pos", 100 - display.position])
+    await this.command(["set_property", "sub-delay", display.offset])
+    await this.command(["set_property", "sub-border-style", display.background ? "background-box" : "outline-and-shadow"])
+    await this.command(["set_property", "sub-back-color", "#B8000000"])
+  }
+
   async control(input: NativeLabControl): Promise<void> {
     if (input.action === "stop") { await this.stop(); return }
     if (input.action === "pause" || input.action === "resume") {

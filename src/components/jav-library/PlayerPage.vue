@@ -24,6 +24,8 @@ import type { Movie } from "@/domain/movie/types"
 import { HttpClientError } from "@/api/http-client"
 import { moviePlaybackAbsoluteUrl, resolveMoviePlaybackSourceUrl } from "@/api/playback-url"
 import PlayerTransportControls from "@/components/jav-library/PlayerTransportControls.vue"
+import PlayerSubtitleMenu from "./PlayerSubtitleMenu.vue"
+import { usePlayerSubtitles } from "@/composables/use-player-subtitles"
 import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
 import PlayerPlaylistPanel from "@/components/jav-library/PlayerPlaylistPanel.vue"
 import PlayerPlaylistRevealTab from "@/components/jav-library/PlayerPlaylistRevealTab.vue"
@@ -342,6 +344,7 @@ const isSwitchingPlaybackSession = ref(false)
 const isPlaybackWaiting = ref(false)
 const isPlaying = ref(false)
 const currentTime = ref(0)
+const playerSubtitles = usePlayerSubtitles(computed(() => props.movie.id), selectedFileId, currentTime)
 const duration = ref(0)
 const bufferedUntilSec = ref(0)
 const progressSliderValue = ref([0])
@@ -3281,6 +3284,9 @@ const videoPreloadMode = computed(() =>
             {{ noStreamHint }}
           </p>
         </div>
+        <div v-if="playbackSrc && playerSubtitles.text.value" data-player-subtitle class="pointer-events-none absolute inset-x-4 text-center" :style="{ bottom: `${playerSubtitles.preferences.value.position}%`, fontSize: `${playerSubtitles.preferences.value.size}px`, zIndex: 6 }" aria-live="off">
+          <span class="inline whitespace-pre-line rounded px-2 py-1 text-white" :style="{ background: playerSubtitles.preferences.value.background ? 'rgba(0,0,0,.72)' : 'transparent', textShadow: '0 1px 3px black', lineHeight: '1.5' }">{{ playerSubtitles.text.value }}</span>
+        </div>
 
         <div
           v-if="playbackError"
@@ -3446,6 +3452,7 @@ const videoPreloadMode = computed(() =>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button v-if="playlistActive" data-player-auxiliary variant="ghost" size="icon" class="rounded-full" :aria-label="t('player.playlistAutoAdvanceAria')" :aria-pressed="playlistAutoAdvance" @click="setPlaylistAutoAdvance(!playlistAutoAdvance)"><Repeat2 /></Button>
+            <PlayerSubtitleMenu v-model="playerSubtitles.preferences.value" :available="playerSubtitles.available.value" :error="playerSubtitles.error.value" :disabled="!playbackSrc" />
             <PlayerPlaybackSettingsMenu
               :disabled="!playbackSrc"
               :playback-rate="playbackRate"

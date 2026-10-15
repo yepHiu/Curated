@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onBeforeUnmount, ref } from "vue"
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useElementSize } from "@vueuse/core"
 import { Camera, Film, Info, Loader2, Maximize2, Minimize2, Monitor, Repeat2, SkipBack, SkipForward, X } from "lucide-vue-next"
@@ -10,6 +10,9 @@ import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui
 import CaptureReceipt from "@/components/jav-library/CaptureReceipt.vue"
 import FrameImageViewer from "@/components/jav-library/FrameImageViewer.vue"
 import PlayerTransportControls from "@/components/jav-library/PlayerTransportControls.vue"
+import PlayerSubtitleMenu from "@/components/jav-library/PlayerSubtitleMenu.vue"
+import { readSubtitlePreferences, saveSubtitlePreferences } from "@/lib/subtitle-preferences"
+import type { SubtitleDisplay } from "../../electron/subtitle-format"
 import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
 import MoviePartSelect from "@/components/jav-library/MoviePartSelect.vue"
 import NativePlaybackInfo from "@/components/jav-library/NativePlaybackInfo.vue"
@@ -25,6 +28,7 @@ import { nativeMessages, type NativeMessage } from "../native-player-prototype/m
 const bridge = window.curatedPlayer
 const snapshot = ref<DesktopPlaybackSnapshot>()
 const macChrome = computed(() => bridge?.windowChrome === "macos" && !snapshot.value?.fullscreen)
+const subtitleDisplay = ref(readSubtitlePreferences())
 const busy = ref(false)
 const error = ref("")
 const diagnostics = ref(false)
@@ -74,6 +78,18 @@ function receive(next: DesktopPlaybackSnapshot) {
   locale.value = lang.value
   document.documentElement.lang = lang.value
   if (previous?.sessionId !== next.sessionId) { error.value = ""; infoFeedback.value = ""; immersive.revealChrome() }
+}
+watch(() => `${snapshot.value?.sessionId ?? ""}:${snapshot.value?.subtitles?.preferenceScope ?? ""}`, () => {
+  subtitleDisplay.value = readSubtitlePreferences(snapshot.value?.subtitles?.preferenceScope)
+  const available = snapshot.value?.subtitles?.available ?? []
+  const mode = subtitleDisplay.value.mode
+  if (snapshot.value?.sessionId && (mode === "off" || mode === "bilingual" && available.includes("zh-CN") && available.includes("ja") || available.includes(mode))) void updateSubtitles(subtitleDisplay.value)
+})
+async function updateSubtitles(display: SubtitleDisplay) {
+  subtitleDisplay.value = display; saveSubtitlePreferences(display, snapshot.value?.subtitles?.preferenceScope)
+  if (!bridge || !snapshot.value) return
+  try { await bridge.command(snapshot.value.sessionId, { action: "subtitles", display }); receive(await bridge.snapshot()) }
+  catch { /* The snapshot exposes a subtitle-specific error; video playback continues. */ }
 }
 function closeDiagnostics() {
   diagnostics.value = false
@@ -225,6 +241,7 @@ onBeforeUnmount(() => {
         <Button data-player-capture variant="ghost" size="icon" class="rounded-full" :disabled="!capture.available.value || busy" :aria-label="captureLabel" :title="captureLabel" @pointerdown="startCapture" @pointerup="capture.finishPress" @pointercancel="capture.cancelPress" @click="captureClick"><Loader2 v-if="capture.busy.value" class="animate-spin motion-reduce:animate-none" /><Camera v-else /></Button>
         <Button data-player-capture variant="ghost" size="icon" class="rounded-full" :disabled="((!playing || !capture.available.value) && !capture.recording.value) || busy" :aria-label="capture.recording.value ? uiT('curated.stopClip') : 'GIF'" :title="capture.recording.value ? uiT('curated.stopClip') : 'GIF'" :aria-pressed="capture.recording.value" @click="toggleGif"><Film /></Button>
         <Button data-player-auxiliary variant="ghost" size="icon" class="rounded-full" :aria-label="extra.auto" :aria-pressed="snapshot?.autoAdvance" @click="command({ action: 'autoAdvance', enabled: !snapshot?.autoAdvance })"><Repeat2 /></Button>
+        <PlayerSubtitleMenu :model-value="subtitleDisplay" :available="snapshot?.subtitles?.available ?? []" :error="snapshot?.subtitles?.error" :disabled="!active || busy" @update:model-value="updateSubtitles" @update:open="settings = $event" />
         <PlayerPlaybackSettingsMenu native :disabled="!active || busy" :playback-rate="state?.speed ?? 1" @update:playback-rate="command({ action: 'speed', value: $event })" @update:open="settings = $event" />
         <Button data-player-auxiliary variant="ghost" size="icon" class="rounded-full" :aria-label="extra.web" :title="extra.web" @click="command({ action: 'web' })"><Monitor /></Button>
         <Button data-player-auxiliary data-native-info-trigger variant="ghost" size="icon" class="rounded-full" :aria-label="nativePlaybackInfoMessages[lang].title" :aria-pressed="diagnostics" @click="diagnostics = !diagnostics"><Info /></Button>

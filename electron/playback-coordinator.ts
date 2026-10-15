@@ -1,3 +1,7 @@
+import { mkdtemp, writeFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
+import { defaultSubtitleDisplay, validateSubtitleDisplay, mergeSubtitleSRT, plainSubtitleSRT, type SubtitleDisplay } from "./subtitle-format.js"
 import { randomUUID } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { NativeMediaProxy, type MediaFetcher } from "./native-media-proxy.js"
@@ -18,6 +22,9 @@ export interface PlaybackSurface {
   dispose(): Promise<void>
 }
 interface Active {
+ subtitleDirectory?: string
+ subtitleFiles?: Partial<Record<"zh-CN" | "ja" | "bilingual", string>>
+ subtitleAssets?: { id: string; language: string; format: string; fileId: string }[]
   context: PlaybackContext
   player: NativeMpvPlayer
   proxy: NativeMediaProxy
@@ -173,6 +180,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       movieId: movie.id, fileId }, movie, windowOpen: true, queue: input.queue ?? [], autoAdvance: input.autoAdvance === true,
       locale: input.locale ?? "zh-CN", sourceQuery: structuredClone(input.sourceQuery ?? {}) }
     this.lastContext = context
+    this.snapshotState.subtitles = { available: [], display: { ...defaultSubtitleDisplay } }
       this.surface ??= await this.createSurface()
       await this.surface.setTitle(movie.code?.trim() || "Curated")
       const proxy = new NativeMediaProxy(`${context.origin}/api/library/movies/${encodeURIComponent(movie.id)}/stream?fileId=${encodeURIComponent(fileId)}`, async (url, init) => {
@@ -201,6 +209,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       const prefs = this.preferences()
       await player.control({ action: "volume", value: prefs.volume })
       await player.control({ action: "speed", value: prefs.speed })
+      await this.loadSubtitleAssets(active)
       await player.control({ action: input.autoplay ? "resume" : "pause" })
       await this.api(context, `/api/library/played-movies/${encodeURIComponent(movie.id)}`, { method: "POST" })
       this.receive(active, player.state)
@@ -304,6 +313,16 @@ export class NativePlaybackCoordinator extends EventEmitter {
         return
       }
       if (!active) throw new Error("NO_ACTIVE_PLAYER")
+      if (input.action === "subtitles") {
+        const display = validateSubtitleDisplay(input.display)
+        await this.ensureUnlocked(active.context)
+        try { await this.applySubtitles(active, display); this.snapshotState.subtitles = { ...this.snapshotState.subtitles, available: (active.subtitleAssets ?? []).map(asset => asset.language), display } }
+        catch (failure) {
+          if (failure instanceof Error && failure.message === "SERVER_LOCKED") { await this.finish("SERVER_LOCKED"); throw failure }
+          this.snapshotState.subtitles = { ...this.snapshotState.subtitles, available: (active.subtitleAssets ?? []).map(asset => asset.language), display, error: "SUBTITLE_LOAD_FAILED" }; this.publish(); throw failure
+        }
+        this.publish(); return
+      }
       if (!["pause", "resume", "seek", "speed", "volume"].includes(input.action)) throw new Error("INVALID_CONTROL")
       if (input.action === "seek") { this.clearPreparedCapture(); active.tracker.onSeeking(input.value ?? active.player.state.positionSec) }
       await active.player.control(input)
@@ -453,6 +472,41 @@ export class NativePlaybackCoordinator extends EventEmitter {
       await this.startClip(job.active, job.state.frameId, job.state.startSec, job.state.endSec)
     })
   }
+  private async loadSubtitleAssets(active: Active): Promise<void> {
+    try {
+      const assets = await this.api<{ id: string; language: string; format: string; fileId: string }[]>(active.context,
+        `/api/library/movies/${encodeURIComponent(active.movie.id)}/subtitles?fileId=${encodeURIComponent(active.fileId)}`)
+      active.subtitleAssets = assets.filter(asset => /^[a-f0-9]{32}-[012]$/.test(asset.id) && asset.fileId === active.fileId && asset.format === "srt" && ["zh-CN", "ja"].includes(asset.language))
+      const preferenceScope = `${active.context.origin}:${active.fileId}:${active.subtitleAssets.map(asset => asset.id).sort().join(",")}`
+      this.snapshotState.subtitles = { available: active.subtitleAssets.map(asset => asset.language), display: { ...defaultSubtitleDisplay }, preferenceScope }
+    } catch { active.subtitleAssets = []; this.snapshotState.subtitles = { available: [], display: { ...defaultSubtitleDisplay }, error: "SUBTITLE_LOAD_FAILED" } }
+  }
+  private async subtitleText(active: Active, language: string): Promise<string> {
+    const asset = active.subtitleAssets?.find(item => item.language === language)
+    if (!asset) throw new Error("SUBTITLE_NOT_AVAILABLE")
+    const response = await active.context.fetch(`${active.context.origin}/api/subtitles/${encodeURIComponent(asset.id)}/content`, { redirect: "error", signal: AbortSignal.timeout(10000) })
+    if (!response.ok) { await response.body?.cancel(); throw new Error(response.status === 401 || response.status === 403 ? "SERVER_LOCKED" : "SUBTITLE_LOAD_FAILED") }
+    const reader = response.body?.getReader()
+    if (!reader) throw new Error("SUBTITLE_LOAD_FAILED")
+    const chunks: Uint8Array[] = []; let total = 0
+    try { for (;;) { const { done, value } = await reader.read(); if (done) break; total += value.byteLength; if (total > 16 * 1024 * 1024) throw new Error("SUBTITLE_TOO_LARGE"); chunks.push(value) } }
+    finally { await reader.cancel() }
+    return Buffer.concat(chunks).toString("utf8")
+  }
+  private async applySubtitles(active: Active, display: SubtitleDisplay): Promise<void> {
+    if (display.mode === "off") { await active.player.subtitles(undefined, display); return }
+    active.subtitleFiles ??= {}
+    let filename = active.subtitleFiles[display.mode]
+    if (!filename) {
+      await this.loadSubtitleAssets(active)
+      const text = display.mode === "bilingual" ? mergeSubtitleSRT(await this.subtitleText(active, "zh-CN"), await this.subtitleText(active, "ja")) : plainSubtitleSRT(await this.subtitleText(active, display.mode))
+      active.subtitleDirectory ??= await mkdtemp(path.join(tmpdir(), "curated-subtitles-"))
+      filename = path.join(active.subtitleDirectory, `${display.mode}.srt`)
+      await writeFile(filename, text, { mode: 0o600 })
+      active.subtitleFiles[display.mode] = filename
+    }
+    await active.player.subtitles(filename, display)
+  }
   private async save(active: Active): Promise<void> {
     const state = active.player.state
     try {
@@ -481,6 +535,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
     active.proxy.removeAllListeners("diagnostics")
     active.tracker.onPause(active.player.state.positionSec)
     await active.player.stop()
+    if (active.subtitleDirectory) await rm(active.subtitleDirectory, { recursive: true, force: true })
     await active.proxy.stop()
     this.snapshotState.state = { ...active.player.state, movieId: active.movie.id, fileId: active.fileId,
       diagnostics: { ...(active.player.state.diagnostics ?? projectPlaybackDiagnostics({})), network: active.proxy.diagnostics() } }
