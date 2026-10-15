@@ -49,4 +49,32 @@ describe("subtitle provider enable visibility", () => {
     wrapper.unmount()
   })
 
+  it("shows success in the test button for three seconds and keeps failures available for retry", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+    service.settings.mockResolvedValue({ enabled: true, canManage: true, apiKeyConfigured: true, translationModel: "configured-ai" })
+    service.testProvider.mockResolvedValue(undefined)
+    const wrapper = mount(SettingsSubtitlesSection)
+    try {
+      await flushPromises()
+      const button = wrapper.get("[data-subtitle-provider-test]")
+      await button.trigger("click"); await flushPromises()
+      expect(button.text()).toBe("aiSettings.connectivityPassed")
+      expect(button.attributes("data-status")).toBe("success")
+      await vi.advanceTimersByTimeAsync(2999)
+      expect(button.attributes("data-status")).toBe("success")
+      await vi.advanceTimersByTimeAsync(1)
+      expect(button.text()).toBe("subtitles.testProvider")
+      expect(button.attributes("data-status")).toBeUndefined()
+      service.testProvider.mockRejectedValueOnce(new Error("invalid credentials"))
+      await button.trigger("click"); await flushPromises()
+      expect(button.text()).toBe("aiSettings.connectivityFailed")
+      expect(button.attributes("aria-label")).toContain("invalid credentials")
+      expect(button.attributes("disabled")).toBeUndefined()
+      await button.trigger("click"); await flushPromises()
+      expect(button.attributes("data-status")).toBe("success")
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
+  })
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue"
+import { onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Captions, Eye, EyeOff } from "lucide-vue-next"
+import { Captions, Check, Eye, EyeOff, Loader2, X } from "lucide-vue-next"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import SettingsHint from "./SettingsHint.vue"
 import SubtitleModelSelect from "../SubtitleModelSelect.vue"
@@ -37,6 +37,18 @@ const busy = ref(false)
 const error = ref("")
 const ready = ref(false)
 const tested = ref(false)
+const testing = ref(false)
+const testError = ref("")
+let disposed = false
+let testResetTimer: ReturnType<typeof setTimeout> | undefined
+function resetTestResult() {
+  if (testResetTimer !== undefined) clearTimeout(testResetTimer)
+  testResetTimer = undefined
+  tested.value = false
+  testError.value = ""
+}
+watch(() => [cfg.value?.enabled, cfg.value?.recognitionModel, cfg.value?.translationModel, key.value], resetTestResult)
+onBeforeUnmount(() => { disposed = true; resetTestResult() })
 function draft() {
   return { enabled: cfg.value?.enabled ?? false, recognitionModel: cfg.value?.recognitionModel, translationModel: cfg.value?.translationModel ?? "configured-ai", ...(key.value ? { apiKey: key.value } : {}) }
 }
@@ -53,12 +65,18 @@ const autosave = useAISettingsAutosave({
   onDetachedError: detail => pushAppToast(t("aiSettings.autoSaveFailed", { message: detail }), { variant: "destructive" }),
 })
 async function testProvider() {
-  error.value = ""; tested.value = false
-  if (!await autosave.flush()) return
-  busy.value = true
-  try { await service.testProvider(); tested.value = true }
-  catch (e) { error.value = e instanceof Error ? e.message : String(e) }
-  finally { busy.value = false }
+  if (busy.value) return
+  error.value = ""; resetTestResult()
+  busy.value = true; testing.value = true
+  try {
+    if (!await autosave.flush() || disposed) return
+    await service.testProvider()
+    if (disposed) return
+    tested.value = true
+    testResetTimer = setTimeout(resetTestResult, 3000)
+  } catch (e) {
+    if (!disposed) testError.value = e instanceof Error ? e.message : String(e)
+  } finally { busy.value = false; testing.value = false }
 }
 onMounted(async () => {
   try {
@@ -119,12 +137,28 @@ onMounted(async () => {
       <p v-if="cfg && !cfg.canManage" class="text-sm text-muted-foreground">{{ t('subtitles.localOnly') }}</p>
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0 flex-1 text-xs text-muted-foreground" role="status">
-          <p v-if="cfg?.enabled && tested">{{ t('subtitles.testPassed') }}</p>
-          <p v-else-if="autosave.saving.value || autosave.dirty.value">{{ t('common.saving') }}</p>
+          <p v-if="autosave.saving.value || autosave.dirty.value">{{ t('common.saving') }}</p>
           <p v-else-if="autosave.saved.value">{{ t('settings.autoPersistSaved') }}</p>
         </div>
         <div class="flex flex-wrap justify-end gap-2">
-          <Button v-if="cfg?.enabled" variant="outline" size="sm" class="rounded-full" :disabled="!cfg?.canManage || (!cfg.apiKeyConfigured && !key.trim()) || busy" @click="testProvider">{{ t('subtitles.testProvider') }}</Button>
+          <SettingsHint v-if="cfg?.enabled" :text="testError || t('subtitles.testPassed')">
+            <Button
+              variant="outline" size="sm"
+              class="rounded-full data-[status=success]:border-success/35 data-[status=success]:bg-success/10 data-[status=success]:text-success data-[status=success]:hover:bg-success/20 data-[status=success]:hover:text-success dark:data-[status=success]:border-success/35 dark:data-[status=success]:bg-success/10 dark:data-[status=success]:hover:bg-success/20"
+              :disabled="!cfg.canManage || (!cfg.apiKeyConfigured && !key.trim()) || busy"
+              :aria-busy="testing"
+              :aria-label="testError ? `${t('subtitles.testProvider')}: ${testError}` : undefined"
+              aria-live="polite"
+              :data-status="testing ? 'testing' : tested ? 'success' : testError ? 'failed' : undefined"
+              data-subtitle-provider-test
+              @click="testProvider"
+            >
+              <Loader2 v-if="testing" data-icon="inline-start" class="motion-safe:animate-spin" aria-hidden="true" />
+              <Check v-else-if="tested" data-icon="inline-start" aria-hidden="true" />
+              <X v-else-if="testError" data-icon="inline-start" aria-hidden="true" />
+              {{ testing ? t('settings.experimentalTestTesting') : tested ? t('aiSettings.connectivityPassed') : testError ? t('aiSettings.connectivityFailed') : t('subtitles.testProvider') }}
+            </Button>
+          </SettingsHint>
           <Button v-if="autosave.error.value" variant="outline" size="sm" class="rounded-full" @click="autosave.flush()">{{ t('aiSettings.retry') }}</Button>
         </div>
       </div>
