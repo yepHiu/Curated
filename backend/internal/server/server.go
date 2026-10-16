@@ -689,6 +689,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/proxy/ping-google", localServerManagement(h.handleProxyPingGoogle))
 
 	h.registerSubtitleRoutes(mux)
+	h.registerTaskCenterRoutes(mux)
 	mux.HandleFunc("POST /api/ai/provider/test", localServerManagement(h.handleAIProviderTest))
 	mux.HandleFunc("POST /api/ai/chat", h.handleAIChat)
 	mux.HandleFunc("GET /api/ai/sessions", h.handleListAIChatSessions)
