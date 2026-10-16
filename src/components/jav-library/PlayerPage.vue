@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue"
+import { provide, computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import MoviePartSelect from "@/components/jav-library/MoviePartSelect.vue"
 import { useRoute, useRouter } from "vue-router"
@@ -30,7 +30,7 @@ import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackS
 import PlayerPlaylistPanel from "@/components/jav-library/PlayerPlaylistPanel.vue"
 import PlayerPlaylistRevealTab from "@/components/jav-library/PlayerPlaylistRevealTab.vue"
 import PlayerProgressFrameMarkers from "@/components/jav-library/PlayerProgressFrameMarkers.vue"
-import { Button } from "@/components/ui/button"
+import Button from "@/components/jav-library/PlayerButton.vue"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu'
 import { Slider } from "@/components/ui/slider"
 import {
@@ -253,6 +253,7 @@ const playbackSeekForwardStep = computed(() =>
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const surfaceRef = ref<HTMLElement | null>(null)
+provide("playerTooltipPortal", surfaceRef)
 const progressSliderRootRef = ref<HTMLElement | null>(null)
 let hlsInstance: HlsInstance | null = null
 let detachHlsStatsListeners: (() => void) | null = null
@@ -3235,7 +3236,7 @@ const videoPreloadMode = computed(() =>
               <span v-else-if="clipCapturePhase === 'success'">{{ t('player.clipSavedToLibrary') }}</span>
               <span v-else>{{ clipExportError || t('player.clipExportFailed') }}</span>
               <span v-if="clipCaptureIsRecording" class="ml-auto font-mono tabular-nums text-muted-foreground">{{ clipCaptureElapsedSec.toFixed(1) }}s</span>
-              <Button v-if="clipCapturePhase === 'processing' && clipCapture.taskId.value" size="sm" variant="ghost" @click="cancelClipExport">{{ t('common.cancel') }}</Button>
+              <Button v-if="clipCapturePhase === 'processing' && clipCapture.taskId.value" size="sm" variant="ghost" @click="cancelClipExport" :tooltip="t('common.cancel')">{{ t('common.cancel') }}</Button>
             </div>
             <div v-if="clipCaptureIsRecording" class="mt-2 h-1 overflow-hidden rounded-full bg-muted">
               <div

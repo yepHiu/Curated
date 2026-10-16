@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PlayerButton from "@/components/jav-library/PlayerButton.vue"
 import { ChevronLeft, ChevronRight } from "lucide-vue-next"
 import { useI18n } from "vue-i18n"
 
@@ -24,16 +25,17 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <button
+  <PlayerButton unstyled
     v-if="expanded"
     type="button"
     data-player-playlist-tab
     class="flex h-16 w-6 items-center justify-center rounded-l-md border border-r-0 border-border bg-background text-foreground"
     :aria-label="t('player.playlistCloseAria')"
+    :title="t('player.playlistCloseAria')"
     @click.stop="emit('close')"
   >
     <ChevronRight class="size-4" aria-hidden="true" />
-  </button>
+  </PlayerButton>
   <div
     v-else
     data-player-playlist-hotzone
@@ -42,15 +44,16 @@ const emit = defineEmits<{
     @mouseleave="emit('leave')"
     @click.stop
   >
-    <button
+    <PlayerButton unstyled
       v-if="visible"
       type="button"
       data-player-playlist-tab
       class="flex h-16 w-6 items-center justify-center rounded-l-md border border-r-0 border-border bg-background text-foreground"
       :aria-label="t('player.playlistOpenAria')"
+    :title="t('player.playlistOpenAria')"
       @click.stop="emit('open')"
     >
       <ChevronLeft class="size-4" aria-hidden="true" />
-    </button>
+    </PlayerButton>
   </div>
 </template>

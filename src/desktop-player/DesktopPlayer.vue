@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
+import { provide, computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useElementSize } from "@vueuse/core"
 import { Camera, Film, Info, Loader2, Maximize2, Minimize2, Monitor, Repeat2, SkipBack, SkipForward, X } from "lucide-vue-next"
-import { Button } from "@/components/ui/button"
+import Button from "@/components/jav-library/PlayerButton.vue"
 import { Slider } from "@/components/ui/slider"
 import { Alert, AlertTitle } from "@/components/ui/alert"
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -38,6 +38,7 @@ const settings = ref(false)
 const focusedControl = ref(false)
 const draft = ref<number>()
 const surface = ref<HTMLElement>()
+provide("playerTooltipPortal", surface)
 const footer = ref<HTMLElement>()
 const playbackControls = ref<HTMLElement>()
 const { height: footerHeight } = useElementSize(footer, { width: 0, height: 0 }, { box: "border-box" })
@@ -213,7 +214,7 @@ onBeforeUnmount(() => {
     <div v-if="state?.status === 'starting'" class="pointer-events-none absolute inset-0 flex items-center justify-center">{{ t('starting') }}</div>
     <div v-if="immersive.feedback.value && !chromeShown" class="pointer-events-none absolute inset-0 flex items-center justify-center"><span class="rounded-2xl bg-black/60 px-6 py-4 text-xl">{{ immersive.feedback.value.label }}</span></div>
     <div v-if="state && ['ended', 'stopped', 'error'].includes(state.status)" class="absolute inset-0 flex items-center justify-center">
-      <Button variant="secondary" @click="toggle">{{ t('replay') }}</Button>
+      <Button variant="secondary" @click="toggle" :tooltip="t('replay')">{{ t('replay') }}</Button>
     </div>
     <NativePlaybackInfo v-if="diagnostics" :state="state" :lang="lang" :busy="infoBusy" :feedback="infoFeedback"
       :style="{ bottom: `${footerHeight + 12}px` }" @close="closeDiagnostics" @copy="exportDiagnostics('copy')" @save="exportDiagnostics('save')" />

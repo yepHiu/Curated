@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { Play, MonitorPlay, FolderOpen, Info, Maximize2, Minimize2, Loader2, X } from "lucide-vue-next"
-import { Button } from "@/components/ui/button"
+import Button from "@/components/jav-library/PlayerButton.vue"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -283,8 +283,8 @@ onBeforeUnmount(() => {
       <MonitorPlay class="size-12 text-primary" aria-hidden="true" />
       <h1 class="text-xl font-semibold">{{ status.state.status === 'idle' ? t('title') : t(status.state.status) }}</h1>
       <p class="text-sm text-muted-foreground">{{ status.state.status === 'idle' ? t('idleHint') : playingMovie?.title }}</p>
-      <Button v-if="playingMovie && ['ended', 'stopped'].includes(status.state.status)" :disabled="busy" @click="replay"><Play data-icon="inline-start" />{{ t('replay') }}</Button>
-      <Button v-else :disabled="busy" @click="prepareOpen = true"><FolderOpen data-icon="inline-start" />{{ t('chooseMedia') }}</Button>
+      <Button v-if="playingMovie && ['ended', 'stopped'].includes(status.state.status)" :disabled="busy" @click="replay" :tooltip="t('replay')"><Play data-icon="inline-start" />{{ t('replay') }}</Button>
+      <Button v-else :disabled="busy" @click="prepareOpen = true" :tooltip="t('chooseMedia')"><FolderOpen data-icon="inline-start" />{{ t('chooseMedia') }}</Button>
     </div>
     <header class="absolute inset-x-0 top-0 flex flex-wrap items-center gap-2 bg-gradient-to-b from-black/85 via-black/40 to-transparent p-4 transition-opacity sm:flex-nowrap sm:gap-3 sm:p-5" :class="chromeShown ? 'opacity-100' : 'pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100'">
       <div class="min-w-0 flex-1">
@@ -330,15 +330,15 @@ onBeforeUnmount(() => {
       <CardContent>
         <FieldGroup>
           <Field><FieldLabel for="server">{{ t('server') }}</FieldLabel>
-            <div class="flex flex-wrap gap-2"><Input id="server" v-model="origin" class="min-w-0 flex-1" :disabled="busy" @keydown.enter="connect" /><Button variant="outline" :disabled="!bridge || busy" @click="connect">{{ t('connect') }}</Button></div>
+            <div class="flex flex-wrap gap-2"><Input id="server" v-model="origin" class="min-w-0 flex-1" :disabled="busy" @keydown.enter="connect" /><Button variant="outline" :disabled="!bridge || busy" @click="connect" :tooltip="t('connect')">{{ t('connect') }}</Button></div>
           </Field>
           <Field v-if="status.connection && !unlocked"><FieldLabel for="pin">{{ t('pin') }}</FieldLabel>
-            <div class="flex gap-2"><Input id="pin" v-model="pin" type="password" inputmode="numeric" autocomplete="off" :disabled="busy" @keydown.enter="unlock" /><Button :disabled="busy || !pin" @click="unlock">{{ t('unlock') }}</Button></div>
+            <div class="flex gap-2"><Input id="pin" v-model="pin" type="password" inputmode="numeric" autocomplete="off" :disabled="busy" @keydown.enter="unlock" /><Button :disabled="busy || !pin" @click="unlock" :tooltip="t('unlock')">{{ t('unlock') }}</Button></div>
           </Field>
         </FieldGroup>
       </CardContent>
       <CardFooter class="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="outline" :disabled="!bridge || busy" @click="selectExecutable">{{ t('engine') }}</Button>
+        <Button variant="outline" :disabled="!bridge || busy" @click="selectExecutable" :tooltip="t('engine')">{{ t('engine') }}</Button>
         <span v-if="status.connection" class="text-sm text-muted-foreground">{{ unlocked ? t('connected') : t('locked') }}</span>
       </CardFooter>
     </Card>
@@ -346,7 +346,7 @@ onBeforeUnmount(() => {
       <CardHeader><CardTitle>{{ t('media') }}</CardTitle><CardDescription v-if="!unlocked">{{ t('lockedHint') }}</CardDescription></CardHeader>
       <CardContent>
         <FieldGroup>
-          <Field><FieldLabel for="query">{{ t('query') }}</FieldLabel><div class="flex gap-2"><Input id="query" v-model="query" :disabled="!unlocked || busy" @keydown.enter="search" /><Button variant="outline" :disabled="!unlocked || busy" @click="search">{{ t('search') }}</Button></div></Field>
+          <Field><FieldLabel for="query">{{ t('query') }}</FieldLabel><div class="flex gap-2"><Input id="query" v-model="query" :disabled="!unlocked || busy" @keydown.enter="search" /><Button variant="outline" :disabled="!unlocked || busy" @click="search" :tooltip="t('search')">{{ t('search') }}</Button></div></Field>
           <Field v-if="movies.length"><FieldLabel for="movie">{{ t('movie') }}</FieldLabel>
             <Select :model-value="movie?.id" :disabled="busy" @update:model-value="chooseMovie"><SelectTrigger id="movie"><SelectValue :placeholder="t('selectMovie')" /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="item in movies" :key="item.id" :value="item.id">{{ item.code }} · {{ item.title }}</SelectItem></SelectGroup></SelectContent></Select>
           </Field>
@@ -357,7 +357,7 @@ onBeforeUnmount(() => {
           <Field><FieldLabel for="start">{{ t('start') }}</FieldLabel><Input id="start" v-model.number="startSec" type="number" min="0" :disabled="!movie || busy" /></Field>
         </FieldGroup>
       </CardContent>
-      <CardFooter class="flex flex-wrap items-center justify-between gap-2"><span class="text-sm text-muted-foreground">{{ status.engineReady ? t('nativeWindow') : t('engineRequired') }}</span><Button :disabled="!status.engineReady || !unlocked || !movie || busy" @click="play"><Play data-icon="inline-start" />{{ t('play') }}</Button></CardFooter>
+      <CardFooter class="flex flex-wrap items-center justify-between gap-2"><span class="text-sm text-muted-foreground">{{ status.engineReady ? t('nativeWindow') : t('engineRequired') }}</span><Button :disabled="!status.engineReady || !unlocked || !movie || busy" @click="play" :tooltip="t('play')"><Play data-icon="inline-start" />{{ t('play') }}</Button></CardFooter>
     </Card>
       </DialogContent>
     </Dialog>

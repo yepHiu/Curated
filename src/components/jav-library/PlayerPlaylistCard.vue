@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PlayerButton from "@/components/jav-library/PlayerButton.vue"
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import type { Movie } from "@/domain/movie/types"
@@ -24,7 +25,7 @@ const actorsLine = computed(() => {
 </script>
 
 <template>
-  <button
+  <PlayerButton unstyled
     type="button"
     class="flex w-full overflow-hidden rounded-[1.1rem] border text-left transition-[border-color,background-color] duration-150 motion-reduce:transition-none"
     :class="
@@ -33,6 +34,7 @@ const actorsLine = computed(() => {
         : 'border-border/70 bg-card/80 hover:border-primary/25'
     "
     :data-player-playlist-item="movie.id"
+    :title="movie.title"
     :aria-current="props.current ? 'true' : undefined"
     @click="emit('select')"
   >
@@ -66,5 +68,5 @@ const actorsLine = computed(() => {
         {{ actorsLine }}
       </p>
     </div>
-  </button>
+  </PlayerButton>
 </template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Captions } from "lucide-vue-next"
 import { useI18n } from "vue-i18n"
-import { Button } from "@/components/ui/button"
+import Button from "@/components/jav-library/PlayerButton.vue"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field"

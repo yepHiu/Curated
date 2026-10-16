@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
 import { Copy, Download, X } from "lucide-vue-next"
-import { Button } from "@/components/ui/button"
+import Button from "@/components/jav-library/PlayerButton.vue"
 import { Separator } from "@/components/ui/separator"
 import { nativePlaybackInfoMessages, playbackInfoGroups, transferPolyline, type NativeInfoLanguage } from "@/lib/native-playback-info"
 import type { NativePlayerState } from "../../../electron/native-player-contract"

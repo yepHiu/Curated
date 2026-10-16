@@ -2,7 +2,7 @@
 import { computed } from "vue"
 import { Settings2 } from "lucide-vue-next"
 import { useI18n } from "vue-i18n"
-import { Button } from "@/components/ui/button"
+import Button from "@/components/jav-library/PlayerButton.vue"
 import {
   DropdownMenu,
   DropdownMenuContent,

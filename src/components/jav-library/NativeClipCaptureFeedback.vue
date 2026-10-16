@@ -2,7 +2,7 @@
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { Circle, Film, Loader2 } from "lucide-vue-next"
-import { Button } from "@/components/ui/button"
+import Button from "@/components/jav-library/PlayerButton.vue"
 import type { DesktopPlaybackClip } from "../../../electron/playback-contract"
 const props = defineProps<{ recording: boolean; elapsedSec: number; progress: number; clip?: DesktopPlaybackClip; busy: boolean }>()
 defineEmits<{ cancel: []; retry: []; dismiss: [] }>()
@@ -19,9 +19,9 @@ const message = computed(() => props.recording ? t("player.clipRecording") : pro
       <Film v-else class="size-4 shrink-0 text-primary" aria-hidden="true" />
       <span role="status" aria-live="polite" class="min-w-0 flex-1">{{ message }}</span>
       <span v-if="recording" class="font-mono tabular-nums text-muted-foreground">{{ elapsedSec.toFixed(1) }}s / 6s</span>
-      <Button v-if="recording || clip?.phase === 'processing'" size="sm" variant="ghost" :disabled="busy" @click="$emit('cancel')">{{ t('common.cancel') }}</Button>
-      <Button v-else-if="clip?.phase === 'error'" size="sm" variant="outline" :disabled="busy" @click="$emit('retry')">{{ t('common.retry') }}</Button>
-      <Button v-if="!recording && clip?.phase !== 'processing'" size="sm" variant="ghost" @click="$emit('dismiss')">{{ t('common.close') }}</Button>
+      <Button v-if="recording || clip?.phase === 'processing'" size="sm" variant="ghost" :disabled="busy" @click="$emit('cancel')" :tooltip="t('common.cancel')">{{ t('common.cancel') }}</Button>
+      <Button v-else-if="clip?.phase === 'error'" size="sm" variant="outline" :disabled="busy" @click="$emit('retry')" :tooltip="t('common.retry')">{{ t('common.retry') }}</Button>
+      <Button v-if="!recording && clip?.phase !== 'processing'" size="sm" variant="ghost" @click="$emit('dismiss')" :tooltip="t('common.close')">{{ t('common.close') }}</Button>
     </div>
     <div v-if="recording || clip?.phase === 'processing'" role="progressbar" :aria-label="message" :aria-valuenow="Math.round(recording ? progress * 100 : clip?.progress ?? 0)" aria-valuemin="0" aria-valuemax="100" class="mt-2 h-1 overflow-hidden rounded-full bg-muted">
       <div class="h-full origin-left rounded-full bg-primary transition-transform duration-200 ease-linear motion-reduce:transition-none" :style="{ transform: `scaleX(${recording ? progress : (clip?.progress ?? 0) / 100})` }" />
