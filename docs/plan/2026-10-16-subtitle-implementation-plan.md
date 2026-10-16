@@ -351,3 +351,12 @@ backend/ 目录：
 2026-10-16：字幕弹窗成品复用 AI 整理的可展开历史列表；选择器统一胶囊样式，底部取消关闭按钮，重新生成文案简化。AppShell 观察 GET /api/subtitle-jobs 的持久任务快照；侧栏与播放/AI整理相同区域显示进度，点击按 movieId/fileId 恢复弹窗，关闭弹窗不停止观察。断线保留最后快照；无新增配置或迁移。
 
 验证完成：pnpm build（含 typecheck，体积监管零提醒/超限）、定向 ESLint、5 文件 48 项 Vitest、backend 下 go test ./internal/server -run Subtitle -count=1 通过。Playwright 在真实页面使用模拟任务响应检查 1440px/390px、下拉尺寸一致、历史展开、Escape关闭后侧栏恢复及折叠侧栏恢复；窄屏无横向溢出。当前运行的旧开发 Server 不含新增端点，需重启新版 Server；未中断它，也未触发付费模型。未运行完整 display-scaling 套件。截图保存在忽略的 output/playwright/subtitle-history-sidebar-*.png。
+
+
+## 2026-10-17 千问 3 结果链接兼容修复
+
+真实任务在 recognizing 阶段报 recognition result unavailable。只读查询原云端任务确认其已 SUCCEEDED，但 result.transcription_url 使用 HTTP，被本地仅 HTTPS 的供应商地址校验拒绝。将同一签名链接协议升级为 HTTPS 后，实际下载返回 200，包含 67 条句子，确认无需重新识别该片段。
+
+修复仅在转写结果下载入口升级协议，随后继续校验既有供应商域名、无用户信息及无自定义端口限制；原始签名路径和查询不重编码，不允许明文下载。回归测试覆盖千问 3 HTTP 结果、签名保留、无凭据下载和非受信地址拒绝。go test ./internal/subtitles 与 go vet ./internal/subtitles 通过。修复提交 f590ba92。
+
+本轮不重启正在执行其它字幕任务的开发后端，不自动重试失败任务；重启后修复生效。没有新建云端识别请求，排查仅查询既有任务和下载既有结果。当前用户另发起的千问 3.1 任务继续运行。
