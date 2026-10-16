@@ -2136,6 +2136,7 @@
     "coverViewerAria": "{code} のポスターをビューアで開く"
   },
   "aiSettings": {
+    "rowsPerPage": "1ページの件数",
     "today": "今日",
     "connectivityPassed": "接続成功",
     "connectivityFailed": "接続失敗",

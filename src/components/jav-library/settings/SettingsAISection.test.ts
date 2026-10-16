@@ -16,13 +16,13 @@ vi.mock("@/services/library-service", () => ({ useLibraryService: () => ({ aiPro
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ locale: ref("en"), t: (key: string, params?: { message?: string }) => params?.message ? `${key}: ${params.message}` : key }) }))
 
 function emptyReport(): AIReport {
-  return { items: [], total: 0, limit: 5, offset: 0, summary: { runs: 0, failed: 0, partial: 0, cancelled: 0, modelCalls: 0, usageCalls: 0, toolCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, avgDurationMs: null, avgFirstTextMs: null } }
+  return { items: [], total: 0, limit: 20, offset: 0, summary: { runs: 0, failed: 0, partial: 0, cancelled: 0, modelCalls: 0, usageCalls: 0, toolCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, avgDurationMs: null, avgFirstTextMs: null } }
 }
 async function setup() { const wrapper = mount(SettingsAISection, { props: { useWebApi: true } }); await flushPromises(); return wrapper }
 function paginatedRecords() {
   const report = emptyReport()
-  report.total = 7
-  report.items = Array.from({ length: 5 }, (_, index) => ({ id: `run-${index}`, startedAt: "2026-09-06T00:00:00Z", channel: "chat", action: "", sessionId: "", provider: "test", model: "model", promptVersion: "v1", status: "completed", errorCode: "", durationMs: 12, firstTextMs: 4, modelCalls: 1, usageCalls: 1, toolCalls: 0, promptTokens: 2, completionTokens: 3, totalTokens: 5 }))
+  report.total = 22
+  report.items = Array.from({ length: 20 }, (_, index) => ({ id: `run-${index}`, startedAt: "2026-09-06T00:00:00Z", channel: "chat", action: "", sessionId: "", provider: "test", model: "model", promptVersion: "v1", status: "completed", errorCode: "", durationMs: 12, firstTextMs: 4, modelCalls: 1, usageCalls: 1, toolCalls: 0, promptTokens: 2, completionTokens: 3, totalTokens: 5 }))
   const audit: AIPage<AIAuditEntry> = { items: Array.from({ length: 10 }, (_, index) => ({ id: `audit-${index}`, createdAt: "2026-09-06T00:00:00Z", channel: "chat", sessionId: "", tool: "search_movies", permission: "read", result: "ok", errorCode: "", durationMs: 1 })), total: 12, limit: 10, offset: 0 }
   mocks.getUsage.mockResolvedValue(report)
   mocks.getAudit.mockResolvedValue(audit)
@@ -188,9 +188,21 @@ describe("SettingsAISection", () => {
     }
     wrapper.unmount()
   })
-  it("loads five recent requests and ten audit records per page", async () => {
+  it.each(["50", "100"])("changes usage page size to %s and resets pagination", async (size) => {
+    paginatedRecords()
     const wrapper = await setup()
-    expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 5, offset: 0 }))
+    const block = wrapper.get("[data-ai-settings-block=recent-runs]")
+    await block.findAll("button").at(-1)!.trigger("click")
+    await flushPromises()
+    const selector = wrapper.findAllComponents(Select).find(component => component.props("modelValue") === "20")!
+    selector.vm.$emit("update:modelValue", size)
+    await flushPromises()
+    expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ limit: Number(size), offset: 0 }))
+    wrapper.unmount()
+  })
+  it("loads twenty recent requests and ten audit records per page", async () => {
+    const wrapper = await setup()
+    expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 20, offset: 0 }))
     expect(mocks.getAudit).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 0 }))
     wrapper.unmount()
   })
@@ -215,7 +227,7 @@ describe("SettingsAISection", () => {
     expect(nextButton.attributes("disabled")).toBeDefined()
     expect(mocks.getUsage).toHaveBeenCalledTimes(kind === "runs" ? 2 : 1)
     expect(mocks.getAudit).toHaveBeenCalledTimes(kind === "audit" ? 2 : 1)
-    resolvePage(kind === "runs" ? { ...report, offset: 5, items: report.items.slice(0, 2) } : { ...audit, offset: 10, items: audit.items.slice(0, 2) })
+    resolvePage(kind === "runs" ? { ...report, offset: 20, items: report.items.slice(0, 2) } : { ...audit, offset: 10, items: audit.items.slice(0, 2) })
     await flushPromises()
     expect(list.element.style.minHeight).toBe(`${measuredHeight}px`)
     expect(list.findAll("li")).toHaveLength(2)
@@ -230,11 +242,11 @@ describe("SettingsAISection", () => {
     const block = wrapper.get("[data-ai-settings-block=recent-runs]")
     await block.findAll("button").at(-1)!.trigger("click"); await flushPromises()
     expect(block.get("[role=alert]").text()).toBe("page unavailable")
-    expect(block.get("ul").findAll("li")).toHaveLength(5)
-    expect(block.text()).toContain("1–5 / 7")
+    expect(block.get("ul").findAll("li")).toHaveLength(20)
+    expect(block.text()).toContain("1–20 / 22")
     expect(block.findAll("button").at(-2)!.attributes("disabled")).toBeDefined()
     await block.findAll("button").at(-1)!.trigger("click"); await flushPromises()
-    expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 5 }))
+    expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 20 }))
     expect(mocks.getAudit).toHaveBeenCalledOnce()
     wrapper.unmount()
   })

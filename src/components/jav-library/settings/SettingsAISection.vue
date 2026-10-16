@@ -64,7 +64,7 @@ watch(providerTestResult, result => {
 const days = ref("30")
 const channel = ref("all")
 const status = ref("all")
-const RUNS_PAGE_SIZE = 5
+const runsPageSize = ref("20")
 const AUDIT_PAGE_SIZE = 10
 const offset = ref(0)
 const auditOffset = ref(0)
@@ -182,7 +182,7 @@ async function refresh() {
   const query = { ...periodQuery(), channel: channel.value === "all" ? undefined : channel.value }
   try {
     const [nextReport, nextAudit, overview] = await Promise.all([
-      service.getUsage({ ...query, status: status.value === "all" ? undefined : status.value, offset: offset.value, limit: RUNS_PAGE_SIZE }),
+      service.getUsage({ ...query, status: status.value === "all" ? undefined : status.value, offset: offset.value, limit: Number(runsPageSize.value) }),
       service.getAudit({ ...query, status: status.value === "failed" ? "failed" : undefined, offset: auditOffset.value, limit: AUDIT_PAGE_SIZE }),
       channel.value !== "all" || status.value !== "all" ? service.getUsage({ ...periodQuery(), limit: 1, offset: 0 }) : Promise.resolve(null),
     ])
@@ -195,7 +195,7 @@ async function refresh() {
   } catch (err) { if (id === requestId && !disposed) error.value = (err as Error).message }
   finally { if (id === requestId) loading.value = false }
 }
-watch([days, channel, status], () => { offset.value = 0; auditOffset.value = 0; void refresh() })
+watch([days, channel, status, runsPageSize], () => { offset.value = 0; auditOffset.value = 0; void refresh() })
 async function perform(action: () => Promise<void>) {
   if (busy.value) return
   busy.value = true; error.value = ""; message.value = ""
@@ -246,7 +246,7 @@ function measured(total: number, known: number, calls: number) {
 function toolLabel(name: string) { const key = AGENT_TOOL_I18N_KEYS[name]; return key ? t(key) : name }
 async function page(kind: "runs" | "audit", direction: -1 | 1) {
   if (loading.value) return
-  const pageSize = kind === "runs" ? RUNS_PAGE_SIZE : AUDIT_PAGE_SIZE
+  const pageSize = kind === "runs" ? Number(runsPageSize.value) : AUDIT_PAGE_SIZE
   const current = kind === "runs" ? report.value : audit.value
   if (!current) return
   const nextOffset = Math.max(0, current.offset + direction * pageSize)
@@ -482,11 +482,11 @@ function auditLine(entry: AIAuditEntry) {
             <p v-if="channel !== 'all' || status !== 'all'" class="text-xs text-muted-foreground">{{ t('aiSettings.recordFiltersHint') }}</p>
             <p v-if="pageError?.kind === 'runs'" role="alert" class="text-sm text-destructive">{{ pageError.message }}</p>
             <p v-if="report && !report.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
-            <ul ref="runsList" class="flex min-w-0 flex-col gap-1.5" :style="{ minHeight: runsMinHeight ? `${runsMinHeight}px` : undefined }">
+            <ul ref="runsList" class="flex min-w-0 flex-col" :style="{ minHeight: runsMinHeight ? `${runsMinHeight}px` : undefined }">
               <li v-for="run in report?.items ?? []" :key="run.id" class="min-h-9 min-w-0 border-t border-border/50" :data-ai-run-row="run.id" :data-status="run.status">
                 <Collapsible v-model:open="expandedRuns[run.id]">
-                  <CollapsibleTrigger as-child><button type="button" :aria-label="runLine(run)" class="group flex min-h-16 w-full items-center gap-3 rounded-lg px-2 py-4 text-left hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <span class="min-w-0 flex-1"><span class="block text-sm font-medium">{{ t(`aiSettings.channels.${run.channel}`) }}</span><span class="mt-1 block break-words text-xs text-muted-foreground">{{ time(run.startedAt) }} · {{ run.model || t('aiSettings.unknown') }}</span></span>
+                  <CollapsibleTrigger as-child><button type="button" :aria-label="runLine(run)" class="group flex min-h-11 w-full items-center gap-2 rounded-lg px-2 py-2 sm:min-h-10 sm:py-1.5 text-left hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <span class="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3"><span class="shrink-0 text-sm font-medium">{{ t(`aiSettings.channels.${run.channel}`) }}</span><span class="truncate text-xs text-muted-foreground">{{ time(run.startedAt) }} · {{ run.model || t('aiSettings.unknown') }}</span></span>
                     <span class="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-5"><span class="text-right text-sm tabular-nums">{{ measured(run.totalTokens, run.usageCalls, run.modelCalls) }} <span class="text-xs text-muted-foreground">Token</span></span><span class="hidden text-xs text-muted-foreground sm:block">{{ duration(run.durationMs) }}</span><Badge :variant="runStatusTone(run.status)">{{ t(`aiSettings.statuses.${run.status}`) }}</Badge></span>
                     <ChevronRight class="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" aria-hidden="true" />
                   </button></CollapsibleTrigger>
@@ -508,7 +508,16 @@ function auditLine(entry: AIAuditEntry) {
                 </Collapsible>
               </li>
             </ul>
-            <div v-if="report && report.total > report.limit" class="flex flex-wrap items-center justify-end gap-2"><span class="mr-auto text-xs text-muted-foreground">{{ offset + 1 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}</span><Button variant="outline" size="sm" :disabled="loading || offset === 0" @click="page('runs', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || offset + RUNS_PAGE_SIZE >= report.total" @click="page('runs', 1)">{{ t('aiSettings.next') }}</Button></div>
+            <FieldGroup class="w-fit self-end">
+              <Field orientation="horizontal" class="items-center gap-2">
+                <FieldLabel for="ai-runs-page-size" class="shrink-0 text-xs text-muted-foreground">{{ t('aiSettings.rowsPerPage') }}</FieldLabel>
+                <Select v-model="runsPageSize" :disabled="loading">
+                  <SelectTrigger id="ai-runs-page-size" class="w-20"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectGroup><SelectItem v-for="size in ['20','50','100']" :key="size" :value="size">{{ size }}</SelectItem></SelectGroup></SelectContent>
+                </Select>
+              </Field>
+            </FieldGroup>
+            <div v-if="report && report.total > report.limit" class="flex flex-wrap items-center justify-end gap-2"><span class="mr-auto text-xs text-muted-foreground">{{ offset + 1 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}</span><Button variant="outline" size="sm" :disabled="loading || offset === 0" @click="page('runs', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || offset + Number(runsPageSize) >= report.total" @click="page('runs', 1)">{{ t('aiSettings.next') }}</Button></div>
           </section>
           <details class="mt-2" data-ai-more-statistics><summary class="min-h-11 cursor-pointer py-3 text-sm text-muted-foreground">{{ t('aiSettings.moreStatistics') }}</summary>
           <dl v-if="summary" class="my-4 flex flex-wrap gap-6 text-sm">

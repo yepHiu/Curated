@@ -2136,6 +2136,7 @@
     "coverViewerAria": "Open {code} poster in viewer"
   },
   "aiSettings": {
+    "rowsPerPage": "Rows per page",
     "today": "Today",
     "connectivityPassed": "Connected",
     "connectivityFailed": "Connection failed",

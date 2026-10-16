@@ -2136,6 +2136,7 @@
     "coverViewerAria": "在查看器中打开 {code} 海报大图"
   },
   "aiSettings": {
+    "rowsPerPage": "每页条数",
     "today": "今天",
     "connectivityPassed": "联通成功",
     "connectivityFailed": "联通失败",
