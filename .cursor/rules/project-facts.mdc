@@ -561,3 +561,8 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 字幕发起入口与任务列表共用 `TaskDetailDialog` / `TaskDetailContent`。`SubtitleJobDialog` 仅管理发起配置和按文件筛选的历史索引；提交后原弹窗切换统一详情，已有活动任务直接打开详情，可返回「发起与历史」。进度、取消确认、重试与成果操作不再另写一套；设置读取失败不阻止查看已知历史，关闭不取消服务端任务。无新增 API 或配置。
 
 `/tasks` 与 `/tasks/:taskKey` 已接入 AI 字幕/AI 整理。侧栏 SidebarTaskEntry 替代两个旧入口；AppShell 的 use-task-center 集中调度摘要和既有业务观察（活动 2s/空闲 10s/隐藏 30s），页面按 revision 查询，字幕弹窗不另启轮询。后端新增 GET /api/task-center/summary、/tasks、/tasks/{taskKey}（后两者前缀仍为 /api/task-center）；全量 SQLite 来源投影、游标分页、排除删除记录，稳定 key 为 subtitle:id / organize:id。控制动作复用原端点，远端只读；无迁移或 cfg 项。阶段计数和真实时间来源见计划 §14；未新增阶段事件/耗时/统一调度器。P5 扫描/刮削/导入未接入。源码与本地检查完成，未发布。
+
+
+### 字幕翻译优先整批（2026-10-17）
+
+识别仍每10分钟切片，翻译跨分片合并全部待译cue，按文本和估算输入/输出容量分组，取消固定30条。configured-ai继承contextWindow，缺省/千问入口预算65536；输出分组估算上限32768（不发送max_tokens）。显式上下文超限/输出length才二分重试，成功组写检查点，其他供应商/校验错误原样失败。翻译请求超时15分钟，取消拒绝发布；既有提示词冻结不变，无新API/config/迁移。三包Go测试、vet与开发构建通过，无本轮付费云调用。详见字幕实施计划。

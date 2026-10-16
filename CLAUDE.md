@@ -819,3 +819,8 @@ Subtitle creation and task-center rows share `TaskDetailDialog` and `TaskDetailC
 | GET | `/api/task-center/tasks/{taskKey}` | URL-encoded subtitle:id or organize:id; common task fields and typed business data; 404 for unavailable records. |
 
 All three require existing API authentication and return no-store. Cursor order is createdAt then stable key descending. Soft-deleted organization records are excluded. `canManage` reflects a direct Server-local request; existing business mutation endpoints still enforce their own permissions and current-state rules. No generic write endpoint, migration or new config. Subtitle provider errors are reduced to a safe category; credentials and internal paths are not part of the projection. The UI shows stage-specific units rather than invented total progress. See docs/plan/2026-10-16-ai-task-center-requirements.md §14.
+
+
+## Subtitle translation capacity — 2026-10-17
+
+Translation combines pending cues across all recognition parts, sending one request when the estimated context/output budget fits. Capacity groups replace the fixed 30-cue loop. Requests omit max_tokens; explicit context overflow or output truncation halves only the affected group. Successful groups checkpoint; auth/rate/policy/validation failures remain errors. Translation timeout is 15 minutes with cancellation. Configured AI inherits contextWindow; unknown/Qwen entries use a conservative 65536-token estimate. No API, config, schema or prompt-version changes. See the subtitle implementation record and guide.
