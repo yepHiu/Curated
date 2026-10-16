@@ -513,17 +513,19 @@ function auditLine(entry: AIAuditEntry) {
                 {{ report.total ? offset + 1 : 0 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}
               </span>
               <div class="flex flex-wrap items-center justify-end gap-2">
-                <FieldGroup class="w-auto">
+                <FieldGroup class="w-44 shrink-0">
                   <Field orientation="horizontal" class="items-center gap-2">
-                    <FieldLabel for="ai-runs-page-size" class="shrink-0 text-xs text-muted-foreground">{{ t('aiSettings.rowsPerPage') }}</FieldLabel>
+                    <FieldLabel for="ai-runs-page-size" class="whitespace-nowrap text-xs text-muted-foreground">{{ t('aiSettings.rowsPerPage') }}</FieldLabel>
                     <Select v-model="runsPageSize" :disabled="loading">
-                      <SelectTrigger id="ai-runs-page-size" class="w-20"><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="ai-runs-page-size" class="w-20 shrink-0"><SelectValue /></SelectTrigger>
                       <SelectContent><SelectGroup><SelectItem v-for="size in ['20','50','100']" :key="size" :value="size">{{ size }}</SelectItem></SelectGroup></SelectContent>
                     </Select>
                   </Field>
                 </FieldGroup>
-                <Button variant="outline" size="sm" :disabled="loading || !report || offset === 0" @click="page('runs', -1)">{{ t('aiSettings.previous') }}</Button>
-                <Button variant="outline" size="sm" :disabled="loading || !report || offset + Number(runsPageSize) >= report.total" @click="page('runs', 1)">{{ t('aiSettings.next') }}</Button>
+                <div class="flex shrink-0 items-center gap-2">
+                  <Button variant="outline" size="sm" :disabled="loading || !report || offset === 0" @click="page('runs', -1)">{{ t('aiSettings.previous') }}</Button>
+                  <Button variant="outline" size="sm" :disabled="loading || !report || offset + Number(runsPageSize) >= report.total" @click="page('runs', 1)">{{ t('aiSettings.next') }}</Button>
+                </div>
               </div>
             </div>
           </section>
