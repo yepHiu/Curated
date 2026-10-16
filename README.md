@@ -22,6 +22,8 @@ AI 字幕识别与翻译已接入源码：详情页明确发起，千问 3.1 日
 
 # Curated
 
+任务中心已接入 AI 字幕和 AI 整理：侧栏统一查看进度、历史与任务详情。使用真实任务需更新 Server 和前端；见 [任务中心使用说明](docs/guide.md#task-center)。
+
 New macOS packages bundle the native MPV engine and dependencies; users need no MPV or Homebrew installation. New Mac profiles default to native playback (Apple Silicon, macOS 15+). Apple signing/notarization remains pending; see the [setup and delivery boundaries](docs/guide.md#macos-native-playback).
 
 For daily Desktop testing, build once with `pnpm desktop:test:build`, then run `pnpm desktop:test`. Electron serves the compiled test pages without a Vite process; see the [test-run guide](docs/guide.md#desktop-test-runs-with-prebuilt-pages).

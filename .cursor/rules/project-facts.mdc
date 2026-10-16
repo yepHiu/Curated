@@ -554,3 +554,8 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 
 
 2026-10-16：字幕弹窗成品复用 AI 整理的可展开历史列表；选择器统一胶囊样式，底部取消关闭按钮，重新生成文案简化。AppShell 观察 GET /api/subtitle-jobs 的持久任务快照；侧栏与播放/AI整理相同区域显示进度，点击按 movieId/fileId 恢复弹窗，关闭弹窗不停止观察。断线保留最后快照；无新增配置或迁移。
+
+
+## 通用任务中心（2026-10-17）
+
+`/tasks` 与 `/tasks/:taskKey` 已接入 AI 字幕/AI 整理。侧栏 SidebarTaskEntry 替代两个旧入口；AppShell 的 use-task-center 集中调度摘要和既有业务观察（活动 2s/空闲 10s/隐藏 30s），页面按 revision 查询，字幕弹窗不另启轮询。后端新增 GET /api/task-center/summary、/tasks、/tasks/{taskKey}（后两者前缀仍为 /api/task-center）；全量 SQLite 来源投影、游标分页、排除删除记录，稳定 key 为 subtitle:id / organize:id。控制动作复用原端点，远端只读；无迁移或 cfg 项。阶段计数和真实时间来源见计划 §14；未新增阶段事件/耗时/统一调度器。P5 扫描/刮削/导入未接入。源码与本地检查完成，未发布。

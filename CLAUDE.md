@@ -806,3 +806,14 @@ Migration 0066 stores metadata in subtitle_jobs; cues/audio are temporary cache 
 2026-10-16: `POST /api/subtitles/provider/key` explicitly reveals the saved subtitle provider API key to a direct Server-local authenticated settings client only; response `{apiKey: string}` with `Cache-Control: no-store`. Ordinary settings GET remains redacted. Remote calls return 403.
 
 2026-10-16: subtitleProvider settings add recognitionModel: qwen-audio-3.1-asr-flash-filetrans (default) or qwen3-asr-flash-filetrans. GET returns it; PATCH validates/persists it. Each new job freezes the selected recognitionModel in metadata; old jobs default to 3.1 on resume.
+
+
+## Unified task center (2026-10-17)
+
+| Method | Endpoint | Contract |
+| --- | --- | --- |
+| GET | `/api/task-center/summary` | Full persisted-source counts: total/running/queued/waiting/attention/history. |
+| GET | `/api/task-center/tasks` | kind=all/subtitle/organize; state=all/active/attention/history; cursor; limit=1..100 (default 30). Returns items/nextCursor/summary. |
+| GET | `/api/task-center/tasks/{taskKey}` | URL-encoded subtitle:id or organize:id; common task fields and typed business data; 404 for unavailable records. |
+
+All three require existing API authentication and return no-store. Cursor order is createdAt then stable key descending. Soft-deleted organization records are excluded. `canManage` reflects a direct Server-local request; existing business mutation endpoints still enforce their own permissions and current-state rules. No generic write endpoint, migration or new config. Subtitle provider errors are reduced to a safe category; credentials and internal paths are not part of the projection. The UI shows stage-specific units rather than invented total progress. See docs/plan/2026-10-16-ai-task-center-requirements.md §14.
