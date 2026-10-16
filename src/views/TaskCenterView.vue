@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { RouterLink, useRoute, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { Captions, ChevronRight, RefreshCw, Sparkles } from "lucide-vue-next"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -14,14 +15,26 @@ import TaskStatusBadge from "@/components/jav-library/TaskStatusBadge.vue"
 import { useTaskCenterService } from "@/services/task-center-service"
 import { useTaskCenter } from "@/composables/use-task-center"
 import type { CenterTask, TaskKind, TaskFilter } from "@/services/contracts/task-center-service"
-import { taskActive, taskAttention, taskPercent, taskRoute } from "@/lib/task-center"
+import { taskActive, taskAttention, taskPercent } from "@/lib/task-center"
 import { taskDate, taskStage, taskSubject, taskTitle } from "@/lib/task-center-text"
 
 const { t } = useI18n(), route = useRoute(), router = useRouter(), service = useTaskCenterService()
 const center = useTaskCenter()
 const items = ref<CenterTask[]>([]), cursor = ref("")
 const scrollEl = ref<HTMLElement | null>(null)
-const scrollTop = ref(0)
+const TaskDetailContent = defineAsyncComponent(() => import("@/components/jav-library/TaskDetailContent.vue"))
+const selectedTaskKey = ref("")
+const detailOpen = ref(false)
+let detailTrigger: HTMLElement | null = null
+function openDetails(key: string, event: MouseEvent) {
+  selectedTaskKey.value = key
+  detailTrigger = event.currentTarget as HTMLElement
+  detailOpen.value = true
+}
+function restoreDetailFocus(event: Event) {
+  event.preventDefault()
+  if (detailTrigger?.isConnected) detailTrigger.focus({ preventScroll: true })
+}
 const pageCount = computed(() => Math.max(1, Math.min(100, Number(route.query.pages) || 1)))
 const loading = ref(true), failed = ref(false), moreBusy = ref(false)
 const state = computed<TaskFilter>(() => ["active", "attention", "history"].includes(String(route.query.state)) ? route.query.state as TaskFilter : "all")
@@ -63,7 +76,7 @@ watch(center.revision, () => { if (!loading.value && !moreBusy.value) void load(
 onBeforeUnmount(() => generation++)
 </script>
 <template>
-  <div ref="scrollEl" class="h-full min-h-0 overflow-y-auto" data-task-center @scroll="scrollTop = scrollEl?.scrollTop ?? 0">
+  <div ref="scrollEl" class="h-full min-h-0 overflow-y-auto" data-task-center>
     <div class="mx-auto flex max-w-6xl flex-col gap-6 px-1 py-3 sm:px-4 sm:py-5">
       <h1 class="text-2xl font-semibold tracking-tight">{{ t('tasks.title') }}</h1>
       <Alert v-if="failed || !center.connected.value"><AlertDescription class="flex flex-wrap items-center justify-between gap-3"><span>{{ items.length ? t('tasks.stale', { time: taskDate(center.updatedAt.value) }) : t('tasks.loadFailed') }}</span><Button variant="outline" size="sm" @click="load()"><RefreshCw data-icon="inline-start" />{{ t('tasks.reload') }}</Button></AlertDescription></Alert>
@@ -76,15 +89,25 @@ onBeforeUnmount(() => generation++)
       <section v-for="group in groups" v-else :key="group.key" class="flex flex-col gap-3">
         <h2 class="text-xs font-medium text-muted-foreground">{{ t(`tasks.groups.${group.key}`) }} · {{ group.items.length }}</h2>
         <div class="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-          <RouterLink v-for="task in group.items" :key="task.key" :to="{ path: taskRoute(task.key), query: { ...route.query, scroll: String(scrollTop) } }" class="grid min-w-0 grid-cols-[2.5rem_minmax(0,1fr)_1rem] items-center gap-3 px-4 py-5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:grid-cols-[2.5rem_minmax(0,1fr)_minmax(12rem,30%)_1rem]" :aria-label="`${taskTitle(task)} · ${taskSubject(task)}`">
+          <button v-for="task in group.items" :key="task.key" type="button" aria-haspopup="dialog" @click="openDetails(task.key, $event)" class="grid w-full min-w-0 text-left grid-cols-[2.5rem_minmax(0,1fr)_1rem] items-center gap-3 px-4 py-5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:grid-cols-[2.5rem_minmax(0,1fr)_minmax(12rem,30%)_1rem]" :aria-label="`${taskTitle(task)} · ${taskSubject(task)}`">
             <span class="flex size-10 items-center justify-center rounded-xl bg-secondary text-primary"><Captions v-if="task.kind === 'subtitle'" class="size-5" /><Sparkles v-else class="size-5" /></span>
             <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h3 class="text-sm font-medium">{{ taskTitle(task) }}</h3><TaskStatusBadge :state="task.state" /></div><p class="mt-1.5 break-words text-xs text-muted-foreground">{{ taskSubject(task) }}</p></div>
             <div class="col-start-2 min-w-0 text-xs lg:col-auto"><div class="flex flex-wrap justify-between gap-2"><span>{{ taskStage(task) }}</span><span v-if="taskActive(task) && task.total > 0" class="tabular-nums">{{ task.completed }} / {{ task.total }} {{ t(`tasks.units.${task.unit}`) }}</span></div><Progress v-if="taskActive(task) && task.total > 0" :model-value="taskPercent(task)" class="my-2 h-1" :aria-label="taskStage(task)" /><p class="mt-1 text-xs text-muted-foreground">{{ taskDate(task.updatedAt) }}</p></div>
             <ChevronRight class="col-start-3 row-start-1 size-4 text-muted-foreground lg:col-auto lg:row-auto" aria-hidden="true" />
-          </RouterLink>
+          </button>
         </div>
       </section>
       <Button v-if="cursor && !loading" variant="outline" class="self-center rounded-full" :disabled="moreBusy" @click="load(true)">{{ t(moreBusy ? 'tasks.loading' : 'tasks.loadMore') }}</Button>
     </div>
+    <Dialog v-model:open="detailOpen">
+      <DialogContent class="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl" :aria-describedby="undefined" @close-auto-focus="restoreDetailFocus">
+        <DialogHeader class="shrink-0 border-b border-border px-5 py-4 pr-12 sm:px-6 sm:pr-12">
+          <DialogTitle>{{ t('tasks.detailTitle') }}</DialogTitle>
+        </DialogHeader>
+        <div class="min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6" data-task-detail-scroll>
+          <TaskDetailContent v-if="detailOpen" :key="selectedTaskKey" :task-key="selectedTaskKey" />
+        </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

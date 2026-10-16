@@ -2609,6 +2609,7 @@
     "noAudio": "This video has no audio track to recognize."
   },
   "tasks": {
+    "detailTitle": "Task details",
     "title": "Task center",
     "runningCount": "{count} running",
     "queueCount": "{count} queued or waiting",

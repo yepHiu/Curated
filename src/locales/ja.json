@@ -2609,6 +2609,7 @@
     "noAudio": "認識できる音声トラックがありません。"
   },
   "tasks": {
+    "detailTitle": "タスク詳細",
     "title": "タスクセンター",
     "runningCount": "{count} 件実行中",
     "queueCount": "{count} 件待機中",

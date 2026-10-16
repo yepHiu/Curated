@@ -2609,6 +2609,7 @@
     "noAudio": "当前视频没有可识别的音轨。"
   },
   "tasks": {
+    "detailTitle": "任务详情",
     "title": "任务中心",
     "runningCount": "{count} 执行中",
     "queueCount": "{count} 个任务排队或等待",
