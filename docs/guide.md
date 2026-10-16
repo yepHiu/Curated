@@ -238,7 +238,7 @@ Natural-language chat initiation, automatic incremental organization, detail-pag
 
 ### Agent prompt caching
 
-Chat keeps base system rules and admitted history before the current page context and latest question, so navigation does not change the earlier shared prefix. Page projection and working-context compaction still preserve the current selection. Polish, title/synopsis translation and insights send source text/JSON once in a separate user message. Versions are `agent-system-v8` / `agent-actions-v2`. Rebuild and restart the Server to use the changes.
+Chat keeps base system rules and admitted history before the current page context and latest question, so navigation does not change the earlier shared prefix. Page projection and working-context compaction still preserve the current selection. Polish, title/synopsis translation and insights send source text/JSON once in a separate user message. Versions are `agent-system-v8` / `agent-actions-v3`. Rebuild and restart the Server to use the changes.
 
 DeepSeek enables caching automatically. Valid reported cache counts produce Server Info logs named `AI prompt cache usage` with `promptTokens`, `promptCacheHitTokens` and, when reported, `promptCacheMissTokens`, plus run/model/version identifiers. Unknown counts are not zero, and cached tokens are not added to total usage again. Cache counts are currently logs only; the existing AI report still shows total measured usage. Divide summed hits by summed input tokens of calls with reported hits. Cold requests, eviction, compaction and model/toolset changes can reduce reuse. Code checks alone do not establish a real hit-rate improvement. See [implementation and observation limits](plan/2026-10-07-agent-prompt-cache-optimization.md) and [DeepSeek documentation](https://api-docs.deepseek.com/guides/kv_cache).
 
@@ -255,6 +255,9 @@ Built-in AI prompt text lives in `backend/internal/agent/prompts/*.txt`, followi
 | Polish, display translation, insights | `polish-comment.txt`, `translate-display.txt`, `insights-narrative.txt`, `action-source.txt` |
 | Memory and recovery | `memory-checkpoint.txt`, `answer-correction.txt`, `history-omitted.txt` |
 | Provider connectivity probe | `provider-probe.txt` |
+| Subtitle translation | `subtitle-translation.txt` |
+
+Translation prompts explicitly scope the request to translating supplied text: no role-play, scene continuation, added details or inferred context. Display translation uses `agent-actions-v3`; subtitle translation uses `subtitle-translation-v3`. These instructions aim to reduce task misunderstanding, but do not override provider content filters; real-provider rejection-rate improvement has not been measured. After a Server rebuild/restart, an unfinished subtitle job recorded with an older prompt version cannot resume cloud work under the new prompt: the existing version guard requires a new generation. Completed translations that only need saving do not require cloud work. See the [translation prompt implementation record](plan/2026-10-02-agent-prompt-management-research.md#7-2026-10-17-翻译任务边界优化).
 
 Templates use Go `text/template` fields such as `{{.Source}}`, `{{.Locale}}`, `{{.Kind}}` and `{{.Context}}`. Keep the required fields for each call site. Missing fields fail explicitly; inserted source text is never parsed as another template. The loader removes one final file newline and preserves other whitespace. The migration retains existing model-facing text, message roles and prompt versions; topic calls now receive their text and audit version together. Output validation, write permissions and NFO isolation remain enforced by Go.
 
