@@ -342,9 +342,12 @@ func TestQwen3ProtocolUsesSingularFileAndResult(t *testing.T) {
 			}
 			body = `{"output":{"task_id":"qwen3-task"}}`
 		case r.URL.Host == "results.test.aliyuncs.com":
+			if r.URL.Scheme != "https" || r.URL.RawQuery != "signature=a%2Bb%2Fc&expires=123" || r.Header.Get("Authorization") != "" || r.Header.Get("Content-Type") != "" {
+				t.Fatal("result download must use HTTPS and preserve signature without credential headers")
+			}
 			body = `{"transcripts":[{"sentences":[{"begin_time":100,"end_time":900,"text":"fixture"}]}]}`
 		default:
-			body = `{"output":{"task_status":"SUCCEEDED","result":{"transcription_url":"https://results.test.aliyuncs.com/result"}}}`
+			body = `{"output":{"task_status":"SUCCEEDED","result":{"transcription_url":"http://results.test.aliyuncs.com/result?signature=a%2Bb%2Fc&expires=123"}}}`
 		}
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
 	})}
@@ -358,5 +361,17 @@ func TestQwen3ProtocolUsesSingularFileAndResult(t *testing.T) {
 	cues, done, err := p.Result(context.Background(), "secret", "qwen3-task")
 	if err != nil || !done || len(cues) != 1 || cues[0].Begin != 100 {
 		t.Fatalf("cues=%+v done=%v err=%v", cues, done, err)
+	}
+}
+
+func TestTranscriptURLRejectsUntrustedAddresses(t *testing.T) {
+	for _, raw := range []string{"http://evil.example/result", "http://aliyuncs.com.evil.example/result", "http://results.aliyuncs.com:80/result", "http://user@results.aliyuncs.com/result", "file:///result", "//results.aliyuncs.com/result"} {
+		if _, ok := transcriptURL(raw); ok {
+			t.Errorf("accepted untrusted URL: %s", raw)
+		}
+	}
+	const signed = "https://results.aliyuncs.com/a%2Fb?signature=a%2Bb&x=1&x=2"
+	if got, ok := transcriptURL(signed); !ok || got != signed {
+		t.Fatal("HTTPS signature changed")
 	}
 }

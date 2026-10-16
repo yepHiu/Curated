@@ -78,6 +78,15 @@ func supplierURL(raw string) bool {
 	h := strings.ToLower(u.Hostname())
 	return strings.HasSuffix(h, ".aliyuncs.com") || strings.HasSuffix(h, ".alibabacloud.com")
 }
+
+// Qwen3 may return an HTTP OSS result URL. Upgrade only the scheme before
+// applying the existing supplier checks; preserve the signed path and query.
+func transcriptURL(raw string) (string, bool) {
+	if strings.HasPrefix(raw, "http://") {
+		raw = "https://" + strings.TrimPrefix(raw, "http://")
+	}
+	return raw, supplierURL(raw)
+}
 func (p *Bailian) client() *http.Client {
 	c := http.Client{Timeout: 3 * time.Minute}
 	if p.Client != nil {
@@ -276,7 +285,8 @@ func (p *Bailian) Result(ctx context.Context, key, id string) ([]Cue, bool, erro
 	}
 	cues := []Cue{}
 	for _, r := range result.Output.Results {
-		if r.Status != "SUCCEEDED" || !supplierURL(r.URL) {
+		resultURL, validURL := transcriptURL(r.URL)
+		if r.Status != "SUCCEEDED" || !validURL {
 			return nil, false, fmt.Errorf("recognition result unavailable")
 		}
 		var transcript struct {
@@ -288,7 +298,7 @@ func (p *Bailian) Result(ctx context.Context, key, id string) ([]Cue, bool, erro
 				} `json:"sentences"`
 			} `json:"transcripts"`
 		}
-		if e := p.json(ctx, "GET", r.URL, "", nil, &transcript, false); e != nil {
+		if e := p.json(ctx, "GET", resultURL, "", nil, &transcript, false); e != nil {
 			return nil, false, fmt.Errorf("transcript download: %w", e)
 		}
 		for _, t := range transcript.Transcripts {
