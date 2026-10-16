@@ -89,5 +89,5 @@ func ProviderProbePrompt() string {
 }
 
 func SubtitleTranslationPrompt() Definition {
-	return Definition{Text: renderPrompt("subtitle-translation.txt", nil), Version: "subtitle-translation-v2"}
+	return Definition{Text: renderPrompt("subtitle-translation.txt", nil), Version: "subtitle-translation-v3"}
 }
