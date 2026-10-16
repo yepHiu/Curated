@@ -4,17 +4,18 @@ import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { BarChart3, Check, Eye, EyeOff, Loader2, RefreshCw, Server, ShieldCheck, X } from "lucide-vue-next"
+import { AlertCircle, BarChart3, Check, ChevronRight, Eye, EyeOff, Loader2, RefreshCw, Server, ShieldCheck, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAIGovernanceService } from "@/services/ai-governance-service"
 import { useLibraryService } from "@/services/library-service"
-import { defaultAIGovernance, type AIReport, type AIPage, type AIAuditEntry, type AIRun } from "@/services/contracts/ai-governance-service"
+import { defaultAIGovernance, type AISummary, type AIReport, type AIPage, type AIAuditEntry, type AIRun } from "@/services/contracts/ai-governance-service"
 import type { StatusTone } from "@/lib/ui/status-tone"
 import { applyAIGovernance } from "@/lib/experimental-agent"
 import { AGENT_TOOL_I18N_KEYS } from "@/lib/agent-tool-labels"
@@ -78,7 +79,29 @@ const runsMinHeight = ref(0)
 const auditMinHeight = ref(0)
 let requestId = 0
 let disposed = false
-const summary = computed(() => report.value?.summary)
+const summary = ref<AISummary | null>(null)
+const inputShare = computed(() => summary.value?.totalTokens ? Math.min(100, Math.max(0, summary.value.promptTokens / summary.value.totalTokens * 100)) : 0)
+const recordHeading = ref<HTMLElement | null>(null)
+const expandFirstFailure = ref(false)
+const expandedRuns = ref<Record<string, boolean>>({})
+const usagePeriod = computed(() => {
+  const end = new Date()
+  const start = new Date(end)
+  start.setDate(start.getDate() - Number(days.value))
+  return `${start.toLocaleDateString(locale.value)} – ${end.toLocaleDateString(locale.value)}`
+})
+function viewFailures() {
+  expandFirstFailure.value = true
+  if (status.value === "failed" && channel.value === "all") {
+    if (report.value?.items[0]) expandedRuns.value[report.value.items[0].id] = true
+    expandFirstFailure.value = false
+  } else {
+    channel.value = "all"
+    status.value = "failed"
+  }
+  recordHeading.value?.focus({ preventScroll: true })
+  recordHeading.value?.scrollIntoView?.({ block: "nearest" })
+}
 const validSettings = computed(() => Number.isInteger(settings.value.stepLimit) && settings.value.stepLimit >= 0 && settings.value.stepLimit <= 30
   && Number.isInteger(settings.value.writePerMinute) && settings.value.writePerMinute >= 1 && settings.value.writePerMinute <= 60
   && Number.isInteger(settings.value.retentionDays) && settings.value.retentionDays >= 7 && settings.value.retentionDays <= 365)
@@ -147,15 +170,21 @@ async function refresh() {
   error.value = ""
   report.value = null
   audit.value = null
+  summary.value = null
+  expandedRuns.value = {}
   const query = { days: Number(days.value), channel: channel.value === "all" ? undefined : channel.value }
   try {
-    const [nextReport, nextAudit] = await Promise.all([
+    const [nextReport, nextAudit, overview] = await Promise.all([
       service.getUsage({ ...query, status: status.value === "all" ? undefined : status.value, offset: offset.value, limit: RUNS_PAGE_SIZE }),
       service.getAudit({ ...query, status: status.value === "failed" ? "failed" : undefined, offset: auditOffset.value, limit: AUDIT_PAGE_SIZE }),
+      channel.value !== "all" || status.value !== "all" ? service.getUsage({ days: Number(days.value), limit: 1, offset: 0 }) : Promise.resolve(null),
     ])
     if (id !== requestId || disposed) return
     report.value = nextReport
     audit.value = nextAudit
+    summary.value = overview?.summary ?? nextReport.summary
+    if (expandFirstFailure.value && nextReport.items[0]) expandedRuns.value[nextReport.items[0].id] = true
+    expandFirstFailure.value = false
   } catch (err) { if (id === requestId && !disposed) error.value = (err as Error).message }
   finally { if (id === requestId) loading.value = false }
 }
@@ -195,7 +224,13 @@ function cleanup() {
     await refresh()
   })
 }
-function duration(value: number | null | undefined) { return value == null ? t("aiSettings.unknown") : t("aiSettings.milliseconds", { value: Math.round(value).toLocaleString(locale.value) }) }
+function duration(value: number | null | undefined) {
+  if (value == null) return t("aiSettings.unknown")
+  if (value >= 1000) return t("aiSettings.seconds", { value: (value / 1000).toLocaleString(locale.value, { maximumFractionDigits: 1 }) })
+  return t("aiSettings.milliseconds", { value: Math.round(value).toLocaleString(locale.value) })
+}
+const knownRunErrors = new Set(["timeout", "authentication", "rate_limit", "network", "configuration", "stream_interrupted", "provider_http", "invalid_response"])
+function runError(run: AIRun) { return t(`aiSettings.runErrors.${knownRunErrors.has(run.errorCode) ? run.errorCode : "other"}`) }
 function time(value: string) { return new Date(value).toLocaleString(locale.value) }
 function measured(total: number, known: number, calls: number) {
   if (known === 0) return t("aiSettings.unknown")
@@ -407,47 +442,87 @@ function auditLine(entry: AIAuditEntry) {
           </CardTitle></CardHeader>
         <CardContent class="flex min-w-0 flex-col gap-4">
           <p v-if="!useWebApi" class="text-sm text-muted-foreground">{{ t('aiSettings.mockHint') }}</p>
-          <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" data-ai-settings-block="filters">
-            <FieldGroup class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <section class="flex flex-wrap items-end justify-end gap-3" data-ai-settings-block="filters">
+            <FieldGroup class="w-40">
               <Field><FieldLabel for="ai-days">{{ t('aiSettings.range') }}</FieldLabel><Select v-model="days"><SelectTrigger id="ai-days"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="day in ['7','30','90']" :key="day" :value="day">{{ t('aiSettings.days', { count: day }) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
-              <Field><FieldLabel for="ai-channel">{{ t('aiSettings.channel') }}</FieldLabel><Select v-model="channel"><SelectTrigger id="ai-channel"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="item in ['all','chat','action','test','subtitle']" :key="item" :value="item">{{ t(`aiSettings.channels.${item}`) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
-              <Field><FieldLabel for="ai-status">{{ t('aiSettings.status') }}</FieldLabel><Select v-model="status"><SelectTrigger id="ai-status"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="item in ['all','completed','failed','partial','cancelled','needs_input','needs_confirmation']" :key="item" :value="item">{{ t(`aiSettings.statuses.${item}`) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
             </FieldGroup>
-            <Button variant="outline" size="sm" :disabled="loading" class="self-end" data-ai-refresh @click="refresh"><RefreshCw data-icon="inline-start" />{{ t('aiSettings.refresh') }}</Button>
+            <Button variant="ghost" size="icon" :disabled="loading" :aria-label="t('aiSettings.refresh')" data-ai-refresh @click="refresh"><RefreshCw /></Button>
           </section>
           <p v-if="loading" role="status" :class="{ 'sr-only': paging }">{{ t('aiSettings.loading') }}</p>
-          <dl v-if="summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" data-ai-summary>
-            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.runs') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ summary.runs }}</dd></div>
-            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.failed') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ summary.failed }} / {{ summary.partial }} / {{ summary.cancelled }}</dd></div>
-            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.totalTokens') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums" data-ai-token-total>{{ measured(summary.totalTokens, summary.usageCalls, summary.modelCalls) }}</dd></div>
-            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.coverage') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ summary.usageCalls }} / {{ summary.modelCalls }}</dd></div>
-            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.inputOutput') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ measured(summary.promptTokens, summary.usageCalls, summary.modelCalls) }} / {{ measured(summary.completionTokens, summary.usageCalls, summary.modelCalls) }}</dd></div>
-            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.toolCalls') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ summary.toolCalls }}</dd></div>
-            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.firstText') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ duration(summary.avgFirstTextMs) }}</dd></div>
-            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.duration') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ duration(summary.avgDurationMs) }}</dd></div>
-          </dl>
+          <div v-if="summary" class="flex min-w-0 flex-col gap-4 pb-6" data-ai-summary>
+            <p class="text-xs text-muted-foreground">{{ usagePeriod }}</p>
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1"><span class="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl" data-ai-token-total>{{ summary.modelCalls === 0 ? '0' : summary.usageCalls === 0 ? t('aiSettings.unknown') : summary.totalTokens.toLocaleString(locale) }}</span><span class="text-sm text-muted-foreground">Token</span></div>
+            <dl class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+              <div class="flex items-center gap-2"><span class="size-2 rounded-full bg-primary" aria-hidden="true" /><dt class="text-muted-foreground">{{ t('aiSettings.inputTokens') }}</dt><dd class="tabular-nums">{{ summary.modelCalls === 0 ? '0' : measured(summary.promptTokens, summary.usageCalls, summary.modelCalls) }}</dd></div>
+              <div class="flex items-center gap-2"><span class="size-2 rounded-full bg-chart-2" aria-hidden="true" /><dt class="text-muted-foreground">{{ t('aiSettings.outputTokens') }}</dt><dd class="tabular-nums">{{ summary.modelCalls === 0 ? '0' : measured(summary.completionTokens, summary.usageCalls, summary.modelCalls) }}</dd></div>
+              <div class="flex gap-2"><dt class="text-muted-foreground">{{ t('aiSettings.tasks') }}</dt><dd class="tabular-nums">{{ summary.runs.toLocaleString(locale) }}</dd></div>
+            </dl>
+            <div v-if="summary.totalTokens > 0 && summary.usageCalls > 0" class="flex h-1 w-72 max-w-full gap-1 overflow-hidden rounded-full" aria-hidden="true"><span class="rounded-full bg-primary" :style="{ width: `${inputShare}%` }" /><span class="rounded-full bg-chart-2" :style="{ width: `${100 - inputShare}%` }" /></div>
+            <p class="text-xs text-muted-foreground">{{ t('aiSettings.tokenExplanation') }}</p>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <Button v-if="summary.failed > 0" variant="link" class="min-h-11 px-0 text-destructive" :disabled="loading" data-ai-view-failures @click="viewFailures"><AlertCircle data-icon="inline-start" />{{ t('aiSettings.failedTasks', { count: summary.failed }) }}</Button>
+              <p class="text-xs text-muted-foreground" data-ai-usage-coverage>{{ t(summary.usageCalls < summary.modelCalls ? 'aiSettings.partialCoverage' : 'aiSettings.completeCoverage') }}</p>
+            </div>
+          </div>
           <section class="flex min-w-0 flex-col gap-3" :aria-busy="paging === 'runs'" data-ai-settings-block="recent-runs">
-            <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.recentRuns') }}</h3>
+            <div class="flex flex-wrap items-end justify-between gap-4">
+              <h3 ref="recordHeading" tabindex="-1" class="text-sm font-semibold text-foreground">{{ t('aiSettings.recentRuns') }}</h3>
+              <FieldGroup class="grid w-full grid-cols-2 gap-3 sm:w-80 sm:shrink-0">
+                <Field><FieldLabel for="ai-channel">{{ t('aiSettings.channel') }}</FieldLabel><Select v-model="channel"><SelectTrigger id="ai-channel" class="sm:w-36"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="item in ['all','chat','action','test','subtitle']" :key="item" :value="item">{{ t(`aiSettings.channels.${item}`) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
+                <Field><FieldLabel for="ai-status">{{ t('aiSettings.status') }}</FieldLabel><Select v-model="status"><SelectTrigger id="ai-status" class="sm:w-36"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="item in ['all','completed','failed','partial','cancelled','needs_input','needs_confirmation']" :key="item" :value="item">{{ t(`aiSettings.statuses.${item}`) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
+              </FieldGroup>
+            </div>
+            <p v-if="channel !== 'all' || status !== 'all'" class="text-xs text-muted-foreground">{{ t('aiSettings.recordFiltersHint') }}</p>
             <p v-if="pageError?.kind === 'runs'" role="alert" class="text-sm text-destructive">{{ pageError.message }}</p>
             <p v-if="report && !report.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
             <ul ref="runsList" class="flex min-w-0 flex-col gap-1.5" :style="{ minHeight: runsMinHeight ? `${runsMinHeight}px` : undefined }">
-              <li v-for="run in report?.items ?? []" :key="run.id" :title="runLine(run)" class="flex min-h-9 min-w-0 items-center gap-2 rounded-lg border border-border/50 bg-muted/5 px-3 py-1.5" :data-ai-run-row="run.id" :data-status="run.status">
-                <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ run.model || t('aiSettings.unknown') }}</span>
-                <span class="hidden min-w-0 truncate text-xs text-muted-foreground md:block">{{ time(run.startedAt) }} · {{ t(`aiSettings.channels.${run.channel}`) }} · {{ duration(run.durationMs) }} · {{ t('aiSettings.totalTokens') }}: {{ measured(run.totalTokens, run.usageCalls, run.modelCalls) }} · {{ t('aiSettings.toolCalls') }}: {{ run.toolCalls }}<template v-if="run.errorCode"> · {{ run.errorCode }}</template></span>
-                <Badge :variant="runStatusTone(run.status)">{{ t(`aiSettings.statuses.${run.status}`) }}</Badge>
+              <li v-for="run in report?.items ?? []" :key="run.id" class="min-h-9 min-w-0 border-t border-border/50" :data-ai-run-row="run.id" :data-status="run.status">
+                <Collapsible v-model:open="expandedRuns[run.id]">
+                  <CollapsibleTrigger as-child><button type="button" :aria-label="runLine(run)" class="group flex min-h-16 w-full items-center gap-3 rounded-lg px-2 py-4 text-left hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <span class="min-w-0 flex-1"><span class="block text-sm font-medium">{{ t(`aiSettings.channels.${run.channel}`) }}</span><span class="mt-1 block break-words text-xs text-muted-foreground">{{ time(run.startedAt) }} · {{ run.model || t('aiSettings.unknown') }}</span></span>
+                    <span class="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-5"><span class="text-right text-sm tabular-nums">{{ measured(run.totalTokens, run.usageCalls, run.modelCalls) }} <span class="text-xs text-muted-foreground">Token</span></span><span class="hidden text-xs text-muted-foreground sm:block">{{ duration(run.durationMs) }}</span><Badge :variant="runStatusTone(run.status)">{{ t(`aiSettings.statuses.${run.status}`) }}</Badge></span>
+                    <ChevronRight class="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" aria-hidden="true" />
+                  </button></CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div class="mb-5 ml-2 flex min-w-0 flex-col gap-4 border-l-2 border-border/60 pl-4 text-sm" data-ai-run-detail>
+                      <p v-if="run.status === 'failed' || run.status === 'partial'" class="text-destructive">{{ runError(run) }}</p>
+                      <p v-if="run.usageCalls < run.modelCalls" class="text-xs text-muted-foreground">{{ t('aiSettings.partialCoverage') }}</p>
+                      <dl class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                        <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.inputTokens') }}</dt><dd class="mt-1 tabular-nums">{{ measured(run.promptTokens, run.usageCalls, run.modelCalls) }}</dd></div>
+                        <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.outputTokens') }}</dt><dd class="mt-1 tabular-nums">{{ measured(run.completionTokens, run.usageCalls, run.modelCalls) }}</dd></div>
+                        <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.taskDuration') }}</dt><dd class="mt-1">{{ duration(run.durationMs) }}</dd></div>
+                        <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.modelCalls') }}</dt><dd class="mt-1 tabular-nums">{{ run.modelCalls }}</dd></div>
+                        <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.toolCalls') }}</dt><dd class="mt-1 tabular-nums">{{ run.toolCalls }}</dd></div>
+                        <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.firstTextSingle') }}</dt><dd class="mt-1">{{ duration(run.firstTextMs) }}</dd></div>
+                      </dl>
+                      <details v-if="run.errorCode"><summary class="min-h-11 cursor-pointer py-3 text-xs text-muted-foreground">{{ t('aiSettings.technicalDetails') }}</summary><p class="break-all font-mono text-xs">{{ run.errorCode }}</p></details>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               </li>
             </ul>
             <div v-if="report && report.total > report.limit" class="flex flex-wrap items-center justify-end gap-2"><span class="mr-auto text-xs text-muted-foreground">{{ offset + 1 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}</span><Button variant="outline" size="sm" :disabled="loading || offset === 0" @click="page('runs', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || offset + RUNS_PAGE_SIZE >= report.total" @click="page('runs', 1)">{{ t('aiSettings.next') }}</Button></div>
           </section>
+          <details class="mt-2" data-ai-more-statistics><summary class="min-h-11 cursor-pointer py-3 text-sm text-muted-foreground">{{ t('aiSettings.moreStatistics') }}</summary>
+          <dl v-if="summary" class="my-4 flex flex-wrap gap-6 text-sm">
+            <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.modelCalls') }}</dt><dd class="mt-1 tabular-nums">{{ summary.modelCalls }}</dd></div>
+            <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.firstText') }}</dt><dd class="mt-1">{{ duration(summary.avgFirstTextMs) }}</dd></div>
+            <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.duration') }}</dt><dd class="mt-1">{{ duration(summary.avgDurationMs) }}</dd></div>
+            <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.toolCalls') }}</dt><dd class="mt-1">{{ summary.toolCalls }}</dd></div>
+            <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.coverage') }}</dt><dd class="mt-1">{{ summary.usageCalls }} / {{ summary.modelCalls }}</dd></div>
+            <div><dt class="text-xs text-muted-foreground">{{ t('aiSettings.failed') }}</dt><dd class="mt-1">{{ summary.failed }} / {{ summary.partial }} / {{ summary.cancelled }}</dd></div>
+          </dl>
+          <p class="mb-5 text-xs text-muted-foreground">{{ t('aiSettings.timingHint') }}</p>
           <section class="flex min-w-0 flex-col gap-3" :aria-busy="paging === 'audit'" data-ai-settings-block="audit">
             <SettingsHint :text="t('aiSettings.auditHint')">
               <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.audit') }}</h3>
             </SettingsHint>
             <p v-if="pageError?.kind === 'audit'" role="alert" class="text-sm text-destructive">{{ pageError.message }}</p>
             <p v-if="audit && !audit.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
-            <ul ref="auditList" class="flex min-w-0 flex-col gap-1.5" :style="{ minHeight: auditMinHeight ? `${auditMinHeight}px` : undefined }"><li v-for="entry in audit?.items ?? []" :key="entry.id" :title="auditLine(entry)" class="flex min-h-9 min-w-0 items-center gap-2 rounded-lg border border-border/50 bg-muted/5 px-3 py-1.5" :data-ai-audit-row="entry.id" :data-status="entry.result"><span class="min-w-0 flex-1 truncate text-sm font-medium">{{ toolLabel(entry.tool) }}</span><span class="hidden min-w-0 truncate text-xs text-muted-foreground md:block">{{ time(entry.createdAt) }} · {{ entry.permission }} · {{ duration(entry.durationMs) }}<template v-if="entry.errorCode"> · {{ entry.errorCode }}</template></span><Badge :variant="auditStatusTone(entry.result)">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge></li></ul>
+            <ul ref="auditList" class="flex min-w-0 flex-col" :style="{ minHeight: auditMinHeight ? `${auditMinHeight}px` : undefined }"><li v-for="entry in audit?.items ?? []" :key="entry.id" :title="auditLine(entry)" class="flex min-h-11 min-w-0 items-center gap-2 border-t border-border/50 px-2 py-3" :data-ai-audit-row="entry.id" :data-status="entry.result"><span class="min-w-0 flex-1"><span class="block text-sm font-medium">{{ toolLabel(entry.tool) }}</span><span class="block break-words text-xs text-muted-foreground">{{ time(entry.createdAt) }} · {{ entry.permission }} · {{ duration(entry.durationMs) }}<template v-if="entry.errorCode"> · {{ entry.errorCode }}</template></span></span><Badge :variant="auditStatusTone(entry.result)">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge></li></ul>
             <div v-if="audit && audit.total > audit.limit" class="flex flex-wrap justify-end gap-2"><Button variant="outline" size="sm" :disabled="loading || auditOffset === 0" @click="page('audit', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || auditOffset + AUDIT_PAGE_SIZE >= audit.total" @click="page('audit', 1)">{{ t('aiSettings.next') }}</Button></div>
           </section>
+          </details>
         </CardContent>
       </Card>
       <SettingsSubtitlesSection />

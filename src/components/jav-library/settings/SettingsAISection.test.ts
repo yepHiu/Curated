@@ -43,6 +43,45 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 describe("SettingsAISection", () => {
+  it("keeps period usage unchanged when filtering failed records and opens the failure details", async () => {
+    const { report } = paginatedRecords()
+    report.summary = { ...report.summary, runs: 7, modelCalls: 8, usageCalls: 7, totalTokens: 120, failed: 1 }
+    const wrapper = await setup()
+    const failure = { ...report.items[0]!, id: "failed-run", status: "failed", errorCode: "authentication", usageCalls: 0, totalTokens: 0 }
+    mocks.getUsage.mockImplementation(async query => query.status === "failed"
+      ? { ...report, items: [failure], total: 1, summary: { ...report.summary, totalTokens: 0, runs: 1 } }
+      : report)
+    await wrapper.get("[data-ai-view-failures]").trigger("click"); await flushPromises()
+    expect(mocks.getUsage).toHaveBeenCalledWith(expect.objectContaining({ days: 30, status: "failed", offset: 0 }))
+    expect(mocks.getUsage).toHaveBeenCalledWith({ days: 30, limit: 1, offset: 0 })
+    expect(wrapper.get("[data-ai-token-total]").text()).toBe("120")
+    expect(wrapper.get('[data-ai-run-row="failed-run"] [data-ai-run-detail]').text()).toContain("aiSettings.runErrors.authentication")
+    expect(wrapper.get('[data-ai-run-row="failed-run"] [data-ai-run-detail]').text()).toContain("aiSettings.unknown")
+    wrapper.unmount()
+  })
+  it("opens task details on demand and keeps technical errors in a second disclosure", async () => {
+    const { report } = paginatedRecords()
+    report.items[0] = { ...report.items[0]!, status: "failed", errorCode: "UNRECOGNIZED_ERROR" }
+    const wrapper = await setup()
+    const row = wrapper.get('[data-ai-run-row="run-0"]')
+    expect(row.find("[data-ai-run-detail]").exists()).toBe(false)
+    await row.get("button").trigger("click"); await flushPromises()
+    expect(row.get("[data-ai-run-detail]").text()).toContain("aiSettings.runErrors.other")
+    expect(row.get("details").attributes("open")).toBeUndefined()
+    expect(row.get("details").text()).toContain("UNRECOGNIZED_ERROR")
+    expect(wrapper.get("[data-ai-more-statistics]").attributes("open")).toBeUndefined()
+    wrapper.unmount()
+  })
+  it("distinguishes no model calls from calls with unreported usage", async () => {
+    const wrapper = await setup()
+    expect(wrapper.get("[data-ai-token-total]").text()).toBe("0")
+    const report = emptyReport(); report.summary.modelCalls = 1
+    mocks.getUsage.mockResolvedValue(report)
+    await wrapper.get("[data-ai-refresh]").trigger("click"); await flushPromises()
+    expect(wrapper.get("[data-ai-token-total]").text()).toBe("aiSettings.unknown")
+    expect(wrapper.get("[data-ai-usage-coverage]").text()).toBe("aiSettings.partialCoverage")
+    wrapper.unmount()
+  })
   it("hydrates capacity and applies a preset without changing model or credentials", async () => {
     providerState.value = { kind: "openai-compatible", baseUrl: "https://example.com/v1", apiKey: "secret", model: "custom-alias", contextWindow: 128000 }
     const wrapper = await setup()
@@ -180,13 +219,13 @@ describe("SettingsAISection", () => {
     expect(block.get("[role=alert]").text()).toBe("page unavailable")
     expect(block.get("ul").findAll("li")).toHaveLength(5)
     expect(block.text()).toContain("1–5 / 7")
-    expect(block.findAll("button")[0]!.attributes("disabled")).toBeDefined()
+    expect(block.findAll("button").at(-2)!.attributes("disabled")).toBeDefined()
     await block.findAll("button").at(-1)!.trigger("click"); await flushPromises()
     expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 5 }))
     expect(mocks.getAudit).toHaveBeenCalledOnce()
     wrapper.unmount()
   })
-  it("compacts request and audit records to one line with semantic status colors", async () => {
+  it("keeps semantic status colors in expandable task and audit records", async () => {
     const report = emptyReport()
     report.items = [{ id: "run-success", startedAt: "2026-09-06T00:00:00Z", channel: "chat", action: "", sessionId: "", provider: "test", model: "model", promptVersion: "v1", status: "completed", errorCode: "", durationMs: 12, firstTextMs: 4, modelCalls: 1, usageCalls: 1, toolCalls: 0, promptTokens: 2, completionTokens: 3, totalTokens: 5 }, { id: "run-failure", startedAt: "2026-09-06T00:00:00Z", channel: "chat", action: "", sessionId: "", provider: "test", model: "model", promptVersion: "v1", status: "failed", errorCode: "AI_FAILED", durationMs: 12, firstTextMs: null, modelCalls: 1, usageCalls: 0, toolCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 }]
     mocks.getUsage.mockResolvedValue(report)
@@ -217,7 +256,8 @@ describe("SettingsAISection", () => {
     const report = emptyReport(); report.summary.modelCalls = 2; report.summary.usageCalls = 1; report.summary.totalTokens = 30
     mocks.getUsage.mockResolvedValue(report)
     const wrapper = await setup()
-    expect(wrapper.get("[data-ai-token-total]").text()).toBe("30 (aiSettings.partialUsage)")
+    expect(wrapper.get("[data-ai-token-total]").text()).toBe("30")
+    expect(wrapper.get("[data-ai-usage-coverage]").text()).toBe("aiSettings.partialCoverage")
     mocks.getUsage.mockRejectedValueOnce(new Error("query failed"))
     await wrapper.get("[data-ai-refresh]").trigger("click"); await flushPromises()
     expect(wrapper.find("[data-ai-summary]").exists()).toBe(false)
