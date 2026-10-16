@@ -286,28 +286,6 @@ async function patchCache(maxBytes: number) {
         </CardTitle>
       </CardHeader>
       <CardContent class="flex flex-col gap-3 pt-0">
-        <SettingsPhotoLibraryPathsSection
-          :paths="photoLibraryPaths"
-          :default-import-library-path-id="defaultPhotoImportLibraryPathId"
-          v-model:add-path-dialog-open="addPathDialogOpen"
-          v-model:new-path="newPath"
-          v-model:new-path-title="newPathTitle"
-          :pick-directory-busy="pickDirectoryBusy"
-          :directory-hint-display="directoryHintDisplay"
-          :add-busy="pathBusy"
-          :can-save-new-path="canSaveNewPath"
-          :default-saving="defaultPathBusy"
-          :scan-path-busy="pathScanBusy"
-          :path-add-error="pathError"
-          dialog-content-class="rounded-3xl border-border/50 sm:max-w-md"
-          @clear-error="clearPathAddError"
-          @browse="browseForDirectory"
-          @submit="submitAddPath"
-          @scan-path="scanPhotoPath"
-          @remove-path="removePhotoPath"
-          @change-default-import-path="changeDefaultPath"
-        />
-
         <template v-if="isServerLocal">
           <div
             data-photo-auto-watch
@@ -338,6 +316,28 @@ async function patchCache(maxBytes: number) {
           </div>
           <p v-if="autoWatchError" class="text-sm text-destructive">{{ autoWatchError }}</p>
         </template>
+
+        <SettingsPhotoLibraryPathsSection
+          :paths="photoLibraryPaths"
+          :default-import-library-path-id="defaultPhotoImportLibraryPathId"
+          v-model:add-path-dialog-open="addPathDialogOpen"
+          v-model:new-path="newPath"
+          v-model:new-path-title="newPathTitle"
+          :pick-directory-busy="pickDirectoryBusy"
+          :directory-hint-display="directoryHintDisplay"
+          :add-busy="pathBusy"
+          :can-save-new-path="canSaveNewPath"
+          :default-saving="defaultPathBusy"
+          :scan-path-busy="pathScanBusy"
+          :path-add-error="pathError"
+          dialog-content-class="rounded-3xl border-border/50 sm:max-w-md"
+          @clear-error="clearPathAddError"
+          @browse="browseForDirectory"
+          @submit="submitAddPath"
+          @scan-path="scanPhotoPath"
+          @remove-path="removePhotoPath"
+          @change-default-import-path="changeDefaultPath"
+        />
       </CardContent>
     </Card>
 
