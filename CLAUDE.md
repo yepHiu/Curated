@@ -810,6 +810,8 @@ Migration 0066 stores metadata in subtitle_jobs; cues/audio are temporary cache 
 
 ## Unified task center (2026-10-17)
 
+Subtitle creation and task-center rows share `TaskDetailDialog` and `TaskDetailContent`. `SubtitleJobDialog` keeps file/audio/model setup and a per-file history index; submission switches the same dialog to shared details, while active jobs open directly there. Cancel/retry confirmations and result operations are owned by shared details. Returning to setup/history does not cancel execution. No new API or config is required.
+
 | Method | Endpoint | Contract |
 | --- | --- | --- |
 | GET | `/api/task-center/summary` | Full persisted-source counts: total/running/queued/waiting/attention/history. |
