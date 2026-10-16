@@ -4,7 +4,7 @@ import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { BarChart3, Check, Loader2, RefreshCw, Server, ShieldCheck, X } from "lucide-vue-next"
+import { BarChart3, Check, Eye, EyeOff, Loader2, RefreshCw, Server, ShieldCheck, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -33,6 +33,7 @@ const error = ref("")
 const message = ref("")
 const baseUrl = ref("")
 const apiKey = ref("")
+const apiKeyVisible = ref(false)
 const model = ref("")
 const contextWindow = ref<number | string>(DEFAULT_AI_CONTEXT_WINDOW)
 const contextPreset = ref("custom")
@@ -337,7 +338,13 @@ function auditLine(entry: AIAuditEntry) {
           <section class="flex min-w-0 flex-col gap-3">
             <FieldGroup class="gap-3">
               <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><FieldLabel for="ai-base">{{ t('settings.experimentalBaseUrl') }}</FieldLabel><Input class="w-full min-w-0 sm:w-72 sm:shrink-0" id="ai-base" v-model="baseUrl" @blur="providerAutosave.flush()" autocomplete="off" :disabled="busy" /></Field>
-              <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><FieldLabel for="ai-key">{{ t('settings.experimentalApiKey') }}</FieldLabel><Input class="w-full min-w-0 sm:w-72 sm:shrink-0" id="ai-key" v-model="apiKey" @blur="providerAutosave.flush()" type="password" autocomplete="new-password" :disabled="busy" /></Field>
+              <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <FieldLabel for="ai-key">{{ t('settings.experimentalApiKey') }}</FieldLabel>
+                <div class="flex w-full min-w-0 items-center gap-2 sm:w-72 sm:shrink-0">
+                  <Input id="ai-key" v-model="apiKey" @blur="providerAutosave.flush()" :type="apiKeyVisible ? 'text' : 'password'" autocomplete="new-password" :disabled="busy" />
+                  <Button type="button" variant="ghost" size="icon" class="shrink-0 rounded-full" :disabled="busy" :aria-label="t(apiKeyVisible ? 'subtitles.hideKey' : 'subtitles.showKey')" :aria-pressed="apiKeyVisible" @click="apiKeyVisible = !apiKeyVisible"><EyeOff v-if="apiKeyVisible" aria-hidden="true" /><Eye v-else aria-hidden="true" /></Button>
+                </div>
+              </Field>
               <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><FieldLabel for="ai-model">{{ t('settings.experimentalModel') }}</FieldLabel><Input class="w-full min-w-0 sm:w-72 sm:shrink-0" id="ai-model" v-model="model" @blur="providerAutosave.flush()" autocomplete="off" :disabled="busy" /></Field>
               <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4" :data-invalid="!validContext || undefined">
                 <SettingsHint :text="t('aiSettings.contextHint')">
