@@ -58,7 +58,7 @@ export interface AIAuditEntry {
   errorCode: string
   durationMs: number
 }
-export interface AIReportQuery { days?: number; channel?: string; status?: string; offset?: number; limit?: number }
+export interface AIReportQuery { days?: number; since?: string; channel?: string; status?: string; offset?: number; limit?: number }
 export interface AIPage<T> { items: T[]; total: number; limit: number; offset: number }
 export interface AIReport extends AIPage<AIRun> { summary: AISummary }
 export interface AICleanup { runs: number; audit: number; receipts: number }

@@ -68,3 +68,13 @@ func TestAIReportPaginationUnknownUsageAndRetention(t *testing.T) {
 		t.Fatal("chat receipt removed")
 	}
 }
+
+func TestAIReportWhereUsesExplicitSince(t *testing.T) {
+	for _, audit := range []bool{false, true} {
+		since := "2026-10-15T16:00:00Z"
+		_, args := aiReportWhere(contracts.AIReportQuery{Days: 30, Since: since}, audit)
+		if args[0] != since {
+			t.Fatalf("since = %v", args[0])
+		}
+	}
+}

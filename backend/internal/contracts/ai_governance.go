@@ -33,6 +33,7 @@ type AIRunDTO struct {
 type AIReportQuery struct {
 	Days, Limit, Offset int
 	Channel, Status     string
+	Since               string
 }
 type AISummaryDTO struct {
 	Runs             int      `json:"runs"`

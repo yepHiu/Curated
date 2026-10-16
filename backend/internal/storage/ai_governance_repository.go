@@ -21,7 +21,11 @@ func aiReportWhere(q contracts.AIReportQuery, audit bool) (string, []any) {
 		statusColumn = "result"
 	}
 	where := timeColumn + " >= ?"
-	args := []any{time.Now().UTC().AddDate(0, 0, -q.Days).Format(time.RFC3339Nano)}
+	since := q.Since
+	if since == "" {
+		since = time.Now().UTC().AddDate(0, 0, -q.Days).Format(time.RFC3339Nano)
+	}
+	args := []any{since}
 	if q.Channel != "" {
 		where += " AND channel = ?"
 		args = append(args, q.Channel)

@@ -43,3 +43,13 @@ func TestAIReportAcceptsAwaitingConfirmation(t *testing.T) {
 		t.Fatalf("query = %+v, %v", q, err)
 	}
 }
+
+func TestAIReportSince(t *testing.T) {
+	q, err := parseAIReportQuery(httptest.NewRequest("GET", "/api/ai/usage?since=2026-10-16T00:00:00%2B08:00", nil), false)
+	if err != nil || q.Since != "2026-10-15T16:00:00Z" {
+		t.Fatalf("query %+v %v", q, err)
+	}
+	if _, err := parseAIReportQuery(httptest.NewRequest("GET", "/api/ai/usage?since=invalid", nil), false); err == nil {
+		t.Fatal("accepted invalid since")
+	}
+}

@@ -43,6 +43,19 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 describe("SettingsAISection", () => {
+  it("uses local midnight for today's usage and audit records", async () => {
+    const wrapper = await setup()
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    const range = wrapper.findAllComponents(Select).find(component => component.props("modelValue") === "30")!
+    range.vm.$emit("update:modelValue", "today")
+    await flushPromises()
+    expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ since: start.toISOString(), offset: 0 }))
+    expect(mocks.getAudit).toHaveBeenLastCalledWith(expect.objectContaining({ since: start.toISOString(), offset: 0 }))
+    expect(mocks.getUsage.mock.lastCall?.[0]).not.toHaveProperty("days")
+    wrapper.unmount()
+  })
+
   it("keeps period usage unchanged when filtering failed records and opens the failure details", async () => {
     const { report } = paginatedRecords()
     report.summary = { ...report.summary, runs: 7, modelCalls: 8, usageCalls: 7, totalTokens: 120, failed: 1 }

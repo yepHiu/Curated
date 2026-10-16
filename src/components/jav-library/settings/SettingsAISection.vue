@@ -87,9 +87,16 @@ const expandedRuns = ref<Record<string, boolean>>({})
 const usagePeriod = computed(() => {
   const end = new Date()
   const start = new Date(end)
-  start.setDate(start.getDate() - Number(days.value))
+  if (days.value === "today") start.setHours(0, 0, 0, 0)
+  else start.setDate(start.getDate() - Number(days.value))
   return `${start.toLocaleDateString(locale.value)} – ${end.toLocaleDateString(locale.value)}`
 })
+function periodQuery() {
+  if (days.value !== "today") return { days: Number(days.value) }
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  return { since: start.toISOString() }
+}
 function viewFailures() {
   expandFirstFailure.value = true
   if (status.value === "failed" && channel.value === "all") {
@@ -172,12 +179,12 @@ async function refresh() {
   audit.value = null
   summary.value = null
   expandedRuns.value = {}
-  const query = { days: Number(days.value), channel: channel.value === "all" ? undefined : channel.value }
+  const query = { ...periodQuery(), channel: channel.value === "all" ? undefined : channel.value }
   try {
     const [nextReport, nextAudit, overview] = await Promise.all([
       service.getUsage({ ...query, status: status.value === "all" ? undefined : status.value, offset: offset.value, limit: RUNS_PAGE_SIZE }),
       service.getAudit({ ...query, status: status.value === "failed" ? "failed" : undefined, offset: auditOffset.value, limit: AUDIT_PAGE_SIZE }),
-      channel.value !== "all" || status.value !== "all" ? service.getUsage({ days: Number(days.value), limit: 1, offset: 0 }) : Promise.resolve(null),
+      channel.value !== "all" || status.value !== "all" ? service.getUsage({ ...periodQuery(), limit: 1, offset: 0 }) : Promise.resolve(null),
     ])
     if (id !== requestId || disposed) return
     report.value = nextReport
@@ -252,7 +259,7 @@ async function page(kind: "runs" | "audit", direction: -1 | 1) {
   loading.value = true
   paging.value = kind
   pageError.value = null
-  const query = { days: Number(days.value), channel: channel.value === "all" ? undefined : channel.value, offset: nextOffset, limit: pageSize }
+  const query = { ...periodQuery(), channel: channel.value === "all" ? undefined : channel.value, offset: nextOffset, limit: pageSize }
   try {
     if (kind === "runs") {
       const next = await service.getUsage({ ...query, status: status.value === "all" ? undefined : status.value })
@@ -444,7 +451,7 @@ function auditLine(entry: AIAuditEntry) {
           <p v-if="!useWebApi" class="text-sm text-muted-foreground">{{ t('aiSettings.mockHint') }}</p>
           <section class="flex flex-wrap items-end justify-end gap-3" data-ai-settings-block="filters">
             <FieldGroup class="w-40">
-              <Field><FieldLabel for="ai-days">{{ t('aiSettings.range') }}</FieldLabel><Select v-model="days"><SelectTrigger id="ai-days"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="day in ['7','30','90']" :key="day" :value="day">{{ t('aiSettings.days', { count: day }) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
+              <Field><FieldLabel for="ai-days">{{ t('aiSettings.range') }}</FieldLabel><Select v-model="days"><SelectTrigger id="ai-days"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="today">{{ t('aiSettings.today') }}</SelectItem><SelectItem v-for="day in ['7','30','90']" :key="day" :value="day">{{ t('aiSettings.days', { count: day }) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
             </FieldGroup>
             <Button variant="ghost" size="icon" :disabled="loading" :aria-label="t('aiSettings.refresh')" data-ai-refresh @click="refresh"><RefreshCw /></Button>
           </section>

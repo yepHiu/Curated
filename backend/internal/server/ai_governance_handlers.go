@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"curated-backend/internal/contracts"
 )
@@ -61,6 +62,13 @@ func parseAIReportQuery(r *http.Request, audit bool) (contracts.AIReportQuery, e
 			}
 			*field.ptr = n
 		}
+	}
+	if raw := r.URL.Query().Get("since"); raw != "" {
+		start, err := time.Parse(time.RFC3339Nano, raw)
+		if err != nil {
+			return q, fmt.Errorf("invalid since")
+		}
+		q.Since = start.UTC().Format(time.RFC3339Nano)
 	}
 	switch q.Channel {
 	case "", "chat", "action", "test", "subtitle":
