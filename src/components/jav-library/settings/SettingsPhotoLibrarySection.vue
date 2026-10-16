@@ -237,7 +237,7 @@ async function patchCache(maxBytes: number) {
 </script>
 
 <template>
-  <div class="break-inside-avoid">
+  <div class="flex flex-col gap-4">
     <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
       <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
         <span
@@ -337,21 +337,23 @@ async function patchCache(maxBytes: number) {
             />
           </div>
           <p v-if="autoWatchError" class="text-sm text-destructive">{{ autoWatchError }}</p>
-
-          <SettingsPhotoViewerSection
-            :viewer="photoViewer"
-            :saving="viewerBusy"
-            :error="viewerError"
-            @patch-viewer="patchViewer"
-          />
-          <SettingsPhotoCacheSection
-            :max-bytes="photoCache.maxBytes"
-            :saving="cacheBusy"
-            :error="cacheError"
-            @change-max-bytes="patchCache"
-          />
         </template>
       </CardContent>
     </Card>
+
+    <template v-if="photoLibraryEnabled && isServerLocal">
+      <SettingsPhotoViewerSection
+        :viewer="photoViewer"
+        :saving="viewerBusy"
+        :error="viewerError"
+        @patch-viewer="patchViewer"
+      />
+      <SettingsPhotoCacheSection
+        :max-bytes="photoCache.maxBytes"
+        :saving="cacheBusy"
+        :error="cacheError"
+        @change-max-bytes="patchCache"
+      />
+    </template>
   </div>
 </template>

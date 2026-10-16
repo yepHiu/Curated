@@ -255,7 +255,7 @@ async function cleanupCache() {
 </script>
 
 <template>
-  <div class="break-inside-avoid">
+  <div class="flex flex-col gap-4">
     <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
       <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
         <span
@@ -355,24 +355,26 @@ async function cleanupCache() {
             />
           </div>
           <p v-if="autoWatchError" class="text-sm text-destructive">{{ autoWatchError }}</p>
-
-          <SettingsComicReaderSection
-            :reader="comicReader"
-            :saving="readerBusy"
-            :error="readerError"
-            @patch-reader="patchReader"
-          />
-          <SettingsComicCacheSection
-            :max-bytes="comicCache.maxBytes"
-            :status="comicCacheStatus"
-            :saving="cacheBusy"
-            :cleanup-busy="cacheCleanupBusy"
-            :error="cacheError"
-            @change-max-bytes="patchCache"
-            @cleanup="cleanupCache"
-          />
         </template>
       </CardContent>
     </Card>
+
+    <template v-if="comicLibraryEnabled && isServerLocal">
+      <SettingsComicReaderSection
+        :reader="comicReader"
+        :saving="readerBusy"
+        :error="readerError"
+        @patch-reader="patchReader"
+      />
+      <SettingsComicCacheSection
+        :max-bytes="comicCache.maxBytes"
+        :status="comicCacheStatus"
+        :saving="cacheBusy"
+        :cleanup-busy="cacheCleanupBusy"
+        :error="cacheError"
+        @change-max-bytes="patchCache"
+        @cleanup="cleanupCache"
+      />
+    </template>
   </div>
 </template>
