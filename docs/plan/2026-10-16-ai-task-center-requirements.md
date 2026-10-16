@@ -262,3 +262,10 @@ AppShell 只有一个轮询调度器，活动约 2 秒、空闲约 10 秒、后�
 - Playwright 检查实际 Vue 页面：空状态、36 条隔离演示记录的两页恢复、650px 滚动恢复、1440px 桌面与 390px 窄屏、整理只读、字幕取消确认与 Escape。截图位于 `output/playwright/task-implemented-*.png`。
 - 视觉检查使用隔离浏览器中的 Mock 整理数据与运行时字幕 fixture；没有写正式库或调用付费 AI。现有业务执行器由相关 Go 测试覆盖，本轮没有新增整片云任务或安装包跨平台运行验收。
 - 未运行 `pnpm test:display` 或正式发布流水线。使用真实任务需更新并重启 Server，并重新构建对应 Web/Desktop 页面。本轮本地提交，不推送或发布。
+
+
+### 14.4 任务阶段节点动效调整（2026-10-17）
+
+用户要求加粗圆环和勾线，当前执行阶段使用 Windows 风格环形转点，并提供 loading 到成功/错误的过渡（seed 按成功勾处理）。范围限任务详情的阶段节点：28px 尺寸不变、圆环2px、勾/叉3px，沿用 primary/success/destructive 语义色。新增领域组件承载转点、交叉淡入淡出和终态笔画绘制；初次打开历史任务不播放完成动画。失败/阻断显示错误，等待/取消/断线停止转动，部分完成不将问题阶段画成成功。遵循 prefers-reduced-motion，静态显示当前状态。无后端/任务执行逻辑变更。
+
+验证：typecheck、定向 ESLint 与 TaskDetailView 3 项测试通过。Playwright 在实际 Vue 页面使用隔离 fixture 检查运行→失败、重试运行→阶段成功、2px 圆环、5个转点、减少动态效果、1440px 桌面和390px窄屏；截图 `output/playwright/task-node-*.png`。未运行 test:display；无后端重启或真实任务操作。
