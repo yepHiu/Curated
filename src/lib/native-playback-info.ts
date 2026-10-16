@@ -1,3 +1,4 @@
+import type { PlaybackInfoRow } from "./playback-info"
 import type { NativePlayerState } from "../../electron/native-player-contract"
 
 const zh = {
@@ -48,8 +49,7 @@ export function avOffset(value: number | null | undefined): string {
   const ms = Number((value * 1000).toFixed(2))
   return `${ms < 0 ? "" : "+"}${ms.toFixed(2)} ms`
 }
-interface NativeInfoMetric { number: string; unit: string; reserveUnit: boolean }
-interface NativeInfoRow { label: string; value: string; metrics?: NativeInfoMetric[] }
+type NativeInfoRow = PlaybackInfoRow
 /** 固定 30 秒横轴与自适应纵轴，闲置时保留真实零值。 */
 export function transferPolyline(history: number[]): string {
   const values = history.slice(-30).map(value => Number.isFinite(value) && value >= 0 ? value : 0)

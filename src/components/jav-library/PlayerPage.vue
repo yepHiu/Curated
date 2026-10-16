@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { provide, computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
+import { useElementSize } from "@vueuse/core"
+import PlaybackInfoPanel from "@/components/jav-library/PlaybackInfoPanel.vue"
+import { nativePlaybackInfoMessages } from "@/lib/native-playback-info"
+import { webPlaybackInfoGroups, playbackInfoText } from "@/lib/web-playback-info"
 import MoviePartSelect from "@/components/jav-library/MoviePartSelect.vue"
 import { useRoute, useRouter } from "vue-router"
 import {
@@ -118,7 +122,6 @@ import {
   formatTranscodeProfileLabel,
   formatEncoderSpeedLabel,
   formatSeekKindLabel,
-  isPlaybackStatUnavailable,
 } from "@/lib/player-playback-stats-format"
 import {
   hlsStartupBufferOptions,
@@ -269,6 +272,12 @@ type SessionPlaybackMode = "direct" | "hls"
 
 const playerContextMenu = ref<PlayerContextMenuState | null>(null)
 const detailedStatsVisible = ref(false)
+const statsExportBusy = ref(false)
+const statsExportFeedback = ref("")
+const playbackFooterRef = ref<HTMLElement>()
+const { height: playbackFooterHeight } = useElementSize(playbackFooterRef)
+const statsLabels = computed(() => nativePlaybackInfoMessages[locale.value === "ja" ? "ja" : locale.value === "en" ? "en" : "zh-CN"])
+
 const playbackStats = ref<PlaybackStatsState>({
   audioBitrateKbps: null,
   videoBitrateKbps: null,
@@ -1937,11 +1946,41 @@ function onPlayerContextMenu(event: MouseEvent) {
 function toggleDetailedStats() {
   if (!playbackSrc.value) return
   detailedStatsVisible.value = !detailedStatsVisible.value
+  statsExportFeedback.value = ""
   closePlayerContextMenu()
 }
 
 function closeDetailedStats() {
   detailedStatsVisible.value = false
+  void nextTick(() => surfaceRef.value?.querySelector<HTMLButtonElement>("[data-web-info-trigger]")?.focus({ preventScroll: true }))
+}
+
+async function exportPlaybackInfo(action: "copy" | "save") {
+  if (statsExportBusy.value) return
+  statsExportBusy.value = true
+  statsExportFeedback.value = ""
+  const text = playbackInfoText(statsLabels.value.title, playbackStatsGroups.value)
+  try {
+    if (action === "copy") {
+      await navigator.clipboard.writeText(text)
+      statsExportFeedback.value = statsLabels.value.copied
+    } else {
+      const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }))
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "curated-playback-info.txt"
+      document.body.append(link)
+      try { link.click() } finally {
+        link.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+      statsExportFeedback.value = statsLabels.value.saved
+    }
+  } catch {
+    statsExportFeedback.value = statsLabels.value.failed
+  } finally {
+    statsExportBusy.value = false
+  }
 }
 
 function seekDelta(deltaSec: number) {
@@ -2995,11 +3034,10 @@ const playbackStatsRows = computed(() => {
   return rows
 })
 
-const playbackStatsColumns = computed(() => {
-  const rows = playbackStatsRows.value
-  const midpoint = Math.ceil(rows.length / 2)
-  return [rows.slice(0, midpoint), rows.slice(midpoint)]
-})
+const playbackStatsGroups = computed(() => webPlaybackInfoGroups(
+  playbackStatsRows.value,
+  locale.value === "ja" ? "ja" : locale.value === "en" ? "en" : "zh-CN",
+))
 
 const detailedStatsModeLabel = computed(() => {
   const descriptor = playbackDescriptor.value
@@ -3131,61 +3169,19 @@ const videoPreloadMode = computed(() =>
         </div>
       </Transition>
 
-      <div
+      <PlaybackInfoPanel
         v-if="detailedStatsVisible"
-        class="player-stats-panel absolute left-2 top-16 z-[18] w-[min(44rem,calc(100%-1rem))] overflow-hidden rounded-[2px] border border-white/10 bg-[#1a1a1a]/96 text-white shadow-[0_18px_36px_rgba(0,0,0,0.42)] sm:left-4 sm:top-20"
-        @click.stop
-      >
-        <div class="px-4 py-3 sm:px-5 sm:py-3.5">
-          <div class="flex items-start justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-[11px] font-semibold leading-none tracking-[0.08em] text-white/92 sm:text-[12px]">
-                Video Stats
-              </p>
-              <p class="mt-2 truncate font-mono text-[11px] tracking-[0.05em] text-white/78 sm:text-[12px]">
-                {{ movie.code }} / {{ detailedStatsModeLabel }} / {{ fileBasename || movie.location }}
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              class="stats-close-button h-6 w-auto shrink-0 rounded-none px-1.5 text-[12px] font-semibold leading-none text-white/68 hover:bg-transparent hover:text-white"
-              :aria-label="t('player.hideStats')"
-              @click="closeDetailedStats"
-            >
-              [X]
-            </Button>
-          </div>
-        </div>
-        <div class="grid gap-x-5 px-3 pb-3 md:grid-cols-2 sm:px-4 sm:pb-4">
-          <dl
-            v-for="(column, columnIndex) in playbackStatsColumns"
-            :key="columnIndex"
-            class="min-w-0"
-          >
-            <div
-              v-for="row in column"
-              :key="row.key"
-              class="grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-x-2 py-[1px] sm:grid-cols-[9.5rem_minmax(0,1fr)]"
-            >
-              <dt class="truncate text-right text-[10px] font-semibold leading-5 text-white/70 sm:text-[11px]">
-                {{ row.label }}
-              </dt>
-              <dd
-                :class="
-                  cn(
-                    'truncate pl-2 text-left font-mono text-[10px] font-semibold leading-5 tracking-[0.01em] tabular-nums sm:text-[11px]',
-                    isPlaybackStatUnavailable(row.value) ? 'text-white/45' : 'text-white',
-                  )
-                "
-              >
-                {{ row.value }}
-              </dd>
-            </div>
-          </dl>
-        </div>
-      </div>
+        data-web-playback-info
+        class="z-[18]"
+        :style="{ bottom: `${playbackFooterHeight + 12}px` }"
+        :labels="statsLabels"
+        :groups="playbackStatsGroups"
+        :busy="statsExportBusy"
+        :feedback="statsExportFeedback"
+        @close="closeDetailedStats"
+        @copy="exportPlaybackInfo('copy')"
+        @save="exportPlaybackInfo('save')"
+      />
 
         <div
           class="relative flex min-h-0 flex-1 items-center justify-center"
@@ -3319,6 +3315,7 @@ const videoPreloadMode = computed(() =>
       </div>
 
       <div
+        ref="playbackFooterRef"
         class="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/65 to-transparent p-4 sm:p-5"
         :class="[CHROME_LAYER_TRANSITION, chromeLayerVisibleClass]"
       >
@@ -3494,7 +3491,7 @@ const videoPreloadMode = computed(() =>
               <PictureInPicture2 v-else class="size-4 shrink-0" aria-hidden="true" />
             </Button>
 
-            <Button data-player-auxiliary variant="ghost" size="icon" class="rounded-full" :disabled="!playbackSrc" :aria-label="detailedStatsVisible ? t('player.hideStats') : t('player.showStats')" :aria-pressed="detailedStatsVisible" @click="toggleDetailedStats"><Info /></Button>
+            <Button data-web-info-trigger data-player-auxiliary variant="ghost" size="icon" class="rounded-full" :disabled="!playbackSrc" :aria-label="detailedStatsVisible ? t('player.hideStats') : t('player.showStats')" :aria-pressed="detailedStatsVisible" @click="toggleDetailedStats"><Info /></Button>
 
             <Button
               type="button"
@@ -3567,18 +3564,6 @@ const videoPreloadMode = computed(() =>
 </template>
 
 <style scoped>
-.player-stats-panel::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.03);
-}
-
-.stats-close-button {
-  box-shadow: none;
-}
-
 .curated-shutter-ring {
   animation: curated-shutter-inset 0.2s ease-out forwards;
   box-shadow: inset 0 0 0 8px hsl(var(--primary) / 0.42);

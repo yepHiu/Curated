@@ -183,6 +183,31 @@ afterEach(() => {
 })
 
 describe("PlayerPage loading states", () => {
+  it("opens the shared info panel, copies Web diagnostics and closes with Escape", async () => {
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({ movieId: "movie-1", mode: "direct", url: "/movie.mp4", durationSec: 120, canDirectPlay: true })
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    const previous = Object.getOwnPropertyDescriptor(navigator, "clipboard")
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } })
+    const wrapper = await mountPlayerPage()
+    try {
+      await flushPromises()
+      await wrapper.get("[data-web-info-trigger]").trigger("click")
+      const panel = wrapper.get("[data-web-playback-info]")
+      expect(panel.findAll("section")).toHaveLength(4)
+      expect(panel.text()).toContain("播放信息")
+      await panel.get('button[aria-label="复制信息"]').trigger("click")
+      await flushPromises()
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining("媒体传输: Direct"))
+      expect(panel.get('[role="status"]').text()).toBe("播放信息已复制")
+      await panel.trigger("keydown", { key: "Escape" })
+      expect(wrapper.find("[data-web-playback-info]").exists()).toBe(false)
+    } finally {
+      wrapper.unmount()
+      if (previous) Object.defineProperty(navigator, "clipboard", previous)
+      else Reflect.deleteProperty(navigator, "clipboard")
+    }
+  })
+
   // 确认真实 PlayerPage 使用 descriptor 的 AMF 档位，四秒连续缓冲即可自动播放。
   it("autoplays AMF as soon as four seconds are downloaded", async () => {
     const { loadHlsLibrary } = await import("@/lib/hls-player")
