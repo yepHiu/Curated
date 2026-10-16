@@ -2167,7 +2167,7 @@
     "retry": "重新加载",
     "provider": "Agent模型设置",
     "providerHint": "使用 OpenAI 兼容服务。密钥保存在本机资料库配置中；连通测试会发送一次真实请求，可能产生费用。",
-    "statistics": "用量、速度与失败",
+    "statistics": "用量",
     "mockHint": "Mock 模式没有真实模型调用，不生成虚构的用量统计。",
     "range": "时间范围",
     "days": "最近 {count} 天",

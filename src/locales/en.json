@@ -2167,7 +2167,7 @@
     "retry": "Reload",
     "provider": "Agent model settings",
     "providerHint": "Use an OpenAI-compatible service. The key is stored in local library configuration. Connection tests send a real request and may incur charges.",
-    "statistics": "Usage, speed and failures",
+    "statistics": "Usage",
     "mockHint": "Mock mode has no real model calls and does not invent usage statistics.",
     "range": "Time range",
     "days": "Last {count} days",
