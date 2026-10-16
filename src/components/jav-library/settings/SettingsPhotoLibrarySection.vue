@@ -317,6 +317,9 @@ async function patchCache(maxBytes: number) {
           <p v-if="autoWatchError" class="text-sm text-destructive">{{ autoWatchError }}</p>
         </template>
 
+        <h3 class="text-sm font-semibold text-foreground">
+          {{ t("settings.storageDirectoriesListTitle") }}
+        </h3>
         <SettingsPhotoLibraryPathsSection
           :paths="photoLibraryPaths"
           :default-import-library-path-id="defaultPhotoImportLibraryPathId"

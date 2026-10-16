@@ -335,6 +335,9 @@ async function cleanupCache() {
           <p v-if="autoWatchError" class="text-sm text-destructive">{{ autoWatchError }}</p>
         </template>
 
+        <h3 class="text-sm font-semibold text-foreground">
+          {{ t("settings.storageDirectoriesListTitle") }}
+        </h3>
         <SettingsComicLibraryPathsSection
           :paths="comicLibraryPaths"
           :default-import-library-path-id="defaultComicImportLibraryPathId"

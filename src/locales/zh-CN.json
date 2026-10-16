@@ -1783,6 +1783,7 @@
     "comicAutoWatchSyncing": "正在保存漫画自动扫描设置…",
     "comicLibraryPathRequired": "启用漫画库前，请先添加漫画存储路径。",
     "comicLibraryPathAbsoluteRequired": "请填写绝对漫画存储路径，例如 D:\\\\Comics 或 /Users/you/Comics。",
+    "storageDirectoriesListTitle": "我们下面展示的是存储目录",
     "storagePathSettings": "存储路径设置",
     "comicLibraryPathsTitle": "漫画存储路径",
     "comicLibraryPathsDesc": "仅扫描这些路径下的 zip/cbz 漫画；源压缩包不会被解压进媒体库。",
