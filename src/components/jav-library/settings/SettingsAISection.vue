@@ -65,7 +65,7 @@ const days = ref("30")
 const channel = ref("all")
 const status = ref("all")
 const runsPageSize = ref("20")
-const AUDIT_PAGE_SIZE = 10
+const auditPageSize = ref("20")
 const offset = ref(0)
 const auditOffset = ref(0)
 const report = ref<AIReport | null>(null)
@@ -183,7 +183,7 @@ async function refresh() {
   try {
     const [nextReport, nextAudit, overview] = await Promise.all([
       service.getUsage({ ...query, status: status.value === "all" ? undefined : status.value, offset: offset.value, limit: Number(runsPageSize.value) }),
-      service.getAudit({ ...query, status: status.value === "failed" ? "failed" : undefined, offset: auditOffset.value, limit: AUDIT_PAGE_SIZE }),
+      service.getAudit({ ...query, status: status.value === "failed" ? "failed" : undefined, offset: auditOffset.value, limit: Number(auditPageSize.value) }),
       channel.value !== "all" || status.value !== "all" ? service.getUsage({ ...periodQuery(), limit: 1, offset: 0 }) : Promise.resolve(null),
     ])
     if (id !== requestId || disposed) return
@@ -195,7 +195,7 @@ async function refresh() {
   } catch (err) { if (id === requestId && !disposed) error.value = (err as Error).message }
   finally { if (id === requestId) loading.value = false }
 }
-watch([days, channel, status, runsPageSize], () => { offset.value = 0; auditOffset.value = 0; void refresh() })
+watch([days, channel, status, runsPageSize, auditPageSize], () => { offset.value = 0; auditOffset.value = 0; void refresh() })
 async function perform(action: () => Promise<void>) {
   if (busy.value) return
   busy.value = true; error.value = ""; message.value = ""
@@ -246,7 +246,7 @@ function measured(total: number, known: number, calls: number) {
 function toolLabel(name: string) { const key = AGENT_TOOL_I18N_KEYS[name]; return key ? t(key) : name }
 async function page(kind: "runs" | "audit", direction: -1 | 1) {
   if (loading.value) return
-  const pageSize = kind === "runs" ? Number(runsPageSize.value) : AUDIT_PAGE_SIZE
+  const pageSize = kind === "runs" ? Number(runsPageSize.value) : Number(auditPageSize.value)
   const current = kind === "runs" ? report.value : audit.value
   if (!current) return
   const nextOffset = Math.max(0, current.offset + direction * pageSize)
@@ -545,8 +545,38 @@ function auditLine(entry: AIAuditEntry) {
             </SettingsHint>
             <p v-if="pageError?.kind === 'audit'" role="alert" class="text-sm text-destructive">{{ pageError.message }}</p>
             <p v-if="audit && !audit.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
-            <ul ref="auditList" class="flex min-w-0 flex-col" :style="{ minHeight: auditMinHeight ? `${auditMinHeight}px` : undefined }"><li v-for="entry in audit?.items ?? []" :key="entry.id" :title="auditLine(entry)" class="flex min-h-11 min-w-0 items-center gap-2 border-t border-border/50 px-2 py-3" :data-ai-audit-row="entry.id" :data-status="entry.result"><span class="min-w-0 flex-1"><span class="block text-sm font-medium">{{ toolLabel(entry.tool) }}</span><span class="block break-words text-xs text-muted-foreground">{{ time(entry.createdAt) }} · {{ entry.permission }} · {{ duration(entry.durationMs) }}<template v-if="entry.errorCode"> · {{ entry.errorCode }}</template></span></span><Badge :variant="auditStatusTone(entry.result)">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge></li></ul>
-            <div v-if="audit && audit.total > audit.limit" class="flex flex-wrap justify-end gap-2"><Button variant="outline" size="sm" :disabled="loading || auditOffset === 0" @click="page('audit', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || auditOffset + AUDIT_PAGE_SIZE >= audit.total" @click="page('audit', 1)">{{ t('aiSettings.next') }}</Button></div>
+            <ul ref="auditList" class="flex min-w-0 flex-col" :style="{ minHeight: auditMinHeight ? `${auditMinHeight}px` : undefined }">
+              <li v-for="entry in audit?.items ?? []" :key="entry.id" :title="auditLine(entry)" class="flex min-h-11 min-w-0 items-center gap-2 border-t border-border/50 px-2 py-2 sm:min-h-10 sm:py-1.5" :data-ai-audit-row="entry.id" :data-status="entry.result">
+                <span class="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
+                  <span class="shrink-0 text-sm font-medium">{{ toolLabel(entry.tool) }}</span>
+                  <span class="truncate text-xs text-muted-foreground">{{ time(entry.createdAt) }} · {{ entry.permission }}<template v-if="entry.errorCode"> · {{ entry.errorCode }}</template></span>
+                </span>
+                <span class="flex shrink-0 items-center gap-5">
+                  <span class="hidden text-xs text-muted-foreground sm:block">{{ duration(entry.durationMs) }}</span>
+                  <Badge :variant="auditStatusTone(entry.result)">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge>
+                </span>
+              </li>
+            </ul>
+            <div class="flex flex-wrap items-center justify-end gap-x-4 gap-y-2" data-ai-audit-pagination>
+              <span v-if="audit" class="mr-auto text-xs text-muted-foreground">
+                {{ audit.total ? auditOffset + 1 : 0 }}–{{ Math.min(auditOffset + audit.limit, audit.total) }} / {{ audit.total }}
+              </span>
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <FieldGroup class="w-auto shrink-0 [container-type:normal]">
+                  <Field orientation="horizontal" class="items-center gap-2">
+                    <FieldLabel for="ai-audit-page-size" class="whitespace-nowrap text-xs text-muted-foreground">{{ t('aiSettings.rowsPerPage') }}</FieldLabel>
+                    <Select v-model="auditPageSize" :disabled="loading">
+                      <SelectTrigger id="ai-audit-page-size" class="w-20 shrink-0"><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectGroup><SelectItem v-for="size in ['20','50','100']" :key="size" :value="size">{{ size }}</SelectItem></SelectGroup></SelectContent>
+                    </Select>
+                  </Field>
+                </FieldGroup>
+                <div class="flex shrink-0 items-center gap-2">
+                  <Button variant="outline" size="sm" :disabled="loading || !audit || auditOffset === 0" @click="page('audit', -1)">{{ t('aiSettings.previous') }}</Button>
+                  <Button variant="outline" size="sm" :disabled="loading || !audit || auditOffset + Number(auditPageSize) >= audit.total" @click="page('audit', 1)">{{ t('aiSettings.next') }}</Button>
+                </div>
+              </div>
+            </div>
           </section>
           </details>
         </CardContent>

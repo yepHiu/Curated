@@ -23,7 +23,7 @@ function paginatedRecords() {
   const report = emptyReport()
   report.total = 22
   report.items = Array.from({ length: 20 }, (_, index) => ({ id: `run-${index}`, startedAt: "2026-09-06T00:00:00Z", channel: "chat", action: "", sessionId: "", provider: "test", model: "model", promptVersion: "v1", status: "completed", errorCode: "", durationMs: 12, firstTextMs: 4, modelCalls: 1, usageCalls: 1, toolCalls: 0, promptTokens: 2, completionTokens: 3, totalTokens: 5 }))
-  const audit: AIPage<AIAuditEntry> = { items: Array.from({ length: 10 }, (_, index) => ({ id: `audit-${index}`, createdAt: "2026-09-06T00:00:00Z", channel: "chat", sessionId: "", tool: "search_movies", permission: "read", result: "ok", errorCode: "", durationMs: 1 })), total: 12, limit: 10, offset: 0 }
+  const audit: AIPage<AIAuditEntry> = { items: Array.from({ length: 20 }, (_, index) => ({ id: `audit-${index}`, createdAt: "2026-09-06T00:00:00Z", channel: "chat", sessionId: "", tool: "search_movies", permission: "read", result: "ok", errorCode: "", durationMs: 1 })), total: 22, limit: 20, offset: 0 }
   mocks.getUsage.mockResolvedValue(report)
   mocks.getAudit.mockResolvedValue(audit)
   return { report, audit }
@@ -36,7 +36,7 @@ beforeEach(() => {
   mocks.getSettings.mockResolvedValue(enabledGovernance())
   mocks.saveSettings.mockImplementation(async (value) => value)
   mocks.getUsage.mockResolvedValue(emptyReport())
-  mocks.getAudit.mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 })
+  mocks.getAudit.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 })
   mocks.cleanup.mockResolvedValue({ runs: 2, audit: 1, receipts: 0 })
   mocks.setAIProvider.mockImplementation(async (value) => { providerState.value = { kind: "openai-compatible", ...value } })
   mocks.testAIProvider.mockResolvedValue({ ok: true, latencyMs: 10 })
@@ -200,10 +200,20 @@ describe("SettingsAISection", () => {
     expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ limit: Number(size), offset: 0 }))
     wrapper.unmount()
   })
-  it("loads twenty recent requests and ten audit records per page", async () => {
+  it.each(["50", "100"])("changes tool record page size to %s", async (size) => {
+    paginatedRecords()
+    const wrapper = await setup()
+    const block = wrapper.get("[data-ai-settings-block=audit]")
+    const selector = block.findComponent(Select)
+    selector.vm.$emit("update:modelValue", size)
+    await flushPromises()
+    expect(mocks.getAudit).toHaveBeenLastCalledWith(expect.objectContaining({ limit: Number(size), offset: 0 }))
+    wrapper.unmount()
+  })
+  it("loads twenty recent requests and twenty audit records per page", async () => {
     const wrapper = await setup()
     expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 20, offset: 0 }))
-    expect(mocks.getAudit).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 0 }))
+    expect(mocks.getAudit).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 20, offset: 0 }))
     wrapper.unmount()
   })
   it.each(["runs", "audit"] as const)("keeps content mounted while paging %s and only fetches that list", async (kind) => {
@@ -227,7 +237,7 @@ describe("SettingsAISection", () => {
     expect(nextButton.attributes("disabled")).toBeDefined()
     expect(mocks.getUsage).toHaveBeenCalledTimes(kind === "runs" ? 2 : 1)
     expect(mocks.getAudit).toHaveBeenCalledTimes(kind === "audit" ? 2 : 1)
-    resolvePage(kind === "runs" ? { ...report, offset: 20, items: report.items.slice(0, 2) } : { ...audit, offset: 10, items: audit.items.slice(0, 2) })
+    resolvePage(kind === "runs" ? { ...report, offset: 20, items: report.items.slice(0, 2) } : { ...audit, offset: 20, items: audit.items.slice(0, 2) })
     await flushPromises()
     expect(list.element.style.minHeight).toBe(`${measuredHeight}px`)
     expect(list.findAll("li")).toHaveLength(2)
