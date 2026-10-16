@@ -63,9 +63,7 @@ async function loadSettings() {
 
 watch(open, (value) => {
   if (value) {
-    returnFocus = document.querySelector<HTMLElement>(
-      tab.value === "performance" ? "[data-dev-performance-trigger]" : "[data-dev-debug-trigger]",
-    )
+    returnFocus = document.querySelector<HTMLElement>("[data-dev-debug-trigger]")
     void loadSettings()
   }
   else tab.value = "actions"

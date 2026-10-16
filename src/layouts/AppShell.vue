@@ -8,7 +8,7 @@ import { moviesInBrowseCategory } from "@/lib/movie-category"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
 import ImportMenu from "@/components/jav-library/ImportMenu.vue"
 import DevEnvironmentBadge from "@/components/dev/DevEnvironmentBadge.vue"
-import DevPerformanceBar from "@/components/dev/DevPerformanceBar.vue"
+import DevDebugTools from "@/components/dev/DevDebugTools.vue"
 import SubtitleJobDialog from "@/components/jav-library/SubtitleJobDialog.vue"
 import { useSubtitleJobs, startSubtitleTracking, stopSubtitleTracking } from "@/composables/use-subtitle-jobs"
 import TagOrganizationDialog from "@/components/jav-library/TagOrganizationDialog.vue"
@@ -45,7 +45,6 @@ import { useLibraryWatchToasts } from "@/composables/use-library-watch-toasts"
 import { useLibraryStorageStatusAlerts } from "@/composables/use-library-storage-status-alerts"
 import NotificationCenter from "@/components/notification-center/NotificationCenter.vue"
 import { useTheme } from "@/composables/use-theme"
-import { devPerformanceBarHidden, setDevPerformanceBarHidden } from "@/lib/dev-performance/visibility"
 import { useLibraryService } from "@/services/library-service"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { useAgentWindow } from "@/composables/use-agent-window"
@@ -1068,7 +1067,7 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
     <TagOrganizationDialog />
     <SubtitleJobDialog v-if="subtitleJobs.movie.value && subtitleJobs.dialogOpen.value" v-model:open="subtitleJobs.dialogOpen.value" :movie="subtitleJobs.movie.value" :initial-file-id="subtitleJobs.fileId.value" />
     <ScanProgressDock />
-    <DevPerformanceBar v-if="isDev" v-model:debug-open="debugOpen" />
+    <DevDebugTools v-if="isDev" v-model:debug-open="debugOpen" />
 
     <Teleport to="body">
       <div
@@ -1102,8 +1101,6 @@ onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 *
 
     <DevEnvironmentBadge
       v-if="isDev"
-      :show-perf-restore="devPerformanceBarHidden"
-      @show-performance-monitor="setDevPerformanceBarHidden(false)"
       @show-debug-tools="debugOpen = true"
     />
   </div>

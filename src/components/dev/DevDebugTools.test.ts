@@ -1,11 +1,7 @@
 import { mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { useDevPerformanceMonitor } from "@/composables/use-dev-performance-monitor"
-import DevPerformanceBar from "./DevPerformanceBar.vue"
-import {
-  DEV_PERFORMANCE_BAR_HIDDEN_STORAGE_KEY,
-  setDevPerformanceBarHidden,
-} from "@/lib/dev-performance/visibility"
+import DevDebugTools from "./DevDebugTools.vue"
 
 vi.mock("@/composables/use-dev-performance-monitor", async () => {
   const { ref } = await vi.importActual<typeof import("vue")>("vue")
@@ -13,7 +9,6 @@ vi.mock("@/composables/use-dev-performance-monitor", async () => {
   return {
     useDevPerformanceMonitor: vi.fn(() => ({
       useWebApi: false,
-      expanded: ref(false),
       paused: ref(false),
       frontendSnapshot: ref({
         routeName: "library",
@@ -41,7 +36,6 @@ vi.mock("@/composables/use-dev-performance-monitor", async () => {
       backendHealthLatencyMs: ref(null),
       backendVersion: ref(null),
       backendPerformance: ref({ supported: false }),
-      toggleExpanded: vi.fn(),
       togglePaused: vi.fn(),
       clearStats: vi.fn(),
       copySummary: vi.fn(),
@@ -49,57 +43,55 @@ vi.mock("@/composables/use-dev-performance-monitor", async () => {
   }
 })
 
-function mountBar() {
-  return mount(DevPerformanceBar, {
+function mountTools() {
+  return mount(DevDebugTools, {
     global: {
       stubs: {
-        Teleport: true,
-        DevDebugDialog: true,
+        DevDebugDialog: {
+          name: "DevDebugDialog",
+          props: ["open", "tab"],
+          emits: ["update:open", "update:tab"],
+          template: '<div v-if="open"><slot name="performance" /></div>',
+        },
         Button: {
           template: '<button v-bind="$attrs"><slot /></button>',
         },
-        ChevronDown: true,
-        ChevronUp: true,
         ClipboardCopy: true,
-        Cpu: true,
         Pause: true,
         Play: true,
         RotateCcw: true,
-        X: true,
       },
     },
   })
 }
 
-describe("DevPerformanceBar visibility", () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    localStorage.clear()
-    setDevPerformanceBarHidden(false)
-  })
+describe("DevDebugTools", () => {
+  beforeEach(() => vi.clearAllMocks())
 
-  it("opens performance in the shared dialog without creating another monitor", async () => {
-    const wrapper = mountBar()
-    await wrapper.get('[aria-haspopup="dialog"]').trigger("click")
-    const dialog = wrapper.getComponent({ name: "DevDebugDialog" })
-    expect(dialog.props("open")).toBe(true)
-    expect(dialog.props("tab")).toBe("performance")
-    dialog.vm.$emit("update:open", false)
-    await wrapper.vm.$nextTick()
-    await wrapper.get('[aria-haspopup="dialog"]').trigger("click")
+  it("keeps one monitor across debug dialog reopenings", async () => {
+    const wrapper = mountTools()
+    await wrapper.setProps({ debugOpen: true })
+    expect(wrapper.text()).toContain("Dev Performance Monitor")
+    expect(wrapper.text()).toContain("FPS: 60")
+    expect(wrapper.text()).toContain("Status: mock")
+    await wrapper.setProps({ debugOpen: false })
+    await wrapper.setProps({ debugOpen: true })
     expect(useDevPerformanceMonitor).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
 
-  it("hides the full monitor from its own toolbar and persists the local preference", async () => {
-    const wrapper = mountBar()
-
-    expect(wrapper.text()).toContain("Perf")
-
-    await wrapper.get('[aria-label="Hide performance monitor"]').trigger("click")
-
-    expect(localStorage.getItem(DEV_PERFORMANCE_BAR_HIDDEN_STORAGE_KEY)).toBe("true")
-    expect(wrapper.text()).not.toContain("CPU")
-    expect(wrapper.text()).not.toContain("Show Perf")
+  it("preserves performance controls in the dialog", async () => {
+    const wrapper = mountTools()
+    await wrapper.setProps({ debugOpen: true })
+    const monitor = vi.mocked(useDevPerformanceMonitor).mock.results[0]!.value
+    for (const [label, action] of [
+      ["Pause", monitor.togglePaused],
+      ["Clear", monitor.clearStats],
+      ["Copy Summary", monitor.copySummary],
+    ] as const) {
+      await wrapper.findAll("button").find(button => button.text() === label)!.trigger("click")
+      expect(action).toHaveBeenCalledTimes(1)
+    }
+    wrapper.unmount()
   })
 })

@@ -104,8 +104,8 @@ vi.mock("@/components/dev/DevEnvironmentBadge.vue", () => ({
   default: { name: "DevEnvironmentBadge", template: "<div />" },
 }))
 
-vi.mock("@/components/dev/DevPerformanceBar.vue", () => ({
-  default: { name: "DevPerformanceBar", template: "<div />" },
+vi.mock("@/components/dev/DevDebugTools.vue", () => ({
+  default: { name: "DevDebugTools", template: "<div />" },
 }))
 
 vi.mock("@/components/jav-library/ScanProgressDock.vue", () => ({
