@@ -65,6 +65,7 @@ func (a *App) subtitleRuntime(model string) (subtitles.RuntimeConfig, error) {
 	case "configured-ai":
 		p := a.currentAIProviderConfig()
 		r.Text = llm.ClientConfig{BaseURL: p.BaseURL, APIKey: p.APIKey, Model: p.Model}
+		r.Translation = subtitles.TranslationLimits{ContextWindow: config.EffectiveAIContextWindow(p.ContextWindow)}
 	case "qwen-flash", "qwen-plus":
 		disabled := false
 		r.Text = llm.ClientConfig{BaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1", APIKey: c.APIKey, Model: model, EnableThinking: &disabled}
@@ -103,17 +104,13 @@ func (a *App) translateSubtitleCues(ctx context.Context, r storage.SubtitleRecor
 	observation.row.Model = cfg.Text.Model
 	observation.row.PromptVersion = r.PromptVersion
 	observation.row.Provider = r.Job.TranslationModel
-	client, err := newAIHTTPClient(a.currentProxyConfig(), 3*time.Minute)
+	client, err := newAIHTTPClient(a.currentProxyConfig(), 15*time.Minute)
 	if err != nil {
 		return nil, err
 	}
 	completer := llm.NewClient(cfg.Text, client)
 	completer.Observe = observation.observe
-	input := make([]map[string]any, 0, len(cues))
-	for _, c := range cues {
-		input = append(input, map[string]any{"id": c.ID, "text": c.Text})
-	}
-	raw, err := json.Marshal(input)
+	raw, err := subtitles.TranslationInput(cues)
 	if err != nil {
 		return nil, err
 	}

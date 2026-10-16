@@ -25,6 +25,7 @@ import (
 )
 
 type RuntimeConfig struct {
+	Translation      TranslationLimits
 	RecognitionModel string
 	Enabled          bool
 	APIKey           string
@@ -527,43 +528,8 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 	if total == 0 {
 		return fmt.Errorf("no speech recognized")
 	}
-	for pi := range cp.Parts {
-		p := &cp.Parts[pi]
-		for start := 0; start < len(p.Cues); start += 30 {
-			end := start + 30
-			if end > len(p.Cues) {
-				end = len(p.Cues)
-			}
-			pending := []Cue{}
-			for _, c := range p.Cues[start:end] {
-				if c.Translation == "" {
-					pending = append(pending, c)
-				}
-			}
-			if len(pending) == 0 {
-				continue
-			}
-			if e = s.update(ctx, r, "translating", completed, total); e != nil {
-				return e
-			}
-			translated, err := s.opt.Translate(ctx, *r, pending)
-			if err != nil {
-				return err
-			}
-			values, err := validateTranslations(pending, translated)
-			if err != nil {
-				return err
-			}
-			for j := start; j < end; j++ {
-				if v, ok := values[p.Cues[j].ID]; ok {
-					p.Cues[j].Translation = v
-					completed++
-				}
-			}
-			if e = writeJSON(s.cpPath(r.Job.ID), cp); e != nil {
-				return e
-			}
-		}
+	if e = s.translatePending(ctx, r, &cp, cfg.Translation, &completed, total); e != nil {
+		return e
 	}
 	if e = s.update(ctx, r, "saving", completed, total); e != nil {
 		return e
@@ -622,6 +588,62 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 	_ = os.RemoveAll(s.dir(r.Job.ID))
 	return nil
 }
+func (s *Service) translatePending(ctx context.Context, r *storage.SubtitleRecord, cp *checkpoint, limits TranslationLimits, completed *int, total int) error {
+	pending := []Cue{}
+	positions := make(map[int]*Cue)
+	for pi := range cp.Parts {
+		for ci := range cp.Parts[pi].Cues {
+			c := &cp.Parts[pi].Cues[ci]
+			if c.Translation == "" {
+				pending = append(pending, *c)
+				positions[c.ID] = c
+			}
+		}
+	}
+	// Recognition chunks are an upload concern; translation sees the complete
+	// remaining dialogue, in playback order, whenever request capacity permits.
+	sort.SliceStable(pending, func(i, j int) bool { return pending[i].Begin < pending[j].Begin })
+	var translate func([]Cue) error
+	translate = func(batch []Cue) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := s.update(ctx, r, "translating", *completed, total); err != nil {
+			return err
+		}
+		// Keep the expected IDs separate from the callback's mutable slice.
+		translated, err := s.opt.Translate(ctx, *r, append([]Cue(nil), batch...))
+		if err != nil {
+			if ctx.Err() == nil && len(batch) > 1 && translationCapacityError(err) {
+				mid := len(batch) / 2
+				if err := translate(batch[:mid]); err != nil {
+					return err
+				}
+				return translate(batch[mid:])
+			}
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		values, err := validateTranslations(batch, translated)
+		if err != nil {
+			return err
+		}
+		for id, value := range values {
+			positions[id].Translation = value
+			(*completed)++
+		}
+		return writeJSON(s.cpPath(r.Job.ID), cp)
+	}
+	for _, batch := range translationBatches(pending, limits) {
+		if err := translate(batch); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func validateTranslations(input, output []Cue) (map[int]string, error) {
 	expected := map[int]bool{}
 	for _, c := range input {

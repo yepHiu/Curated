@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,21 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestCompleteRejectsTruncatedOutputEvenWhenJSONLooksComplete(t *testing.T) {
+	for _, content := range []string{"", `[{"id":1,"translation":"你好"}]`} {
+		t.Run(content, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprintf(w, `{"choices":[{"finish_reason":"length","message":{"content":%q}}]}`, content)
+			}))
+			defer server.Close()
+			client := NewClient(ClientConfig{BaseURL: server.URL, Model: "fixture"}, server.Client())
+			if _, err := client.Complete(context.Background(), nil, 0); !errors.Is(err, ErrOutputTruncated) {
+				t.Fatalf("accepted truncated output: %v", err)
+			}
+		})
+	}
+}
 
 func TestClientConfigValidate(t *testing.T) {
 	t.Parallel()

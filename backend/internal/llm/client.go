@@ -81,6 +81,9 @@ type ClientConfig struct {
 // ErrInvalidConfig is returned when BaseURL or Model is missing or malformed.
 var ErrInvalidConfig = errors.New("llm provider config invalid")
 
+// ErrOutputTruncated means the provider stopped at its output token limit.
+var ErrOutputTruncated = errors.New("provider returned incomplete text (output truncated)")
+
 // Validate reports whether cfg has a usable BaseURL and Model.
 func (c ClientConfig) Validate() error {
 	if strings.TrimSpace(c.Model) == "" {
@@ -302,11 +305,12 @@ func (c *Client) Complete(ctx context.Context, messages []ChatMessage, maxTokens
 		return "", fmt.Errorf("provider returned no choices")
 	}
 	choice := parsed.Choices[0]
+	if strings.EqualFold(choice.FinishReason, "length") {
+		return "", ErrOutputTruncated
+	}
 	text := extractChoiceText(choice.Message.Content, choice.Message.ReasoningContent)
 	if strings.TrimSpace(text) == "" {
 		switch {
-		case strings.EqualFold(choice.FinishReason, "length"):
-			return "", fmt.Errorf("provider returned empty text (output truncated)")
 		case strings.TrimSpace(choice.Message.ReasoningContent) != "":
 			return "", fmt.Errorf("provider returned empty text (reasoning only)")
 		default:
