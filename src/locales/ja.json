@@ -2559,6 +2559,8 @@
     "videoFile": "動画ファイル",
     "waiting": "クラウド処理待ち",
     "historyCount": "{count} 件の履歴",
+    "taskHistory": "字幕タスク",
+    "setupAndHistory": "作成と履歴",
     "movieUnavailable": "この作品は利用できなくなりました。",
     "outputs": "保存済みファイル",
     "missing": "ファイルが不明または変更済み",

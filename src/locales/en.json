@@ -2559,6 +2559,8 @@
     "videoFile": "Video file",
     "waiting": "Waiting for cloud processing",
     "historyCount": "{count} records",
+    "taskHistory": "Subtitle tasks",
+    "setupAndHistory": "Setup & history",
     "movieUnavailable": "This movie is no longer available.",
     "outputs": "Saved outputs",
     "missing": "File missing or changed",

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { RouterLink, useRoute, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { Captions, ChevronRight, RefreshCw, Sparkles } from "lucide-vue-next"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import TaskDetailDialog from "@/components/jav-library/TaskDetailDialog.vue"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -22,7 +22,6 @@ const { t } = useI18n(), route = useRoute(), router = useRouter(), service = use
 const center = useTaskCenter()
 const items = ref<CenterTask[]>([]), cursor = ref("")
 const scrollEl = ref<HTMLElement | null>(null)
-const TaskDetailContent = defineAsyncComponent(() => import("@/components/jav-library/TaskDetailContent.vue"))
 const selectedTaskKey = ref("")
 const detailOpen = ref(false)
 let detailTrigger: HTMLElement | null = null
@@ -99,15 +98,6 @@ onBeforeUnmount(() => generation++)
       </section>
       <Button v-if="cursor && !loading" variant="outline" class="self-center rounded-full" :disabled="moreBusy" @click="load(true)">{{ t(moreBusy ? 'tasks.loading' : 'tasks.loadMore') }}</Button>
     </div>
-    <Dialog v-model:open="detailOpen">
-      <DialogContent class="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl" :aria-describedby="undefined" @close-auto-focus="restoreDetailFocus">
-        <DialogHeader class="shrink-0 border-b border-border px-5 py-4 pr-12 sm:px-6 sm:pr-12">
-          <DialogTitle>{{ t('tasks.detailTitle') }}</DialogTitle>
-        </DialogHeader>
-        <div class="min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6" data-task-detail-scroll>
-          <TaskDetailContent v-if="detailOpen" :key="selectedTaskKey" :task-key="selectedTaskKey" />
-        </div>
-      </DialogContent>
-    </Dialog>
+    <TaskDetailDialog v-model:open="detailOpen" :task-key="selectedTaskKey" @close-auto-focus="restoreDetailFocus" />
   </div>
 </template>

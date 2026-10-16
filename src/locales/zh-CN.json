@@ -2559,6 +2559,8 @@
     "videoFile": "视频文件",
     "waiting": "等待云端处理",
     "historyCount": "{count} 条记录",
+    "taskHistory": "字幕任务",
+    "setupAndHistory": "发起与历史",
     "movieUnavailable": "该影片已不可用。",
     "outputs": "已保存的成品",
     "missing": "文件缺失或已变更",
