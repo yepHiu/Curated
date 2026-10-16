@@ -1782,6 +1782,7 @@
     "comicAutoWatchSyncing": "コミック自動スキャン設定を保存中…",
     "comicLibraryPathRequired": "有効化する前にコミックの保存パスを追加してください。",
     "comicLibraryPathAbsoluteRequired": "D:\\\\Comics や /Users/you/Comics のような絶対パスを入力してください。",
+    "storagePathSettings": "保存先の設定",
     "comicLibraryPathsTitle": "コミック保存パス",
     "comicLibraryPathsDesc": "これらのパス配下の zip/cbz だけをスキャンします。元の圧縮ファイルはライブラリ内へ展開しません。",
     "comicLibraryPathLabel": "コミック保存パス",

@@ -1783,6 +1783,7 @@
     "comicAutoWatchSyncing": "Saving comic auto-scan setting...",
     "comicLibraryPathRequired": "Add a comic storage path before enabling comics.",
     "comicLibraryPathAbsoluteRequired": "Use an absolute comic storage path, such as D:\\\\Comics or /Users/you/Comics.",
+    "storagePathSettings": "Storage path settings",
     "comicLibraryPathsTitle": "Comic storage paths",
     "comicLibraryPathsDesc": "Only zip/cbz archives under these paths are scanned. Source archives are never extracted into the library.",
     "comicLibraryPathLabel": "Comic storage path",

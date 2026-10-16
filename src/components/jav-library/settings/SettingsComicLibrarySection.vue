@@ -4,7 +4,7 @@ import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { BookOpen } from "lucide-vue-next"
+import { BookOpen, FolderOpen } from "lucide-vue-next"
 import { HttpClientError } from "@/api/http-client"
 import type { ComicCacheStatusDTO } from "@/api/types"
 import type {
@@ -302,9 +302,24 @@ async function cleanupCache() {
         </div>
 
         <p v-if="enableError" role="alert" class="text-sm text-destructive">{{ enableError }}</p>
+      </CardContent>
+    </Card>
 
+    <Card v-if="comicLibraryEnabled" data-comic-storage-settings class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+      <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0">
+        <span
+          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+          aria-hidden="true"
+        >
+          <FolderOpen class="size-4" />
+        </span>
+        <CardTitle class="flex min-w-0 flex-wrap items-center gap-2 text-lg tracking-tight">
+          <span>{{ t("settings.storagePathSettings") }}</span>
+          <SettingsScopeBadge scope="server" />
+        </CardTitle>
+      </CardHeader>
+      <CardContent class="flex flex-col gap-3 pt-0">
         <SettingsComicLibraryPathsSection
-          v-if="comicLibraryEnabled"
           :paths="comicLibraryPaths"
           :default-import-library-path-id="defaultComicImportLibraryPathId"
           v-model:add-path-dialog-open="addPathDialogOpen"
@@ -326,7 +341,7 @@ async function cleanupCache() {
           @change-default-import-path="changeDefaultPath"
         />
 
-        <template v-if="comicLibraryEnabled && isServerLocal">
+        <template v-if="isServerLocal">
           <div
             data-comic-auto-watch
             class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
