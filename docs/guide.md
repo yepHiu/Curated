@@ -941,3 +941,5 @@ New releases display `Curated YYYYMMDD` with `-2`, `-3`, etc. for later same-day
 
 
 2026-10-16：字幕弹窗成品复用 AI 整理的可展开历史列表；选择器统一胶囊样式，底部取消关闭按钮，重新生成文案简化。AppShell 观察 GET /api/subtitle-jobs 的持久任务快照；侧栏与播放/AI整理相同区域显示进度，点击按 movieId/fileId 恢复弹窗，关闭弹窗不停止观察。断线保留最后快照；无新增配置或迁移。
+
+AI 用量统计的时间范围支持「今天」及近 7／30／90 天。「今天」按客户端本地当天零点起算；用量汇总、执行记录、审计记录和翻页共用该起点。`GET /api/ai/usage` 与 `GET /api/ai/audit` 可传 RFC3339 `since`，优先于 `days`。
