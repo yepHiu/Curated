@@ -193,7 +193,7 @@ describe("SettingsPhotoLibrarySection", () => {
   it("hides paths and viewer configuration until beta is enabled", () => {
     const wrapper = mount(SettingsPhotoLibrarySection)
 
-    expect(wrapper.text()).toContain("settings.photoLibraryTitle")
+    expect(wrapper.text()).toContain("settings.photoLibraryEnable")
     expect(wrapper.text()).not.toContain("settings.photoLibraryDisabledDesc")
     expect(wrapper.findAllComponents({ name: "SettingsHint" }).some(hint => hint.props("text") === "settings.photoLibraryDisabledDesc")).toBe(true)
     expect(wrapper.text()).not.toContain("settings.photoLibraryPathsEmpty")

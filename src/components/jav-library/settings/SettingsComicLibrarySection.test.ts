@@ -213,7 +213,7 @@ describe("SettingsComicLibrarySection", () => {
   it("renders disabled state with an enable action", () => {
     const wrapper = mount(SettingsComicLibrarySection)
 
-    expect(wrapper.text()).toContain("settings.comicLibraryTitle")
+    expect(wrapper.text()).toContain("settings.comicLibraryEnable")
     expect(wrapper.text()).not.toContain("settings.comicLibraryDisabledDesc")
     expect(wrapper.findAllComponents({ name: "SettingsHint" }).some(hint => hint.props("text") === "settings.comicLibraryDisabledDesc")).toBe(true)
     expect(wrapper.find("[data-comic-beta-switch]").exists()).toBe(true)

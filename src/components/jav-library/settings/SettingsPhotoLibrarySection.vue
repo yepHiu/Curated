@@ -4,7 +4,7 @@ import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { Images, FolderOpen } from "lucide-vue-next"
+import { FolderOpen } from "lucide-vue-next"
 import { HttpClientError } from "@/api/http-client"
 import type { PhotoCacheSettings, PhotoLibrarySetting, PhotoViewerSettings } from "@/domain/photo/types"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import SettingsPhotoCacheSection from "./SettingsPhotoCacheSection.vue"
 import SettingsPhotoLibraryPathsSection from "./SettingsPhotoLibraryPathsSection.vue"
 import SettingsPhotoViewerSection from "./SettingsPhotoViewerSection.vue"
@@ -238,54 +239,38 @@ async function patchCache(maxBytes: number) {
 
 <template>
   <div class="flex flex-col gap-4">
-    <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
-      <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
-        <span
-          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-          aria-hidden="true"
-        >
-          <Images class="size-4" />
-        </span>
-        <SettingsHint :text="t('settings.photoLibraryDesc')">
-          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
-            <span>{{ t("settings.photoLibraryTitle") }}</span>
+    <section
+      class="rounded-xl border border-border bg-card p-6 shadow-sm"
+      data-photo-enable-section
+      :aria-busy="enableBusy"
+    >
+      <FieldGroup>
+        <Field orientation="horizontal" class="items-center justify-between">
+          <div class="flex min-w-0 flex-wrap items-center gap-2">
+            <SettingsHint :text="photoLibraryEnabled ? t('settings.photoLibraryEnabledDesc') : t('settings.photoLibraryDisabledDesc')">
+              <FieldLabel for="photo-library-enabled" class="text-lg font-semibold">
+                {{ t("settings.photoLibraryEnable") }}
+              </FieldLabel>
+            </SettingsHint>
             <SettingsScopeBadge scope="server" />
             <Badge variant="secondary">Beta</Badge>
-          </CardTitle>
-        </SettingsHint>
-      </CardHeader>
-
-      <CardContent class="flex flex-col gap-3 pt-0">
-        <div
-          class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-          :aria-busy="enableBusy"
-        >
-          <div class="flex min-w-0 flex-col gap-1">
-            <SettingsHint :text="photoLibraryEnabled ? t('settings.photoLibraryEnabledDesc') : t('settings.photoLibraryDisabledDesc')">
-              <p class="text-sm font-semibold text-foreground">
-                {{ photoLibraryEnabled ? t("settings.photoLibraryEnabledTitle") : t("settings.photoLibraryDisabledTitle") }}
-              </p>
-            </SettingsHint>
-            <p
-              v-if="enableBusy"
-              class="text-xs text-muted-foreground motion-safe:animate-pulse"
-            >
-              {{ t("settings.photoLibrarySyncing") }}
-            </p>
           </div>
           <Switch
             v-if="isServerLocal"
+            id="photo-library-enabled"
             data-photo-beta-switch
             :model-value="photoLibraryEnabled"
-            :disabled="!isServerLocal || enableBusy"
-            :aria-label="t('settings.photoLibraryTitle') + ' Beta'"
+            :disabled="enableBusy"
+            :aria-label="t('settings.photoLibraryEnable')"
             @update:model-value="setPhotoLibraryEnabled"
           />
-        </div>
-
-        <p v-if="enableError" role="alert" class="text-sm text-destructive">{{ enableError }}</p>
-      </CardContent>
-    </Card>
+        </Field>
+      </FieldGroup>
+      <p v-if="enableBusy" class="mt-3 text-xs text-muted-foreground motion-safe:animate-pulse">
+        {{ t("settings.photoLibrarySyncing") }}
+      </p>
+      <p v-if="enableError" role="alert" class="mt-3 text-sm text-destructive">{{ enableError }}</p>
+    </section>
 
     <Card v-if="photoLibraryEnabled" data-photo-storage-settings class="gap-2 rounded-xl border border-border bg-card shadow-sm">
       <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0">

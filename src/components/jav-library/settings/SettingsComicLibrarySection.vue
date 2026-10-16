@@ -4,7 +4,7 @@ import SettingsHint from "./SettingsHint.vue"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { BookOpen, FolderOpen } from "lucide-vue-next"
+import { FolderOpen } from "lucide-vue-next"
 import { HttpClientError } from "@/api/http-client"
 import type { ComicCacheStatusDTO } from "@/api/types"
 import type {
@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import SettingsComicCacheSection from "./SettingsComicCacheSection.vue"
 import SettingsComicLibraryPathsSection from "./SettingsComicLibraryPathsSection.vue"
 import SettingsComicReaderSection from "./SettingsComicReaderSection.vue"
@@ -256,54 +257,38 @@ async function cleanupCache() {
 
 <template>
   <div class="flex flex-col gap-4">
-    <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
-      <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
-        <span
-          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-          aria-hidden="true"
-        >
-          <BookOpen class="size-4" />
-        </span>
-        <SettingsHint :text="t('settings.comicLibraryDesc')">
-          <CardTitle class="flex flex-wrap items-center gap-2 min-w-0 text-lg tracking-tight">
-            <span>{{ t("settings.comicLibraryTitle") }}</span>
+    <section
+      class="rounded-xl border border-border bg-card p-6 shadow-sm"
+      data-comic-enable-section
+      :aria-busy="enableBusy"
+    >
+      <FieldGroup>
+        <Field orientation="horizontal" class="items-center justify-between">
+          <div class="flex min-w-0 flex-wrap items-center gap-2">
+            <SettingsHint :text="comicLibraryEnabled ? t('settings.comicLibraryEnabledDesc') : t('settings.comicLibraryDisabledDesc')">
+              <FieldLabel for="comic-library-enabled" class="text-lg font-semibold">
+                {{ t("settings.comicLibraryEnable") }}
+              </FieldLabel>
+            </SettingsHint>
             <SettingsScopeBadge scope="server" />
             <Badge variant="secondary">Beta</Badge>
-          </CardTitle>
-        </SettingsHint>
-      </CardHeader>
-
-      <CardContent class="flex flex-col gap-3 pt-0">
-        <div
-          class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-          :aria-busy="enableBusy"
-        >
-          <div class="flex min-w-0 flex-col gap-1">
-            <SettingsHint :text="comicLibraryEnabled ? t('settings.comicLibraryEnabledDesc') : t('settings.comicLibraryDisabledDesc')">
-              <p class="text-sm font-semibold text-foreground">
-                {{ comicLibraryEnabled ? t("settings.comicLibraryEnabledTitle") : t("settings.comicLibraryDisabledTitle") }}
-              </p>
-            </SettingsHint>
-            <p
-              v-if="enableBusy"
-              class="text-xs text-muted-foreground motion-safe:animate-pulse"
-            >
-              {{ t("settings.comicLibrarySyncing") }}
-            </p>
           </div>
           <Switch
             v-if="isServerLocal"
+            id="comic-library-enabled"
             data-comic-beta-switch
             :model-value="comicLibraryEnabled"
-            :disabled="!isServerLocal || enableBusy"
-            :aria-label="t('settings.comicLibraryTitle') + ' Beta'"
+            :disabled="enableBusy"
+            :aria-label="t('settings.comicLibraryEnable')"
             @update:model-value="setComicLibraryEnabled"
           />
-        </div>
-
-        <p v-if="enableError" role="alert" class="text-sm text-destructive">{{ enableError }}</p>
-      </CardContent>
-    </Card>
+        </Field>
+      </FieldGroup>
+      <p v-if="enableBusy" class="mt-3 text-xs text-muted-foreground motion-safe:animate-pulse">
+        {{ t("settings.comicLibrarySyncing") }}
+      </p>
+      <p v-if="enableError" role="alert" class="mt-3 text-sm text-destructive">{{ enableError }}</p>
+    </section>
 
     <Card v-if="comicLibraryEnabled" data-comic-storage-settings class="gap-2 rounded-xl border border-border bg-card shadow-sm">
       <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0">
