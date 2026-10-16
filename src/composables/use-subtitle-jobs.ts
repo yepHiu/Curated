@@ -2,6 +2,8 @@ import { computed, ref } from "vue"
 import { useSubtitleService } from "@/services/subtitle-service"
 import type { SubtitleJob } from "@/services/contracts/subtitle-service"
 import type { Movie } from "@/domain/movie/types"
+import { useNotificationCenter } from "./use-notification-center"
+import { i18n } from "@/i18n"
 
 const jobs = ref<SubtitleJob[]>([])
 const connected = ref(true)
@@ -13,6 +15,7 @@ let timer: ReturnType<typeof setTimeout> | undefined
 let generation = 0
 let opening = 0
 let pending: Promise<void> | undefined
+let initialized = false
 export const isSubtitleActive = (job: SubtitleJob) => ["queued", "running"].includes(job.state)
 export const subtitleProgress = (job: SubtitleJob) => job.total > 0 ? Math.max(0, Math.min(100, job.completed / job.total * 100)) : 0
 
@@ -22,7 +25,16 @@ async function refresh() {
   pending = (async () => {
     try {
       const next = await useSubtitleService().jobs()
-      if (seq === generation) { jobs.value = next; connected.value = true }
+      if (seq === generation) {
+        if (initialized && connected.value) for (const job of next) {
+          const previous = jobs.value.find(item => item.id === job.id)
+          if (previous && isSubtitleActive(previous) && ["completed", "failed", "blocked"].includes(job.state)) {
+            const success = job.state === "completed"
+            useNotificationCenter().addNotification({ messageId: success ? "MSG-0050" : "MSG-0051", type: "system", severity: success ? "success" : "warning", title: i18n.global.t("subtitles.title"), message: `${job.fileName} · ${i18n.global.t(`subtitles.states.${job.state}`)}`, source: { taskId: job.id, movieId: job.movieId, route: `/tasks/${encodeURIComponent(`subtitle:${job.id}`)}` }, group: `subtitle-${job.id}` })
+          }
+        }
+        jobs.value = next; connected.value = true; initialized = true
+      }
     } catch { if (seq === generation) connected.value = false }
     finally { if (seq === generation) pending = undefined }
   })()
@@ -37,7 +49,7 @@ export function startSubtitleTracking() {
   void poll(generation)
 }
 export function stopSubtitleTracking() {
-  generation++; opening++; clearTimeout(timer); pending = undefined
+  generation++; opening++; clearTimeout(timer); pending = undefined; initialized = false; connected.value = true
   jobs.value = []; movie.value = undefined; dialogOpen.value = false; error.value = ""
 }
 async function openJob(job: SubtitleJob) {

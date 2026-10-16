@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
+import { RouterLink } from "vue-router"
 import { ChevronDown, Download, FolderOpen, Loader2 } from "lucide-vue-next"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -35,7 +36,6 @@ const loading = ref(false)
 const error = ref("")
 const requestId = ref(crypto.randomUUID())
 let generation = 0
-let timer: ReturnType<typeof setTimeout> | undefined
 const job = computed(() => jobs.value.find(j => !fileId.value || j.fileId === fileId.value))
 const active = computed(() => job.value && ["queued", "running"].includes(job.value.state))
 watch(job, current => { if (current && ["queued", "running"].includes(current.state)) model.value = current.translationModel })
@@ -43,12 +43,13 @@ const history = computed(() => jobs.value.filter(j => (!fileId.value || j.fileId
 const assets = computed(() => jobs.value.find(j => (!fileId.value || j.fileId === fileId.value) && j.state === "completed")?.assets ?? [])
 const ready = computed(() => cfg.value?.canManage && cfg.value.enabled && cfg.value.apiKeyConfigured && (model.value !== "configured-ai" || cfg.value.configuredModel))
 async function refresh(seq: number) {
-  try { const result = await service.jobs(props.movie.id); if (seq === generation) { jobs.value = result; error.value = "" } }
+  try { await tracking.refresh(); if (seq === generation) { jobs.value = tracking.jobs.value.filter(item => item.movieId === props.movie.id); error.value = "" } }
   catch (e) { if (seq === generation) error.value = e instanceof Error ? e.message : String(e) }
-  finally { if (seq === generation && props.open) { loading.value = false; timer = setTimeout(() => void refresh(seq), 2000) } }
+  finally { if (seq === generation) loading.value = false }
 }
+watch(tracking.jobs, next => { if (props.open) jobs.value = next.filter(item => item.movieId === props.movie.id) })
 watch(() => [props.open, props.movie.id] as const, async ([open]) => {
-  generation++; clearTimeout(timer); jobs.value = []; error.value = ""
+  generation++; jobs.value = []; error.value = ""
   if (!open) return
   const seq = generation; loading.value = true; fileId.value = props.initialFileId ?? props.movie.files?.[0]?.id
   try { const settings = await service.settings(); if (seq !== generation) return; cfg.value = settings; model.value = settings.translationModel }
@@ -62,12 +63,13 @@ watch(fileId, async () => {
   catch (e) { if (seq === trackRevision) tracksError.value = e instanceof Error ? e.message : String(e) }
   finally { if (seq === trackRevision) tracksLoading.value = false }
 }, { immediate: true })
-onBeforeUnmount(() => { generation++; trackRevision++; clearTimeout(timer) })
+onBeforeUnmount(() => { generation++; trackRevision++ })
 async function run(action: "start" | "cancel" | "retry") {
   busy.value = true; error.value = ""; const seq = generation
   try {
     const result = action === "start" ? await service.create(props.movie.id, { requestId: requestId.value, fileId: fileId.value, translationModel: model.value, audioTrack: Number(audioTrack.value) }) : await service.action(job.value!.id, action)
     tracking.remember(result)
+    window.dispatchEvent(new Event("curated:task-center-updated"))
     if (seq === generation) { jobs.value = [result, ...jobs.value.filter(j => j.id !== result.id)]; if (action === "start") requestId.value = crypto.randomUUID() }
   } catch (e) { if (seq === generation) error.value = e instanceof Error ? e.message : String(e) }
   finally { busy.value = false }
@@ -91,6 +93,7 @@ async function fileAction(asset: SubtitleAsset, reveal: boolean) {
         <Field><FieldLabel for="subtitle-job-model">{{ t('subtitles.translationModel') }}</FieldLabel><SubtitleModelSelect pill id="subtitle-job-model" v-model="model" :configured-model="cfg?.configuredModel" :disabled="active || busy" /></Field>
       </FieldGroup>
       <div v-if="job" class="flex min-w-0 flex-col gap-3 rounded-xl border border-border/50 bg-muted/5 p-4" role="status" aria-live="polite">
+        <Button as-child variant="outline" size="sm" class="self-start rounded-full"><RouterLink :to="`/tasks/${encodeURIComponent(`subtitle:${job.id}`)}`" @click="emit('update:open', false)">{{ t('tasks.viewTask') }}</RouterLink></Button>
         <div class="flex items-center justify-between gap-2"><Badge variant="secondary">{{ t(`subtitles.states.${job.state}`) }}</Badge><span class="text-sm text-muted-foreground">{{ t(`subtitles.stages.${job.stage}`) }}</span></div>
         <Progress v-if="active && job.total > 0" :model-value="job.completed / job.total * 100" />
         <p v-if="active" class="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 class="size-4 shrink-0 motion-safe:animate-spin" aria-hidden="true" />{{ job.total ? `${job.completed} / ${job.total}` : t('subtitles.waiting') }} · {{ job.translationModel }}</p>

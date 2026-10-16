@@ -2,13 +2,28 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import type { SubtitleJob } from "@/services/contracts/subtitle-service"
 import { flushPromises } from "@vue/test-utils"
 import { startSubtitleTracking, stopSubtitleTracking, useSubtitleJobs } from "./use-subtitle-jobs"
-const api = vi.hoisted(() => ({ jobs: vi.fn(), loadMovieDetail: vi.fn() }))
+const api = vi.hoisted(() => ({ jobs: vi.fn(), loadMovieDetail: vi.fn(), addNotification: vi.fn() }))
 vi.mock("@/services/subtitle-service", () => ({ useSubtitleService: () => api }))
 vi.mock("@/services/library-service", () => ({ useLibraryService: () => api }))
+vi.mock("./use-notification-center", () => ({ useNotificationCenter: () => api }))
 const job: SubtitleJob = { id: "job", movieId: "movie", fileId: "part", fileName: "movie.mp4", state: "running", stage: "translating", completed: 1, total: 3, assets: [], translationModel: "qwen-plus", createdAt: "", updatedAt: "" }
 
 afterEach(() => { stopSubtitleTracking(); vi.useRealTimers(); vi.clearAllMocks() })
 describe("global subtitle tracking", () => {
+  it("notifies once on a live transition without replaying initial or reconnect results", async () => {
+    const state = useSubtitleJobs()
+    api.jobs.mockResolvedValue([{ ...job, state: "completed" }])
+    await state.refresh()
+    expect(api.addNotification).not.toHaveBeenCalled()
+    api.jobs.mockResolvedValue([job]); await state.refresh()
+    api.jobs.mockResolvedValue([{ ...job, state: "completed" }]); await state.refresh(); await state.refresh()
+    expect(api.addNotification).toHaveBeenCalledTimes(1)
+    expect(api.addNotification).toHaveBeenCalledWith(expect.objectContaining({ messageId: "MSG-0050", source: expect.objectContaining({ route: "/tasks/subtitle%3Ajob" }) }))
+    api.jobs.mockResolvedValue([job]); await state.refresh()
+    api.jobs.mockRejectedValueOnce(new Error("offline")); await state.refresh()
+    api.jobs.mockResolvedValue([{ ...job, state: "failed" }]); await state.refresh()
+    expect(api.addNotification).toHaveBeenCalledTimes(1)
+  })
   it("restores server tasks on startup, keeps polling after close, and reopens the exact file", async () => {
     vi.useFakeTimers()
     api.jobs.mockResolvedValue([job])

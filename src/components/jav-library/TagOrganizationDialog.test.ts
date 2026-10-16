@@ -151,3 +151,5 @@ it.each(["failed", "partial_failed", "blocked", "cancelled", "completed"] as con
  expect(state.remove).toHaveBeenCalledWith("one")
  wrapper.unmount()
 })
+
+vi.mock("vue-router", () => ({ RouterLink: { props: ["to"], template: '<a :href="String(to)"><slot /></a>' } }))

@@ -56,3 +56,7 @@ describe("subtitle dialog owns interaction while Server owns execution", () => {
     expect(wrapper.text()).toContain("subtitles.localOnly"); wrapper.unmount()
   })
 })
+
+vi.mock("vue-router", () => ({ RouterLink: { props: ["to"], template: '<a :href="String(to)"><slot /></a>' } }))
+
+vi.mock("@/i18n", () => ({ i18n: { global: { t: (key: string) => key } } }))

@@ -87,7 +87,7 @@ function notifyResult(job: TagOrganizationJob) {
   notices.add(noticeKey)
   const t = i18n.global.t
   const text = job.status === "completed" ? t("topics.completed", { count: job.succeeded }) : job.status === "partial_failed" ? t("topics.completedWithIssues", { success: job.succeeded, unresolved: job.unresolved, failed: job.failed }) : t("topics.needsAttention")
-  useNotificationCenter().addNotification({ messageId: job.status === "completed" ? "MSG-0048" : "MSG-0049", type: "system", severity: job.status === "completed" ? "success" : "warning", title: t("topics.organize"), message: text, source: { taskId: job.id, route: "/" }, group: `tag-organization-${job.id}` })
+  useNotificationCenter().addNotification({ messageId: job.status === "completed" ? "MSG-0048" : "MSG-0049", type: "system", severity: job.status === "completed" ? "success" : "warning", title: t("topics.organize"), message: text, source: { taskId: job.id, route: `/tasks/${encodeURIComponent(`organize:${job.id}`)}` }, group: `tag-organization-${job.id}` })
   if (!document.fullscreenElement && !quiet.value && !dialogOpen.value) pushAppToast(text, { variant: job.status === "completed" ? "success" : "warning" })
 }
 
@@ -134,7 +134,7 @@ export function stopTagOrganizationTracking() {
 async function operate(action: () => Promise<unknown>) {
   if (busy.value) return
   busy.value = true; error.value = ""
-  try { await action(); if (loading) await loading; await refreshJobs(); revision.value++; if (statsRequest) await statsRequest; await refreshStats(); await useLibraryService().reloadMoviesFromApi() }
+  try { await action(); if (loading) await loading; await refreshJobs(); revision.value++; window.dispatchEvent(new Event("curated:task-center-updated")); if (statsRequest) await statsRequest; await refreshStats(); await useLibraryService().reloadMoviesFromApi() }
   catch (e) {
     const code = e instanceof HttpClientError ? e.apiError?.code : e instanceof Error ? e.message : ""
     error.value = code && i18n.global.te(`topics.errors.${code}`) ? organizationErrorText(code) : e instanceof Error ? e.message : String(e)

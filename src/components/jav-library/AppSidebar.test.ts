@@ -296,3 +296,7 @@ vi.mock("@/composables/use-tag-organization", async () => {
   const { ref } = await import("vue")
   return { useTagOrganization: () => ({ busy: ref(false), active: ref(undefined), jobs: ref([]), connected: ref(true), dialogOpen: ref(false), openSelected: vi.fn() }), organizationProgressText: () => "", organizationProgressValue: () => 0 }
 })
+vi.mock("@/composables/use-task-center", async () => {
+  const { ref } = await import("vue")
+  return { startTaskCenterTracking: vi.fn(), stopTaskCenterTracking: vi.fn(), useTaskCenter: () => ({ summary: ref({ total: 0, running: 0, queued: 0, waiting: 0, attention: 0, history: 0 }), connected: ref(true), loaded: ref(true) }) }
+})

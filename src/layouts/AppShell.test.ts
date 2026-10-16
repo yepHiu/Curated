@@ -379,3 +379,10 @@ describe("AppShell library search route sync", () => {
     })
   })
 })
+
+vi.mock("@/composables/use-task-center", async () => {
+  const { ref } = await import("vue")
+  return { startTaskCenterTracking: vi.fn(), stopTaskCenterTracking: vi.fn(), useTaskCenter: () => ({ summary: ref({ total: 0, running: 0, queued: 0, waiting: 0, attention: 0, history: 0 }), connected: ref(true), loaded: ref(true) }) }
+})
+
+vi.mock("@/i18n", () => ({ i18n: { global: { t: (key: string) => key } } }))

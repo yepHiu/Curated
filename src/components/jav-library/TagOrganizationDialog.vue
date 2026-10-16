@@ -130,6 +130,7 @@ async function showResults(id: string, more = false) {
           <Button variant="ghost" size="sm" class="min-h-11 shrink-0 rounded-full lg:min-h-8" :disabled="state.busy.value" @click="state.cancel(state.active.value.id)">{{ t("topics.cancel") }}</Button>
         </div>
         <Progress :model-value="organizationProgressValue(state.active.value)" class="h-1" :aria-label="organizationProgressText(state.active.value)" />
+        <Button as-child variant="outline" size="sm" class="self-start rounded-full"><RouterLink :to="`/tasks/${encodeURIComponent(`organize:${state.active.value.id}`)}`" @click="state.dialogOpen.value = false">{{ t('tasks.viewTask') }}</RouterLink></Button>
       </div>
       <div v-else class="flex min-w-0 flex-wrap items-center justify-between gap-3" data-organization-scope>
         <p class="w-full min-w-0 truncate text-sm font-medium sm:w-auto sm:flex-1" :title="scopeLabel">{{ scopeLabel }}</p>
@@ -213,6 +214,7 @@ async function showResults(id: string, more = false) {
               </DropdownMenu>
             </div>
             <div v-if="expandedJob === job.id" class="flex flex-col gap-2 px-3 pb-3 text-xs" data-organization-history-detail>
+              <Button as-child variant="outline" size="sm" class="self-start rounded-full"><RouterLink :to="`/tasks/${encodeURIComponent(`organize:${job.id}`)}`" @click="state.dialogOpen.value = false">{{ t('tasks.viewTask') }}</RouterLink></Button>
               <p class="text-muted-foreground">{{ t("topics.result", { success: job.succeeded, unresolved: job.unresolved, failed: job.failed }) }}</p>
               <p v-if="job.status === 'partial_failed'" role="status" class="text-muted-foreground">{{ t("topics.completedWithIssues", { success: job.succeeded, unresolved: job.unresolved, failed: job.failed }) }}</p>
               <Button v-if="job.failed && state.stats.value?.needsAttention" variant="outline" size="sm" class="min-h-11 self-end rounded-full lg:min-h-8" @click="showIssues()">{{ t("topics.viewIssues") }}</Button>

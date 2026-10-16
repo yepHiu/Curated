@@ -77,6 +77,8 @@ const router = createRouter({
       path: "/",
       component: () => import("@/layouts/AppShell.vue"),
       children: [
+        { path: "tasks", name: "tasks", component: () => import("@/views/TaskCenterView.vue") },
+        { path: "tasks/:taskKey", name: "task-detail", component: () => import("@/views/TaskDetailView.vue") },
         {
           path: "",
           name: "home",

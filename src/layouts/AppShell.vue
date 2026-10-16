@@ -10,9 +10,10 @@ import ImportMenu from "@/components/jav-library/ImportMenu.vue"
 import DevEnvironmentBadge from "@/components/dev/DevEnvironmentBadge.vue"
 import DevDebugTools from "@/components/dev/DevDebugTools.vue"
 import SubtitleJobDialog from "@/components/jav-library/SubtitleJobDialog.vue"
-import { useSubtitleJobs, startSubtitleTracking, stopSubtitleTracking } from "@/composables/use-subtitle-jobs"
+import { useSubtitleJobs } from "@/composables/use-subtitle-jobs"
 import TagOrganizationDialog from "@/components/jav-library/TagOrganizationDialog.vue"
-import { useTagOrganization, startTagOrganizationTracking, stopTagOrganizationTracking } from "@/composables/use-tag-organization"
+import { useTagOrganization } from "@/composables/use-tag-organization"
+import { startTaskCenterTracking, stopTaskCenterTracking } from "@/composables/use-task-center"
 import ScanProgressDock from "@/components/jav-library/ScanProgressDock.vue"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -782,13 +783,13 @@ function clearActorsSearch() {
   })
 }
 const subtitleJobs = useSubtitleJobs()
-onMounted(startSubtitleTracking)
-onBeforeUnmount(stopSubtitleTracking)
+onMounted(startTaskCenterTracking)
+onBeforeUnmount(stopTaskCenterTracking)
 const tagOrganization = useTagOrganization()
 const { isFullscreen: topicFullscreen } = useFullscreen()
 watch([() => route.name, topicFullscreen], ([name, fullscreen]) => { /* 播放和全屏只留结果记录。 */ tagOrganization.quiet.value = name === "player" || fullscreen }, { immediate: true })
-onMounted(() => { /* 全局观察任务，不因进入首页触发整理。 */ startTagOrganizationTracking() })
-onBeforeUnmount(() => { /* 离开壳层停止观察，服务端任务继续。 */ stopTagOrganizationTracking() })
+
+
 </script>
 
 <template>

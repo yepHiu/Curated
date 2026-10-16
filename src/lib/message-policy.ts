@@ -68,6 +68,8 @@ export const MESSAGE_POLICIES = {
   "MSG-0047": { id: "MSG-0047", level: "now", toast: false, center: "now", badge: "none" },
   "MSG-0048": { id: "MSG-0048", level: "notify", toast: true, center: "recent", badge: "none" },
   "MSG-0049": { id: "MSG-0049", level: "needs-you", toast: true, center: "needs-you", badge: "needs-you" },
+  "MSG-0050": { id: "MSG-0050", level: "notify", toast: false, center: "recent", badge: "none" },
+  "MSG-0051": { id: "MSG-0051", level: "needs-you", toast: false, center: "needs-you", badge: "needs-you" },
 } as const satisfies Record<string, MessagePolicy>
 
 export type MessagePolicyId = keyof typeof MESSAGE_POLICIES
