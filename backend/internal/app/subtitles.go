@@ -117,7 +117,8 @@ func (a *App) translateSubtitleCues(ctx context.Context, r storage.SubtitleRecor
 	if err != nil {
 		return nil, err
 	}
-	text, err := completer.Complete(ctx, []llm.ChatMessage{{Role: "system", Content: prompts.SubtitleTranslationPrompt().Text}, {Role: "user", Content: string(raw)}}, 8192)
+	// Omit max_tokens so the provider applies its default output budget.
+	text, err := completer.Complete(ctx, []llm.ChatMessage{{Role: "system", Content: prompts.SubtitleTranslationPrompt().Text}, {Role: "user", Content: string(raw)}}, 0)
 	if err != nil {
 		return nil, &subtitles.TranslationError{Category: llm.ErrorCategory(err), Cause: err}
 	}
