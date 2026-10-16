@@ -25,6 +25,22 @@ async function setup() {
 }
 beforeEach(() => { vi.clearAllMocks(); i18n.global.locale.value = "zh-CN"; api.get.mockResolvedValue(structuredClone(job)) })
 describe("task detail behavior", () => {
+  it("moves the active stage from loading to success or error and stops on disconnect", async () => {
+    const { wrapper } = await setup()
+    const states = () => wrapper.findAll('[data-node-state]').map(n => n.attributes('data-node-state'))
+    expect(states()).toEqual(["success", "success", "running", "pending"])
+    api.get.mockResolvedValue({ ...job, state: "failed" }); revision.value++; await flushPromises()
+    expect(states()).toEqual(["success", "success", "error", "pending"])
+    api.get.mockResolvedValue({ ...job, stage: "uploading" }); revision.value++; await flushPromises()
+    expect(states()).toEqual(["success", "running", "pending", "pending"])
+    api.get.mockRejectedValueOnce(new Error("offline")); revision.value++; await flushPromises()
+    expect(states()).toEqual(["success", "paused", "pending", "pending"])
+    api.get.mockResolvedValue({ ...job, state: "cancelled" }); revision.value++; await flushPromises()
+    expect(states()).toEqual(["success", "success", "paused", "pending"])
+    api.get.mockResolvedValue({ ...job, state: "succeeded", stage: "done" }); revision.value++; await flushPromises()
+    expect(states()).toEqual(["success", "success", "success", "success"])
+    wrapper.unmount()
+  })
   it("requires confirmation before cancellation and respects a read-only connection", async () => {
     const { wrapper } = await setup()
     const cancel = wrapper.findAll("button").find(b => b.text() === "取消任务")!

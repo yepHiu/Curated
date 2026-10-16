@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { RouterLink, useRoute } from "vue-router"
 import { useI18n } from "vue-i18n"
-import { ArrowLeft, Captions, Check, Download, FileText, FolderOpen, Sparkles } from "lucide-vue-next"
+import { ArrowLeft, Captions, Download, FileText, FolderOpen, Sparkles } from "lucide-vue-next"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import TaskStageNode, { type TaskStageNodeState } from "@/components/jav-library/TaskStageNode.vue"
 import TaskStatusBadge from "@/components/jav-library/TaskStatusBadge.vue"
 import MediaEmptyState from "@/components/jav-library/MediaEmptyState.vue"
 import { HttpClientError } from "@/api/http-client"
@@ -50,9 +51,19 @@ const steps = computed(() => {
   if (!current) return []
   // Extraction/recognition are interleaved per segment: never claim all extraction finished.
   const labels = current.kind === "subtitle" ? ["preparing", "recognizing", "translating", "saving"] : ["queued", "vocabulary", "classifying", "done"]
-  const stage = current.kind === "subtitle" && current.stage === "extracting" ? "recognizing" : current.stage === "waiting_quota" ? "classifying" : current.stage
+  const stage = current.kind === "subtitle" && ["extracting", "uploading"].includes(current.stage) ? "recognizing" : current.stage === "waiting_quota" || current.stage === "classify" ? "classifying" : current.stage === "finished" || current.stage === "done" ? labels.at(-1)! : current.stage
   const index = labels.indexOf(stage)
-  return labels.map((name, i) => ({ name, done: current.state === "succeeded" || current.state === "partial" || index >= 0 && i < index, current: name === stage && !["succeeded", "partial", "queued"].includes(current.state) }))
+  return labels.map((name, i) => {
+    let state: TaskStageNodeState = "pending"
+    let text = "tasks.stepPending"
+    if (current.state === "succeeded" || index >= 0 && i < index) { state = "success"; text = "tasks.stepDone" }
+    else if (i === index) {
+      if (["failed", "blocked", "partial"].includes(current.state)) { state = "error"; text = `tasks.states.${current.state}` }
+      else if (["waiting", "cancelled"].includes(current.state)) { state = "paused"; text = `tasks.states.${current.state}` }
+      else if (current.state === "running") { state = disconnected.value ? "paused" : "running"; text = disconnected.value ? "tasks.disconnected" : "tasks.stepCurrent" }
+    }
+    return { name, state, text }
+  })
 })
 let generation = 0, itemGeneration = 0, request = 0, alive = true
 async function load(quiet = false) {
@@ -145,7 +156,7 @@ async function assetAction(asset: SubtitleAsset, action: "preview" | "download" 
             <Card><CardHeader><div class="flex flex-wrap items-start justify-between gap-3"><div class="flex flex-col gap-2"><span class="text-xs text-muted-foreground">{{ t('tasks.currentStage') }}</span><CardTitle>{{ taskStage(task) }}</CardTitle><TaskStatusBadge :state="task.state" /></div><div v-if="taskActive(task) && task.total > 0" class="text-2xl tabular-nums">{{ task.completed }} <span class="text-sm text-muted-foreground">/ {{ task.total }} {{ t(`tasks.units.${task.unit}`) }}</span></div></div></CardHeader><CardContent class="flex flex-col gap-5">
               <div v-if="taskActive(task) && task.total > 0"><Progress :model-value="taskPercent(task)" class="h-1.5" :aria-label="taskStage(task)" /><p class="mt-2 text-xs text-muted-foreground">{{ t('tasks.phaseProgress', { percent: Math.round(taskPercent(task) ?? 0) }) }}</p></div>
               <p v-else-if="taskActive(task)" class="text-sm text-muted-foreground">{{ t(task.state === 'queued' ? 'tasks.queuedDescription' : task.state === 'waiting' ? 'tasks.waitingDescription' : 'tasks.unknownProgress') }}</p>
-              <ol class="flex flex-col gap-5"><li v-for="step in steps" :key="step.name" class="flex items-start gap-3"><span class="flex size-7 shrink-0 items-center justify-center rounded-full border" :class="step.done ? 'border-success/40 text-success' : step.current ? 'border-primary text-primary' : 'border-border text-muted-foreground'"><Check v-if="step.done" class="size-4" /><span v-else class="size-1.5 rounded-full bg-current" /></span><div><p class="text-sm font-medium">{{ t(`tasks.stages.${step.name}`) }}</p><p class="mt-1 text-xs text-muted-foreground">{{ t(step.done ? 'tasks.stepDone' : step.current ? 'tasks.stepCurrent' : 'tasks.stepPending') }}</p></div></li></ol>
+              <ol class="flex flex-col gap-5"><li v-for="step in steps" :key="`${task.key}:${step.name}`" class="flex items-start gap-3"><TaskStageNode :state="step.state" /><div><p class="text-sm font-medium">{{ t(`tasks.stages.${step.name}`) }}</p><p class="mt-1 text-xs text-muted-foreground">{{ t(step.text) }}</p></div></li></ol>
             </CardContent></Card>
             <Card v-if="task.subtitle"><CardHeader><CardTitle>{{ t('tasks.results') }}</CardTitle></CardHeader><CardContent><p v-if="!task.subtitle.assets.length" class="text-sm text-muted-foreground">{{ t('tasks.noAssets') }}</p><ul v-else class="divide-y divide-border"><li v-for="asset in task.subtitle.assets" :key="asset.id" class="flex flex-wrap items-center gap-3 py-3"><FileText class="size-5 shrink-0 text-muted-foreground" /><div class="min-w-0 flex-1"><p class="break-all text-sm">{{ asset.name }}</p><p class="text-xs text-muted-foreground">{{ asset.language }} · {{ asset.format }}<span v-if="asset.missing"> · {{ t('subtitles.missing') }}</span></p></div><div class="flex flex-wrap gap-1"><Button variant="ghost" size="sm" :disabled="asset.missing || busy || disconnected" @click="assetAction(asset, 'preview')">{{ t('tasks.preview') }}</Button><Button variant="ghost" size="icon" :aria-label="t('subtitles.download')" :disabled="asset.missing || busy || disconnected" @click="assetAction(asset, 'download')"><Download /></Button><Button v-if="task.canManage" variant="ghost" size="icon" :aria-label="t('subtitles.reveal')" :disabled="asset.missing || busy || disconnected" @click="assetAction(asset, 'reveal')"><FolderOpen /></Button></div></li></ul></CardContent></Card>
             <Card v-if="task.organization"><CardHeader><CardTitle>{{ t('tasks.items') }}</CardTitle></CardHeader><CardContent class="flex flex-col gap-4">
