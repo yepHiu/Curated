@@ -513,7 +513,7 @@ function auditLine(entry: AIAuditEntry) {
                 {{ report.total ? offset + 1 : 0 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}
               </span>
               <div class="flex flex-wrap items-center justify-end gap-2">
-                <FieldGroup class="w-44 shrink-0">
+                <FieldGroup class="w-auto shrink-0 [container-type:normal]">
                   <Field orientation="horizontal" class="items-center gap-2">
                     <FieldLabel for="ai-runs-page-size" class="whitespace-nowrap text-xs text-muted-foreground">{{ t('aiSettings.rowsPerPage') }}</FieldLabel>
                     <Select v-model="runsPageSize" :disabled="loading">
