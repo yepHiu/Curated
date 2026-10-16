@@ -508,16 +508,24 @@ function auditLine(entry: AIAuditEntry) {
                 </Collapsible>
               </li>
             </ul>
-            <FieldGroup class="w-fit self-end">
-              <Field orientation="horizontal" class="items-center gap-2">
-                <FieldLabel for="ai-runs-page-size" class="shrink-0 text-xs text-muted-foreground">{{ t('aiSettings.rowsPerPage') }}</FieldLabel>
-                <Select v-model="runsPageSize" :disabled="loading">
-                  <SelectTrigger id="ai-runs-page-size" class="w-20"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectGroup><SelectItem v-for="size in ['20','50','100']" :key="size" :value="size">{{ size }}</SelectItem></SelectGroup></SelectContent>
-                </Select>
-              </Field>
-            </FieldGroup>
-            <div v-if="report && report.total > report.limit" class="flex flex-wrap items-center justify-end gap-2"><span class="mr-auto text-xs text-muted-foreground">{{ offset + 1 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}</span><Button variant="outline" size="sm" :disabled="loading || offset === 0" @click="page('runs', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || offset + Number(runsPageSize) >= report.total" @click="page('runs', 1)">{{ t('aiSettings.next') }}</Button></div>
+            <div class="flex flex-wrap items-center justify-end gap-x-4 gap-y-2" data-ai-runs-pagination>
+              <span v-if="report" class="mr-auto text-xs text-muted-foreground">
+                {{ report.total ? offset + 1 : 0 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}
+              </span>
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <FieldGroup class="w-auto">
+                  <Field orientation="horizontal" class="items-center gap-2">
+                    <FieldLabel for="ai-runs-page-size" class="shrink-0 text-xs text-muted-foreground">{{ t('aiSettings.rowsPerPage') }}</FieldLabel>
+                    <Select v-model="runsPageSize" :disabled="loading">
+                      <SelectTrigger id="ai-runs-page-size" class="w-20"><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectGroup><SelectItem v-for="size in ['20','50','100']" :key="size" :value="size">{{ size }}</SelectItem></SelectGroup></SelectContent>
+                    </Select>
+                  </Field>
+                </FieldGroup>
+                <Button variant="outline" size="sm" :disabled="loading || !report || offset === 0" @click="page('runs', -1)">{{ t('aiSettings.previous') }}</Button>
+                <Button variant="outline" size="sm" :disabled="loading || !report || offset + Number(runsPageSize) >= report.total" @click="page('runs', 1)">{{ t('aiSettings.next') }}</Button>
+              </div>
+            </div>
           </section>
           <details class="mt-2" data-ai-more-statistics><summary class="min-h-11 cursor-pointer py-3 text-sm text-muted-foreground">{{ t('aiSettings.moreStatistics') }}</summary>
           <dl v-if="summary" class="my-4 flex flex-wrap gap-6 text-sm">
