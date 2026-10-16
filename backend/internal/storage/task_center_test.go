@@ -8,6 +8,23 @@ import (
 	"curated-backend/internal/contracts"
 )
 
+func TestTaskCenterPreservesPublicSubtitleProviderError(t *testing.T) {
+	s := newTopicTestStore(t)
+	ctx := context.Background()
+	detail := "HTTP 400: DataInspectionFailed (request_id: req-123)"
+	r := SubtitleRecord{RequestID: "diagnostic", Job: contracts.SubtitleJob{ID: "diagnostic", MovieID: "a", FileID: "a:primary", State: "failed", Stage: "translating", Error: "private/path", ProviderError: detail}}
+	if err := s.SaveSubtitleRecord(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	v, err := s.TaskCenterTask(ctx, "subtitle:diagnostic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Subtitle.ProviderError != detail || v.Subtitle.Error != "SUBTITLE_TASK_FAILED" {
+		t.Fatalf("unexpected diagnostic projection: %+v", v.Subtitle)
+	}
+}
+
 func TestTaskCenterPersistentPaginationAndSummary(t *testing.T) {
 	s := newTopicTestStore(t)
 	ctx := context.Background()

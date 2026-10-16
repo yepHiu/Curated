@@ -253,7 +253,8 @@ func (c *Client) do(ctx context.Context, body chatCompletionRequest) (*http.Resp
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer resp.Body.Close()
-		return nil, &HTTPError{Status: resp.StatusCode, Detail: fmt.Sprintf("provider returned HTTP %d: %s", resp.StatusCode, errorSnippet(resp.Body))}
+		detail := errorSnippet(resp.Body)
+		return nil, &HTTPError{Status: resp.StatusCode, Detail: fmt.Sprintf("provider returned HTTP %d: %s", resp.StatusCode, detail), PublicDetail: fmt.Sprintf("HTTP %d: %s", resp.StatusCode, publicProviderDetail(detail, c.cfg.APIKey))}
 	}
 	return resp, nil
 }

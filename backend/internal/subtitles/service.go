@@ -204,6 +204,7 @@ func (s *Service) Action(ctx context.Context, id, action string) (contracts.Subt
 		}
 		r.Job.State = "queued"
 		r.Job.Error = ""
+		r.Job.ProviderError = ""
 		r.Job.ExpiresAt = ""
 	default:
 		return r.Job, fmt.Errorf("invalid subtitle action")
@@ -346,6 +347,7 @@ func (s *Service) run(parent context.Context, r storage.SubtitleRecord) {
 			r.Job.State = "blocked"
 		}
 		r.Job.Error = e.Error()
+		r.Job.ProviderError = translationProviderDetail(e)
 		r.Job.ExpiresAt = time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339Nano)
 		r.Job.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
 		_ = s.opt.Store.SaveSubtitleRecord(parent, r)

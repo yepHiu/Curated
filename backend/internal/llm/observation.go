@@ -30,6 +30,8 @@ type Observation struct {
 type HTTPError struct {
 	Status int
 	Detail string
+	// PublicDetail is bounded and credential-redacted before leaving the client.
+	PublicDetail string
 }
 
 func (e *HTTPError) Error() string { return e.Detail }

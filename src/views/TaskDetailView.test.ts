@@ -25,6 +25,14 @@ async function setup() {
 }
 beforeEach(() => { vi.clearAllMocks(); i18n.global.locale.value = "zh-CN"; api.get.mockResolvedValue(structuredClone(job)) })
 describe("task detail behavior", () => {
+  it("shows persisted provider diagnostics as text on failed subtitle tasks", async () => {
+    const providerError = 'HTTP 400: {"code":"DataInspectionFailed","message":"<script>alert(1)</script>","request_id":"req-123"}'
+    api.get.mockResolvedValue({ ...job, state: "failed", subtitle: { ...job.subtitle!, providerError } })
+    const { wrapper } = await setup()
+    expect(wrapper.find("pre").text()).toBe(providerError)
+    expect(wrapper.find("script").exists()).toBe(false)
+    wrapper.unmount()
+  })
   it("moves the active stage from loading to success or error and stops on disconnect", async () => {
     const { wrapper } = await setup()
     const states = () => wrapper.findAll('[data-node-state]').map(n => n.attributes('data-node-state'))

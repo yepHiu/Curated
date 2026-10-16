@@ -119,7 +119,7 @@ func (a *App) translateSubtitleCues(ctx context.Context, r storage.SubtitleRecor
 	}
 	text, err := completer.Complete(ctx, []llm.ChatMessage{{Role: "system", Content: prompts.SubtitleTranslationPrompt().Text}, {Role: "user", Content: string(raw)}}, 8192)
 	if err != nil {
-		return nil, fmt.Errorf("subtitle translation failed (%s)", llm.ErrorCategory(err))
+		return nil, &subtitles.TranslationError{Category: llm.ErrorCategory(err), Cause: err}
 	}
 	if err = json.Unmarshal([]byte(text), &result); err != nil {
 		return nil, fmt.Errorf("translation response is not a JSON cue array")

@@ -51,6 +51,7 @@ type SubtitleJob struct {
 	Completed        int             `json:"completed"`
 	Total            int             `json:"total"`
 	Error            string          `json:"error,omitempty"`
+	ProviderError    string          `json:"providerError,omitempty"`
 	CreatedAt        string          `json:"createdAt"`
 	UpdatedAt        string          `json:"updatedAt"`
 	ExpiresAt        string          `json:"expiresAt,omitempty"`

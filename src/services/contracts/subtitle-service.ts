@@ -14,7 +14,7 @@ export interface SubtitleJob {
   recognitionModel?: RecognitionModel
   id: string; movieId: string; fileId: string; fileName: string
   state: string; stage: string; translationModel: SubtitleModel
-  completed: number; total: number; error?: string; expiresAt?: string
+  completed: number; total: number; error?: string; providerError?: string; expiresAt?: string
   createdAt: string; updatedAt: string; assets: SubtitleAsset[]
 }
 export interface SubtitlePreferences { mode: SubtitleMode; size: number; background: boolean; position: number; offset: number }
