@@ -2,7 +2,7 @@
 import { ref } from "vue"
 import { TooltipContent, TooltipPortal, TooltipProvider, TooltipRoot, TooltipTrigger } from "reka-ui"
 
-defineProps<{ text: string }>()
+defineProps<{ text: string; portalTo?: HTMLElement }>()
 const open = ref(false)
 
 function showFromKeyboard(event: KeyboardEvent) {
@@ -26,7 +26,7 @@ function showFromKeyboard(event: KeyboardEvent) {
       >
         <slot />
       </TooltipTrigger>
-      <TooltipPortal>
+      <TooltipPortal :to="portalTo">
         <TooltipContent
           side="bottom"
           align="start"

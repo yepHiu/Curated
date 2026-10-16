@@ -22,7 +22,7 @@ macOS 原生播放沿用同一 HUD，在窗口模式顶部保留红黄绿和 36p
 
 Desktop 连接页 Debug 复用右下角入口与 Dialog/Tabs，限高内部滚动、关闭恢复焦点；仅提供本地诊断与无会话服务器探测，不依赖业务服务。发布版隐藏入口，主进程按真实开发状态限制 IPC。
 
-萃取帧反馈采用局部 `CaptureReceipt`，成功后显示准确媒体时间与缩略图，失败提供受限重试，不连续堆 Toast；`FrameImageViewer` 自适应展示当前图片，保留加载/重试提示，加载完成后不显示分辨率和 100% 切换浮层。播放器中的 Dialog / DropdownMenu 通过 `portalTo` 放入全屏 surface，避免全屏时被遮挡；不改变其它页面默认 portal。
+萃取帧反馈采用局部 `CaptureReceipt`，成功后显示准确媒体时间与缩略图，失败提供受限重试，不连续堆 Toast；`FrameImageViewer` 自适应展示当前图片，保留加载/重试提示，加载完成后不显示分辨率和 100% 切换浮层。播放器中的 Dialog / DropdownMenu 通过 `portalTo` 放入全屏 surface，避免全屏时被遮挡；不改变其它页面默认 portal。 字幕设置沿用紧凑 Field 表单：语言选择在上，其余标签/控件左右对齐，数字输入窄宽；偏移说明收进 SettingsHint。字幕 Popover、Select 与提示显式传入播放器 portalTo，保持全屏可见；错误和无字幕状态就地显示。
 
 人读详解与维护约定：**[`docs/reference/2026-03-24-frontend-ui-spec.md`](docs/reference/2026-03-24-frontend-ui-spec.md)**（仓库根相对路径）。表单控件细节：**[`vue-frontend-standards.mdc`](vue-frontend-standards.mdc)**。业务页面体验：**[`jav-library-frontend-patterns.mdc`](jav-library-frontend-patterns.mdc)**。
 
