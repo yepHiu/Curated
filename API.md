@@ -3713,3 +3713,5 @@ All three require existing API authentication and return no-store. Cursor order 
 2026-10-17: SubtitleJob optionally exposes `supersededBy` for failures replaced by the initial restart implementation. Such records retain their original failure details in history, with a replacement link, but are excluded from task-center attention counts/lists. Startup reconciliation only links a single matching prior failure with a `restart-` generation (same movie/file/audio/source revision); ambiguous matches stay untouched. New full restarts keep the task ID; internal attemptId isolates cache only, without a schema/config migration.
 
 Full-restart output asset IDs also distinguish the execution attempt (opaque IDs; clients must not parse them), while legacy asset IDs continue to resolve. This prevents saved per-version subtitle timing preferences from leaking across attempts with the same task ID.
+
+On Server startup, interrupted running subtitle records are requeued before the worker starts. Task IDs, attempts, stages/counts, timestamps and checkpoints are retained; a task becomes running only when the worker actually resumes it.

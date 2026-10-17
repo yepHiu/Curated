@@ -412,4 +412,8 @@ backend/ 目录：
 
 验证：前端3文件18项测试、typecheck及定向ESLint通过；pnpm build通过，体积监管0项提醒/超限；Go字幕、storage、Server整包测试和vet通过，开发二进制已构建。覆盖同ID重排队/需处理汇总与筛选、配置/检查点过期、重复点击、同文件冲突、取消/恢复、新attempt检查点及成品读取、旧接替关系的幂等修复和歧义保护。仅本地合成音频与provider fixture，不额外发起付费任务。
 
-实现提交25fe6f01。当前JUR-067翻译请求仍在执行，先保留现有后端，等待当前调用结束再切换，以避免重复消耗。切换前已将开发SQLite在线快照保存到忽略目录.workspace/subtitle-restart-backend/pre-reconcile.db。
+实现提交25fe6f01。切换前JUR-067翻译请求仍在执行，先保留原后端等待；随后用户明确选择立即重启并接受当前请求可能重复计费。切换前已将开发SQLite在线快照保存到忽略目录.workspace/subtitle-restart-backend/pre-reconcile.db。
+
+启动核对进一步修正：启动worker前将持久running记录恢复为queued，保留ID、attemptId、阶段/计数、时间和检查点，worker真正领取后才标记running，避免重启后显示多个实际未执行的running任务。新增幂等恢复与进度保留测试；字幕整包测试、go vet及开发构建通过。实现提交f61f396d。
+
+开发后端最终运行标准backend/runtime/curated-dev.exe，PID31908，8080健康检查通过。实际任务中心total=11/running=1/queued=1/attention=0/history=9，attention筛选为空；旧JUR-067与STAR-684失败记录分别关联81eb047719854a118fdd0eb2b1ca529d、7d4aacf47305fe88509782d0ded3f50c。JUR-067从739/1165条译文继续翻译，STAR-684排队并保留4/14段识别检查点；没有声称整片已完成。
