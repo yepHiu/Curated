@@ -160,16 +160,21 @@ func TestRetryTranslationReusesRecognition(t *testing.T) {
 func TestPublishPreservesExistingFilesAndValidatesTranslationIDs(t *testing.T) {
 	source := filepath.Join(t.TempDir(), "test.mp4")
 	cues := []Cue{{ID: 1, Begin: 0, End: 1200, Text: "原文", Translation: "译文"}}
-	first, e := publish(source, "file", newID(), cues)
+	id := newID()
+	first, e := publish(source, "file", id, cues)
 	if e != nil {
 		t.Fatal(e)
 	}
-	second, e := publish(source, "file", newID(), cues)
+	second, e := publish(source, "file", id, cues)
 	if e != nil {
 		t.Fatal(e)
 	}
 	if first[0].Name == second[0].Name {
 		t.Fatal("overwrote prior generation")
+	}
+	third, e := publish(source, "file", id, cues)
+	if e != nil || third[0].Name == second[0].Name {
+		t.Fatalf("cannot publish repeated attempts of the same task: %+v %v", third, e)
 	}
 	if _, e = ValidateTranslations(cues, []Cue{{ID: 2, Translation: "wrong"}}); e == nil {
 		t.Fatal("accepted unknown cue ID")

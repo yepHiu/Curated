@@ -9,6 +9,7 @@ import (
 // SubtitleRecord persists metadata only. Body checkpoints are separate files.
 type SubtitleRecord struct {
 	Job           contracts.SubtitleJob `json:"job"`
+	AttemptID     string                `json:"attemptId,omitempty"`
 	RequestID     string                `json:"requestId"`
 	SourcePath    string                `json:"sourcePath"`
 	Revision      string                `json:"revision"`

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -81,6 +82,9 @@ func newID() string {
 func New(ctx context.Context, opt Options) *Service {
 	ctx, cancel := context.WithCancel(ctx)
 	s := &Service{opt: opt, cancel: cancel, done: make(chan struct{}), wake: make(chan struct{}, 1), active: map[string]context.CancelFunc{}}
+	if err := s.reconcileLegacyRestarts(ctx); err != nil {
+		slog.Warn("could not reconcile legacy subtitle restarts", "error", err)
+	}
 	go s.loop(ctx)
 	return s
 }
@@ -105,10 +109,6 @@ func active(state string) bool { return state == "queued" || state == "running" 
 func (s *Service) Create(ctx context.Context, movieID string, req contracts.SubtitleRequest) (contracts.SubtitleJob, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.createLocked(ctx, movieID, req)
-}
-
-func (s *Service) createLocked(ctx context.Context, movieID string, req contracts.SubtitleRequest) (contracts.SubtitleJob, error) {
 	if len(req.RequestID) < 8 || len(req.RequestID) > 128 || req.AudioTrack < 0 || req.AudioTrack > 31 {
 		return contracts.SubtitleJob{}, fmt.Errorf("invalid subtitle request")
 	}
@@ -192,17 +192,63 @@ func (s *Service) Action(ctx context.Context, id, action string) (contracts.Subt
 	}
 	switch action {
 	case "restart":
+		if r.Job.SupersededBy != "" {
+			return r.Job, fmt.Errorf("task was superseded; open its replacement task")
+		}
+		if active(r.Job.State) {
+			return r.Job, nil
+		}
 		if r.Job.State != "failed" && r.Job.State != "blocked" && r.Job.State != "cancelled" {
 			return r.Job, fmt.Errorf("only failed, blocked or cancelled subtitle tasks can restart")
 		}
 		if _, ok := s.active[id]; ok {
 			return r.Job, fmt.Errorf("task is still stopping; retry shortly")
 		}
-		// A new job gets current provider/model/prompt configuration and no old
-		// checkpoint. Keep the original job, partial results and assets intact.
-		return s.createLocked(ctx, r.Job.MovieID, contracts.SubtitleRequest{
-			RequestID: "restart-" + newID(), FileID: r.Job.FileID, AudioTrack: r.AudioTrack,
-		})
+		records, err := s.opt.Store.ListSubtitleRecords(ctx, "")
+		if err != nil {
+			return r.Job, err
+		}
+		queued := 0
+		for _, other := range records {
+			if active(other.Job.State) {
+				if other.Job.FileID == r.Job.FileID {
+					return r.Job, fmt.Errorf("another subtitle task is already active for this file")
+				}
+				queued++
+			}
+		}
+		if queued >= 8 {
+			return r.Job, fmt.Errorf("subtitle queue is full (maximum 8 files)")
+		}
+		cfg, err := s.opt.Config("")
+		if err != nil {
+			return r.Job, err
+		}
+		if !cfg.Enabled || cfg.APIKey == "" {
+			return r.Job, fmt.Errorf("subtitle provider is not enabled or configured")
+		}
+		detail, err := s.opt.Store.GetMoviePlaybackDetail(contracts.WithMovieFileSelection(ctx, r.Job.FileID), r.Job.MovieID)
+		if err != nil {
+			return r.Job, err
+		}
+		rev, err := revision(detail.Location)
+		if err != nil {
+			return r.Job, err
+		}
+		// Rotate the checkpoint namespace atomically with the state. The task ID
+		// stays stable, and a failed metadata write cannot discard prior progress.
+		r.AttemptID = newID()
+		if rev != r.Revision || filepath.Clean(detail.Location) != filepath.Clean(r.SourcePath) {
+			r.Job.Assets = []contracts.SubtitleAsset{}
+		}
+		r.SourcePath, r.Revision = detail.Location, rev
+		r.TextBaseURL, r.TextModel = cfg.Text.BaseURL, cfg.Text.Model
+		r.PromptVersion = prompts.SubtitleTranslationPrompt().Version
+		r.Job.FileName = filepath.Base(detail.Location)
+		r.Job.RecognitionModel, r.Job.TranslationModel = cfg.RecognitionModel, cfg.DefaultModel
+		r.Job.State, r.Job.Stage = "queued", "preparing"
+		r.Job.Completed, r.Job.Total = 0, 0
+		r.Job.Error, r.Job.ProviderError, r.Job.ExpiresAt = "", "", ""
 	case "cancel":
 		if !active(r.Job.State) {
 			return r.Job, nil
@@ -210,13 +256,16 @@ func (s *Service) Action(ctx context.Context, id, action string) (contracts.Subt
 		r.Job.State = "cancelled"
 		r.Job.ExpiresAt = time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339Nano)
 	case "retry":
+		if r.Job.SupersededBy != "" {
+			return r.Job, fmt.Errorf("task was superseded; open its replacement task")
+		}
 		if active(r.Job.State) || r.Job.State == "completed" {
 			return r.Job, nil
 		}
 		if _, ok := s.active[id]; ok {
 			return r.Job, fmt.Errorf("task is still stopping; retry shortly")
 		}
-		if _, e := os.Stat(s.cpPath(id)); e != nil {
+		if _, e := os.Stat(s.cpPath(checkpointID(r))); e != nil {
 			return r.Job, fmt.Errorf("checkpoint expired; start a new generation")
 		}
 		r.Job.State = "queued"
@@ -238,6 +287,12 @@ func (s *Service) Action(ctx context.Context, id, action string) (contracts.Subt
 }
 func (s *Service) dir(id string) string    { return filepath.Join(s.opt.Root, id) }
 func (s *Service) cpPath(id string) string { return filepath.Join(s.dir(id), "checkpoint.json") }
+func checkpointID(r storage.SubtitleRecord) string {
+	if r.AttemptID != "" {
+		return r.AttemptID
+	}
+	return r.Job.ID
+}
 func writeJSON(path string, v any) error {
 	b, e := json.Marshal(v)
 	if e != nil {
@@ -301,10 +356,10 @@ func (s *Service) loop(ctx context.Context) {
 				if active(r.Job.State) {
 					s.run(ctx, r)
 				} else if r.Job.State == "completed" {
-					_ = os.RemoveAll(s.dir(r.Job.ID))
+					_ = os.RemoveAll(s.dir(checkpointID(r)))
 				} else if r.Job.ExpiresAt != "" {
 					if expiry, e := time.Parse(time.RFC3339Nano, r.Job.ExpiresAt); e == nil && time.Now().After(expiry) {
-						_ = os.RemoveAll(s.dir(r.Job.ID))
+						_ = os.RemoveAll(s.dir(checkpointID(r)))
 					}
 				}
 			}
@@ -321,7 +376,7 @@ func (s *Service) loop(ctx context.Context) {
 func (s *Service) cleanupOrphans(records []storage.SubtitleRecord) {
 	known := map[string]bool{}
 	for _, r := range records {
-		known[r.Job.ID] = true
+		known[checkpointID(r)] = true
 	}
 	entries, e := os.ReadDir(s.opt.Root)
 	if e != nil {
@@ -344,6 +399,13 @@ func (s *Service) cleanupOrphans(records []storage.SubtitleRecord) {
 func (s *Service) run(parent context.Context, r storage.SubtitleRecord) {
 	ctx, cancel := context.WithCancel(parent)
 	s.mu.Lock()
+	latest, err := s.opt.Store.SubtitleRecord(parent, r.Job.ID)
+	if err != nil || !active(latest.Job.State) {
+		s.mu.Unlock()
+		cancel()
+		return
+	}
+	r = latest
 	s.active[r.Job.ID] = cancel
 	s.mu.Unlock()
 	e := s.execute(ctx, &r)
@@ -389,7 +451,7 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 		return e
 	}
 	cp := checkpoint{Version: 1}
-	raw, e := os.ReadFile(s.cpPath(r.Job.ID))
+	raw, e := os.ReadFile(s.cpPath(checkpointID(*r)))
 	if e == nil {
 		if e = json.Unmarshal(raw, &cp); e != nil {
 			return fmt.Errorf("checkpoint damaged")
@@ -439,7 +501,7 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 		for offset := float64(0); offset < duration; offset += 600 {
 			cp.Parts = append(cp.Parts, part{Offset: int64(offset * 1000)})
 		}
-		if e = writeJSON(s.cpPath(r.Job.ID), cp); e != nil {
+		if e = writeJSON(s.cpPath(checkpointID(*r)), cp); e != nil {
 			return e
 		}
 	}
@@ -456,8 +518,8 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 				if e = s.update(ctx, r, "extracting", i, len(cp.Parts)); e != nil {
 					return e
 				}
-				audio := filepath.Join(s.dir(r.Job.ID), fmt.Sprintf("part-%04d.flac", i))
-				if e = os.MkdirAll(s.dir(r.Job.ID), 0700); e != nil {
+				audio := filepath.Join(s.dir(checkpointID(*r)), fmt.Sprintf("part-%04d.flac", i))
+				if e = os.MkdirAll(s.dir(checkpointID(*r)), 0700); e != nil {
 					return e
 				}
 				extractCtx, stop := context.WithTimeout(ctx, 15*time.Minute)
@@ -475,7 +537,7 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 					return err
 				}
 				p.Submitted = true
-				if e = writeJSON(s.cpPath(r.Job.ID), cp); e != nil {
+				if e = writeJSON(s.cpPath(checkpointID(*r)), cp); e != nil {
 					return e
 				}
 				if ctx.Err() != nil {
@@ -485,7 +547,7 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 				if e != nil {
 					return e
 				}
-				if e = writeJSON(s.cpPath(r.Job.ID), cp); e != nil {
+				if e = writeJSON(s.cpPath(checkpointID(*r)), cp); e != nil {
 					return e
 				}
 			}
@@ -500,7 +562,7 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 					if errors.As(err, &failed) {
 						p.TaskID = ""
 						p.Submitted = false
-						if e = writeJSON(s.cpPath(r.Job.ID), cp); e != nil {
+						if e = writeJSON(s.cpPath(checkpointID(*r)), cp); e != nil {
 							stop()
 							return e
 						}
@@ -526,10 +588,10 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 				}
 			}
 			stop()
-			if e = writeJSON(s.cpPath(r.Job.ID), cp); e != nil {
+			if e = writeJSON(s.cpPath(checkpointID(*r)), cp); e != nil {
 				return e
 			}
-			_ = os.Remove(filepath.Join(s.dir(r.Job.ID), fmt.Sprintf("part-%04d.flac", i)))
+			_ = os.Remove(filepath.Join(s.dir(checkpointID(*r)), fmt.Sprintf("part-%04d.flac", i)))
 		}
 	}
 	total, completed := 0, 0
@@ -569,12 +631,12 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 	}
 	assets := cp.Assets
 	if len(assets) == 0 {
-		assets, e = publish(r.SourcePath, r.Job.FileID, r.Job.ID, cues)
+		assets, e = publish(r.SourcePath, r.Job.FileID, r.Job.ID, cues, r.AttemptID)
 		if e != nil {
 			return e
 		}
 		cp.Assets = assets
-		if e = writeJSON(s.cpPath(r.Job.ID), cp); e != nil {
+		if e = writeJSON(s.cpPath(checkpointID(*r)), cp); e != nil {
 			return e
 		}
 	} else {
@@ -601,7 +663,7 @@ func (s *Service) execute(ctx context.Context, r *storage.SubtitleRecord) error 
 	if e = s.opt.Store.SaveSubtitleRecord(ctx, *r); e != nil {
 		return e
 	}
-	_ = os.RemoveAll(s.dir(r.Job.ID))
+	_ = os.RemoveAll(s.dir(checkpointID(*r)))
 	return nil
 }
 func (s *Service) translatePending(ctx context.Context, r *storage.SubtitleRecord, cp *checkpoint, limits TranslationLimits, completed *int, total int) error {
@@ -656,7 +718,7 @@ func (s *Service) translatePending(ctx context.Context, r *storage.SubtitleRecor
 		for id, value := range values {
 			positions[id].Translation = value
 		}
-		if saveErr := writeJSON(s.cpPath(r.Job.ID), cp); saveErr != nil {
+		if saveErr := writeJSON(s.cpPath(checkpointID(*r)), cp); saveErr != nil {
 			return saveErr
 		}
 		*completed += len(values)
@@ -724,7 +786,7 @@ func outputText(cues []Cue, translated bool, txt bool) []byte {
 	}
 	return []byte(b.String())
 }
-func publish(source, fileID, id string, cues []Cue) ([]contracts.SubtitleAsset, error) {
+func publish(source, fileID, id string, cues []Cue, attemptID ...string) ([]contracts.SubtitleAsset, error) {
 	dir := filepath.Join(filepath.Dir(source), "sub")
 	if e := os.MkdirAll(dir, 0755); e != nil {
 		return nil, fmt.Errorf("cannot create sub directory")
@@ -735,7 +797,7 @@ func publish(source, fileID, id string, cues []Cue) ([]contracts.SubtitleAsset, 
 	// Every regeneration has a distinct name; reserve all three before writing.
 	for _, suffix := range suffixes {
 		if _, e := os.Lstat(filepath.Join(dir, stem+suffix)); !errors.Is(e, os.ErrNotExist) {
-			stem += "." + id[:8]
+			stem += "." + id[:8] + "." + newID()[:8]
 			break
 		}
 	}
@@ -774,7 +836,11 @@ func publish(source, fileID, id string, cues []Cue) ([]contracts.SubtitleAsset, 
 		if i == 2 {
 			format = "txt"
 		}
-		assets = append(assets, contracts.SubtitleAsset{ID: id + "-" + strconv.Itoa(i), FileID: fileID, Name: name, Language: lang, Format: format, Size: int64(len(bodies[i])), Hash: hex.EncodeToString(hash[:])})
+		assetID := id + "-" + strconv.Itoa(i)
+		if len(attemptID) > 0 && attemptID[0] != "" {
+			assetID = id + "-" + attemptID[0] + "-" + strconv.Itoa(i)
+		}
+		assets = append(assets, contracts.SubtitleAsset{ID: assetID, FileID: fileID, Name: name, Language: lang, Format: format, Size: int64(len(bodies[i])), Hash: hex.EncodeToString(hash[:])})
 	}
 	success = true
 	return assets, nil
@@ -782,7 +848,7 @@ func publish(source, fileID, id string, cues []Cue) ([]contracts.SubtitleAsset, 
 
 // AssetPath resolves only metadata-backed IDs against the current selected media directory.
 func (s *Service) AssetPath(ctx context.Context, id string) (string, error) {
-	if len(id) != 34 || id[32] != '-' {
+	if (len(id) != 34 && len(id) != 67) || id[32] != '-' || (len(id) == 67 && id[65] != '-') {
 		return "", fmt.Errorf("invalid subtitle asset ID")
 	}
 	r, e := s.opt.Store.SubtitleRecord(ctx, id[:32])

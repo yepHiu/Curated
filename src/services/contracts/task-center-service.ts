@@ -18,5 +18,5 @@ export interface TaskCenterService {
   list(query?: TaskQuery): Promise<TaskPage>
   summary(): Promise<TaskSummary>
   get(key: string): Promise<CenterTask>
-  action(task: CenterTask, action: "cancel" | "retry" | "restart" | "undo"): Promise<void | { restored: number; conflicts: number } | { taskKey: string }>
+  action(task: CenterTask, action: "cancel" | "retry" | "restart" | "undo"): Promise<void | { restored: number; conflicts: number }>
 }

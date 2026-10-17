@@ -30,7 +30,6 @@ import type { SubtitleAsset } from "@/services/contracts/subtitle-service"
 import type { TagOrganizationItem } from "@/services/contracts/topic-service"
 
 const props = defineProps<{ taskKey: string }>()
-const emit = defineEmits<{ restarted: [taskKey: string] }>()
 const { t, te } = useI18n(), service = useTaskCenterService(), center = useTaskCenter()
 const { writeEnabled } = useExperimentalAgent()
 const task = ref<CenterTask>(), loading = ref(true), unavailable = ref(false), disconnected = ref(false)
@@ -40,17 +39,15 @@ const preview = ref(""), previewName = ref(""), previewOpen = ref(false)
 const items = ref<TagOrganizationItem[]>([]), itemsLoading = ref(false), itemsError = ref(false), itemsMore = ref(false)
 const issuesOnly = ref(false)
 const visibleItems = computed(() => issuesOnly.value ? items.value.filter(item => ["failed", "conflict"].includes(item.status)) : items.value)
-const restartedKey = ref("")
-const key = computed(() => restartedKey.value || props.taskKey)
-watch(() => props.taskKey, () => { restartedKey.value = "" })
+const key = computed(() => props.taskKey)
 const canWrite = computed(() => task.value?.canManage && !disconnected.value && (task.value.kind === "subtitle" || writeEnabled.value))
 const canRetry = computed(() => {
   const current = task.value
-  if (!current || !["blocked", "partial", "failed", "cancelled"].includes(current.state)) return false
+  if (!current || current.subtitle?.supersededBy || !["blocked", "partial", "failed", "cancelled"].includes(current.state)) return false
   if (current.subtitle?.expiresAt && Date.parse(current.subtitle.expiresAt) <= Date.now()) return false
   return true
 })
-const canRestart = computed(() => task.value?.kind === "subtitle" && ["failed", "blocked", "cancelled"].includes(task.value.state))
+const canRestart = computed(() => task.value?.kind === "subtitle" && !task.value.subtitle?.supersededBy && ["failed", "blocked", "cancelled"].includes(task.value.state))
 const steps = computed(() => {
   const current = task.value
   if (!current) return []
@@ -117,14 +114,7 @@ async function perform() {
     const result = await service.action(current, operation)
     if (!alive || seq !== generation) return
     confirm.value = ""
-    if (result && "taskKey" in result) {
-      restartedKey.value = result.taskKey
-      emit("restarted", result.taskKey)
-      await useSubtitleJobs().refresh()
-      await center.refresh()
-      return
-    }
-    if (result && "restored" in result) feedback.value = t("topics.undoResult", result)
+    if (result) feedback.value = t("topics.undoResult", result)
     await load(true)
     if (!alive || seq !== generation) return
     if (current.organization) {
@@ -159,9 +149,10 @@ async function assetAction(asset: SubtitleAsset, action: "preview" | "download" 
       <template v-if="task">
         <div class="flex flex-wrap items-center justify-between gap-4"><div class="flex min-w-0 items-center gap-3"><span class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary"><Captions v-if="task.kind === 'subtitle'" class="size-6" /><Sparkles v-else class="size-6" /></span><div class="min-w-0"><h2 class="text-xl font-semibold tracking-tight sm:text-2xl">{{ taskTitle(task) }}</h2><p class="mt-1 break-words text-xs text-muted-foreground">{{ taskSubject(task) }}</p></div></div><div class="flex flex-wrap gap-2"><Button v-if="taskActive(task)" variant="outline" class="rounded-full" :disabled="!canWrite || busy" @click="confirm = 'cancel'">{{ t('tasks.cancel') }}</Button><Button v-if="canRetry" class="rounded-full" :disabled="!canWrite || busy" @click="confirm = 'retry'">{{ t('tasks.retry') }}</Button><Button v-if="canRestart" variant="outline" class="rounded-full" :disabled="!canWrite || busy" @click="confirm = 'restart'">{{ t('tasks.restart') }}</Button><Button v-if="task.organization && !taskActive(task) && task.organization.succeeded > 0" variant="outline" class="rounded-full" :disabled="!canWrite || busy" @click="confirm = 'undo'">{{ t('tasks.undo') }}</Button></div></div>
         <Alert v-if="!task.canManage || task.kind === 'organize' && !writeEnabled"><AlertDescription>{{ t(!task.canManage ? 'tasks.readOnly' : 'tasks.aiReadOnly') }}</AlertDescription></Alert>
+        <Alert v-if="task.subtitle?.supersededBy"><AlertDescription class="flex flex-wrap items-center justify-between gap-3"><span>{{ t('tasks.superseded') }}</span><Button as-child variant="link"><RouterLink :to="`/tasks/${encodeURIComponent(`subtitle:${task.subtitle.supersededBy}`)}`">{{ t('tasks.viewReplacement') }}</RouterLink></Button></AlertDescription></Alert>
         <Alert v-if="error" variant="destructive"><AlertDescription>{{ error }}</AlertDescription></Alert>
         <Alert v-if="feedback"><AlertDescription>{{ feedback }}</AlertDescription></Alert>
-        <Alert v-if="taskAttention(task)"><AlertTitle>{{ t(task.state === 'partial' ? 'tasks.partialNotice' : 'tasks.problemNotice') }}</AlertTitle><AlertDescription><p>{{ task.organization?.error ? organizationErrorText(task.organization.error) : task.kind === 'subtitle' ? t(task.stage === 'saving' ? 'tasks.saveProblem' : 'tasks.subtitleProblem') : t('tasks.inspectItems') }}</p><pre v-if="task.subtitle?.providerError" class="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs">{{ task.subtitle.providerError }}</pre></AlertDescription></Alert>
+        <Alert v-if="taskAttention(task) || task.subtitle?.supersededBy"><AlertTitle>{{ t(task.state === 'partial' ? 'tasks.partialNotice' : 'tasks.problemNotice') }}</AlertTitle><AlertDescription><p>{{ task.organization?.error ? organizationErrorText(task.organization.error) : task.kind === 'subtitle' ? t(task.stage === 'saving' ? 'tasks.saveProblem' : 'tasks.subtitleProblem') : t('tasks.inspectItems') }}</p><pre v-if="task.subtitle?.providerError" class="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs">{{ task.subtitle.providerError }}</pre></AlertDescription></Alert>
         <div class="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
           <div class="flex min-w-0 flex-col gap-5">
             <Card><CardHeader><div class="flex flex-wrap items-start justify-between gap-3"><div class="flex flex-col gap-2"><span class="text-xs text-muted-foreground">{{ t('tasks.currentStage') }}</span><CardTitle>{{ taskStage(task) }}</CardTitle><TaskStatusBadge :state="task.state" /></div><div v-if="taskActive(task) && task.total > 0" class="text-2xl tabular-nums">{{ task.completed }} <span class="text-sm text-muted-foreground">/ {{ task.total }} {{ t(`tasks.units.${task.unit}`) }}</span></div></div></CardHeader><CardContent class="flex flex-col gap-5">

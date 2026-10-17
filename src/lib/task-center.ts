@@ -4,8 +4,8 @@ import type { TagOrganizationJob } from "@/services/contracts/topic-service"
 
 export const emptyTaskSummary = (): TaskSummary => ({ total: 0, running: 0, queued: 0, waiting: 0, attention: 0, history: 0 })
 export const taskActive = (task: CenterTask) => ["queued", "running", "waiting"].includes(task.state)
-export const taskAttention = (task: CenterTask) => ["blocked", "partial", "failed"].includes(task.state)
-export const taskHistory = (task: CenterTask) => ["succeeded", "partial", "failed", "cancelled"].includes(task.state)
+export const taskAttention = (task: CenterTask) => !task.subtitle?.supersededBy && ["blocked", "partial", "failed"].includes(task.state)
+export const taskHistory = (task: CenterTask) => !!task.subtitle?.supersededBy || ["succeeded", "partial", "failed", "cancelled"].includes(task.state)
 export const taskPercent = (task: CenterTask) => task.total > 0 ? Math.max(0, Math.min(100, task.completed / task.total * 100)) : undefined
 export const taskRoute = (key: string) => `/tasks/${encodeURIComponent(key)}`
 export function taskState(state: string, stage: string): TaskState {

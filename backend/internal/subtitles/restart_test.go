@@ -2,25 +2,30 @@ package subtitles
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"curated-backend/internal/agent/prompts"
+	"curated-backend/internal/contracts"
 	"curated-backend/internal/executil"
 	"curated-backend/internal/llm"
 	"curated-backend/internal/storage"
 )
 
-func TestRestartCreatesFreshJobWithCurrentSettingsAndKeepsHistory(t *testing.T) {
+func TestRestartKeepsTaskIDAndRequeuesWithCurrentSettings(t *testing.T) {
 	for _, checkpointExists := range []bool{true, false} {
 		t.Run(map[bool]string{true: "with checkpoint", false: "expired checkpoint"}[checkpointExists], func(t *testing.T) {
 			opt, r := fixture(t)
 			ctx := context.Background()
 			r.Job.State = "failed"
 			r.Job.Error = "old failure"
+			r.Job.ProviderError = "old provider error"
+			r.Job.ExpiresAt = time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)
 			r.Job.Completed = 1
 			r.Job.Total = 2
 			r.AudioTrack = 1
@@ -51,19 +56,34 @@ func TestRestartCreatesFreshJobWithCurrentSettingsAndKeepsHistory(t *testing.T) 
 			if err != nil {
 				t.Fatal(err)
 			}
-			if next.ID == r.Job.ID || next.State != "queued" || next.Stage != "preparing" || next.Completed != 0 || next.Total != 0 || len(next.Assets) != 0 || next.TranslationModel != "configured-ai" || next.RecognitionModel != "qwen3-asr-flash-filetrans" {
+			if next.ID != r.Job.ID || next.State != "queued" || next.Stage != "preparing" || next.Completed != 0 || next.Total != 0 || next.Error != "" || next.ProviderError != "" || next.ExpiresAt != "" || next.CreatedAt != r.Job.CreatedAt || len(next.Assets) != len(assets) || next.TranslationModel != "configured-ai" || next.RecognitionModel != "qwen3-asr-flash-filetrans" {
 				t.Fatalf("restart not fresh: %+v", next)
 			}
 			record, err := opt.Store.SubtitleRecord(ctx, next.ID)
 			if err != nil || record.PromptVersion != prompts.SubtitleTranslationPrompt().Version || record.TextModel != "new-model" || record.AudioTrack != 1 || record.Job.FileID != r.Job.FileID {
 				t.Fatalf("wrong restart configuration: %+v error=%v", record, err)
 			}
-			if _, err := os.Stat(s.cpPath(next.ID)); !os.IsNotExist(err) {
+			if record.AttemptID == "" || record.AttemptID == r.Job.ID {
+				t.Fatal("restart did not isolate its checkpoint")
+			}
+			if _, err := os.Stat(s.cpPath(checkpointID(record))); !os.IsNotExist(err) {
 				t.Fatal("restart reused checkpoint")
 			}
-			old, err := opt.Store.SubtitleRecord(ctx, r.Job.ID)
-			if err != nil || old.Job.State != "failed" || old.Job.Completed != 1 || old.Job.Error != "old failure" {
-				t.Fatalf("old history changed: %+v error=%v", old, err)
+			records, err := opt.Store.ListSubtitleRecords(ctx, "")
+			if err != nil || len(records) != 1 || records[0].RequestID != r.RequestID {
+				t.Fatalf("restart created another task: %+v error=%v", records, err)
+			}
+			summary, err := opt.Store.TaskCenterSummary(ctx)
+			if err != nil || summary.Total != 1 || summary.Attention != 0 || summary.Queued != 1 {
+				t.Fatalf("restarted task still needs attention: %+v error=%v", summary, err)
+			}
+			keys, _, err := opt.Store.TaskCenterKeys(ctx, storage.TaskCenterFilter{State: "attention"})
+			if err != nil || len(keys) != 0 {
+				t.Fatalf("restarted task remains in attention list: %v %v", keys, err)
+			}
+			keys, _, err = opt.Store.TaskCenterKeys(ctx, storage.TaskCenterFilter{State: "active"})
+			if err != nil || len(keys) != 1 || keys[0] != "subtitle:"+r.Job.ID {
+				t.Fatalf("active task ID changed: %v %v", keys, err)
 			}
 			after, _ := os.ReadFile(path)
 			if string(before) != string(after) {
@@ -77,12 +97,16 @@ func TestRestartCreatesFreshJobWithCurrentSettingsAndKeepsHistory(t *testing.T) 
 			if err != nil || again.ID != next.ID {
 				t.Fatalf("duplicate restart: %+v %v", again, err)
 			}
+			againRecord, _ := opt.Store.SubtitleRecord(ctx, again.ID)
+			if againRecord.AttemptID != record.AttemptID {
+				t.Fatal("repeated restart discarded active progress")
+			}
 		})
 	}
 }
 
-func TestRestartRejectsRunningCompletedAndUnavailableProvider(t *testing.T) {
-	for _, state := range []string{"running", "completed", "failed"} {
+func TestRestartRejectsCompletedAndUnavailableProvider(t *testing.T) {
+	for _, state := range []string{"completed", "failed"} {
 		t.Run(state, func(t *testing.T) {
 			opt, r := fixture(t)
 			r.Job.State = state
@@ -115,6 +139,9 @@ func TestRestartRunsRecognitionAndTranslationFromBeginning(t *testing.T) {
 	}
 	r.Job.State = "failed"
 	r.Revision, _ = revision(r.SourcePath)
+	if err := writeJSON(filepath.Join(opt.Root, r.Job.ID, "checkpoint.json"), checkpoint{Version: 1, Duration: 10, Parts: []part{{Recognized: true, Cues: []Cue{{ID: 1, Translation: "old completed translation"}}}}}); err != nil {
+		t.Fatal(err)
+	}
 	if err := opt.Store.SaveSubtitleRecord(ctx, r); err != nil {
 		t.Fatal(err)
 	}
@@ -145,5 +172,142 @@ func TestRestartRunsRecognitionAndTranslationFromBeginning(t *testing.T) {
 	}
 	if opt.Provider.(*fakeProvider).calls != 3 || translations != 1 || record.Job.State != "completed" {
 		t.Fatalf("restart did not execute full pipeline: %+v", record.Job)
+	}
+}
+
+func TestRetryAndServerResumeUseOnlyTheRestartedAttempt(t *testing.T) {
+	opt, r := fixture(t)
+	ctx := context.Background()
+	r.Job.State = "failed"
+	if err := opt.Store.SaveSubtitleRecord(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{opt: opt}
+	if err := writeJSON(s.cpPath(r.Job.ID), checkpoint{Version: 1, Duration: 10, Parts: []part{{Recognized: true, Cues: []Cue{{ID: 1, Text: "old", Translation: "old"}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Action(ctx, r.Job.ID, "restart"); err != nil {
+		t.Fatal(err)
+	}
+	r, _ = opt.Store.SubtitleRecord(ctx, r.Job.ID)
+	r.Job.State = "failed"
+	if err := opt.Store.SaveSubtitleRecord(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(s.cpPath(checkpointID(r)), checkpoint{Version: 1, Duration: 10, Parts: []part{{Recognized: true, Cues: []Cue{{ID: 1, End: 1000, Text: "new", Translation: "new translation"}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Action(ctx, r.Job.ID, "retry"); err != nil {
+		t.Fatal(err)
+	}
+	worker := New(ctx, opt)
+	defer worker.Close()
+	job := waitJob(t, worker, r.Job.ID, "completed")
+	if !strings.Contains(job.Assets[1].ID, "-"+r.AttemptID+"-") {
+		t.Fatal("subtitle output version did not distinguish the new attempt")
+	}
+	if opt.Provider.(*fakeProvider).calls != 0 {
+		t.Fatal("server resume resubmitted a recognition request")
+	}
+	path, err := worker.AssetPath(ctx, job.Assets[1].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(raw), "new translation") || strings.Contains(string(raw), "old") {
+		t.Fatalf("resumed wrong checkpoint: %s %v", raw, err)
+	}
+}
+
+func TestRestartDoesNotCreateCompetingTasks(t *testing.T) {
+	for _, state := range []string{"queued", "running", "blocked", "cancelled"} {
+		t.Run(state, func(t *testing.T) {
+			opt, r := fixture(t)
+			ctx := context.Background()
+			r.Job.State = state
+			if err := opt.Store.SaveSubtitleRecord(ctx, r); err != nil {
+				t.Fatal(err)
+			}
+			s := &Service{opt: opt}
+			job, err := s.Action(ctx, r.Job.ID, "restart")
+			if err != nil || job.ID != r.Job.ID || (active(state) && job.State != state) || (!active(state) && job.State != "queued") {
+				t.Fatalf("unexpected restart: %+v %v", job, err)
+			}
+		})
+	}
+	opt, r := fixture(t)
+	ctx := context.Background()
+	other := r
+	other.Job.ID, other.RequestID = newID(), "other-request"
+	r.Job.State = "failed"
+	if err := opt.Store.SaveSubtitleRecord(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	if err := opt.Store.SaveSubtitleRecord(ctx, other); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{opt: opt}
+	if _, err := s.Action(ctx, r.Job.ID, "restart"); err == nil {
+		t.Fatal("accepted competing restart")
+	}
+	unchanged, _ := opt.Store.SubtitleRecord(ctx, r.Job.ID)
+	if unchanged.Job.State != "failed" || unchanged.AttemptID != "" {
+		t.Fatal("conflicting restart changed original task")
+	}
+}
+
+func TestRestartValidationKeepsOriginalProgress(t *testing.T) {
+	for _, scenario := range []string{"full queue", "source missing", "still stopping"} {
+		t.Run(scenario, func(t *testing.T) {
+			opt, r := fixture(t)
+			ctx := context.Background()
+			r.Job.State, r.Job.Completed = "failed", 7
+			if err := opt.Store.SaveSubtitleRecord(ctx, r); err != nil {
+				t.Fatal(err)
+			}
+			s := &Service{opt: opt}
+			if err := writeJSON(s.cpPath(r.Job.ID), checkpoint{Version: 1, Duration: 10}); err != nil {
+				t.Fatal(err)
+			}
+			switch scenario {
+			case "full queue":
+				for i := range 8 {
+					path := filepath.Join(filepath.Dir(r.SourcePath), fmt.Sprintf("DEMO-%03d.mp4", i+2))
+					if err := os.WriteFile(path, []byte("fixture"), 0600); err != nil {
+						t.Fatal(err)
+					}
+					movie, err := opt.Store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{Number: fmt.Sprintf("DEMO-%03d", i+2), Path: path, FileName: filepath.Base(path)})
+					if err != nil {
+						t.Fatal(err)
+					}
+					detail, err := opt.Store.GetMoviePlaybackDetail(ctx, movie.MovieID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					other := r
+					other.Job.ID, other.RequestID = newID(), newID()
+					other.Job.MovieID, other.Job.FileID, other.Job.State = movie.MovieID, detail.SelectedFileID, "queued"
+					if err := opt.Store.SaveSubtitleRecord(ctx, other); err != nil {
+						t.Fatal(err)
+					}
+				}
+			case "source missing":
+				if err := os.Remove(r.SourcePath); err != nil {
+					t.Fatal(err)
+				}
+			case "still stopping":
+				s.active = map[string]context.CancelFunc{r.Job.ID: func() {}}
+			}
+			if _, err := s.Action(ctx, r.Job.ID, "restart"); err == nil {
+				t.Fatal("invalid restart accepted")
+			}
+			got, err := opt.Store.SubtitleRecord(ctx, r.Job.ID)
+			if err != nil || got.Job.State != "failed" || got.Job.Completed != 7 || got.AttemptID != "" {
+				t.Fatalf("rejected restart lost progress: %+v %v", got, err)
+			}
+			if _, err := os.Stat(s.cpPath(r.Job.ID)); err != nil {
+				t.Fatal("rejected restart lost checkpoint")
+			}
+		})
 	}
 }

@@ -14,12 +14,13 @@ import (
 const taskCenterSource = `WITH tasks AS (
  SELECT 'subtitle:'||id AS task_key,'subtitle' AS kind,
  CASE state WHEN 'completed' THEN 'succeeded' WHEN 'partial_failed' THEN 'partial' ELSE state END AS state,
- json_extract(payload,'$.job.createdAt') AS created_at FROM subtitle_jobs
+ json_extract(payload,'$.job.createdAt') AS created_at,
+ COALESCE(json_extract(payload,'$.job.supersededBy'),'') AS superseded_by FROM subtitle_jobs
  UNION ALL
  SELECT 'organize:'||id,'organize',
  CASE WHEN status='running' AND stage='waiting_quota' THEN 'waiting'
  WHEN status='completed' THEN 'succeeded' WHEN status='partial_failed' THEN 'partial' ELSE status END,
- created_at FROM ai_tag_organization_jobs WHERE deleted_at=''
+ created_at,'' FROM ai_tag_organization_jobs WHERE deleted_at=''
 ) `
 
 type TaskCenterFilter struct {
@@ -37,8 +38,8 @@ func (s *SQLiteStore) TaskCenterSummary(ctx context.Context) (contracts.TaskCent
 	var out contracts.TaskCenterSummary
 	err := s.db.QueryRowContext(ctx, taskCenterSource+`SELECT COUNT(*),
  COALESCE(SUM(state='running'),0),COALESCE(SUM(state='queued'),0),COALESCE(SUM(state='waiting'),0),
- COALESCE(SUM(state IN ('blocked','failed','partial')),0),
- COALESCE(SUM(state IN ('succeeded','partial','failed','cancelled')),0) FROM tasks`).Scan(&out.Total, &out.Running, &out.Queued, &out.Waiting, &out.Attention, &out.History)
+ COALESCE(SUM(state IN ('blocked','failed','partial') AND superseded_by=''),0),
+ COALESCE(SUM(state IN ('succeeded','partial','failed','cancelled') OR superseded_by<>''),0) FROM tasks`).Scan(&out.Total, &out.Running, &out.Queued, &out.Waiting, &out.Attention, &out.History)
 	return out, err
 }
 
@@ -57,9 +58,9 @@ func (s *SQLiteStore) TaskCenterKeys(ctx context.Context, f TaskCenterFilter) ([
 	case "active":
 		where += " AND state IN ('queued','running','waiting')"
 	case "attention":
-		where += " AND state IN ('blocked','failed','partial')"
+		where += " AND state IN ('blocked','failed','partial') AND superseded_by=''"
 	case "history":
-		where += " AND state IN ('succeeded','partial','failed','cancelled')"
+		where += " AND (state IN ('succeeded','partial','failed','cancelled') OR superseded_by<>'')"
 	default:
 		return nil, "", ErrTaskCenterFilter
 	}

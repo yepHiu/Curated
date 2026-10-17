@@ -2634,6 +2634,8 @@
     "cancel": "Cancel task",
     "retry": "Retry unfinished work",
     "restart": "Restart entire task",
+    "superseded": "A restarted task has superseded this failed record, which remains in history.",
+    "viewReplacement": "View replacement task",
     "undo": "Undo organization",
     "close": "Back",
     "confirmAction": "Confirm",
@@ -2732,7 +2734,7 @@
     "confirm": {
       "cancel": "Stop subsequent work. Applied tags and saved subtitles are retained. Cancellation does not undo results.",
       "retry": "Retry unfinished work using the original checkpoints and retain successful results. Invalid sources, settings or checkpoints may require a new task.",
-      "restart": "Create a new task for the same file, recognizing audio and translating all subtitles from scratch using the current subtitle models and prompt. Keep the original audio track selection, task history and outputs. Existing checkpoints are not reused; recognition and translation incur new charges.",
+      "restart": "Run audio recognition and all subtitle translation again on this task. Its ID stays the same and its state returns to queued. Uses current subtitle recognition/translation models and the latest prompt, keeping the original file, audio track and existing outputs without reusing old checkpoints. Recognition and translation will be charged again.",
       "undo": "Restore user tags changed by this task. Later edits and conflicts are skipped and reported."
     }
   }
