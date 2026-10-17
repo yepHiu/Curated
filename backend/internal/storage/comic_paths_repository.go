@@ -136,20 +136,5 @@ func (s *SQLiteStore) UpdateComicLibraryPathTitle(ctx context.Context, id, title
 }
 
 func (s *SQLiteStore) DeleteComicLibraryPath(ctx context.Context, id string) error {
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return ErrComicLibraryPathNotFound
-	}
-	res, err := s.db.ExecContext(ctx, `DELETE FROM comic_library_paths WHERE id = ?`, id)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return ErrComicLibraryPathNotFound
-	}
-	return nil
+	return s.deleteBookLibraryPath(ctx, "comic", id)
 }

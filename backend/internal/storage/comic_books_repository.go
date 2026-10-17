@@ -54,6 +54,7 @@ func (s *SQLiteStore) UpsertComicBook(ctx context.Context, in ComicBookUpsert) (
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'unread', ?, ?)
 		ON CONFLICT(location) DO UPDATE SET
 			library_path_id = excluded.library_path_id,
+			detached = 0,
 			title = excluded.title,
 			source_file_name = excluded.source_file_name,
 			file_size = excluded.file_size,
@@ -95,7 +96,7 @@ func (s *SQLiteStore) GetComicBookDetail(ctx context.Context, id string) (contra
 		        COALESCE(crp.current_page_index, 0)
 		   FROM comic_books cb
 		   LEFT JOIN comic_reading_progress crp ON crp.comic_id = cb.id
-		  WHERE cb.id = ?`,
+		  WHERE cb.id = ? AND cb.detached = 0`,
 		id,
 	).Scan(
 		&item.OriginalTitle,
@@ -238,7 +239,7 @@ func (s *SQLiteStore) ListComicBooks(ctx context.Context, req contracts.ListComi
 }
 
 func comicBookWhere(req contracts.ListComicBooksRequest) (string, []any) {
-	var clauses []string
+	clauses := []string{"cb.detached = 0"}
 	var args []any
 	if q := strings.TrimSpace(req.Query); q != "" {
 		like := "%" + strings.ToLower(q) + "%"

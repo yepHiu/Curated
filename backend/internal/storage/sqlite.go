@@ -117,6 +117,14 @@ func (s *SQLiteStore) Migrate(ctx context.Context) error {
 				return err
 			}
 		}
+		if entry.Name() == "0070_detached_books.sql" {
+			for _, kind := range []string{"comic", "photo"} {
+				if err := reconcileDetachedBooks(ctx, tx, kind); err != nil {
+					_ = tx.Rollback()
+					return err
+				}
+			}
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (name) VALUES (?)`, entry.Name()); err != nil {
 			_ = tx.Rollback()
 			return err

@@ -136,20 +136,5 @@ func (s *SQLiteStore) UpdatePhotoLibraryPathTitle(ctx context.Context, id, title
 }
 
 func (s *SQLiteStore) DeletePhotoLibraryPath(ctx context.Context, id string) error {
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return ErrPhotoLibraryPathNotFound
-	}
-	res, err := s.db.ExecContext(ctx, `DELETE FROM photo_library_paths WHERE id = ?`, id)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return ErrPhotoLibraryPathNotFound
-	}
-	return nil
+	return s.deleteBookLibraryPath(ctx, "photo", id)
 }

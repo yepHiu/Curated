@@ -377,3 +377,30 @@ describe("webComicLibraryService", () => {
     expect(comicApiMocks.listComics).toHaveBeenCalledTimes(1)
   })
 })
+
+
+it("removing a path refreshes books and ignores an older in-flight list", async () => {
+  const { webComicLibraryService: service } = await import("./web-comic-library-service")
+  comicApiMocks.listComics.mockResolvedValueOnce({ items: [comicListItem("old")], total: 1 })
+  await service.reloadComicsFromApi()
+  let resolveOld!: (value: unknown) => void
+  comicApiMocks.listComics.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+  const stale = service.reloadComicsFromApi()
+  comicApiMocks.deleteComicLibraryPath.mockResolvedValueOnce(undefined)
+  comicApiMocks.listComics.mockResolvedValueOnce({ items: [comicListItem("remaining")], total: 1 })
+  await service.removeComicLibraryPath("removed")
+  resolveOld({ items: [comicListItem("old")], total: 1 })
+  await stale
+  expect(service.comics.value.map(book => book.id)).toEqual(["remaining"])
+})
+
+it("successful path removal clears stale books even if refresh fails", async () => {
+  const { webComicLibraryService: service } = await import("./web-comic-library-service")
+  comicApiMocks.listComics.mockResolvedValueOnce({ items: [comicListItem("old")], total: 1 })
+  await service.reloadComicsFromApi()
+  comicApiMocks.deleteComicLibraryPath.mockResolvedValueOnce(undefined)
+  comicApiMocks.listComics.mockRejectedValueOnce(new Error("offline"))
+  await service.removeComicLibraryPath("removed")
+  expect(service.comics.value).toEqual([])
+  expect(service.comicsLoaded.value).toBe(false)
+})

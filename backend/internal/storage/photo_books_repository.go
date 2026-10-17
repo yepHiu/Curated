@@ -54,6 +54,7 @@ func (s *SQLiteStore) UpsertPhotoBook(ctx context.Context, in PhotoBookUpsert) (
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
 		ON CONFLICT(location) DO UPDATE SET
 			library_path_id = excluded.library_path_id,
+			detached = 0,
 			title = excluded.title,
 			source_file_name = excluded.source_file_name,
 			file_size = excluded.file_size,
@@ -95,7 +96,7 @@ func (s *SQLiteStore) GetPhotoBookDetail(ctx context.Context, id string) (contra
 		        COALESCE(pvp.current_page_index, 0)
 		   FROM photo_books pb
 		   LEFT JOIN photo_viewing_progress pvp ON pvp.photo_id = pb.id
-		  WHERE pb.id = ?`,
+		  WHERE pb.id = ? AND pb.detached = 0`,
 		id,
 	).Scan(
 		&item.OriginalTitle,
@@ -236,7 +237,7 @@ func (s *SQLiteStore) ListPhotoBooks(ctx context.Context, req contracts.ListPhot
 }
 
 func photoBookWhere(req contracts.ListPhotoBooksRequest) (string, []any) {
-	var clauses []string
+	clauses := []string{"pb.detached = 0"}
 	var args []any
 	if q := strings.TrimSpace(req.Query); q != "" {
 		like := "%" + strings.ToLower(q) + "%"

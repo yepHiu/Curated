@@ -28,6 +28,8 @@ import type { ComicLibraryService } from "@/services/contracts/comic-library-ser
 const LIST_BATCH_SIZE = 500
 
 const comicsState: Ref<ComicBook[]> = shallowRef([])
+let libraryGeneration = 0
+let listRequest = 0
 const comicsLoadedState = ref(false)
 const comicSettingsHydratedState = ref(false)
 const loadErrorState = ref<string | null>(null)
@@ -172,12 +174,13 @@ function patchToBody(patch: ComicPatch): PatchComicBookBody {
 }
 
 /** 按 500 本一批拉完漫画列表；调用方显式传 limit 时只拉一页。 */
-async function fetchPagedComics(params: ComicListParams = {}): Promise<ComicBook[]> {
+async function fetchPagedComics(params: ComicListParams = {}, isCurrent: () => boolean = () => true): Promise<ComicBook[]> {
   const first = await comicApi.listComics({
     ...params,
     limit: params.limit ?? LIST_BATCH_SIZE,
     offset: params.offset ?? 0,
   })
+  if (!isCurrent()) return []
   const all = first.items.map(mapComicListItem)
   comicsState.value = all
   comicsLoadedState.value = true
@@ -194,6 +197,7 @@ async function fetchPagedComics(params: ComicListParams = {}): Promise<ComicBook
       limit: LIST_BATCH_SIZE,
       offset,
     })
+    if (!isCurrent()) return []
     const batch = page.items.map(mapComicListItem)
     if (batch.length === 0) break
     all.push(...batch)
@@ -277,6 +281,12 @@ function createWebComicLibraryService(): ComicLibraryService {
       if (defaultComicImportLibraryPathIdState.value === trimmed) {
         defaultComicImportLibraryPathIdState.value = ""
       }
+      libraryGeneration++
+      listRequest++
+      comicsState.value = []
+      comicsLoadedState.value = false
+      // Removal has succeeded; a failed refresh must not restore stale cards.
+      try { await impl.reloadComicsFromApi() } catch { /* loadError keeps the list retryable. */ }
     },
 
     async setDefaultComicImportLibraryPathId(id: string) {
@@ -315,11 +325,15 @@ function createWebComicLibraryService(): ComicLibraryService {
 
     /** 强制全量（或带 limit 的单页）重拉漫画列表。 */
     async reloadComicsFromApi(params?: ComicListParams) {
+      const generation = libraryGeneration, request = ++listRequest
       try {
-        comicsState.value = await fetchPagedComics(params)
+        const next = await fetchPagedComics(params, () => generation === libraryGeneration && request === listRequest)
+        if (generation !== libraryGeneration || request !== listRequest) return
+        comicsState.value = next
         comicsLoadedState.value = true
         loadErrorState.value = null
       } catch (err) {
+        if (generation !== libraryGeneration || request !== listRequest) return
         loadErrorState.value = formatLoadError(err, "Failed to load comics")
         throw err
       }
@@ -334,12 +348,15 @@ function createWebComicLibraryService(): ComicLibraryService {
     async loadComicDetail(comicId: string) {
       const id = comicId.trim()
       if (!id) return undefined
+      const generation = libraryGeneration
       try {
         const detail = mapComicDetail(await comicApi.getComic(id))
+        if (generation !== libraryGeneration) return undefined
         mergeComicIntoCache(detail)
         loadErrorState.value = null
         return detail
       } catch (err) {
+        if (generation !== libraryGeneration) return undefined
         loadErrorState.value = formatLoadError(err, "Failed to load comic")
         return undefined
       }

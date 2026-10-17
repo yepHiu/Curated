@@ -23,6 +23,8 @@ import type { PhotoLibraryService } from "@/services/contracts/photo-library-ser
 const photosState: Ref<PhotoBook[]> = shallowRef([])
 const LIST_BATCH_SIZE = 500
 
+let libraryGeneration = 0
+let listRequest = 0
 const photosLoadedState = ref(false)
 const photoSettingsHydratedState = ref(false)
 const loadErrorState = ref<string | null>(null)
@@ -141,12 +143,13 @@ function applySettingsFromDTO(settings: SettingsDTO) {
 }
 
 /** 按 500 本一批拉完写真列表；调用方显式传 limit 时只拉一页。 */
-async function fetchPagedPhotos(params: PhotoListParams = {}): Promise<PhotoBook[]> {
+async function fetchPagedPhotos(params: PhotoListParams = {}, isCurrent: () => boolean = () => true): Promise<PhotoBook[]> {
   const first = await photoApi.listPhotos({
     ...params,
     limit: params.limit ?? LIST_BATCH_SIZE,
     offset: params.offset ?? 0,
   })
+  if (!isCurrent()) return []
   const all = first.items.map(mapPhotoListItem)
   photosState.value = all
   photosLoadedState.value = true
@@ -163,6 +166,7 @@ async function fetchPagedPhotos(params: PhotoListParams = {}): Promise<PhotoBook
       limit: LIST_BATCH_SIZE,
       offset,
     })
+    if (!isCurrent()) return []
     const batch = page.items.map(mapPhotoListItem)
     if (batch.length === 0) break
     all.push(...batch)
@@ -237,6 +241,12 @@ function createWebPhotoLibraryService(): PhotoLibraryService {
       if (defaultPhotoImportLibraryPathIdState.value === trimmed) {
         defaultPhotoImportLibraryPathIdState.value = ""
       }
+      libraryGeneration++
+      listRequest++
+      photosState.value = []
+      photosLoadedState.value = false
+      // Removal has succeeded; a failed refresh must not restore stale cards.
+      try { await impl.reloadPhotosFromApi() } catch { /* loadError keeps the list retryable. */ }
     },
 
     async setDefaultPhotoImportLibraryPathId(id: string) {
@@ -275,11 +285,15 @@ function createWebPhotoLibraryService(): PhotoLibraryService {
 
     /** 强制全量（或带 limit 的单页）重拉写真列表。 */
     async reloadPhotosFromApi(params?: PhotoListParams) {
+      const generation = libraryGeneration, request = ++listRequest
       try {
-        photosState.value = await fetchPagedPhotos(params)
+        const next = await fetchPagedPhotos(params, () => generation === libraryGeneration && request === listRequest)
+        if (generation !== libraryGeneration || request !== listRequest) return
+        photosState.value = next
         photosLoadedState.value = true
         loadErrorState.value = null
       } catch (err) {
+        if (generation !== libraryGeneration || request !== listRequest) return
         loadErrorState.value = formatLoadError(err, "Failed to load photos")
         throw err
       }
@@ -294,12 +308,15 @@ function createWebPhotoLibraryService(): PhotoLibraryService {
     async loadPhotoDetail(photoId: string) {
       const id = photoId.trim()
       if (!id) return undefined
+      const generation = libraryGeneration
       try {
         const detail = mapPhotoDetail(await photoApi.getPhoto(id))
+        if (generation !== libraryGeneration) return undefined
         mergePhotoIntoCache(detail)
         loadErrorState.value = null
         return detail
       } catch (err) {
+        if (generation !== libraryGeneration) return undefined
         loadErrorState.value = formatLoadError(err, "Failed to load photo")
         return undefined
       }

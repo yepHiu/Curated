@@ -446,3 +446,30 @@ describe("webPhotoLibraryService", () => {
     expect(photoApiMocks.listPhotos).toHaveBeenCalledTimes(1)
   })
 })
+
+
+it("removing a path refreshes books and ignores an older in-flight list", async () => {
+  const { webPhotoLibraryService: service } = await import("./web-photo-library-service")
+  photoApiMocks.listPhotos.mockResolvedValueOnce({ items: [photoListItem("old")], total: 1 })
+  await service.reloadPhotosFromApi()
+  let resolveOld!: (value: unknown) => void
+  photoApiMocks.listPhotos.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+  const stale = service.reloadPhotosFromApi()
+  photoApiMocks.deletePhotoLibraryPath.mockResolvedValueOnce(undefined)
+  photoApiMocks.listPhotos.mockResolvedValueOnce({ items: [photoListItem("remaining")], total: 1 })
+  await service.removePhotoLibraryPath("removed")
+  resolveOld({ items: [photoListItem("old")], total: 1 })
+  await stale
+  expect(service.photos.value.map(book => book.id)).toEqual(["remaining"])
+})
+
+it("successful path removal clears stale books even if refresh fails", async () => {
+  const { webPhotoLibraryService: service } = await import("./web-photo-library-service")
+  photoApiMocks.listPhotos.mockResolvedValueOnce({ items: [photoListItem("old")], total: 1 })
+  await service.reloadPhotosFromApi()
+  photoApiMocks.deletePhotoLibraryPath.mockResolvedValueOnce(undefined)
+  photoApiMocks.listPhotos.mockRejectedValueOnce(new Error("offline"))
+  await service.removePhotoLibraryPath("removed")
+  expect(service.photos.value).toEqual([])
+  expect(service.photosLoaded.value).toBe(false)
+})
