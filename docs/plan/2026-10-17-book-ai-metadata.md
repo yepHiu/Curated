@@ -57,3 +57,12 @@
 - 已重新编译并重启开发后端。两条历史失败任务（1 本 + 4 本）均已通过原任务 retry 接口重试。真实模型全部成功，任务中心接口返回待确认 1/4 本、失败 0、已应用 0；使用 book-metadata-v2，提案未应用。
 
 - 最终后端回归：`go test ./internal/app ./internal/agent/prompts ./internal/storage ./internal/server` 全部通过，`go vet ./internal/app ./internal/agent/prompts` 通过；开发后端健康检查正常。
+
+
+## 批量确认写入限流修复（2026-10-17）
+
+- 现场最近漫画任务 4 本中 2 本应用成功，2 本审计返回 AI_RATE_LIMITED，条目仍为 ready；写真任务已全部应用。原前端将额度不足统一显示成部分失败/可能原资料变化，并清空选择。
+- 保留全局写入限额。HTTP 限流返回 429 与 Retry-After: 60；前端遇 AI_RATE_LIMITED 显示倒计时，60 秒后重试原 bookId/revision/decision，逐项继续，不重新调用模型。每条最多等待 3 次，仍受限则暂停并保留待确认选择。
+- 停止等待、卸载详情、切换任务和失去写权限均终止后续自动应用；已成功项移出选择，失败/未完成项在刷新后仍匹配同一版本时保留选择。只有实际冲突才提示来源变化。
+- 前端 13 项测试通过，覆盖同版本重试、成功后继续下一项、4 种停止场景、重试次数上限与原有结果确认；server/core 回归及 server go vet 通过，lint、类型检查与 Web API 生产构建通过。
+- 对用户刚才已确认但受限的两个漫画条目沿用 revision=1 再次调用 review，未重新识别。实际任务返回 completed / applied=4 / pendingReview=0 / failed=0。
