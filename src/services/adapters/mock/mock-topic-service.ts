@@ -1,3 +1,4 @@
+import { randomUuid } from "@/lib/random-uuid"
 import type { Movie } from "@/domain/movie/types"
 import type { HomepageTopicGroup, LibraryTopic, TagOrganizationJob, TagOrganizationItem, TagOrganizationService, TopicLibraryService } from "@/services/contracts/topic-service"
 
@@ -82,7 +83,7 @@ export function createMockTopicServices(movies: () => readonly Movie[], patch: (
       const selected = movies().filter((m) => { /* 模拟范围快照。 */ return !m.trashedAt && (scope === "all" || (scope === "selected" ? movieIds?.includes(m.id) : analysisStatus(m) === scope)) })
       if (!selected.length) throw new Error("AI_ORGANIZATION_NO_MOVIES")
       const now = new Date().toISOString()
-      const job: TagOrganizationJob = { tasks: [...tasks], id: crypto.randomUUID(), taskId: "", status: "running", stage: "classifying", triggerReason: "manual", total: selected.length, processed: 0, succeeded: 0, unresolved: 0, failed: 0, revision: 1, createdAt: now, updatedAt: now }
+      const job: TagOrganizationJob = { tasks: [...tasks], id: randomUuid(), taskId: "", status: "running", stage: "classifying", triggerReason: "manual", total: selected.length, processed: 0, succeeded: 0, unresolved: 0, failed: 0, revision: 1, createdAt: now, updatedAt: now }
       job.taskId = job.id; state.jobs.unshift(job)
       const batch: MockTopicBatch = { before: {}, after: {}, items: [] }; state.batches[job.id] = batch
       for (const movie of selected) {

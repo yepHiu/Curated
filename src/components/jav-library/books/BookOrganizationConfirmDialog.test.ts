@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { ref } from "vue"
-import { beforeEach, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import { i18n } from "@/i18n"
 import BookOrganizationConfirmDialog from "./BookOrganizationConfirmDialog.vue"
 
@@ -11,6 +11,7 @@ vi.mock("@/composables/use-server-local-access", () => ({ useServerLocalAccess: 
 vi.mock("@/composables/use-app-toast", () => ({ pushAppToast: vi.fn() }))
 vi.mock("@/components/ui/dialog", () => ({ Dialog: { props: ["open"], template: '<section v-if="open" role="dialog"><slot /></section>' }, ...Object.fromEntries(["DialogContent", "DialogHeader", "DialogTitle", "DialogDescription", "DialogFooter"].map(name => [name, { template: '<div><slot /></div>' }])) }))
 beforeEach(() => { vi.clearAllMocks(); i18n.global.locale.value = "zh-CN" })
+afterEach(() => vi.unstubAllGlobals())
 const books = [{ id: "a", title: "原文标题", sourceFileName: "source.zip" }]
 function setup() { return mount(BookOrganizationConfirmDialog, { props: { kind: "comic" }, global: { plugins: [i18n], stubs: { RouterLink: { template: '<a><slot /></a>' } } } }) }
 
@@ -25,6 +26,8 @@ it("opening or cancelling the scope dialog never submits work", async () => {
 })
 
 it("submits the frozen selection and reuses its request ID after a failed response", async () => {
+  const source = globalThis.crypto
+  vi.stubGlobal("crypto", { getRandomValues: source.getRandomValues.bind(source) })
   const wrapper = setup()
   api.start.mockRejectedValueOnce(new Error("connection lost")).mockResolvedValueOnce({ id: "job" })
   wrapper.vm.openFor(books); await flushPromises()

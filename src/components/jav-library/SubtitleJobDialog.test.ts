@@ -26,11 +26,30 @@ beforeEach(() => {
   mocks.settings.mockResolvedValue({ enabled: true, canManage: true, apiKeyConfigured: true, translationModel: "qwen-flash", configuredModel: "custom" })
   mocks.jobs.mockResolvedValue([]); mocks.audioTracks.mockResolvedValue([{ index: 0, language: "ja", title: "", codec: "aac", channels: 2 }]); mocks.create.mockResolvedValue(running)
 })
-afterEach(() => { stopSubtitleTracking() })
+afterEach(() => { stopSubtitleTracking(); vi.unstubAllGlobals() })
 const button = (wrapper: ReturnType<typeof mount>, label: string) => wrapper.findAll("button").find(item => item.text() === label)!
 
 describe("subtitle creation and shared task details", () => {
-  it("starts only on request, switches the same dialog to task details, and never cancels on close", async () => {
+  it("mounts while closed and opens remote history on LAN HTTP without randomUUID", async () => {
+    const source = globalThis.crypto
+    vi.stubGlobal("crypto", { getRandomValues: source.getRandomValues.bind(source) })
+    mocks.settings.mockResolvedValue({ enabled: true, canManage: false, apiKeyConfigured: true, translationModel: "qwen-plus" })
+    mocks.jobs.mockResolvedValue([{ ...running, state: "completed" }])
+    const wrapper = mount(SubtitleJobDialog, { props: { open: false, movie } })
+    try {
+      await wrapper.setProps({ open: true }); await flushPromises()
+      expect(button(wrapper, "subtitles.start").attributes("disabled")).toBeDefined()
+      await wrapper.get('[data-subtitle-history] button').trigger("click")
+      expect(wrapper.getComponent(TaskDetailDialog).props("taskKey")).toBe("subtitle:job")
+      expect(mocks.create).not.toHaveBeenCalled()
+    } finally { wrapper.unmount() }
+  })
+
+  it.each([true, false])("starts only on request and shows details with native randomUUID available: %s", async (nativeUuid) => {
+    if (!nativeUuid) {
+      const source = globalThis.crypto
+      vi.stubGlobal("crypto", { getRandomValues: source.getRandomValues.bind(source) })
+    }
     const wrapper = mount(SubtitleJobDialog, { props: { open: true, movie } }); await flushPromises()
     expect(mocks.create).not.toHaveBeenCalled()
     await button(wrapper, "subtitles.start").trigger("click"); await flushPromises()

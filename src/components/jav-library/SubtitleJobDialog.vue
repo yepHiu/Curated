@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { randomUuid } from "@/lib/random-uuid"
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { ArrowLeft, ChevronRight } from "lucide-vue-next"
@@ -32,7 +33,7 @@ const jobs = ref<SubtitleJob[]>([])
 const busy = ref(false)
 const loading = ref(false)
 const error = ref("")
-const requestId = ref(crypto.randomUUID())
+const requestId = ref(randomUuid())
 const selectedTaskKey = ref("")
 const setupEl = ref<HTMLElement>()
 let generation = 0, trackRevision = 0
@@ -66,7 +67,7 @@ watch(() => [props.open, props.movie.id] as const, async ([open]) => {
 
 watch([() => props.open, () => props.movie.id, fileId], async ([open]) => {
   const seq = ++trackRevision
-  requestId.value = crypto.randomUUID(); tracks.value = []; audioTrack.value = "0"; tracksError.value = ""
+  requestId.value = randomUuid(); tracks.value = []; audioTrack.value = "0"; tracksError.value = ""
   tracksLoading.value = open
   if (!open) return
   try {
@@ -96,7 +97,7 @@ async function start() {
     window.dispatchEvent(new Event("curated:task-center-updated"))
     if (seq === generation) {
       jobs.value = [result, ...jobs.value.filter(job => job.id !== result.id)]
-      requestId.value = crypto.randomUUID()
+      requestId.value = randomUuid()
       selectedTaskKey.value = `subtitle:${result.id}`
     }
   } catch (e) { if (seq === generation) error.value = e instanceof Error ? e.message : String(e) }

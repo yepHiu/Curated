@@ -1,10 +1,20 @@
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
+afterEach(() => vi.unstubAllGlobals())
 const state = vi.hoisted(() => ({ locale: { value: "zh-CN" }, delete: vi.fn().mockResolvedValue(undefined), post: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({ total: 3, organized: 1, unorganized: 1, outdated: 1, needsAttention: 0, unresolved: 0 }) }))
 vi.mock("@/i18n", () => ({ i18n: { global: { locale: state.locale } } }))
 vi.mock("@/api/http-client", () => ({ httpClient: { delete: state.delete, post: state.post, get: state.get } }))
 import { webTagOrganization } from "./web-topic-service"
 
 describe("topic label language", () => {
+  it("submits organization with a UUID on LAN HTTP without randomUUID", async () => {
+    const source = globalThis.crypto
+    vi.stubGlobal("crypto", { getRandomValues: source.getRandomValues.bind(source) })
+    await webTagOrganization.startTagOrganization("selected", ["synthetic"], ["title"])
+    expect(state.post).toHaveBeenLastCalledWith("/ai/tag-organizations", expect.objectContaining({
+      scope: "selected", movieIds: ["synthetic"], tasks: ["title"],
+      requestId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+    }))
+  })
   it("paginates issue records without starting a model task", async () => {
     state.get.mockResolvedValueOnce({ items: [{ movieId: 'problem', reason: 'SOURCE_TOO_LONG' }] })
     const calls = state.post.mock.calls.length

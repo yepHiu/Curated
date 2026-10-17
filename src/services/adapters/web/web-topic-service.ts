@@ -1,3 +1,4 @@
+import { randomUuid } from "@/lib/random-uuid"
 import { i18n } from "@/i18n"
 import { httpClient } from "@/api/http-client"
 import type { MovieListItemDTO } from "@/api/types"
@@ -40,7 +41,7 @@ export const webTagOrganization: TagOrganizationService = {
   /** 重连读取快照，不重放完成提示。 */
   async listTagOrganizations() { return (await httpClient.get<{ items: TagOrganizationJob[] }>("/ai/tag-organizations")).items },
   /** 显式发起后后台独立运行，按钮忙碌态防止重复提交。 */
-  startTagOrganization(scope, movieIds, tasks) { return httpClient.post<TagOrganizationJob>("/ai/tag-organizations", { scope, movieIds, tasks, locale: i18n.global.locale.value, requestId: crypto.randomUUID() }) },
+  startTagOrganization(scope, movieIds, tasks) { return httpClient.post<TagOrganizationJob>("/ai/tag-organizations", { scope, movieIds, tasks, locale: i18n.global.locale.value, requestId: randomUuid() }) },
   /** 取消不撤销已应用结果。 */
   cancelTagOrganization(id) { return httpClient.post<TagOrganizationJob>(`/ai/tag-organizations/${encodeURIComponent(id)}/cancel`) },
   /** 重试只处理后端保留的未完成项。 */

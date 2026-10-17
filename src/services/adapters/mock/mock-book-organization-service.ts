@@ -1,3 +1,4 @@
+import { randomUuid } from "@/lib/random-uuid"
 import type { BookKind, BookOrganizationJob, BookOrganizationItem, BookOrganizationService, BookOrganizationRequest } from "@/services/contracts/book-organization-service"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { mockComicLibraryService, applyMockComicMetadata } from "./mock-comic-library-service"
@@ -45,7 +46,7 @@ export const mockBookOrganizationService: BookOrganizationService = {
     }
     if (!request.bookIds.length || request.bookIds.length > 600 || new Set(request.bookIds).size !== request.bookIds.length) throw new Error("BAD_REQUEST")
     const now = new Date().toISOString()
-    const job: BookOrganizationJob = { id: crypto.randomUUID(), kind: request.kind, locale: request.locale, status: "queued", stage: "queued", total: request.bookIds.length, processed: 0, pendingReview: 0, applied: 0, failed: 0, createdAt: now, updatedAt: now }
+    const job: BookOrganizationJob = { id: randomUuid(), kind: request.kind, locale: request.locale, status: "queued", stage: "queued", total: request.bookIds.length, processed: 0, pendingReview: 0, applied: 0, failed: 0, createdAt: now, updatedAt: now }
     const record: Record = { job, request, items: request.bookIds.map(bookId => { const before = bookState(request.kind, bookId); return { bookId, title: before.title, before, metadata: { cleanTitle: "", translatedTitle: "" }, status: "pending", revision: 0, reason: "" } }) }
     // Mock resolves immediately and persists reviewable results; reads never generate work.
     simulate(record); records.push(record); save(records)

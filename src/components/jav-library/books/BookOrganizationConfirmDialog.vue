@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { randomUuid } from "@/lib/random-uuid"
 import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { LoaderCircle } from "lucide-vue-next"
@@ -22,7 +23,7 @@ const invalid = computed(() => selection.value.length === 0 || selection.value.l
 function openFor(books: readonly SelectedBook[]) {
   if (!canSubmit.value || busy.value || !books.length) return
   selection.value = books.map(book => ({ id: book.id, title: book.title, sourceFileName: book.sourceFileName }))
-  requestId = crypto.randomUUID(); targetLocale = locale.value; error.value = ""; open.value = true
+  requestId = randomUuid(); targetLocale = locale.value; error.value = ""; open.value = true
 }
 defineExpose({ openFor, canSubmit, isOpen: open })
 async function start() {
