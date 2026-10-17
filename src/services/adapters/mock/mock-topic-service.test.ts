@@ -93,3 +93,18 @@ it("persists deleted history without changing tags, coverage or problems", async
  expect(await service.listTagOrganizations()).toEqual([])
  expect(await service.getTagOrganizationStats()).toEqual(stats)
 })
+
+it("persists translation-only choices without touching tags or coverage", async () => {
+ const { createMockTopicServices } = await import("./mock-topic-service")
+ const movies = [{ id: "a", title: "Original", summary: "Synopsis", tags: ["Theme"], userTags: ["Personal"] }] as Movie[]
+ const patchTags = vi.fn(), patchDisplay = vi.fn().mockResolvedValue(undefined)
+ const service = createMockTopicServices(() => movies, patchTags, patchDisplay)
+ const job = await service.startTagOrganization("selected", ["a"], ["title", "summary"])
+ expect(job.tasks).toEqual(["title", "summary"])
+ expect(job.succeeded).toBe(1)
+ expect(patchTags).not.toHaveBeenCalled()
+ expect(patchDisplay).toHaveBeenCalledWith("a", { userTitle: "[Mock] Original" })
+ expect(patchDisplay).toHaveBeenCalledWith("a", { userSummary: "[Mock] Synopsis" })
+ expect((await service.getTagOrganizationStats()).unorganized).toBe(1)
+ expect((await service.getTagOrganizationItems(job.id))[0]?.translations).toHaveLength(2)
+})

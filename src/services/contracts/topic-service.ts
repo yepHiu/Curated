@@ -8,7 +8,10 @@ export interface LibraryTopic {
   hidden: boolean
 }
 export interface HomepageTopicGroup { topic: LibraryTopic; movies: Movie[] }
+export type OrganizationTask = "tags" | "title" | "summary"
 export interface TagOrganizationJob {
+  tasks?: OrganizationTask[]
+  translationProcessed?: number
   locale?: "zh-CN" | "en" | "ja"
   id: string
   taskId: string
@@ -34,6 +37,7 @@ export interface TopicLibraryService {
   setTopicHidden(id: string, hidden: boolean): Promise<void>
 }
 export interface TagOrganizationItem {
+  translations?: { kind: OrganizationTask; status: string; reason: string }[]
   movieId: string
   title: string
   status: string
@@ -55,7 +59,7 @@ export interface TagOrganizationService {
   getTagOrganizationStats(): Promise<TagOrganizationStats>
   getTagOrganizationItems(id: string, offset?: number): Promise<TagOrganizationItem[]>
   listTagOrganizations(): Promise<TagOrganizationJob[]>
-  startTagOrganization(scope: TagOrganizationScope, movieIds?: string[]): Promise<TagOrganizationJob>
+  startTagOrganization(scope: TagOrganizationScope, movieIds?: string[], tasks?: OrganizationTask[]): Promise<TagOrganizationJob>
   cancelTagOrganization(id: string): Promise<TagOrganizationJob>
   deleteTagOrganization(id: string): Promise<void>
   retryTagOrganization(id: string): Promise<TagOrganizationJob>

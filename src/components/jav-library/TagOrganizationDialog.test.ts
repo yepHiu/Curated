@@ -8,13 +8,13 @@ import SidebarTagOrganizationEntry from "./SidebarTagOrganizationEntry.vue"
 import MovieLibraryContextMenu from "./MovieLibraryContextMenu.vue"
 import type { Movie } from "@/domain/movie/types"
 
-const state = vi.hoisted(() => ({ start: vi.fn(), remove: vi.fn(), cancel: vi.fn(), retry: vi.fn(), undo: vi.fn(), openSelected: vi.fn(), refreshStats: vi.fn(), refresh: vi.fn(), getIssues: vi.fn(), retryMovie: vi.fn(), retryIssues: vi.fn(), getItems: vi.fn() }))
+const state = vi.hoisted(() => ({ start: vi.fn(), remove: vi.fn(), cancel: vi.fn(), retry: vi.fn(), undo: vi.fn(), openSelected: vi.fn(), refreshStats: vi.fn(), refresh: vi.fn(), getIssues: vi.fn(), retryMovie: vi.fn(), retryIssues: vi.fn(), getItems: vi.fn(), startSelected: vi.fn() }))
 const jobs = ref<TagOrganizationJob[]>([])
 const stats = ref({ total: 10, organized: 4, unorganized: 5, outdated: 1, needsAttention: 0, unresolved: 2 })
 const statsLoading = ref(false)
 const statsError = ref(false)
 const open = ref(true)
-const selection = ref<{ movieIds: string[]; title?: string } | null>(null)
+const selection = ref<{ movieIds: string[]; title?: string; movies?: { id: string; title: string; code: string }[] } | null>(null)
 vi.mock("@/composables/use-tag-organization", () => ({
   useTagOrganization: () => ({ ...state, jobs, selection, revision: ref(0), stats, statsLoading, statsError, active: computed(() => jobs.value.find((job) => job.status === "running")), dialogOpen: open, connected: ref(true), error: ref(""), busy: ref(false) }),
   isOrganizationActive: (job: TagOrganizationJob) => job.status === "running",
@@ -27,7 +27,7 @@ vi.mock("@/services/ai-service", () => ({ useAIService: () => ({ getTagOrganizat
 vi.mock("@/lib/experimental-agent", () => ({ useExperimentalAgent: () => ({ writeEnabled: ref(true) }) }))
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ locale: ref("en"), t: (key: string, values?: Record<string, unknown>) => values ? `${key}:${JSON.stringify(values)}` : key }) }))
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: { template: "<div><slot /></div>" }, DialogClose: { template: "<div><slot /></div>" }, DialogContent: { template: "<div><slot /></div>" }, DialogHeader: { template: "<header><slot /></header>" }, DialogTitle: { template: "<h2><slot /></h2>" }, DialogDescription: { template: "<p><slot /></p>" },
+  DialogFooter: { template: "<footer><slot /></footer>" }, Dialog: { template: "<div><slot /></div>" }, DialogClose: { template: "<div><slot /></div>" }, DialogContent: { template: "<div><slot /></div>" }, DialogHeader: { template: "<header><slot /></header>" }, DialogTitle: { template: "<h2><slot /></h2>" }, DialogDescription: { template: "<p><slot /></p>" },
 }))
 vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenu: { template: "<div><slot /></div>" }, DropdownMenuTrigger: { template: "<div><slot /></div>" }, DropdownMenuContent: { template: "<div><slot /></div>" }, DropdownMenuGroup: { template: "<div><slot /></div>" }, DropdownMenuItem: { template: "<button @click=\"$emit('select')\"><slot /></button>" },
@@ -104,12 +104,16 @@ it("keeps skipped movies for a user decision without retrying on read or dismiss
 })
 
 it("previews the captured single-movie scope and starts only on click", async () => {
- selection.value = { movieIds: ["one"], title: "Selected movie" }
+ selection.value = { movieIds: ["one"], title: "Selected movie", movies: [{ id: "one", title: "Selected movie", code: "CODE-001" }] }
  const wrapper = mount(TagOrganizationDialog)
- expect(wrapper.get("[data-organization-scope]").text()).toContain("Selected movie")
+ expect(wrapper.get("[data-organization-movies]").text()).toContain("Selected movie")
  expect(state.start).not.toHaveBeenCalled()
- await wrapper.get("[data-organization-scope] button").trigger("click")
- expect(state.start).toHaveBeenCalledOnce()
+ expect(wrapper.text()).toContain("CODE-001")
+ expect(wrapper.find("[data-organization-coverage]").exists()).toBe(false)
+ expect(wrapper.find("[data-organization-history]").exists()).toBe(false)
+ expect(state.refreshStats).not.toHaveBeenCalled()
+ await wrapper.get("[data-confirm-organization]").trigger("click")
+ expect(state.startSelected).toHaveBeenCalledWith(["tags"])
  wrapper.unmount()
 })
 

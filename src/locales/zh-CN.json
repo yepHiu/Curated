@@ -2455,7 +2455,7 @@
     "startSelected": "整理 {count} 部影片",
     "movieCount": "{count} 部影片",
     "heading": "从一个题材开始逛",
-    "organize": "AI 整理标签",
+    "organize": "AI 整理",
     "start": "整理整个片库",
     "explanation": "优先复用已有标签，按需补充新题材。仅整理用户标签，可停止或撤销。",
     "completed": "整理完成：已归类 {count} 部",
@@ -2527,7 +2527,10 @@
       "SOURCE_TOO_LONG": "影片资料过长，已跳过。可精简资料后再重试。",
       "MOVIE_UNAVAILABLE": "影片已移除或暂时不可用，已跳过。",
       "TAG_WRITE_REJECTED": "标签写入被拒绝，可能有后续人工修改；未覆盖新数据。",
-      "CHECKPOINT_FAILED": "保存整理进度失败，请检查服务器状态后重试。"
+      "CHECKPOINT_FAILED": "保存整理进度失败，请检查服务器状态后重试。",
+      "TRANSLATION_SOURCE_EMPTY": "没有可翻译的原文",
+      "TRANSLATION_EMPTY": "模型未返回译文",
+      "TRANSLATION_SOURCE_CHANGED": "原文或展示内容已修改，未覆盖"
     }
   },
   "subtitles": {
@@ -2636,7 +2639,7 @@
     "restart": "重新执行整个任务",
     "superseded": "此失败记录已由重新执行的任务接替，保留在历史中。",
     "viewReplacement": "查看接替任务",
-    "undo": "撤销整理结果",
+    "undo": "撤销标签整理",
     "close": "返回",
     "confirmAction": "确认",
     "actionFailed": "操作失败，请重新读取任务后重试。",
@@ -2721,7 +2724,8 @@
       "classifying": "分类并应用标签",
       "classify": "分类并应用标签",
       "done": "汇总结果",
-      "waiting_quota": "等待服务额度"
+      "waiting_quota": "等待服务额度",
+      "translating_metadata": "翻译影片资料"
     },
     "itemStates": {
       "pending": "待处理",
@@ -2735,8 +2739,24 @@
       "cancel": "停止后续处理。已经应用的标签和已保存的字幕成果会保留，取消不等于撤销。",
       "retry": "按原任务的检查点重试未完成部分；已有成功结果保留。若源文件、配置或检查点已失效，服务会提示重新发起。",
       "restart": "在当前任务上从头识别音频并翻译全部字幕，任务编号保持不变，状态重置为排队中。使用当前字幕设置中的识别与翻译模型及最新提示词，保留原文件、音轨选择和已有成品，不复用旧检查点；会重新产生识别和翻译费用。",
-      "undo": "恢复本次整理应用的用户标签。后续人工修改或其他任务产生的冲突会被跳过，并报告恢复与冲突数量。"
+      "undo": "仅撤销本次标签整理，保留翻译结果和之后的人工修改。"
     }
+  },
+  "organizationConfirm": {
+    "title": "确认 AI 整理",
+    "description": "请核对影片与番号，并选择本次要执行的任务。",
+    "movies": "本次整理的影片",
+    "code": "番号",
+    "tasks": "整理任务",
+    "options": {
+      "tags": "AI 整理标签",
+      "title": "AI 翻译标题",
+      "summary": "AI 翻译简介"
+    },
+    "translationHint": "翻译为当前界面语言，并替换对应的用户展示内容；刮削原文保留。",
+    "confirm": "确认并开始",
+    "submitting": "正在提交…",
+    "submitted": "已提交 AI 整理任务，可在任务中心查看。"
   },
   "bookAI": {
     "action": "AI 整理资料",

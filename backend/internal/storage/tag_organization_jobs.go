@@ -13,8 +13,8 @@ var ErrNoOrganizationMovies = errors.New("no eligible movies")
 var ErrOrganizationActive = errors.New("organization is active")
 
 // CreateTagOrganization 固定任务范围并通过唯一约束限制并发；相同请求返回原任务。
-func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, reason, locale string, movieIDs []string) (string, error) {
-	return s.createTagOrganization(ctx, id, requestID, reason, locale, movieIDs, "selected")
+func (s *SQLiteStore) CreateTagOrganization(ctx context.Context, id, requestID, reason, locale string, movieIDs []string, tasks ...string) (string, error) {
+	return s.createTagOrganization(ctx, id, requestID, reason, locale, movieIDs, "selected", tasks...)
 }
 
 // CreateAllTagOrganization snapshots the active library without loading full movie DTOs.
@@ -30,7 +30,11 @@ func (s *SQLiteStore) CreateRemainingTagOrganization(ctx context.Context, id, re
 	return s.createTagOrganization(ctx, id, requestID, reason, locale, nil, scope)
 }
 
-func (s *SQLiteStore) createTagOrganization(ctx context.Context, id, requestID, reason, locale string, movieIDs []string, scope string) (string, error) {
+func (s *SQLiteStore) createTagOrganization(ctx context.Context, id, requestID, reason, locale string, movieIDs []string, scope string, tasks ...string) (string, error) {
+	if len(tasks) == 0 {
+		tasks = []string{"tags"}
+	}
+	taskJSON, _ := json.Marshal(tasks)
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return "", err
@@ -44,7 +48,7 @@ func (s *SQLiteStore) createTagOrganization(ctx context.Context, id, requestID, 
 	if err != sql.ErrNoRows {
 		return "", err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO ai_tag_organization_jobs(id,request_id,status,trigger_reason,locale,created_at,updated_at) VALUES(?,?,'queued',?,?,?,?)`, id, requestID, reason, locale, nowUTC(), nowUTC()); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO ai_tag_organization_jobs(id,request_id,status,trigger_reason,locale,created_at,updated_at,tasks_json) VALUES(?,?,'queued',?,?,?,?,?)`, id, requestID, reason, locale, nowUTC(), nowUTC(), string(taskJSON)); err != nil {
 		return "", err
 	}
 	if scope == "all" {
@@ -84,18 +88,33 @@ func (s *SQLiteStore) createTagOrganization(ctx context.Context, id, requestID, 
 	if count == 0 {
 		return "", ErrNoOrganizationMovies
 	}
+	for _, kind := range tasks {
+		if kind == "tags" {
+			continue
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO ai_organization_translations(job_id,movie_id,kind) SELECT job_id,movie_id,? FROM ai_tag_organization_items WHERE job_id=?`, kind, id); err != nil {
+			return "", err
+		}
+	}
 	return id, tx.Commit()
 }
 
 // GetTagOrganization 根据逐项检查点计算真实进度，重启不依赖内存计数。
 func (s *SQLiteStore) GetTagOrganization(ctx context.Context, id string) (contracts.TagOrganizationJobDTO, error) {
 	v := contracts.TagOrganizationJobDTO{}
-	err := s.db.QueryRowContext(ctx, `SELECT id,status,stage,trigger_reason,revision,created_at,updated_at,error,vocabulary_processed,vocabulary_ready,locale FROM ai_tag_organization_jobs WHERE id=? AND deleted_at=''`, id).Scan(&v.ID, &v.Status, &v.Stage, &v.TriggerReason, &v.Revision, &v.CreatedAt, &v.UpdatedAt, &v.Error, &v.VocabularyProcessed, &v.VocabularyReady, &v.Locale)
+	var taskJSON string
+	err := s.db.QueryRowContext(ctx, `SELECT id,status,stage,trigger_reason,revision,created_at,updated_at,error,vocabulary_processed,vocabulary_ready,locale,tasks_json FROM ai_tag_organization_jobs WHERE id=? AND deleted_at=''`, id).Scan(&v.ID, &v.Status, &v.Stage, &v.TriggerReason, &v.Revision, &v.CreatedAt, &v.UpdatedAt, &v.Error, &v.VocabularyProcessed, &v.VocabularyReady, &v.Locale, &taskJSON)
 	if err != nil {
+		return v, err
+	}
+	if err = json.Unmarshal([]byte(taskJSON), &v.Tasks); err != nil {
 		return v, err
 	}
 	v.TaskID = v.ID
 	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*),COALESCE(SUM(status!='pending'),0),COALESCE(SUM(status='succeeded'),0),COALESCE(SUM(status='unresolved'),0),COALESCE(SUM(status IN ('failed','conflict')),0) FROM ai_tag_organization_items WHERE job_id=?`, id).Scan(&v.Total, &v.Processed, &v.Succeeded, &v.Unresolved, &v.Failed)
+	if err == nil && len(v.Tasks) > 0 && (len(v.Tasks) > 1 || v.Tasks[0] != "tags") {
+		err = s.organizationCounts(ctx, &v)
+	}
 	return v, err
 }
 
@@ -213,7 +232,22 @@ func (s *SQLiteStore) TagOrganizationItems(ctx context.Context, id string, pendi
 		}
 		out = append(out, v)
 	}
-	return out, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	_ = rows.Close()
+	if !pending {
+		job, e := s.GetTagOrganization(ctx, id)
+		if e != nil {
+			return nil, e
+		}
+		for i := range out {
+			if e = s.mergeOrganizationTranslations(ctx, id, job.Tasks, &out[i]); e != nil {
+				return nil, e
+			}
+		}
+	}
+	return out, nil
 }
 
 // SetTagOrganizationItem 仅记录尚未提交项的失败／待归类，不覆盖成功检查点。
@@ -257,6 +291,9 @@ func (s *SQLiteStore) RetryTagOrganization(ctx context.Context, id string) error
 	}
 	if undone > 0 || status == "running" || status == "queued" || status == "completed" {
 		return fmt.Errorf("job cannot be retried")
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE ai_organization_translations SET status='pending',reason='' WHERE job_id=? AND status IN ('failed','conflict')`, id); err != nil {
+		return err
 	}
 	// Revisit vocabulary only for pending items when a preparation failure is retried.
 	if _, err = tx.ExecContext(ctx, `UPDATE ai_tag_organization_jobs SET vocabulary_processed=0,vocabulary_ready=0 WHERE id=? AND EXISTS(SELECT 1 FROM ai_tag_organization_items i WHERE i.job_id=? AND i.status IN ('failed','conflict') AND i.reason LIKE 'VOCABULARY_%')`, id, id); err != nil {

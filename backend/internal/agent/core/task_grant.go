@@ -4,6 +4,7 @@ import "context"
 
 const PermissionUserTagTask = "user-tag-task"
 const UserTagTaskApplyName = "apply_organization_user_tags"
+const OrganizationTranslationApplyName = "apply_organization_translation"
 
 type userTagTaskGrantKey struct{}
 
@@ -15,5 +16,5 @@ func WithUserTagTaskGrant(ctx context.Context, jobID string) context.Context {
 // hasUserTagTaskGrant 验证工具、通道与任务范围身份，不扩展普通写工具权限。
 func hasUserTagTaskGrant(ctx context.Context, call Call) bool {
 	jobID, _ := ctx.Value(userTagTaskGrantKey{}).(string)
-	return jobID != "" && jobID == call.SessionID && call.Name == UserTagTaskApplyName && call.Channel == ChannelAction
+	return jobID != "" && jobID == call.SessionID && (call.Name == UserTagTaskApplyName || call.Name == OrganizationTranslationApplyName) && call.Channel == ChannelAction
 }

@@ -18,7 +18,7 @@ export function projectSubtitle(j: SubtitleJob): CenterTask {
   return { key: `subtitle:${j.id}`, id: j.id, kind: "subtitle", state: taskState(j.state, j.stage), stage: j.stage, completed: j.completed, total: j.total, unit: j.stage === "translating" ? "cues" : "segments", createdAt: j.createdAt, updatedAt: j.updatedAt, canManage: true, subtitle: j }
 }
 export function projectOrganization(j: TagOrganizationJob): CenterTask {
-  return { key: `organize:${j.id}`, id: j.id, kind: "organize", state: taskState(j.status, j.stage), stage: j.stage, completed: j.stage === "vocabulary" ? j.vocabularyProcessed ?? 0 : j.processed, total: j.total, unit: "movies", createdAt: j.createdAt, updatedAt: j.updatedAt, canManage: true, organization: j }
+  return { key: `organize:${j.id}`, id: j.id, kind: "organize", state: taskState(j.status, j.stage), stage: j.stage, completed: j.stage === "vocabulary" ? j.vocabularyProcessed ?? 0 : j.stage === "translating_metadata" ? j.translationProcessed ?? 0 : j.processed, total: j.total, unit: "movies", createdAt: j.createdAt, updatedAt: j.updatedAt, canManage: true, organization: j }
 }
 export function summarizeTasks(tasks: CenterTask[]): TaskSummary {
   return { total: tasks.length, running: tasks.filter(t => t.state === "running").length, queued: tasks.filter(t => t.state === "queued").length, waiting: tasks.filter(t => t.state === "waiting").length, attention: tasks.filter(taskAttention).length, history: tasks.filter(taskHistory).length }

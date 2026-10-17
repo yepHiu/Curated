@@ -17,6 +17,7 @@ type HomepageTopicGroupDTO struct {
 
 // TagOrganizationRequest 固定影片范围和标签语言，不接受元数据写字段。
 type TagOrganizationRequest struct {
+	Tasks     []string `json:"tasks,omitempty"`
 	Locale    string   `json:"locale,omitempty"`
 	Scope     string   `json:"scope"`
 	MovieIDs  []string `json:"movieIds,omitempty"`
@@ -36,23 +37,25 @@ type TagOrganizationStatsDTO struct {
 
 // TagOrganizationJobDTO 保存可恢复整理的真实进度和触发来源。
 type TagOrganizationJobDTO struct {
-	Locale              string `json:"locale"`
-	VocabularyProcessed int    `json:"vocabularyProcessed"`
-	VocabularyReady     bool   `json:"vocabularyReady"`
-	ID                  string `json:"id"`
-	TaskID              string `json:"taskId"`
-	Status              string `json:"status"`
-	Stage               string `json:"stage"`
-	TriggerReason       string `json:"triggerReason"`
-	Total               int    `json:"total"`
-	Processed           int    `json:"processed"`
-	Succeeded           int    `json:"succeeded"`
-	Unresolved          int    `json:"unresolved"`
-	Failed              int    `json:"failed"`
-	Revision            int64  `json:"revision"`
-	CreatedAt           string `json:"createdAt"`
-	UpdatedAt           string `json:"updatedAt"`
-	Error               string `json:"error,omitempty"`
+	Tasks                []string `json:"tasks"`
+	TranslationProcessed int      `json:"translationProcessed"`
+	Locale               string   `json:"locale"`
+	VocabularyProcessed  int      `json:"vocabularyProcessed"`
+	VocabularyReady      bool     `json:"vocabularyReady"`
+	ID                   string   `json:"id"`
+	TaskID               string   `json:"taskId"`
+	Status               string   `json:"status"`
+	Stage                string   `json:"stage"`
+	TriggerReason        string   `json:"triggerReason"`
+	Total                int      `json:"total"`
+	Processed            int      `json:"processed"`
+	Succeeded            int      `json:"succeeded"`
+	Unresolved           int      `json:"unresolved"`
+	Failed               int      `json:"failed"`
+	Revision             int64    `json:"revision"`
+	CreatedAt            string   `json:"createdAt"`
+	UpdatedAt            string   `json:"updatedAt"`
+	Error                string   `json:"error,omitempty"`
 }
 
 // TopicEvidenceDTO 只提供已核对的原文片段，不暴露路径或完整模型输入。
@@ -64,11 +67,18 @@ type TopicEvidenceDTO struct {
 
 // TagOrganizationItemDTO exposes only validated excerpts and the movie display identity.
 type TagOrganizationItemDTO struct {
-	Title    string             `json:"title"`
-	Evidence []TopicEvidenceDTO `json:"evidence"`
-	MovieID  string             `json:"movieId"`
-	Status   string             `json:"status"`
-	Reason   string             `json:"reason"`
+	Translations []OrganizationTranslationDTO `json:"translations,omitempty"`
+	Title        string                       `json:"title"`
+	Evidence     []TopicEvidenceDTO           `json:"evidence"`
+	MovieID      string                       `json:"movieId"`
+	Status       string                       `json:"status"`
+	Reason       string                       `json:"reason"`
+}
+
+type OrganizationTranslationDTO struct {
+	Kind   string `json:"kind"`
+	Status string `json:"status"`
+	Reason string `json:"reason"`
 }
 
 // TagOrganizationUndoDTO 明确区分成功恢复和因新修改而跳过的影片。

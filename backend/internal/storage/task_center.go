@@ -147,6 +147,9 @@ func (s *SQLiteStore) TaskCenterTask(ctx context.Context, key string) (contracts
 		if j.Stage == "vocabulary" {
 			out.Completed = j.VocabularyProcessed
 		}
+		if j.Stage == "translating_metadata" {
+			out.Completed = j.TranslationProcessed
+		}
 		out.CreatedAt = j.CreatedAt
 		out.UpdatedAt = j.UpdatedAt
 		out.Organization = &j

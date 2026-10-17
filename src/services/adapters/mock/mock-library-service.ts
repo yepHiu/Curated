@@ -1157,6 +1157,7 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
 export const mockTopicServices = createMockTopicServices(
   () => { /* 延迟访问已初始化的 Mock 资料库。 */ return mockLibraryService.movies.value },
   (id, tags) => { /* 模拟整理仅走用户标签字段。 */ return mockLibraryService.patchMovie(id, { userTags: tags }) },
+  (id, patch) => mockLibraryService.patchMovie(id, patch),
 )
 
 export const mockLibraryService: LibraryService = {

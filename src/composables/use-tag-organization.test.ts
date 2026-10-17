@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { TagOrganizationJob } from "@/services/contracts/topic-service"
 
-const api = vi.hoisted(() => ({ deleteTagOrganization: vi.fn().mockResolvedValue(undefined), getTagOrganizationStats: vi.fn(), listTagOrganizations: vi.fn(), startTagOrganization: vi.fn(), reloadMoviesFromApi: vi.fn().mockResolvedValue(undefined) }))
+const api = vi.hoisted(() => ({ getMovieById: vi.fn((id: string) => ({ id, title: id, code: id })), deleteTagOrganization: vi.fn().mockResolvedValue(undefined), getTagOrganizationStats: vi.fn(), listTagOrganizations: vi.fn(), startTagOrganization: vi.fn(), reloadMoviesFromApi: vi.fn().mockResolvedValue(undefined) }))
 const toast = vi.hoisted(() => vi.fn())
 const notify = vi.hoisted(() => vi.fn())
 vi.mock("@/services/ai-service", () => ({ useAIService: () => api }))
@@ -178,3 +178,26 @@ it("does not delete active tasks or hide records when deletion fails", async () 
  expect(state.error.value).toBe("Delete failed")
  expect(toast).not.toHaveBeenCalled()
 })
+
+ it("submits selected actions once and closes only after acceptance", async () => {
+  const state = useTagOrganization()
+  state.openSelected(["one", "two"])
+  let accept!: (job: TagOrganizationJob) => void
+  api.startTagOrganization.mockReturnValueOnce(new Promise(resolve => { accept = resolve }))
+  const pending = state.startSelected(["title", "summary"])
+  await state.startSelected(["tags"])
+  expect(api.startTagOrganization).toHaveBeenCalledOnce()
+  expect(api.startTagOrganization).toHaveBeenCalledWith("selected", ["one", "two"], ["title", "summary"])
+  expect(state.dialogOpen.value).toBe(true)
+  accept(job("new", "queued")); await pending
+  expect(state.dialogOpen.value).toBe(false)
+ })
+
+ it("keeps the confirmation open when submission fails", async () => {
+  const state = useTagOrganization(); state.openSelected(["one"])
+  api.startTagOrganization.mockRejectedValueOnce(new Error("offline"))
+  expect(await state.startSelected(["title"])).toBe(false)
+  expect(state.dialogOpen.value).toBe(true)
+  expect(state.error.value).toBeTruthy()
+  expect(state.busy.value).toBe(false)
+ })

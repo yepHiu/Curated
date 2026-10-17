@@ -2455,7 +2455,7 @@
     "startSelected": "Organize {count} movies",
     "movieCount": "{count} movies",
     "heading": "Start with a theme",
-    "organize": "Organize tags with AI",
+    "organize": "AI organization",
     "start": "Organize the library",
     "explanation": "Reuse existing labels first and add subjects when needed. Only user tags change; you can stop or undo.",
     "completed": "Organized {count} movies",
@@ -2527,7 +2527,10 @@
       "SOURCE_TOO_LONG": "Movie data is too long; skipped. Shorten it before retrying.",
       "MOVIE_UNAVAILABLE": "The movie was removed or is unavailable; skipped.",
       "TAG_WRITE_REJECTED": "Tag write rejected, possibly due to later manual edits. New data was preserved.",
-      "CHECKPOINT_FAILED": "Unable to save progress. Check server state and retry."
+      "CHECKPOINT_FAILED": "Unable to save progress. Check server state and retry.",
+      "TRANSLATION_SOURCE_EMPTY": "No source text to translate",
+      "TRANSLATION_EMPTY": "The model returned no translation",
+      "TRANSLATION_SOURCE_CHANGED": "Source or display text changed; no overwrite"
     }
   },
   "subtitles": {
@@ -2636,7 +2639,7 @@
     "restart": "Restart entire task",
     "superseded": "A restarted task has superseded this failed record, which remains in history.",
     "viewReplacement": "View replacement task",
-    "undo": "Undo organization",
+    "undo": "Undo tag organization",
     "close": "Back",
     "confirmAction": "Confirm",
     "actionFailed": "Action failed. Refresh the task and try again.",
@@ -2721,7 +2724,8 @@
       "classifying": "Classifying and applying tags",
       "classify": "Classifying and applying tags",
       "done": "Results recorded",
-      "waiting_quota": "Waiting for quota"
+      "waiting_quota": "Waiting for quota",
+      "translating_metadata": "Translating movie metadata"
     },
     "itemStates": {
       "pending": "Pending",
@@ -2735,8 +2739,24 @@
       "cancel": "Stop subsequent work. Applied tags and saved subtitles are retained. Cancellation does not undo results.",
       "retry": "Retry unfinished work using the original checkpoints and retain successful results. Invalid sources, settings or checkpoints may require a new task.",
       "restart": "Run audio recognition and all subtitle translation again on this task. Its ID stays the same and its state returns to queued. Uses current subtitle recognition/translation models and the latest prompt, keeping the original file, audio track and existing outputs without reusing old checkpoints. Recognition and translation will be charged again.",
-      "undo": "Restore user tags changed by this task. Later edits and conflicts are skipped and reported."
+      "undo": "Undo only the tags from this run. Keep translations and later manual edits."
     }
+  },
+  "organizationConfirm": {
+    "title": "Confirm AI organization",
+    "description": "Check the movies and codes, then select the tasks to run.",
+    "movies": "Selected movies",
+    "code": "Code",
+    "tasks": "Tasks",
+    "options": {
+      "tags": "Organize tags with AI",
+      "title": "Translate titles with AI",
+      "summary": "Translate synopses with AI"
+    },
+    "translationHint": "Translations use the interface language and replace the selected display fields. Scraped originals are preserved.",
+    "confirm": "Confirm and start",
+    "submitting": "Submitting…",
+    "submitted": "AI organization submitted. View it in the task center."
   },
   "bookAI": {
     "action": "AI metadata",

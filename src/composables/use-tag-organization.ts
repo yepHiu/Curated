@@ -1,7 +1,7 @@
 import { computed, ref } from "vue"
 import { useAIService } from "@/services/ai-service"
 import { useLibraryService } from "@/services/library-service"
-import type { TagOrganizationJob, TagOrganizationStats, TagOrganizationScope } from "@/services/contracts/topic-service"
+import type { TagOrganizationJob, TagOrganizationStats, TagOrganizationScope, OrganizationTask } from "@/services/contracts/topic-service"
 import { HttpClientError } from "@/api/http-client"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useNotificationCenter } from "@/composables/use-notification-center"
@@ -12,7 +12,7 @@ const error = ref("")
 const busy = ref(false)
 const connected = ref(true)
 const dialogOpen = ref(false)
-const selection = ref<{ movieIds: string[]; title?: string } | null>(null)
+const selection = ref<{ movieIds: string[]; title?: string; movies: { id: string; title: string; code: string }[] } | null>(null)
 const revision = ref(0)
 const quiet = ref(false)
 const stats = ref<TagOrganizationStats | null>(null)
@@ -44,7 +44,11 @@ export function organizationProgressValue(job: TagOrganizationJob): number {
 
 /** Menus capture the current selection; later grid changes cannot expand the task. */
 function openSelected(movieIds: readonly string[], title?: string) {
-  selection.value = { movieIds: [...new Set(movieIds)], title }
+  const ids = [...new Set(movieIds)]
+  selection.value = { movieIds: ids, title, movies: ids.map(id => {
+    const movie = useLibraryService().getMovieById(id)
+    return { id, title: movie?.title || (ids.length === 1 ? title : "") || id, code: movie?.code || "—" }
+  }) }
   error.value = ""
   dialogOpen.value = true
 }
@@ -102,7 +106,7 @@ async function refreshJobs() {
       if (currentGeneration !== generation) return
       if (initialized) for (const job of next) {
         const previous = jobs.value.find((item) => { /* 用任务 ID 对账。 */ return item.id === job.id })
-        if (previous && isOrganizationActive(previous) && !isOrganizationActive(job)) { if (connected.value && job.status !== "cancelled") notifyResult(job); revision.value++; if (dialogOpen.value) void refreshStats(); void useLibraryService().reloadMoviesFromApi().catch(() => { /* 已有库错误状态负责展示。 */ }) }
+        if (previous && isOrganizationActive(previous) && !isOrganizationActive(job)) { if (connected.value && job.status !== "cancelled") notifyResult(job); revision.value++; if (dialogOpen.value && !selection.value) void refreshStats(); void useLibraryService().reloadMoviesFromApi().catch(() => { /* 已有库错误状态负责展示。 */ }) }
       }
       jobs.value = next; connected.value = true; initialized = true
     } catch { if (currentGeneration === generation) connected.value = false }
@@ -118,7 +122,7 @@ function onTaskEvent() { void refreshJobs() }
 export function startTagOrganizationTracking() {
   if (timer) return
   void refreshJobs()
-  timer = setInterval(() => { /* 断线时兜底读快照，不启动整理。 */ void refreshJobs(); if (dialogOpen.value) void refreshStats() }, 10_000)
+  timer = setInterval(() => { /* 断线时兜底读快照，不启动整理。 */ void refreshJobs(); if (dialogOpen.value && !selection.value) void refreshStats() }, 10_000)
   window.addEventListener("curated:tag-organization-updated", onTaskEvent)
 }
 
@@ -146,6 +150,25 @@ async function operate(action: () => Promise<unknown>) {
 export function useTagOrganization() {
   return {
     jobs, error, busy, connected, dialogOpen, revision, quiet, selection, openAll, openSelected, stats, statsLoading, statsError, refreshStats,
+    startSelected: async (tasks: OrganizationTask[]) => {
+      const selected = selection.value
+      if (busy.value || !selected || !tasks.length) return false
+      if (!selected.movieIds.length || selected.movieIds.length > 600) { error.value = i18n.global.t("topics.selectionLimit"); return false }
+      busy.value = true; error.value = ""
+      try {
+        const job = await useAIService().startTagOrganization("selected", [...selected.movieIds], [...tasks])
+        jobs.value = [job, ...jobs.value.filter(item => item.id !== job.id)]
+        dialogOpen.value = false
+        window.dispatchEvent(new Event("curated:task-center-updated"))
+        pushAppToast(i18n.global.t("organizationConfirm.submitted"), { variant: "success" })
+        void refreshJobs()
+        return true
+      } catch (e) {
+        const code = e instanceof HttpClientError ? e.apiError?.code : e instanceof Error ? e.message : ""
+        error.value = organizationErrorText(code || "")
+        return false
+      } finally { busy.value = false }
+    },
     active: computed(() => { /* 优先展示活动任务。 */ return jobs.value.find(isOrganizationActive) }),
     refresh: refreshJobs,
     start: (scope: Exclude<TagOrganizationScope, "selected"> = "unorganized") => {

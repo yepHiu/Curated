@@ -30,3 +30,8 @@ it("deletes the encoded history ID", async () => {
  await webTagOrganization.deleteTagOrganization("job/one")
  expect(state.delete).toHaveBeenCalledWith("/ai/tag-organizations/job%2Fone")
 })
+
+it("forwards the chosen actions without implicitly enabling tags", async () => {
+ await webTagOrganization.startTagOrganization("selected", ["synthetic"], ["title", "summary"])
+ expect(state.post).toHaveBeenLastCalledWith("/ai/tag-organizations", expect.objectContaining({ tasks: ["title", "summary"] }))
+})

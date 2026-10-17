@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
+import AIOrganizationConfirmDialog from "./AIOrganizationConfirmDialog.vue"
 import { RouterLink } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { ChevronDown, MoreHorizontal, X } from "lucide-vue-next"
@@ -60,6 +61,7 @@ watch(state.revision, () => { if (state.dialogOpen.value && issuesOpen.value) vo
 
 watch(state.dialogOpen, async (open) => {
   if (!open) { issuesGeneration++; issuesOpen.value = false; issuesLoading.value = false; return }
+  if (state.selection.value) return
   void state.refresh()
   void state.refreshStats()
   try { hiddenTopics.value = (await useLibraryService().listTopics()).filter((topic) => topic.hidden) }
@@ -93,7 +95,8 @@ async function showResults(id: string, more = false) {
 </script>
 
 <template>
-  <Dialog v-model:open="state.dialogOpen.value">
+  <AIOrganizationConfirmDialog v-if="state.selection.value" />
+  <Dialog v-else v-model:open="state.dialogOpen.value">
     <DialogContent class="max-h-[85dvh] overflow-y-auto sm:max-w-xl" :show-close-button="false" :aria-describedby="undefined">
       <DialogClose as-child>
         <Button variant="ghost" size="icon" class="absolute top-3 right-3 size-11 rounded-full lg:size-8" :aria-label="t('common.close')">

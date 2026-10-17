@@ -27,7 +27,7 @@ function analysisStatus(movie: Movie) {
 }
 
 /** 提供确定性模拟，所有写入均经既有用户标签接口。 */
-export function createMockTopicServices(movies: () => readonly Movie[], patch: (id: string, tags: string[]) => void | Promise<unknown>): TopicLibraryService & TagOrganizationService {
+export function createMockTopicServices(movies: () => readonly Movie[], patch: (id: string, tags: string[]) => void | Promise<unknown>, patchDisplay?: (id: string, patch: { userTitle?: string; userSummary?: string }) => Promise<unknown>): TopicLibraryService & TagOrganizationService {
   return {
     /** Record deletion preserves per-movie coverage and tags. */
     async deleteTagOrganization(id) {
@@ -78,14 +78,28 @@ export function createMockTopicServices(movies: () => readonly Movie[], patch: (
     /** 返回副本避免界面误改持久状态。 */
     async listTagOrganizations() { return state.jobs.filter((j) => !state.deletedIds.includes(j.id)).map((j) => { /* 拷贝快照。 */ return { ...j } }) },
     /** 模拟任务用源标签作为确定性题材样本，写入仅 userTags。 */
-    async startTagOrganization(scope, movieIds) {
+    async startTagOrganization(scope, movieIds, tasks = ["tags"]) {
       const selected = movies().filter((m) => { /* 模拟范围快照。 */ return !m.trashedAt && (scope === "all" || (scope === "selected" ? movieIds?.includes(m.id) : analysisStatus(m) === scope)) })
       if (!selected.length) throw new Error("AI_ORGANIZATION_NO_MOVIES")
       const now = new Date().toISOString()
-      const job: TagOrganizationJob = { id: crypto.randomUUID(), taskId: "", status: "running", stage: "classifying", triggerReason: "manual", total: selected.length, processed: 0, succeeded: 0, unresolved: 0, failed: 0, revision: 1, createdAt: now, updatedAt: now }
+      const job: TagOrganizationJob = { tasks: [...tasks], id: crypto.randomUUID(), taskId: "", status: "running", stage: "classifying", triggerReason: "manual", total: selected.length, processed: 0, succeeded: 0, unresolved: 0, failed: 0, revision: 1, createdAt: now, updatedAt: now }
       job.taskId = job.id; state.jobs.unshift(job)
       const batch: MockTopicBatch = { before: {}, after: {}, items: [] }; state.batches[job.id] = batch
       for (const movie of selected) {
+        const translations: NonNullable<TagOrganizationItem["translations"]> = []
+        for (const kind of tasks.filter(task => task !== "tags")) {
+          const source = kind === "title" ? movie.displayScrapeFallback?.title ?? movie.title : movie.displayScrapeFallback?.summary ?? movie.summary
+          const ok = Boolean(source?.trim() && patchDisplay)
+          if (ok) await patchDisplay!(movie.id, kind === "title" ? { userTitle: `[Mock] ${source}` } : { userSummary: `[Mock] ${source}` })
+          translations.push({ kind, status: ok ? "succeeded" : "failed", reason: ok ? "" : "TRANSLATION_SOURCE_EMPTY" })
+        }
+        if (!tasks.includes("tags")) {
+          const failed = translations.some(item => item.status === "failed")
+          batch.items.push({ movieId: movie.id, title: movie.title, status: failed ? "failed" : "succeeded", reason: "", evidence: [], translations })
+          job.processed++; if (failed) job.failed++; else job.succeeded++
+          continue
+        }
+
         if ((movie.title.length + (movie.summary?.length ?? 0)) > 24000) {
           const item: TagOrganizationItem = { movieId: movie.id, title: movie.title, status: "failed", reason: "SOURCE_TOO_LONG", evidence: [] }
           state.issues[movie.id] = item; batch.items.push(item); job.failed++; job.processed++; continue
@@ -101,9 +115,16 @@ export function createMockTopicServices(movies: () => readonly Movie[], patch: (
         delete state.issues[movie.id]
         state.analysis[movie.id] = { jobId: job.id, fingerprint, unresolved: names.length === 0 }
         for (const name of names) if (!state.topics.some((t) => { /* 复用规范名称。 */ return t.name === name })) state.topics.push({ id: `mock-topic-${encodeURIComponent(name)}`, name, description: "", movieCount: 0, hidden: false })
-        batch.items.push({ movieId: movie.id, title: movie.title, status: names.length ? "succeeded" : "unresolved", reason: names.length ? "" : "INSUFFICIENT_EVIDENCE", evidence: names.map((topic) => { /* 只引用实际源标签。 */ return { topic, field: "metadataTags", quote: topic } }) })
+        batch.items.push({ movieId: movie.id, title: movie.title, status: names.length ? "succeeded" : "unresolved", reason: names.length ? "" : "INSUFFICIENT_EVIDENCE", translations, evidence: names.map((topic) => { /* 只引用实际源标签。 */ return { topic, field: "metadataTags", quote: topic } }) })
         job.processed++; if (names.length) job.succeeded++; else job.unresolved++
       }
+      for (const item of batch.items) {
+        if (item.status !== "failed" && item.translations?.some(result => result.status === "failed")) {
+          if (item.status === "succeeded") job.succeeded--; else job.unresolved--
+          item.status = "failed"; job.failed++
+        }
+      }
+      job.translationProcessed = selected.length
       job.status = job.failed ? "partial_failed" : "completed"; job.stage = "finished"; job.revision++; saveState(); return { ...job }
     },
     /** 模拟取消保留已处理结果。 */

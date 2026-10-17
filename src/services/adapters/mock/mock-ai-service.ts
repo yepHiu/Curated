@@ -258,7 +258,7 @@ export const mockAIService: AIService = {
   /** Read persistent mock task history. */
   async listTagOrganizations() { return (await import("./mock-library-service")).mockTopicServices.listTagOrganizations() },
   /** 整理只由显式动作触发。 */
-  async startTagOrganization(scope, movieIds) { return (await import("./mock-library-service")).mockTopicServices.startTagOrganization(scope, movieIds) },
+  async startTagOrganization(scope, movieIds, tasks) { return (await import("./mock-library-service")).mockTopicServices.startTagOrganization(scope, movieIds, tasks) },
   /** 读取模拟结果证据。 */
   async getTagOrganizationItems(id, offset) { return (await import("./mock-library-service")).mockTopicServices.getTagOrganizationItems(id, offset) },
   /** 停止模拟任务。 */

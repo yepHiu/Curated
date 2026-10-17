@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -49,6 +50,18 @@ func (a *App) StartTagOrganization(ctx context.Context, req contracts.TagOrganiz
 	if locale != "zh-CN" && locale != "en" && locale != "ja" {
 		return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "unsupported label locale"}
 	}
+	if req.Tasks != nil {
+		if len(req.Tasks) == 0 || len(req.Tasks) > 3 || req.Scope != "selected" {
+			return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "invalid tasks"}
+		}
+		seen := map[string]bool{}
+		for _, task := range req.Tasks {
+			if (task != "tags" && task != "title" && task != "summary") || seen[task] {
+				return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "invalid tasks"}
+			}
+			seen[task] = true
+		}
+	}
 	id := newAgentID("tag-org-")
 	var err error
 	switch req.Scope {
@@ -60,7 +73,7 @@ func (a *App) StartTagOrganization(ctx context.Context, req contracts.TagOrganiz
 		if len(req.MovieIDs) == 0 || len(req.MovieIDs) > 600 {
 			return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "select 1 to 600 movies"}
 		}
-		id, err = a.store.CreateTagOrganization(ctx, id, req.RequestID, "manual", locale, req.MovieIDs)
+		id, err = a.store.CreateTagOrganization(ctx, id, req.RequestID, "manual", locale, req.MovieIDs, req.Tasks...)
 	default:
 		return contracts.TagOrganizationJobDTO{}, &core.ToolError{Code: "BAD_REQUEST", Message: "invalid scope"}
 	}
@@ -280,6 +293,23 @@ func (a *App) runTagOrganization(ctx context.Context, id string) {
 	if err := a.aiPermission(true); err != nil {
 		_ = a.store.UpdateTagOrganization(ctx, id, "blocked", "preparing", "AI_PERMISSION_REQUIRED")
 		return
+	}
+	if len(jobState.Tasks) > 1 || (len(jobState.Tasks) == 1 && jobState.Tasks[0] != "tags") {
+		if !a.runOrganizationTranslations(ctx, id) {
+			return
+		}
+		if !slices.Contains(jobState.Tasks, "tags") {
+			job, err := a.store.GetTagOrganization(ctx, id)
+			if err != nil {
+				return
+			}
+			status := "completed"
+			if job.Failed > 0 {
+				status = "partial_failed"
+			}
+			_ = a.store.UpdateTagOrganization(ctx, id, status, "finished", "")
+			return
+		}
 	}
 	if err := a.store.UpdateTagOrganization(ctx, id, "running", "vocabulary", ""); err != nil {
 		return
