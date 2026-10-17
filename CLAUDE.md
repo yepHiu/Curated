@@ -850,3 +850,8 @@ On Server startup, interrupted running subtitle records are requeued before the 
 ### Movie organization tasks (2026-10-17)
 
 `POST /api/ai/tag-organizations` accepts optional `tasks: ["tags", "title", "summary"]` for selected scope only; omitted means tags. Empty, duplicate or unknown tasks are rejected. Migration 0067 persists chosen tasks and per-field translation checkpoints. Existing job DTO adds tasks/translationProcessed; item DTO adds translations. Internal task-only translation writes share gateway permission/rate/audit controls and atomically compare source/override plus save the checkpoint. Task center projects translating_metadata; tag undo preserves translations. No new endpoints/configuration keys.
+
+
+### Book path removal (2026-10-17)
+
+Existing DELETE /api/library/{comics|photos}/paths/{id} now transactionally detaches books that lose all root coverage and rebinds overlaps to a remaining root. Migration 0070 repairs legacy unbound books. Lists/search/details exclude detached books; rescanning the same location restores the original record and user metadata. Source files are untouched. Web invalidates list caches and rejects stale list/detail responses after removal. No new endpoints or cfg keys.

@@ -591,3 +591,8 @@ Translate回调在AI用量记录结束前调用共用ValidateTranslations。合�
 ## 2026-10-17 书库识别角色纠正
 
 书库提示词版本 book-metadata-v2 按库类型渲染角色限制，禁止依据文件名重分类或把作者改认作模特。JSON/角色/来源证据校验失败最多一次模型纠正，共用 Action 两分钟期限与用量统计；纠正提示词为 book-metadata-correction.txt。任务 reason 区分 BOOK_METADATA_INVALID_RESULT、BOOK_METADATA_PROVIDER_FAILED、BOOK_METADATA_TRUNCATED，前端三语显示对应原因；历史通用错误不再提示必须检查配置。仍需任务详情确认才写资料，无新增端点/迁移/配置。
+
+
+## 2026-10-17 书库存储目录移除
+
+漫画/写真删除路径在事务内将失去目录覆盖的作品标记 detached，列表/搜索/详情不再显示，重叠目录重新绑定到剩余最深根。迁移0070增加标记并修复旧无关联记录；保留作品ID/用户资料/磁盘文件，重加目录扫描恢复。Web清空并重拉列表，忽略目录变更前迟到的列表/详情响应。原DELETE路径端点不变，无cfg新增，需更新Server与前端。详见guide的Book storage directory removal。
