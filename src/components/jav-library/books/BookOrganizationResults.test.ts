@@ -46,3 +46,16 @@ it("reports partial batch failures and disables writes on read-only connections"
   expect(wrapper.findAll("button").find(b => b.text() === "选择本页待确认项")!.attributes("disabled")).toBeDefined()
   wrapper.unmount()
 })
+
+it.each([
+  ["BOOK_METADATA_INVALID_RESULT", "角色或来源证据校验"],
+  ["BOOK_METADATA_PROVIDER_FAILED", "AI 连接设置"],
+  ["BOOK_METADATA_TRUNCATED", "模型输出被截断"],
+  ["BOOK_RECOGNITION_FAILED", "识别未完成，请重试任务"],
+])("shows the specific failure reason for %s", async (reason, message) => {
+  api.items.mockResolvedValue([{ ...rows[0], status: "failed", metadata: {}, reason }])
+  const wrapper = setup(); await flushPromises()
+  expect(wrapper.text()).toContain(message)
+  if (reason !== "BOOK_METADATA_PROVIDER_FAILED") expect(wrapper.text()).not.toContain("检查 AI")
+  wrapper.unmount()
+})

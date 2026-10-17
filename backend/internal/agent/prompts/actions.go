@@ -90,3 +90,9 @@ func BookMetadataPrompt(kind, locale string) string {
 	}
 	return renderPrompt("book-metadata.txt", map[string]string{"Kind": kind, "Locale": locale})
 }
+
+const BookMetadataVersion = "book-metadata-v2"
+
+func BookMetadataCorrectionPrompt(reason string) string {
+	return renderPrompt("book-metadata-correction.txt", map[string]string{"Reason": reason})
+}

@@ -20,6 +20,15 @@ const busy = ref(false), loading = ref(false), error = ref(""), feedback = ref("
 const ready = computed(() => items.value.filter(item => item.status === "ready"))
 const chosen = computed(() => ready.value.filter(item => selected.value[item.bookId] === item.revision))
 const mockMode = import.meta.env.VITE_USE_WEB_API !== "true"
+function failureMessage(reason: string) {
+  const keys: Record<string, string> = {
+    AI_WRITE_CONFLICT: "sourceConflict",
+    BOOK_METADATA_INVALID_RESULT: "invalidResult",
+    BOOK_METADATA_PROVIDER_FAILED: "providerFailed",
+    BOOK_METADATA_TRUNCATED: "truncatedResult",
+  }
+  return t(`bookAI.${keys[reason] ?? "recognitionFailed"}`)
+}
 let generation = 0, request = 0, alive = true
 async function load() {
   const seq = generation, req = ++request, id = props.job.id
@@ -90,7 +99,7 @@ async function review(decision: "apply" | "discard") {
         <details v-if="item.before.metadata?.cleanTitle"><summary class="cursor-pointer text-sm text-muted-foreground">{{ t('bookAI.saved') }}</summary><BookMetadataFacts :metadata="item.before.metadata" evidence /></details>
         <BookMetadataFacts :metadata="item.metadata" evidence />
       </template>
-      <p v-if="item.reason" class="text-sm text-muted-foreground">{{ t(item.reason === 'AI_WRITE_CONFLICT' ? 'bookAI.sourceConflict' : 'bookAI.recognitionFailed') }}</p>
+      <p v-if="item.reason" class="text-sm text-muted-foreground">{{ failureMessage(item.reason) }}</p>
     </li></ul>
     <div v-if="job.total > 25" class="flex items-center justify-between gap-2"><Button variant="outline" :disabled="offset === 0 || busy || loading" @click="page(-1)">{{ t('bookAI.previous') }}</Button><span class="text-sm text-muted-foreground">{{ offset / 25 + 1 }} / {{ Math.ceil(job.total / 25) }}</span><Button variant="outline" :disabled="offset + 25 >= job.total || busy || loading" @click="page(1)">{{ t('bookAI.next') }}</Button></div>
   </CardContent></Card>

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -152,5 +153,74 @@ func TestBookMetadataRejectsUnfoundedCredits(t *testing.T) {
 	}
 	if contracts.ValidateBookMetadata("photo", valid, source) == nil {
 		t.Fatal("accepted comic author as photo role")
+	}
+}
+
+func TestBookMetadataCorrectsInvalidOutputOnce(t *testing.T) {
+	valid := `{"cleanTitle":"夏の記録","translatedTitle":"夏日记录","models":[{"name":"花子","evidence":"モデル:花子"}]}`
+	wrongRole := `{"cleanTitle":"夏の記録","translatedTitle":"夏日记录","authors":[{"name":"花子","evidence":"モデル:花子"}]}`
+	for _, tc := range []struct {
+		name, first, second, code string
+		providerErr               error
+		calls                     int
+	}{
+		{name: "photo role correction", first: wrongRole, second: valid, calls: 2},
+		{name: "JSON correction", first: "```json\n" + valid + "\n```", second: valid, calls: 2},
+		{name: "invalid roles remain rejected", first: wrongRole, second: wrongRole, code: "BOOK_METADATA_INVALID_RESULT", calls: 2},
+		{name: "invented evidence remains rejected", first: wrongRole, second: `{"cleanTitle":"夏","translatedTitle":"夏","models":[{"name":"Alice","evidence":"Alice"}]}`, code: "BOOK_METADATA_INVALID_RESULT", calls: 2},
+		{name: "provider failure is not corrected", providerErr: errors.New("connection failed"), code: "BOOK_METADATA_PROVIDER_FAILED", calls: 1},
+		{name: "truncated response", providerErr: llm.ErrOutputTruncated, code: "BOOK_METADATA_TRUNCATED", calls: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			store, err := storage.NewSQLiteStore(filepath.Join(t.TempDir(), "book.db"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer store.Close()
+			if err = store.Migrate(ctx); err != nil {
+				t.Fatal(err)
+			}
+			a := &App{store: store, cfg: enabledAITestConfig(), photoLibraryEnabled: true}
+			book, err := store.UpsertPhotoBook(ctx, storage.PhotoBookUpsert{Title: "モデル:花子 夏の記録", SourceFileName: "sample.zip", Location: filepath.Join(t.TempDir(), "sample.zip"), PageCount: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = store.CreateBookOrganization(ctx, "job", contracts.BookOrganizationRequest{Kind: "photo", BookIDs: []string{book.ID}, Locale: "zh-CN", RequestID: "request"}); err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			model := metadataCompleter(func(_ context.Context, messages []llm.ChatMessage, _ int) (string, error) {
+				calls++
+				if calls == 1 {
+					return tc.first, tc.providerErr
+				}
+				if calls > 2 || len(messages) != 4 || messages[2].Content != tc.first || !strings.Contains(messages[3].Content, "failed validation") {
+					t.Fatalf("unexpected correction: %+v", messages)
+				}
+				return tc.second, nil
+			})
+			a.processBookOrganization(ctx, "job", func(ctx context.Context, req contracts.AIActionRequest) (contracts.AIActionPreviewDTO, error) {
+				return a.runBookMetadataAction(ctx, model, req)
+			})
+			if calls != tc.calls {
+				t.Fatalf("calls = %d", calls)
+			}
+			item, err := store.BookOrganizationItem(ctx, "job", book.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.code == "" {
+				if item.Status != "ready" || len(item.Metadata.Models) != 1 || len(item.Metadata.Authors) != 0 {
+					t.Fatalf("corrected proposal: %+v", item)
+				}
+			} else if item.Status != "failed" || item.Reason != tc.code {
+				t.Fatalf("wrong error classification: %+v", item)
+			}
+			state, err := a.GetBookMetadataState(ctx, "photo", book.ID)
+			if err != nil || state.Title != book.Title || state.Metadata.CleanTitle != "" {
+				t.Fatalf("recognition wrote metadata: %+v %v", state, err)
+			}
+		})
 	}
 }

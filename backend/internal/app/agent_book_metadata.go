@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -55,24 +56,32 @@ func (a *App) runBookMetadataAction(ctx context.Context, completer commentComple
 	if locale == "" {
 		locale = strings.TrimSpace(req.Locale)
 	}
-	raw, err := completer.Complete(ctx, []llm.ChatMessage{{Role: "system", Content: prompts.BookMetadataPrompt(kind, locale)}, {Role: "user", Content: string(source)}}, 4096)
-	if err != nil {
-		return contracts.AIActionPreviewDTO{}, err
-	}
-	if len(raw) > 32000 {
-		return contracts.AIActionPreviewDTO{}, fmt.Errorf("book metadata result too long")
-	}
+	messages := []llm.ChatMessage{{Role: "system", Content: prompts.BookMetadataPrompt(kind, locale)}, {Role: "user", Content: string(source)}}
 	var metadata contracts.BookMetadata
-	decoder := json.NewDecoder(strings.NewReader(strings.TrimSpace(raw)))
-	decoder.DisallowUnknownFields()
-	if err = decoder.Decode(&metadata); err != nil {
-		return contracts.AIActionPreviewDTO{}, fmt.Errorf("invalid book metadata JSON: %w", err)
-	}
-	if err = decoder.Decode(new(any)); err != io.EOF {
-		return contracts.AIActionPreviewDTO{}, fmt.Errorf("invalid trailing book metadata")
-	}
-	if err = contracts.ValidateBookMetadata(kind, metadata, state); err != nil {
-		return contracts.AIActionPreviewDTO{}, err
+	for attempt := 0; attempt < 2; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return contracts.AIActionPreviewDTO{}, err
+		}
+		raw, err := completer.Complete(ctx, messages, 4096)
+		if err != nil {
+			if ctx.Err() != nil {
+				return contracts.AIActionPreviewDTO{}, ctx.Err()
+			}
+			code := "BOOK_METADATA_PROVIDER_FAILED"
+			if errors.Is(err, llm.ErrOutputTruncated) {
+				code = "BOOK_METADATA_TRUNCATED"
+			}
+			return contracts.AIActionPreviewDTO{}, &core.ToolError{Code: code, Message: "book metadata model request failed"}
+		}
+		metadata, err = decodeBookMetadata(raw, kind, state)
+		if err == nil {
+			break
+		}
+		if attempt == 1 || len(raw) > 32000 {
+			return contracts.AIActionPreviewDTO{}, &core.ToolError{Code: "BOOK_METADATA_INVALID_RESULT", Message: "book metadata result failed validation"}
+		}
+		// One bounded correction shares the original deadline and usage observation.
+		messages = append(messages, llm.ChatMessage{Role: "assistant", Content: raw}, llm.ChatMessage{Role: "user", Content: prompts.BookMetadataCorrectionPrompt(err.Error())})
 	}
 	snapshot, _ := json.Marshal(state)
 	args, _ := json.Marshal(tools.BookMetadataArgs{Kind: kind, ID: id, Metadata: metadata, Snapshot: string(snapshot)})
@@ -82,4 +91,20 @@ func (a *App) runBookMetadataAction(ctx context.Context, completer commentComple
 		return contracts.AIActionPreviewDTO{}, result.Error
 	}
 	return contracts.AIActionPreviewDTO{Action: prompts.ActionRecognizeBookMetadata, Name: tools.UpdateBookMetadataName, SessionID: sessionID, OriginalText: state.Title, ProposedText: metadata.TranslatedTitle, Changes: confirmChangeDTOs(result.Changes), ConfirmToken: result.ConfirmToken, ExpiresAt: result.ExpiresAt, Arguments: args, Noop: result.ConfirmToken == ""}, nil
+}
+
+func decodeBookMetadata(raw, kind string, state contracts.BookMetadataState) (contracts.BookMetadata, error) {
+	var metadata contracts.BookMetadata
+	if len(raw) > 32000 {
+		return metadata, fmt.Errorf("book metadata result too long")
+	}
+	decoder := json.NewDecoder(strings.NewReader(strings.TrimSpace(raw)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&metadata); err != nil {
+		return metadata, fmt.Errorf("invalid book metadata JSON: %w", err)
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return metadata, fmt.Errorf("invalid trailing book metadata")
+	}
+	return metadata, contracts.ValidateBookMetadata(kind, metadata, state)
 }

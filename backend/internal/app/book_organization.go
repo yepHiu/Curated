@@ -108,6 +108,13 @@ func (a *App) processBookOrganization(ctx context.Context, id string, recognize 
 			}
 			if err != nil {
 				status, reason = "failed", "BOOK_RECOGNITION_FAILED"
+				var toolErr *core.ToolError
+				if errors.As(err, &toolErr) {
+					switch toolErr.Code {
+					case "BOOK_METADATA_INVALID_RESULT", "BOOK_METADATA_PROVIDER_FAILED", "BOOK_METADATA_TRUNCATED":
+						reason = toolErr.Code
+					}
+				}
 			} else if preview.Noop {
 				status = "unchanged"
 			}

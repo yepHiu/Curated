@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"strings"
 	"testing"
 
 	"curated-backend/internal/contracts"
@@ -54,5 +55,19 @@ func TestTXTStaticPromptsPreserveRules(t *testing.T) {
 		if got := fmt.Sprintf("%x", sha256.Sum256([]byte(tc.text))); got != tc.hash {
 			t.Errorf("%s: rules changed: %s", tc.name, got)
 		}
+	}
+}
+
+func TestBookMetadataPromptKeepsLibraryKind(t *testing.T) {
+	photo := BookMetadataPrompt("photo", "zh-CN")
+	comic := BookMetadataPrompt("comic", "ja")
+	if !strings.Contains(photo, "Always return authors: [] and circles: []") || strings.Contains(photo, "This is the COMIC library") {
+		t.Fatal("photo prompt has incorrect role scope")
+	}
+	if !strings.Contains(comic, "Always return models: [] and photographers: []") || strings.Contains(comic, "This is the PHOTO library") {
+		t.Fatal("comic prompt has incorrect role scope")
+	}
+	if !strings.Contains(BookMetadataCorrectionPrompt("roles do not match book kind"), "roles do not match book kind") {
+		t.Fatal("correction omits validation failure")
 	}
 }

@@ -2807,7 +2807,10 @@
     "reviewResult": "已处理 {succeeded} 本，失败 {failed} 本。",
     "reviewFailed": "部分结果未能应用，请查看条目状态；原资料变更的条目需要重新识别。",
     "sourceConflict": "原资料已变化，未写入结果。请使用任务重试重新识别。",
-    "recognitionFailed": "识别未完成，请检查 AI 设置并重试任务。",
+    "recognitionFailed": "识别未完成，请重试任务。",
+    "invalidResult": "模型返回的资料未通过格式、角色或来源证据校验，自动纠正后仍未通过。请重试任务或更换模型。",
+    "providerFailed": "模型请求失败，请检查 AI 连接设置后重试。",
+    "truncatedResult": "模型输出被截断，未生成完整资料。请重试任务或更换模型。",
     "results": "识别结果",
     "recognizing": "提取与翻译标题资料"
   }

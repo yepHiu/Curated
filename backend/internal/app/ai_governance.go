@@ -102,6 +102,9 @@ func (a *App) beginAIRun(ctx context.Context, channel, action string) (context.C
 	r := &aiRunObservation{started: time.Now(), row: contracts.AIRunDTO{ID: newAgentID("run_"), Channel: channel, Action: action, Provider: config.NormalizeAIProviderKind(cfg.Kind), Model: cfg.Model, PromptVersion: prompts.Version, Status: "completed"}}
 	if channel == "action" {
 		r.row.PromptVersion = "agent-actions-v3"
+		if action == prompts.ActionRecognizeBookMetadata {
+			r.row.PromptVersion = prompts.BookMetadataVersion
+		}
 	}
 	if channel == "test" {
 		r.row.PromptVersion = "provider-probe-v1"

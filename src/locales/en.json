@@ -2807,7 +2807,10 @@
     "reviewResult": "{succeeded} processed; {failed} failed.",
     "reviewFailed": "Some results could not be applied. Check item status; changed source data requires recognition again.",
     "sourceConflict": "Source data changed. Nothing was written. Retry the task to recognize this book again.",
-    "recognitionFailed": "Recognition failed. Check AI settings and retry the task.",
+    "recognitionFailed": "Recognition did not complete. Retry the task.",
+    "invalidResult": "The model result failed format, role or source-evidence validation after one correction attempt. Retry the task or choose another model.",
+    "providerFailed": "The model request failed. Check the AI connection settings and retry.",
+    "truncatedResult": "The model output was truncated before the metadata was complete. Retry the task or choose another model.",
     "results": "Recognition results",
     "recognizing": "Extract and translate book metadata"
   }
