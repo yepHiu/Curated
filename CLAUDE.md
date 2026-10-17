@@ -836,3 +836,11 @@ Translation usage now includes ValidateTranslations before run completion. Safe 
 Full-restart output asset IDs also distinguish the execution attempt (opaque IDs; clients must not parse them), while legacy asset IDs continue to resolve. This prevents saved per-version subtitle timing preferences from leaking across attempts with the same task ID.
 
 On Server startup, interrupted running subtitle records are requeued before the worker starts. Task IDs, attempts, stages/counts, timestamps and checkpoints are retained; a task becomes running only when the worker actually resumes it.
+
+
+### Book metadata AI (2026-10-17)
+
+- `POST /api/ai/actions/recognize_book_metadata`: exactly one comicId or photoId, optional targetLocale. Generates source-backed title/credit preview using the configured AI provider.
+- `POST /api/ai/confirm`: existing confirmation endpoint, new `update_book_metadata` tool; transactional source/current-value comparison and durable receipt.
+- Comic/photo list and detail DTOs add `originalTitle` and `metadata` (cleanTitle, translatedTitle, authors/circles/models/photographers with name/evidence, uncertainty).
+- Migration 0068 adds metadata_json to both book tables; no new configuration keys. Foreground review groups, not background task-center jobs. See docs/guide.md#book-ai-metadata.

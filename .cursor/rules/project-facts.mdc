@@ -577,3 +577,8 @@ Translate回调在AI用量记录结束前调用共用ValidateTranslations。合�
 失败/受阻/已取消字幕任务在共用TaskDetailContent中同时提供检查点续试和整次重试。本机POST /api/subtitle-jobs/{jobId}/restart已修正为原任务同ID重新queued/preparing，保留createdAt/文件/音轨/成品，清进度/错误/期限，冻结当前默认模型与提示词；内部attemptId隔离新检查点，无表迁移。活动任务重复点击不重置，同文件其他活动或满队列拒绝。初版restart-请求创建的新旧任务仅在关联唯一且同文件/音轨/源版本时标记旧记录supersededBy，保留失败历史并排除需处理；不改正在执行的任务ID，不重复付费调用。见字幕实施记录与API.md。
 
 字幕服务启动时先把持久running记录恢复为queued（阶段/计数/attempt与检查点不变），worker实际领取后才标记running，避免重启后虚报并发执行。开发后端已更新，实际running1/queued1/attention0，旧两条失败在历史保留接替链接。
+
+
+## 2026-10-17 书库 AI 资料整理
+
+漫画/写真列表及详情新增 AI 整理资料，共用 recognize_book_metadata Action 和确认网关。仅原始标题、源文件名送模型，区分漫画作者/社团与写真模特/摄影师，名称保留原文，证据须为来源连续片段且包含名称。预览前不写库；确认事务检查来源、当前展示标题与已有资料，持久回执防止重复写入。迁移0068分别添加metadata_json；列表/详情增加originalTitle和metadata，自由文本搜索包含资料。扫描保留展示标题/资料，文件/个人标签不变，无cfg新增。前台每组5本，支持停止/失败重试/逐组确认，未接任务中心；Mock明示模拟。需重编译/重启Server；真实Provider质量待验收。详见guide的Book AI metadata及对应计划。
