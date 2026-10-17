@@ -5,6 +5,8 @@ alwaysApply: true
 
 ## Code Atlas 内部分析工具 — 2026-10-18
 
+`pnpm code:atlas:check` 包含依赖图完整节点、Go 包归属、缩放与范围模型测试；画布交互修改还需验证动态页和离线导出。依赖脉络现为可缩放的完整文件 Canvas 图，操作见 guide。
+
 仓库根目录 `pnpm code:atlas` → `http://127.0.0.1:8795`，Node + Vue/Vite，需 Git/Go 和现有依赖，不依赖产品 Server。页面手动重扫当前工作区，可下载离线 HTML；默认 loopback。构建 `pnpm code:atlas:build`，运行构建版 `pnpm code:atlas:preview`，CLI 导出 `pnpm code:atlas:export`，检查 `pnpm code:atlas:check`。实现位于 `scripts/analysis/`，产物 `.workspace/code-atlas-dist/`。详见 guide “Code Atlas”。
 
 ## macOS 原生播放 — 2026-10-09
