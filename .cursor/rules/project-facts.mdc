@@ -590,7 +590,7 @@ Translate回调在AI用量记录结束前调用共用ValidateTranslations。合�
 
 ## 2026-10-17 书库识别角色纠正
 
-书库提示词版本 book-metadata-v2 按库类型渲染角色限制，禁止依据文件名重分类或把作者改认作模特。JSON/角色/来源证据校验失败最多一次模型纠正，共用 Action 两分钟期限与用量统计；纠正提示词为 book-metadata-correction.txt。任务 reason 区分 BOOK_METADATA_INVALID_RESULT、BOOK_METADATA_PROVIDER_FAILED、BOOK_METADATA_TRUNCATED，前端三语显示对应原因；历史通用错误不再提示必须检查配置。仍需任务详情确认才写资料，无新增端点/迁移/配置。
+书库提示词版本 book-metadata-v2 按库类型渲染角色限制，禁止依据文件名重分类或把作者改认作模特。JSON/角色/来源证据校验失败最多一次模型纠正，共用 Action 两分钟期限与用量统计；纠正提示词为 book-metadata-correction.txt。识别/纠正 Complete 使用0省略max_tokens，移除固定4096输出上限以兼容推理模型，保留两分钟期限、32KB结果及证据校验；Provider仍截断时拒绝提案。任务 reason 区分 BOOK_METADATA_INVALID_RESULT、BOOK_METADATA_PROVIDER_FAILED、BOOK_METADATA_TRUNCATED，前端三语显示对应原因；历史通用错误不再提示必须检查配置。仍需任务详情确认才写资料，无新增端点/迁移/配置。
 
 
 ## 2026-10-17 书库存储目录移除
