@@ -21,7 +21,7 @@
     "code:atlas:export": "node scripts/analysis/code-atlas.mjs",
     "code:atlas:build": "vite build --config scripts/analysis/vite.config.ts",
     "code:atlas:preview": "node scripts/analysis/server.mjs --preview",
-    "code:atlas:check": "vue-tsc --noEmit -p scripts/analysis/tsconfig.json && node --test scripts/analysis/code-atlas.test.mjs scripts/analysis/server.test.mjs",
+    "code:atlas:check": "vue-tsc --noEmit -p scripts/analysis/tsconfig.json && node --test scripts/analysis/code-atlas.test.mjs scripts/analysis/server.test.mjs scripts/analysis/network.test.mjs",
     "build:electron:main": "tsc -p electron/tsconfig.json && node scripts/dev/copy-electron-preload.cjs && pnpm build:desktop-ui && pnpm build:desktop-player",
     "build:desktop-player": "node scripts/dev/build-native-player-host.cjs electron-dist && vite build --config vite.player.config.ts --configLoader native",
     "native-player:prepare": "python scripts/dev/prepare-native-engine.py",

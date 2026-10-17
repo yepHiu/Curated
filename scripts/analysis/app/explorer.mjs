@@ -1,3 +1,4 @@
+import { mountFileNetwork } from "./network-canvas.mjs";
 // Shared visual explorer, isolated by its host; used by Vue and offline exports.
 export function mountAtlas(host, D, previousState = {}, live = false) {
   const controller = new AbortController();
@@ -5,13 +6,13 @@ export function mountAtlas(host, D, previousState = {}, live = false) {
     target.addEventListener(type, handler, { signal: controller.signal });
 
   // Fragment navigation cannot target an element inside a shadow root.
-  const skipLink = host.querySelector('.skip');
-  listen(skipLink, 'click', event => {
+  const skipLink = host.querySelector(".skip");
+  listen(skipLink, "click", (event) => {
     event.preventDefault();
-    const main = host.querySelector('#main');
+    const main = host.querySelector("#main");
     main.tabIndex = -1;
     main.focus();
-    main.scrollIntoView({ block: 'start' });
+    main.scrollIntoView({ block: "start" });
   });
 
   ("use strict");
@@ -63,7 +64,6 @@ export function mountAtlas(host, D, previousState = {}, live = false) {
     metric: "lines",
     sort: "lines",
     page: 0,
-    module: "",
     ...previousState,
   };
   const fileMap = new Map(D.files.map((f) => [f.path, f]));
@@ -207,7 +207,10 @@ export function mountAtlas(host, D, previousState = {}, live = false) {
     D.excluded.map(esc).join("<br>") +
     "</div></details>";
 
+  let network = null;
   function render() {
+    network?.destroy();
+    network = null;
     $$(".tabs button").forEach((b) =>
       b.setAttribute("aria-pressed", String(b.dataset.view === state.view)),
     );
@@ -622,165 +625,16 @@ export function mountAtlas(host, D, previousState = {}, live = false) {
     };
   }
   function renderNetwork() {
-    const files = filteredFiles(),
-      paths = new Set(files.map((f) => f.path)),
-      edges = D.edges.filter((e) => paths.has(e.from) && e.source !== e.target),
-      counts = new Map(),
-      pairs = new Map();
-    for (const e of edges) {
-      counts.set(e.source, (counts.get(e.source) || 0) + 1);
-      counts.set(e.target, (counts.get(e.target) || 0) + 1);
-      const key = e.source + "\0" + e.target;
-      if (!pairs.has(key))
-        pairs.set(key, { source: e.source, target: e.target, count: 0 });
-      pairs.get(key).count++;
-    }
-    const nodes = [...counts]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 18)
-        .map(([name, count], i, all) => {
-          const angle = (i / all.length) * Math.PI * 2 - Math.PI / 2;
-          return {
-            name,
-            count,
-            x: 370 + 250 * Math.cos(angle),
-            y: 320 + 245 * Math.sin(angle),
-          };
-        }),
-      nodeMap = new Map(nodes.map((n) => [n.name, n])),
-      allPairs = [...pairs.values()].sort((a, b) => b.count - a.count),
-      visible = allPairs.filter(
-        (e) => nodeMap.has(e.source) && nodeMap.has(e.target),
-      );
-    if (state.module && !counts.has(state.module)) state.module = "";
-    const selected = state.module,
-      related = allPairs.filter(
-        (e) => !selected || e.source === selected || e.target === selected,
-      ),
-      maxCount = Math.max(1, ...nodes.map((n) => n.count));
-    const svg =
-      '<svg viewBox="0 0 740 640" role="img" aria-label="跨模块静态导入关系图"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8da8c4"/></marker></defs>' +
-      visible
-        .map((e) => {
-          const a = nodeMap.get(e.source),
-            b = nodeMap.get(e.target),
-            dx = b.x - a.x,
-            dy = b.y - a.y,
-            dist = Math.hypot(dx, dy),
-            r = 8 + Math.sqrt(b.count / maxCount) * 13,
-            active =
-              !selected || e.source === selected || e.target === selected;
-          return (
-            '<path d="M ' +
-            a.x +
-            " " +
-            a.y +
-            " Q 370 320 " +
-            (b.x - (dx / dist) * (r + 5)) +
-            " " +
-            (b.y - (dy / dist) * (r + 5)) +
-            '" fill="none" stroke="' +
-            (selected && active ? "#81dec0" : "#53718e") +
-            '" stroke-width="' +
-            Math.min(5, 1 + Math.log2(e.count) / 2) +
-            '" opacity="' +
-            (active ? (selected ? 0.8 : 0.32) : 0.06) +
-            '" marker-end="url(#arrow)"><title>' +
-            esc(e.source + " → " + e.target + " · " + e.count + " 条导入") +
-            "</title></path>"
-          );
-        })
-        .join("") +
-      nodes
-        .map((n) => {
-          const short = n.name
-              .replace("backend/internal/", "go/")
-              .replace("src/components/", "ui/"),
-            r = 8 + Math.sqrt(n.count / maxCount) * 13;
-          return (
-            '<g class="node" tabindex="0" role="button" aria-label="聚焦 ' +
-            esc(n.name) +
-            '" data-module="' +
-            esc(n.name) +
-            '"><circle cx="' +
-            n.x +
-            '" cy="' +
-            n.y +
-            '" r="' +
-            r +
-            '" fill="' +
-            palette(n.name)[0] +
-            '" stroke="' +
-            (selected === n.name ? "#fff" : palette(n.name)[1]) +
-            '" stroke-width="2"/><text x="' +
-            n.x +
-            '" y="' +
-            (n.y + r + 17) +
-            '" text-anchor="middle">' +
-            esc(short) +
-            "</text><title>" +
-            esc(n.name) +
-            " · " +
-            n.count +
-            " 条跨模块导入端点</title></g>"
-          );
-        })
-        .join("") +
-      "</svg>";
-    $("#view").innerHTML =
-      '<div class="grid"><section class="panel"><div class="panel-head"><div><h2>代码之间，如何相连</h2><p>' +
-      num(edges.length) +
-      " 条跨模块导入 · " +
-      num(counts.size) +
-      ' 个关联模块</p></div><button id="unfocus" ' +
-      (!selected ? "disabled" : "") +
-      '>取消聚焦</button></div><div class="network">' +
-      (nodes.length
-        ? svg
-        : '<div class="empty">当前筛选没有跨模块静态导入关系。</div>') +
-      '</div><p class="caption">展示关联最多的前 18 个模块，当前画出 ' +
-      visible.length +
-      ' 组关系。箭头：导入方 → 被导入方；线宽表示引用数。节点大小表示导入端点总数。筛选限定导入方，被依赖模块可在筛选之外。</p></section><aside class="panel"><h2>' +
-      (selected ? "聚焦模块" : "最紧密的关系") +
-      '</h2><p class="caption mono">' +
-      (selected ? esc(selected) : "按跨模块导入引用数排序") +
-      '</p><div class="edge-list">' +
-      related
-        .slice(0, 50)
-        .map(
-          (e) =>
-            '<div class="edge-item">' +
-            esc(e.source) +
-            "<br><strong>→ " +
-            esc(e.target) +
-            '</strong><br><span class="muted">' +
-            num(e.count) +
-            " 条导入引用</span></div>",
-        )
-        .join("") +
-      '</div><p class="caption">显示 ' +
-      Math.min(50, related.length) +
-      " / " +
-      related.length +
-      ' 组关系；JS/TS 按文件导入，Go 按文件引用包。</p></aside></div><section class="panel section-gap"><h2>聚焦任意关联模块</h2><p class="caption">可选择未进入关系图前 18 名的模块，在右侧查看它的连接。</p><div class="module-buttons">' +
-      [...counts]
-        .sort((a, b) => b[1] - a[1])
-        .map(
-          ([name]) =>
-            '<button data-module="' +
-            esc(name) +
-            '" aria-pressed="' +
-            (selected === name) +
-            '">' +
-            esc(name) +
-            "</button>",
-        )
-        .join("") +
-      "</div></section>";
-    $("#unfocus").onclick = () => {
-      state.module = "";
-      renderNetwork();
-    };
+    network?.destroy();
+    const files = D.files.filter(inScope);
+    network = mountFileNetwork($("#view"), D, files, {
+      query: state.queryInput,
+      saved: state.graph,
+      onState: (graph) => {
+        state.graph = { camera: { ...graph.camera }, selected: graph.selected };
+      },
+      onFile: showFile,
+    });
   }
   function showFile(p) {
     const file = fileMap.get(p);
@@ -876,8 +730,7 @@ export function mountAtlas(host, D, previousState = {}, live = false) {
     const f = e.target.closest("[data-file]"),
       dir = e.target.closest("[data-dir]"),
       tab = e.target.closest("[data-view]"),
-      page = e.target.closest("[data-page]"),
-      module = e.target.closest("[data-module]");
+      page = e.target.closest("[data-page]");
     if (f) showFile(f.dataset.file);
     else if (dir) {
       state.dir = dir.dataset.dir;
@@ -890,27 +743,18 @@ export function mountAtlas(host, D, previousState = {}, live = false) {
     } else if (page) {
       state.page += Number(page.dataset.page);
       render();
-    } else if (module) {
-      state.module =
-        state.module === module.dataset.module ? "" : module.dataset.module;
-      renderNetwork();
-    }
-  });
-  listen(host, "keydown", (e) => {
-    const node = e.target.closest("g[data-module]");
-    if (node && (e.key === "Enter" || e.key === " ")) {
-      e.preventDefault();
-      node.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     }
   });
   $("#search").addEventListener("input", (e) => {
     state.queryInput = e.target.value;
     state.query = e.target.value.trim().toLowerCase();
     state.page = 0;
-    render();
+    if (network) network.setQuery(state.queryInput);
+    else render();
   });
   $("#scope").onchange = (e) => {
     state.scope = e.target.value;
+    state.graph = undefined;
     state.page = 0;
     render();
   };
@@ -923,7 +767,7 @@ export function mountAtlas(host, D, previousState = {}, live = false) {
       metric: "lines",
       sort: "lines",
       page: 0,
-      module: "",
+      graph: undefined,
     });
     $("#search").value = "";
     $("#scope").value = "source";
@@ -946,6 +790,7 @@ export function mountAtlas(host, D, previousState = {}, live = false) {
   return {
     state,
     destroy() {
+      network?.destroy();
       controller.abort();
       clearTimeout(resizeTimer);
       clearTimeout(announce.timer);

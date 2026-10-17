@@ -60,6 +60,7 @@ export interface ScanStatus {
   total?: number;
 }
 export interface ExplorerState {
+  graph?: { camera: { x: number; y: number; scale: number }; selected: string };
   view: string;
   scope: string;
   query: string;
@@ -68,5 +69,4 @@ export interface ExplorerState {
   metric: string;
   sort: string;
   page: number;
-  module: string;
 }

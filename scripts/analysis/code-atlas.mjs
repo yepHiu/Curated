@@ -457,9 +457,18 @@ export function renderOfflineHtml(data) {
     .replace(/\u2029/g, "\\u2029");
   const css = fs.readFileSync(path.join(here, "app/explorer.css"), "utf8");
   const markup = fs.readFileSync(path.join(here, "app/explorer.html"), "utf8");
-  const engine = fs
+  const model = fs
+    .readFileSync(path.join(here, "app/network-model.mjs"), "utf8")
+    .replaceAll("export function ", "function ");
+  const network = fs
+    .readFileSync(path.join(here, "app/network-canvas.mjs"), "utf8")
+    .replace(/^import[^;]+;\s*/m, "")
+    .replaceAll("export function ", "function ");
+  const explorer = fs
     .readFileSync(path.join(here, "app/explorer.mjs"), "utf8")
+    .replace(/^import[^;]+;\s*/m, "")
     .replace("export function mountAtlas", "function mountAtlas");
+  const engine = model + "\n" + network + "\n" + explorer;
   return template
     .replace("/*__ATLAS_CSS__*/", () => css)
     .replace("<!--__ATLAS_MARKUP__-->", () => markup)

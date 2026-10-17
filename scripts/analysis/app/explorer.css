@@ -584,60 +584,305 @@ th.num {
 .distribution small {
   font-size: 11px;
 }
-.network svg {
+
+/* Full file network: canvas is the main workspace, inspector stays secondary. */
+.graph-workspace {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.graph-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.graph-heading h2 {
+  margin: 0 0 8px;
+}
+.graph-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.graph-heading p strong {
+  color: var(--text);
+  font-weight: 500;
+}
+.graph-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 285px;
+}
+.graph-stage {
+  position: relative;
+  min-width: 0;
+  height: clamp(550px, 72dvh, 1000px);
+  overflow: hidden;
+  background: #0a111b;
+}
+.graph-canvas {
   display: block;
   width: 100%;
-  height: auto;
-  max-height: 600px;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
 }
-.network svg text {
-  fill: var(--muted);
+.graph-canvas:active {
+  cursor: grabbing;
+}
+.graph-canvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+.graph-tools {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  background: #101b28ed;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.graph-tools button {
+  min-height: 36px;
+  padding: 7px 12px;
+}
+.graph-zoom {
+  min-width: 46px;
+  text-align: center;
   font:
-    11px Consolas,
+    12px Consolas,
     monospace;
+  color: var(--muted);
 }
-.network svg .node {
-  cursor: pointer;
+.graph-hint {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  right: 205px;
+  pointer-events: none;
+  color: #a0b4c9;
+  font-size: 11px;
+  line-height: 1.7;
 }
-.network svg .node:focus {
-  outline: none;
+.graph-minimap {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  border: 1px solid #536b83;
+  border-radius: 7px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px #0005;
 }
-.network svg .node:focus circle {
-  stroke: white;
-  stroke-width: 3;
+.graph-minimap canvas {
+  width: 180px;
+  height: 116px;
+  display: block;
+  cursor: crosshair;
+  touch-action: none;
 }
-.edge-list {
-  max-height: 420px;
-  overflow: auto;
-}
-.edge-item {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line);
+.graph-hover {
+  position: absolute;
+  max-width: 250px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #172432f2;
+  color: var(--text);
+  pointer-events: none;
   font:
-    11px/1.6 Consolas,
+    11px/1.5 Consolas,
     monospace;
   overflow-wrap: anywhere;
 }
-.edge-item strong {
-  color: var(--accent);
-  font-weight: 400;
+.graph-empty {
+  position: absolute;
+  top: 45%;
+  width: 100%;
+  text-align: center;
+  color: var(--muted);
+  pointer-events: none;
 }
-.module-buttons {
+.graph-inspector {
+  border-left: 1px solid var(--line);
+  padding: 18px;
+  overflow: auto;
+  max-height: clamp(550px, 72dvh, 1000px);
+}
+.graph-selection {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.graph-selection .eyebrow {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+}
+.graph-selection h3 {
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+.graph-selected-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.graph-selected-head button {
+  min-height: 32px;
+  font-size: 11px;
+  padding: 6px 8px;
+}
+.graph-selection .graph-selected-path {
+  font:
+    13px/1.7 Consolas,
+    monospace;
+  overflow-wrap: anywhere;
+}
+.graph-selected-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 14px;
 }
-.module-buttons button {
+.graph-selected-actions button {
+  font-size: 12px;
+}
+.graph-node-link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  width: 100%;
+  padding: 9px 8px;
+  margin: 0 0 5px;
+  background: transparent;
+  border-color: transparent;
+  overflow-wrap: anywhere;
+  min-height: 44px;
+}
+.graph-node-link span {
   font:
-    11px Consolas,
+    12px/1.5 Consolas,
     monospace;
-  min-height: 32px;
-  padding: 7px;
+  color: var(--text);
 }
-.module-buttons button[aria-pressed="true"] {
-  border-color: var(--accent);
-  color: var(--accent);
+.graph-node-link small {
+  font:
+    10px/1.6 Consolas,
+    monospace;
+  margin-top: 4px;
+}
+.graph-search-summary {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 12px 0;
+}
+.graph-more {
+  width: 100%;
+  font-size: 12px;
+}
+.graph-neighbors {
+  max-height: 250px;
+  overflow: auto;
+}
+.graph-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: center;
+  padding: 15px 22px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+.graph-footer i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+.graph-render-count {
+  margin-left: auto;
+}
+.graph-note {
+  margin: 0;
+  padding: 0 22px 16px;
+}
+.graph-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+}
+.graph-expanded .graph-body {
+  flex: 1;
+  min-height: 0;
+}
+.graph-expanded .graph-stage {
+  height: 100%;
+}
+.graph-expanded .graph-inspector {
+  max-height: 100%;
+}
+.graph-expanded .graph-note {
+  display: none;
+}
+@media (max-width: 800px) {
+  .graph-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .graph-stage {
+    height: 65dvh;
+    min-height: 430px;
+  }
+  .graph-inspector {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    max-height: 380px;
+  }
+  .graph-heading {
+    padding: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .graph-tools {
+    top: 10px;
+    left: 10px;
+  }
+  .graph-tools button {
+    min-height: 44px;
+  }
+  .graph-minimap canvas {
+    width: 120px;
+    height: 77px;
+  }
+  .graph-hint {
+    right: 145px;
+    font-size: 10px;
+  }
+  .graph-expanded .graph-body {
+    grid-template-rows: minmax(0, 1fr) 180px;
+  }
+  .graph-expanded .graph-stage {
+    min-height: 0;
+  }
+  .graph-expanded .graph-inspector {
+    max-height: 180px;
+  }
+  .graph-expanded .graph-footer {
+    display: none;
+  }
 }
 .foot {
   margin-top: 32px;
@@ -874,9 +1119,6 @@ dialog::backdrop {
   .pager {
     align-items: start;
     flex-wrap: wrap;
-  }
-  .network svg text {
-    font-size: 12px;
   }
   .panel-head select {
     width: 100%;
