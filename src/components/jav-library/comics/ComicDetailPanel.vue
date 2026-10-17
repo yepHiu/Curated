@@ -175,7 +175,7 @@ function commitRating(value: number | null) {
             {{ comic.title }}
           </CardTitle>
           <BookMetadataFacts :metadata="comic.metadata" />
-          <BookMetadataAction kind="comic" :books="[comic]" @applied="emit('reload')" />
+          <BookMetadataAction kind="comic" :books="[comic]" />
         </div>
 
         <div class="flex flex-wrap items-center gap-3">

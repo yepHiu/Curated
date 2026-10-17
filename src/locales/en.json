@@ -2690,7 +2690,8 @@
       "partial": "Partially completed",
       "failed": "Failed",
       "cancelled": "Cancelled",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "needs_confirmation": "Awaiting confirmation"
     },
     "filters": {
       "all": "All",
@@ -2711,7 +2712,8 @@
     "units": {
       "segments": "segments",
       "cues": "cues",
-      "movies": "movies"
+      "movies": "movies",
+      "books": "books"
     },
     "stages": {
       "preparing": "Preparing",
@@ -2725,7 +2727,8 @@
       "classify": "Classifying and applying tags",
       "done": "Results recorded",
       "waiting_quota": "Waiting for quota",
-      "translating_metadata": "Translating movie metadata"
+      "translating_metadata": "Translating movie metadata",
+      "reviewing": "Review and confirm"
     },
     "itemStates": {
       "pending": "Pending",
@@ -2760,7 +2763,7 @@
   },
   "bookAI": {
     "action": "AI metadata",
-    "description": "{count} books, {size} per group. Review titles, credits and evidence before applying. Stopping preserves completed results.",
+    "description": "Submit a background organization task. Review and confirm changes in Task Center → task details after recognition.",
     "mock": "Mock preview. No real AI request; simulated results are stored only in this browser.",
     "select": "Select {title}",
     "cleanTitle": "Original main title",
@@ -2772,20 +2775,39 @@
     "before": "Current title",
     "after": "Translated title",
     "saved": "View saved metadata",
-    "regenerate": "New preview",
-    "previous": "Previous group",
-    "next": "Next group",
-    "stop": "Stop remaining work",
-    "generate": "Generate selected previews",
+    "previous": "Previous page",
+    "next": "Next page",
     "apply": "Confirm {count} books",
     "status": {
       "pending": "Pending",
-      "generating": "Analyzing",
       "ready": "Review",
-      "applying": "Saving",
       "applied": "Applied",
       "unchanged": "Unchanged",
-      "failed": "Failed"
-    }
+      "failed": "Failed",
+      "discarded": "Discarded",
+      "conflict": "Source conflict"
+    },
+    "count": "{count} books selected",
+    "viewTask": "View task",
+    "submitFailed": "Could not submit the task. Check AI settings and the selected books, then retry.",
+    "selectionLimit": "Select 1–600 books per task.",
+    "scope": {
+      "comic": "Extract and translate the main title, distinguishing authors from circles.",
+      "photo": "Extract and translate the main title, distinguishing models from photographers."
+    },
+    "taskTitles": {
+      "comic": "Comic AI organization",
+      "photo": "Photo AI organization"
+    },
+    "reviewHint": "Pending suggestions have not been saved to your books. Check original values, roles and evidence, then select and apply or discard results.",
+    "reviewSummary": "{pending} awaiting review · {applied} applied · {failed} need attention",
+    "selectPage": "Select pending results on this page",
+    "discard": "Discard {count} books",
+    "reviewResult": "{succeeded} processed; {failed} failed.",
+    "reviewFailed": "Some results could not be applied. Check item status; changed source data requires recognition again.",
+    "sourceConflict": "Source data changed. Nothing was written. Retry the task to recognize this book again.",
+    "recognitionFailed": "Recognition failed. Check AI settings and retry the task.",
+    "results": "Recognition results",
+    "recognizing": "Extract and translate book metadata"
   }
 }

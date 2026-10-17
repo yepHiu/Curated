@@ -193,6 +193,23 @@ func (a *App) startTagOrganizationWorker() {
 					a.tagRT.mu.Unlock()
 				}
 			}
+			bookJobs, err := a.store.ActiveBookOrganizations(ctx)
+			if err == nil {
+				for _, id := range bookJobs {
+					if ctx.Err() != nil {
+						return
+					}
+					a.tagRT.mu.Lock()
+					jobCtx, cancelJob := context.WithCancel(ctx)
+					a.tagRT.runningID, a.tagRT.cancelJob = id, cancelJob
+					a.tagRT.mu.Unlock()
+					a.runBookOrganization(jobCtx, id)
+					cancelJob()
+					a.tagRT.mu.Lock()
+					a.tagRT.runningID, a.tagRT.cancelJob = "", nil
+					a.tagRT.mu.Unlock()
+				}
+			}
 			select {
 			case <-ctx.Done():
 				return

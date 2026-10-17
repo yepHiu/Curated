@@ -2690,7 +2690,8 @@
       "partial": "一部完了",
       "failed": "失敗",
       "cancelled": "キャンセル済み",
-      "unknown": "状態不明"
+      "unknown": "状態不明",
+      "needs_confirmation": "確認待ち"
     },
     "filters": {
       "all": "すべて",
@@ -2711,7 +2712,8 @@
     "units": {
       "segments": "区間",
       "cues": "行",
-      "movies": "作品"
+      "movies": "作品",
+      "books": "冊"
     },
     "stages": {
       "preparing": "準備",
@@ -2725,7 +2727,8 @@
       "classify": "分類とタグ適用",
       "done": "結果の集計",
       "waiting_quota": "利用枠待ち",
-      "translating_metadata": "作品情報を翻訳"
+      "translating_metadata": "作品情報を翻訳",
+      "reviewing": "確認して適用"
     },
     "itemStates": {
       "pending": "未処理",
@@ -2760,7 +2763,7 @@
   },
   "bookAI": {
     "action": "AI 資料整理",
-    "description": "全 {count} 冊、1 組 {size} 冊。タイトル・人物・根拠を確認してから適用します。停止しても完了済みの結果は保持されます。",
+    "description": "バックグラウンド整理タスクを開始します。識別完了後、タスクセンターの詳細で変更を確認・適用してください。",
     "mock": "模擬プレビューです。実際の AI は呼び出さず、模擬結果をこのブラウザーに保存します。",
     "select": "{title} を選択",
     "cleanTitle": "原文の作品名",
@@ -2772,20 +2775,39 @@
     "before": "現在のタイトル",
     "after": "翻訳タイトル",
     "saved": "保存済みの資料を見る",
-    "regenerate": "プレビューを再作成",
-    "previous": "前の組",
-    "next": "次の組",
-    "stop": "残りの処理を停止",
-    "generate": "選択した項目をプレビュー",
+    "previous": "前のページ",
+    "next": "次のページ",
     "apply": "{count} 冊を確認して適用",
     "status": {
       "pending": "未処理",
-      "generating": "解析中",
       "ready": "確認待ち",
-      "applying": "保存中",
       "applied": "適用済み",
       "unchanged": "変更なし",
-      "failed": "失敗"
-    }
+      "failed": "失敗",
+      "discarded": "破棄済み",
+      "conflict": "元情報の競合"
+    },
+    "count": "{count} 冊を選択",
+    "viewTask": "タスクを見る",
+    "submitFailed": "タスクを開始できませんでした。AI 設定と選択内容を確認し、再試行してください。",
+    "selectionLimit": "1 回に 1～600 冊を選択してください。",
+    "scope": {
+      "comic": "主題名を抽出・翻訳し、作者とサークルを区別します。",
+      "photo": "主題名を抽出・翻訳し、モデルと撮影者を区別します。"
+    },
+    "taskTitles": {
+      "comic": "漫画 AI 整理",
+      "photo": "写真 AI 整理"
+    },
+    "reviewHint": "確認待ちの識別結果はまだ保存されていません。元の値、役割、根拠を確認し、選択した結果を適用または破棄してください。",
+    "reviewSummary": "確認待ち {pending} 冊 · 適用済み {applied} 冊 · 要対応 {failed} 冊",
+    "selectPage": "このページの確認待ちを選択",
+    "discard": "{count} 冊を破棄",
+    "reviewResult": "{succeeded} 冊を処理、{failed} 冊が失敗。",
+    "reviewFailed": "一部の結果を適用できませんでした。元情報が変更された項目は再識別が必要です。",
+    "sourceConflict": "元情報が変更されたため保存しませんでした。タスクを再試行してください。",
+    "recognitionFailed": "識別に失敗しました。AI 設定を確認して再試行してください。",
+    "results": "識別結果",
+    "recognizing": "タイトル情報の抽出・翻訳"
   }
 }

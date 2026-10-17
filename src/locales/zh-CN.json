@@ -2690,7 +2690,8 @@
       "partial": "部分完成",
       "failed": "失败",
       "cancelled": "已取消",
-      "unknown": "状态未知"
+      "unknown": "状态未知",
+      "needs_confirmation": "待确认"
     },
     "filters": {
       "all": "全部",
@@ -2711,7 +2712,8 @@
     "units": {
       "segments": "段",
       "cues": "条",
-      "movies": "部"
+      "movies": "部",
+      "books": "本"
     },
     "stages": {
       "preparing": "准备任务",
@@ -2725,7 +2727,8 @@
       "classify": "分类并应用标签",
       "done": "汇总结果",
       "waiting_quota": "等待服务额度",
-      "translating_metadata": "翻译影片资料"
+      "translating_metadata": "翻译影片资料",
+      "reviewing": "核对并确认"
     },
     "itemStates": {
       "pending": "待处理",
@@ -2760,7 +2763,7 @@
   },
   "bookAI": {
     "action": "AI 整理资料",
-    "description": "共 {count} 本，每组 {size} 本。核对标题、人物及依据后再应用；停止会保留已完成结果。",
+    "description": "提交后台整理任务。识别完成后，请在任务中心的任务详情中核对并确认修改。",
     "mock": "当前为模拟预览，不调用真实 AI；模拟结果仅保存在此浏览器。",
     "select": "选择 {title}",
     "cleanTitle": "原文主标题",
@@ -2772,20 +2775,39 @@
     "before": "当前标题",
     "after": "译文标题",
     "saved": "查看已有资料",
-    "regenerate": "重新预览",
-    "previous": "上一组",
-    "next": "下一组",
-    "stop": "停止后续处理",
-    "generate": "生成所选预览",
+    "previous": "上一页",
+    "next": "下一页",
     "apply": "确认应用 {count} 本",
     "status": {
       "pending": "待处理",
-      "generating": "识别中",
       "ready": "待确认",
-      "applying": "保存中",
       "applied": "已应用",
       "unchanged": "无变化",
-      "failed": "失败"
-    }
+      "failed": "失败",
+      "discarded": "已忽略",
+      "conflict": "资料冲突"
+    },
+    "count": "已选择 {count} 本",
+    "viewTask": "查看任务",
+    "submitFailed": "任务提交失败，请检查 AI 设置与所选内容后重试。",
+    "selectionLimit": "每次请选择 1–600 本。",
+    "scope": {
+      "comic": "提取原文主标题、翻译标题，并区分作者与社团。",
+      "photo": "提取原文主标题、翻译标题，并区分模特与摄影师。"
+    },
+    "taskTitles": {
+      "comic": "漫画 AI 整理",
+      "photo": "写真 AI 整理"
+    },
+    "reviewHint": "待确认的识别结果尚未写入资料。请核对原值、人物角色及依据，勾选后确认应用；也可以忽略所选结果。",
+    "reviewSummary": "待确认 {pending} 本 · 已应用 {applied} 本 · 需处理 {failed} 本",
+    "selectPage": "选择本页待确认项",
+    "discard": "忽略 {count} 本",
+    "reviewResult": "已处理 {succeeded} 本，失败 {failed} 本。",
+    "reviewFailed": "部分结果未能应用，请查看条目状态；原资料变更的条目需要重新识别。",
+    "sourceConflict": "原资料已变化，未写入结果。请使用任务重试重新识别。",
+    "recognitionFailed": "识别未完成，请检查 AI 设置并重试任务。",
+    "results": "识别结果",
+    "recognizing": "提取与翻译标题资料"
   }
 }

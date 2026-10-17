@@ -123,7 +123,7 @@ function browseByTag(tag: string) {
             {{ photo.title }}
           </CardTitle>
           <BookMetadataFacts :metadata="photo.metadata" />
-          <BookMetadataAction kind="photo" :books="[photo]" @applied="emit('reload')" />
+          <BookMetadataAction kind="photo" :books="[photo]" />
         </div>
 
         <div class="flex flex-wrap items-center gap-3">

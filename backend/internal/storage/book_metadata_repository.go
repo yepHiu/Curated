@@ -75,6 +75,18 @@ func (s *SQLiteStore) ApplyBookMetadata(ctx context.Context, kind, id string, me
 	if _, err = tx.ExecContext(ctx, `UPDATE `+table+` SET user_title = ?, metadata_json = ?, updated_at = ? WHERE id = ?`, metadata.TranslatedTitle, string(raw), nowUTC(), id); err != nil {
 		return state, err
 	}
+	if review, ok := ctx.Value(bookReviewContextKey{}).(bookReviewContext); ok {
+		var jobKind string
+		if err = tx.QueryRowContext(ctx, `SELECT kind FROM ai_book_organization_jobs WHERE id=?`, review.JobID).Scan(&jobKind); err != nil {
+			return state, err
+		}
+		if review.BookID != id || jobKind != kind {
+			return state, ErrAIWriteConflict
+		}
+		if err = finishBookReviewTx(ctx, tx, review.JobID, id, review.Revision, "applied", ""); err != nil {
+			return state, err
+		}
+	}
 	state.Title, state.Metadata = metadata.TranslatedTitle, metadata
 	if err = saveAIApplyReceiptTx(ctx, tx, state); err != nil {
 		return state, err

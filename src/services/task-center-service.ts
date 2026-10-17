@@ -1,14 +1,19 @@
+import { useBookOrganizationService } from "./book-organization-service"
+import { listMockBookOrganizations } from "./adapters/mock/mock-book-organization-service"
 import { httpClient } from "@/api/http-client"
 import { useAIService } from "./ai-service"
 import { useSubtitleService } from "./subtitle-service"
 import type { TaskCenterService, TaskPage, TaskSummary, CenterTask } from "./contracts/task-center-service"
-import { projectOrganization, projectSubtitle, summarizeTasks, taskActive, taskAttention, taskHistory } from "@/lib/task-center"
+import { projectBookOrganization, projectOrganization, projectSubtitle, summarizeTasks, taskActive, taskAttention, taskHistory } from "@/lib/task-center"
 
 const action: TaskCenterService["action"] = async (task, operation) => {
   if (!task.canManage) throw new Error("TASK_READ_ONLY")
   if (task.kind === "subtitle") {
     if (operation === "undo") throw new Error("TASK_ACTION_UNAVAILABLE")
     await useSubtitleService().action(task.id, operation)
+  } else if (task.bookOrganization) {
+    if (operation !== "cancel" && operation !== "retry") throw new Error("TASK_ACTION_UNAVAILABLE")
+    await useBookOrganizationService().control(task.id, operation)
   } else {
     if (operation === "restart") throw new Error("TASK_ACTION_UNAVAILABLE")
     const service = useAIService()
@@ -25,7 +30,7 @@ const web: TaskCenterService = {
 }
 async function mockTasks() {
   const [subtitles, organizations] = await Promise.all([useSubtitleService().jobs(), useAIService().listTagOrganizations()])
-  return [...subtitles.map(projectSubtitle), ...organizations.map(projectOrganization)].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.key.localeCompare(a.key))
+  return [...listMockBookOrganizations().map(projectBookOrganization), ...subtitles.map(projectSubtitle), ...organizations.map(projectOrganization)].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.key.localeCompare(a.key))
 }
 const mock: TaskCenterService = {
   async list(query = {}) {

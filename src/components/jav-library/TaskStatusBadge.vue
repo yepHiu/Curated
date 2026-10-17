@@ -5,6 +5,6 @@ import { Badge } from "@/components/ui/badge"
 import type { TaskState } from "@/services/contracts/task-center-service"
 const props = defineProps<{ state: TaskState }>()
 const { t } = useI18n()
-const variant = computed(() => props.state === "succeeded" ? "success" : ["failed", "blocked", "partial"].includes(props.state) ? "warning" : props.state === "running" ? "info" : "secondary")
+const variant = computed(() => props.state === "succeeded" ? "success" : ["failed", "blocked", "partial", "needs_confirmation"].includes(props.state) ? "warning" : props.state === "running" ? "info" : "secondary")
 </script>
 <template><Badge :variant="variant">{{ t(`tasks.states.${state}`) }}</Badge></template>

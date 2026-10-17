@@ -21,6 +21,8 @@ const taskCenterSource = `WITH tasks AS (
  CASE WHEN status='running' AND stage='waiting_quota' THEN 'waiting'
  WHEN status='completed' THEN 'succeeded' WHEN status='partial_failed' THEN 'partial' ELSE status END,
  created_at,'' FROM ai_tag_organization_jobs WHERE deleted_at=''
+ UNION ALL
+ SELECT 'book-organize:'||id,'organize', CASE status WHEN 'completed' THEN 'succeeded' WHEN 'partial_failed' THEN 'partial' ELSE status END,created_at,'' FROM ai_book_organization_jobs
 ) `
 
 type TaskCenterFilter struct {
@@ -38,7 +40,7 @@ func (s *SQLiteStore) TaskCenterSummary(ctx context.Context) (contracts.TaskCent
 	var out contracts.TaskCenterSummary
 	err := s.db.QueryRowContext(ctx, taskCenterSource+`SELECT COUNT(*),
  COALESCE(SUM(state='running'),0),COALESCE(SUM(state='queued'),0),COALESCE(SUM(state='waiting'),0),
- COALESCE(SUM(state IN ('blocked','failed','partial') AND superseded_by=''),0),
+ COALESCE(SUM(state IN ('blocked','failed','partial','needs_confirmation') AND superseded_by=''),0),
  COALESCE(SUM(state IN ('succeeded','partial','failed','cancelled') OR superseded_by<>''),0) FROM tasks`).Scan(&out.Total, &out.Running, &out.Queued, &out.Waiting, &out.Attention, &out.History)
 	return out, err
 }
@@ -58,7 +60,7 @@ func (s *SQLiteStore) TaskCenterKeys(ctx context.Context, f TaskCenterFilter) ([
 	case "active":
 		where += " AND state IN ('queued','running','waiting')"
 	case "attention":
-		where += " AND state IN ('blocked','failed','partial') AND superseded_by=''"
+		where += " AND state IN ('blocked','failed','partial','needs_confirmation') AND superseded_by=''"
 	case "history":
 		where += " AND (state IN ('succeeded','partial','failed','cancelled') OR superseded_by<>'')"
 	default:
@@ -134,6 +136,14 @@ func (s *SQLiteStore) TaskCenterTask(ctx context.Context, key string) (contracts
 		out.Subtitle = &j
 		out.AudioTrack = &r.AudioTrack
 		out.TextModel = r.TextModel
+	case "book-organize":
+		j, err := s.GetBookOrganization(ctx, id)
+		if err != nil {
+			return out, err
+		}
+		out.Kind, out.State, out.Stage = "organize", contracts.TaskCenterState(j.Status, j.Stage), j.Stage
+		out.Completed, out.Total, out.Unit = j.Processed, j.Total, "books"
+		out.CreatedAt, out.UpdatedAt, out.BookOrganization = j.CreatedAt, j.UpdatedAt, &j
 	case "organize":
 		j, err := s.GetTagOrganization(ctx, id)
 		if err != nil {

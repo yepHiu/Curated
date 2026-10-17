@@ -2,21 +2,22 @@ package contracts
 
 // TaskCenterTask is a read-only projection. Business workers own all mutations.
 type TaskCenterTask struct {
-	Key          string                 `json:"key"`
-	Kind         string                 `json:"kind"`
-	ID           string                 `json:"id"`
-	State        string                 `json:"state"`
-	Stage        string                 `json:"stage"`
-	Completed    int                    `json:"completed"`
-	Total        int                    `json:"total"`
-	Unit         string                 `json:"unit"`
-	CreatedAt    string                 `json:"createdAt"`
-	UpdatedAt    string                 `json:"updatedAt"`
-	CanManage    bool                   `json:"canManage"`
-	Subtitle     *SubtitleJob           `json:"subtitle,omitempty"`
-	Organization *TagOrganizationJobDTO `json:"organization,omitempty"`
-	AudioTrack   *int                   `json:"audioTrack,omitempty"`
-	TextModel    string                 `json:"textModel,omitempty"`
+	BookOrganization *BookOrganizationJob   `json:"bookOrganization,omitempty"`
+	Key              string                 `json:"key"`
+	Kind             string                 `json:"kind"`
+	ID               string                 `json:"id"`
+	State            string                 `json:"state"`
+	Stage            string                 `json:"stage"`
+	Completed        int                    `json:"completed"`
+	Total            int                    `json:"total"`
+	Unit             string                 `json:"unit"`
+	CreatedAt        string                 `json:"createdAt"`
+	UpdatedAt        string                 `json:"updatedAt"`
+	CanManage        bool                   `json:"canManage"`
+	Subtitle         *SubtitleJob           `json:"subtitle,omitempty"`
+	Organization     *TagOrganizationJobDTO `json:"organization,omitempty"`
+	AudioTrack       *int                   `json:"audioTrack,omitempty"`
+	TextModel        string                 `json:"textModel,omitempty"`
 }
 
 type TaskCenterSummary struct {
@@ -44,7 +45,7 @@ func TaskCenterState(state, stage string) string {
 		return "succeeded"
 	case "partial_failed":
 		return "partial"
-	case "queued", "running", "blocked", "failed", "cancelled":
+	case "queued", "running", "blocked", "failed", "cancelled", "needs_confirmation":
 		return state
 	default:
 		return "unknown"

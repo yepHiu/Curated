@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import TaskStageNode, { type TaskStageNodeState } from "@/components/jav-library/TaskStageNode.vue"
+import BookOrganizationResults from "@/components/jav-library/books/BookOrganizationResults.vue"
 import TaskStatusBadge from "@/components/jav-library/TaskStatusBadge.vue"
 import MediaEmptyState from "@/components/jav-library/MediaEmptyState.vue"
 import { HttpClientError } from "@/api/http-client"
@@ -43,6 +44,7 @@ const key = computed(() => props.taskKey)
 const canWrite = computed(() => task.value?.canManage && !disconnected.value && (task.value.kind === "subtitle" || writeEnabled.value))
 const canRetry = computed(() => {
   const current = task.value
+  if (current?.bookOrganization && !taskActive(current) && current.bookOrganization.failed > 0) return true
   if (!current || current.subtitle?.supersededBy || !["blocked", "partial", "failed", "cancelled"].includes(current.state)) return false
   if (current.subtitle?.expiresAt && Date.parse(current.subtitle.expiresAt) <= Date.now()) return false
   return true
@@ -52,7 +54,7 @@ const steps = computed(() => {
   const current = task.value
   if (!current) return []
   // Extraction/recognition are interleaved per segment: never claim all extraction finished.
-  const labels = current.kind === "subtitle" ? ["preparing", "recognizing", "translating", "saving"] : ["queued", ...((current.organization?.tasks ?? ["tags"]).some(task => task !== "tags") ? ["translating_metadata"] : []), ...((current.organization?.tasks ?? ["tags"]).includes("tags") ? ["vocabulary", "classifying"] : []), "done"]
+  const labels = current.bookOrganization ? ["queued", "recognizing", "reviewing", "done"] : current.kind === "subtitle" ? ["preparing", "recognizing", "translating", "saving"] : ["queued", ...((current.organization?.tasks ?? ["tags"]).some(task => task !== "tags") ? ["translating_metadata"] : []), ...((current.organization?.tasks ?? ["tags"]).includes("tags") ? ["vocabulary", "classifying"] : []), "done"]
   const stage = current.kind === "subtitle" && ["extracting", "uploading"].includes(current.stage) ? "recognizing" : current.stage === "waiting_quota" ? ((current.organization?.tasks ?? []).some(task => task !== "tags") && (current.organization?.translationProcessed ?? 0) < current.total ? "translating_metadata" : "classifying") : current.stage === "classify" ? "classifying" : current.stage === "finished" || current.stage === "done" ? labels.at(-1)! : current.stage
   const index = labels.indexOf(stage)
   return labels.map((name, i) => {
@@ -61,7 +63,7 @@ const steps = computed(() => {
     if (current.state === "succeeded" || index >= 0 && i < index) { state = "success"; text = "tasks.stepDone" }
     else if (i === index) {
       if (["failed", "blocked", "partial"].includes(current.state)) { state = "error"; text = `tasks.states.${current.state}` }
-      else if (["waiting", "cancelled"].includes(current.state)) { state = "paused"; text = `tasks.states.${current.state}` }
+      else if (["waiting", "cancelled", "needs_confirmation"].includes(current.state)) { state = "paused"; text = `tasks.states.${current.state}` }
       else if (current.state === "running") { state = disconnected.value ? "paused" : "running"; text = disconnected.value ? "tasks.disconnected" : "tasks.stepCurrent" }
     }
     return { name, state, text }
@@ -122,7 +124,7 @@ async function perform() {
       await useLibraryService().reloadMoviesFromApi()
       if (!alive || seq !== generation) return
       await loadItems()
-    } else await useSubtitleJobs().refresh()
+    } else if (current.subtitle) await useSubtitleJobs().refresh()
     await center.refresh()
   } catch (e) { if (alive && seq === generation) error.value = e instanceof Error ? e.message : t("tasks.actionFailed") }
   finally { if (alive && seq === generation) busy.value = false }
@@ -152,15 +154,16 @@ async function assetAction(asset: SubtitleAsset, action: "preview" | "download" 
         <Alert v-if="task.subtitle?.supersededBy"><AlertDescription class="flex flex-wrap items-center justify-between gap-3"><span>{{ t('tasks.superseded') }}</span><Button as-child variant="link"><RouterLink :to="`/tasks/${encodeURIComponent(`subtitle:${task.subtitle.supersededBy}`)}`">{{ t('tasks.viewReplacement') }}</RouterLink></Button></AlertDescription></Alert>
         <Alert v-if="error" variant="destructive"><AlertDescription>{{ error }}</AlertDescription></Alert>
         <Alert v-if="feedback"><AlertDescription>{{ feedback }}</AlertDescription></Alert>
-        <Alert v-if="taskAttention(task) || task.subtitle?.supersededBy"><AlertTitle>{{ t(task.state === 'partial' ? 'tasks.partialNotice' : 'tasks.problemNotice') }}</AlertTitle><AlertDescription><p>{{ task.organization?.error ? organizationErrorText(task.organization.error) : task.kind === 'subtitle' ? t(task.stage === 'saving' ? 'tasks.saveProblem' : 'tasks.subtitleProblem') : t('tasks.inspectItems') }}</p><pre v-if="task.subtitle?.providerError" class="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs">{{ task.subtitle.providerError }}</pre></AlertDescription></Alert>
+        <Alert v-if="taskAttention(task) || task.subtitle?.supersededBy"><AlertTitle>{{ t(task.state === 'needs_confirmation' ? 'tasks.states.needs_confirmation' : task.state === 'partial' ? 'tasks.partialNotice' : 'tasks.problemNotice') }}</AlertTitle><AlertDescription><p>{{ task.state === 'needs_confirmation' ? t('bookAI.reviewHint') : task.organization?.error ? organizationErrorText(task.organization.error) : task.kind === 'subtitle' ? t(task.stage === 'saving' ? 'tasks.saveProblem' : 'tasks.subtitleProblem') : t('tasks.inspectItems') }}</p><pre v-if="task.subtitle?.providerError" class="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs">{{ task.subtitle.providerError }}</pre></AlertDescription></Alert>
         <div class="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
           <div class="flex min-w-0 flex-col gap-5">
             <Card><CardHeader><div class="flex flex-wrap items-start justify-between gap-3"><div class="flex flex-col gap-2"><span class="text-xs text-muted-foreground">{{ t('tasks.currentStage') }}</span><CardTitle>{{ taskStage(task) }}</CardTitle><TaskStatusBadge :state="task.state" /></div><div v-if="taskActive(task) && task.total > 0" class="text-2xl tabular-nums">{{ task.completed }} <span class="text-sm text-muted-foreground">/ {{ task.total }} {{ t(`tasks.units.${task.unit}`) }}</span></div></div></CardHeader><CardContent class="flex flex-col gap-5">
               <div v-if="taskActive(task) && task.total > 0"><Progress :model-value="taskPercent(task)" class="h-1.5" :aria-label="taskStage(task)" /><p class="mt-2 text-xs text-muted-foreground">{{ t('tasks.phaseProgress', { percent: Math.round(taskPercent(task) ?? 0) }) }}</p></div>
               <p v-else-if="taskActive(task)" class="text-sm text-muted-foreground">{{ t(task.state === 'queued' ? 'tasks.queuedDescription' : task.state === 'waiting' ? 'tasks.waitingDescription' : 'tasks.unknownProgress') }}</p>
-              <ol class="flex flex-col gap-5"><li v-for="step in steps" :key="`${task.key}:${step.name}`" class="flex items-start gap-3"><TaskStageNode :state="step.state" /><div><p class="text-sm font-medium">{{ t(`tasks.stages.${step.name}`) }}</p><p class="mt-1 text-xs text-muted-foreground">{{ t(step.text) }}</p></div></li></ol>
+              <ol class="flex flex-col gap-5"><li v-for="step in steps" :key="`${task.key}:${step.name}`" class="flex items-start gap-3"><TaskStageNode :state="step.state" /><div><p class="text-sm font-medium">{{ t(task.bookOrganization && step.name === "recognizing" ? "bookAI.recognizing" : `tasks.stages.${step.name}`) }}</p><p class="mt-1 text-xs text-muted-foreground">{{ t(step.text) }}</p></div></li></ol>
             </CardContent></Card>
             <Card v-if="task.subtitle"><CardHeader><CardTitle>{{ t('tasks.results') }}</CardTitle></CardHeader><CardContent><p v-if="!task.subtitle.assets.length" class="text-sm text-muted-foreground">{{ t('tasks.noAssets') }}</p><ul v-else class="divide-y divide-border"><li v-for="asset in task.subtitle.assets" :key="asset.id" class="flex flex-wrap items-center gap-3 py-3"><FileText class="size-5 shrink-0 text-muted-foreground" /><div class="min-w-0 flex-1"><p class="break-all text-sm">{{ asset.name }}</p><p class="text-xs text-muted-foreground">{{ asset.language }} · {{ asset.format }}<span v-if="asset.missing"> · {{ t('subtitles.missing') }}</span></p></div><div class="flex flex-wrap gap-1"><Button variant="ghost" size="sm" :disabled="asset.missing || busy || disconnected" @click="assetAction(asset, 'preview')">{{ t('tasks.preview') }}</Button><Button variant="ghost" size="icon" :aria-label="t('subtitles.download')" :disabled="asset.missing || busy || disconnected" @click="assetAction(asset, 'download')"><Download /></Button><Button v-if="task.canManage" variant="ghost" size="icon" :aria-label="t('subtitles.reveal')" :disabled="asset.missing || busy || disconnected" @click="assetAction(asset, 'reveal')"><FolderOpen /></Button></div></li></ul></CardContent></Card>
+            <BookOrganizationResults v-if="task.bookOrganization" :key="task.key" :job="task.bookOrganization" :can-write="!!canWrite && !busy" @updated="load(true); center.refresh()" />
             <Card v-if="task.organization"><CardHeader><CardTitle>{{ t('tasks.items') }}</CardTitle></CardHeader><CardContent class="flex flex-col gap-4">
               <div class="grid grid-cols-3 gap-3"><div v-for="stat in [{ value: task.organization.succeeded, label: 'applied' }, { value: task.organization.unresolved, label: 'unmatched' }, { value: task.organization.failed, label: 'problems' }]" :key="stat.label"><p class="text-2xl tabular-nums">{{ stat.value }}</p><p class="text-xs text-muted-foreground">{{ t(`tasks.${stat.label}`) }}</p></div></div>
               <Separator /><div class="flex flex-wrap items-center justify-between gap-2"><Button variant="outline" size="sm" :aria-pressed="issuesOnly" @click="issuesOnly = !issuesOnly">{{ t(issuesOnly ? 'tasks.showAllItems' : 'tasks.showIssues') }}</Button><Button variant="ghost" size="sm" :disabled="itemsLoading" @click="loadItems()">{{ t('tasks.reload') }}</Button></div>
