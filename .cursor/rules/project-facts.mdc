@@ -574,4 +574,4 @@ Translate回调在AI用量记录结束前调用共用ValidateTranslations。合�
 
 ### 字幕任务整次重试（2026-10-17）
 
-失败/受阻/已取消字幕任务在共用TaskDetailContent中同时提供检查点续试和整次重试。新增本机POST /api/subtitle-jobs/{jobId}/restart返回同文件/原音轨的新queued任务，采用当前字幕默认模型与提示词，不复用旧检查点，保留旧历史/成品，过期仍可用；同文件活动任务复用，沿用队列上限和配置校验。确认提示重新计费，详情/深链切到新任务；无配置/迁移变化。见字幕实施记录与API.md。
+失败/受阻/已取消字幕任务在共用TaskDetailContent中同时提供检查点续试和整次重试。本机POST /api/subtitle-jobs/{jobId}/restart已修正为原任务同ID重新queued/preparing，保留createdAt/文件/音轨/成品，清进度/错误/期限，冻结当前默认模型与提示词；内部attemptId隔离新检查点，无表迁移。活动任务重复点击不重置，同文件其他活动或满队列拒绝。初版restart-请求创建的新旧任务仅在关联唯一且同文件/音轨/源版本时标记旧记录supersededBy，保留失败历史并排除需处理；不改正在执行的任务ID，不重复付费调用。见字幕实施记录与API.md。

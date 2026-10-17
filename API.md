@@ -14,7 +14,7 @@ All business calls use existing authentication/PIN rules. The write/test/reveal 
 | `GET /api/library/movies/{movieId}/subtitle-jobs` | Persisted jobs and validated output metadata. |
 | `GET /api/subtitle-jobs/{jobId}` | State; stage; completed/total for that stage; error; timestamps; assets. |
 | `POST /api/subtitle-jobs/{jobId}/{cancel or retry}` | Local; durable cancellation or retry from checkpoints. |
-| `POST /api/subtitle-jobs/{jobId}/restart` | Local; failed/blocked/cancelled only. Returns a fresh queued job (new ID) for the same file/audio track using current subtitle defaults and prompt, without reusing checkpoints. Keeps old history/assets; works after checkpoint expiry. Reuses any active job for that file. |
+| `POST /api/subtitle-jobs/{jobId}/restart` | Local; requeues the same failed/blocked/cancelled job from preparing with the same ID/file/audio track and creation time. Clears progress/errors/expiry, freezes current subtitle defaults/prompt and uses a fresh checkpoint namespace. Existing outputs remain; expired checkpoints are allowed. Already active returns the same job unchanged; another active job for the file or a full queue returns 409. Superseded legacy failures cannot retry/restart. |
 | `GET /api/library/movies/{movieId}/subtitles?fileId=…` | Latest usable completed generation for selected file. |
 | `GET /api/subtitles/{assetId}/content` | UTF-8 subtitle/text body; optional download=1 attachment. Metadata-backed ID only; size/hash/source validated. |
 | `POST /api/subtitles/{assetId}/reveal` | Local; system file browser for registered output, no path input. |
@@ -3709,3 +3709,7 @@ Unknown input fields/trailing JSON return 400; disabled/read-only AI returns 403
 | GET | `/api/task-center/tasks/{taskKey}` | URL-encoded subtitle:id or organize:id; common task fields and typed business data; 404 for unavailable records. |
 
 All three require existing API authentication and return no-store. Cursor order is createdAt then stable key descending. Soft-deleted organization records are excluded. `canManage` reflects a direct Server-local request; existing business mutation endpoints still enforce their own permissions and current-state rules. No generic write endpoint, migration or new config. Subtitle provider errors are reduced to a safe category; credentials and internal paths are not part of the projection. The UI shows stage-specific units rather than invented total progress. See docs/plan/2026-10-16-ai-task-center-requirements.md §14.
+
+2026-10-17: SubtitleJob optionally exposes `supersededBy` for failures replaced by the initial restart implementation. Such records retain their original failure details in history, with a replacement link, but are excluded from task-center attention counts/lists. Startup reconciliation only links a single matching prior failure with a `restart-` generation (same movie/file/audio/source revision); ambiguous matches stay untouched. New full restarts keep the task ID; internal attemptId isolates cache only, without a schema/config migration.
+
+Full-restart output asset IDs also distinguish the execution attempt (opaque IDs; clients must not parse them), while legacy asset IDs continue to resolve. This prevents saved per-version subtitle timing preferences from leaking across attempts with the same task ID.
