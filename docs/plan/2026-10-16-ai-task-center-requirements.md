@@ -322,3 +322,10 @@ AppShell 只有一个轮询调度器，活动约 2 秒、空闲约 10 秒、后�
 - 单项弹窗限85dvh，内容内部滚动，关闭恢复行焦点。行与书库勾选区域至少44px，长标题不撑宽窄屏；沿用现有Dialog、Button、Badge与语义色。
 
 验证：任务列表/任务详情/书库结果共32项回归通过，全量lint、类型检查与Web API生产构建通过，体积监管0提醒/超限。Playwright实际Vue页面检查100影片和200漫画的隔离响应、分页替换、1280px桌面与390px窄屏、完整提案展示及Escape焦点恢复；照片共用书库组件且有photo参数化回归。截图output/playwright/task-items-desktop.png、task-items-mobile.png、task-item-detail-mobile.png、task-books-mobile.png、task-book-detail-mobile.png。未发起真实AI任务或执行资料写入；本次更新前端即可生效。
+
+
+### 2026-10-18 调整：明细原位展开
+
+按用户反馈将TaskProcessingItem的单项Dialog改为现有Collapsible：点击摘要行在下方展开完整内容，再次点击收起，箭头随状态旋转。内容跟随任务详情原有滚动区域，不再增加弹窗层级；影片/漫画/写真共用，原25项分页保持不变。书库勾选框顶对齐摘要行，展开不改变勾选。此调整取代上一节的单项弹窗交互说明。
+
+验证：任务详情、任务列表与书库结果32项回归通过，包含原位展开/收起、无新增Dialog和分页/勾选；类型检查与定向ESLint通过。
