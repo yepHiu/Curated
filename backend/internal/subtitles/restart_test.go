@@ -311,3 +311,34 @@ func TestRestartValidationKeepsOriginalProgress(t *testing.T) {
 		})
 	}
 }
+
+func TestServerRecoveryQueuesInterruptedTaskWithoutDiscardingAttempt(t *testing.T) {
+	opt, r := fixture(t)
+	ctx := context.Background()
+	r.Job.State, r.Job.Stage = "running", "translating"
+	r.Job.Completed, r.Job.Total = 7, 10
+	r.AttemptID = newID()
+	if err := opt.Store.SaveSubtitleRecord(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{opt: opt}
+	if err := writeJSON(s.cpPath(checkpointID(r)), checkpoint{Version: 1, Duration: 10}); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := s.requeueInterruptedJobs(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := opt.Store.SubtitleRecord(ctx, r.Job.ID)
+	if err != nil || got.Job.State != "queued" || got.Job.Stage != "translating" || got.Job.Completed != 7 || got.Job.Total != 10 || got.AttemptID != r.AttemptID || got.Job.UpdatedAt != r.Job.UpdatedAt {
+		t.Fatalf("startup recovery changed attempt/progress: %+v %v", got, err)
+	}
+	summary, err := opt.Store.TaskCenterSummary(ctx)
+	if err != nil || summary.Running != 0 || summary.Queued != 1 || summary.Attention != 0 {
+		t.Fatalf("waiting recovery shown as running: %+v %v", summary, err)
+	}
+	if _, err := os.Stat(s.cpPath(checkpointID(r))); err != nil {
+		t.Fatal("startup recovery lost checkpoint")
+	}
+}

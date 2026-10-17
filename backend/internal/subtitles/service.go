@@ -82,6 +82,9 @@ func newID() string {
 func New(ctx context.Context, opt Options) *Service {
 	ctx, cancel := context.WithCancel(ctx)
 	s := &Service{opt: opt, cancel: cancel, done: make(chan struct{}), wake: make(chan struct{}, 1), active: map[string]context.CancelFunc{}}
+	if err := s.requeueInterruptedJobs(ctx); err != nil {
+		slog.Warn("could not requeue interrupted subtitle tasks", "error", err)
+	}
 	if err := s.reconcileLegacyRestarts(ctx); err != nil {
 		slog.Warn("could not reconcile legacy subtitle restarts", "error", err)
 	}
@@ -89,6 +92,21 @@ func New(ctx context.Context, opt Options) *Service {
 	return s
 }
 func (s *Service) Close() { s.cancel(); <-s.done }
+func (s *Service) requeueInterruptedJobs(ctx context.Context) error {
+	records, err := s.opt.Store.ListSubtitleRecords(ctx, "")
+	if err != nil {
+		return err
+	}
+	for _, r := range records {
+		if r.Job.State == "running" {
+			r.Job.State = "queued"
+			if err := s.opt.Store.SaveSubtitleRecord(ctx, r); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 func (s *Service) signal() {
 	select {
 	case s.wake <- struct{}{}:
