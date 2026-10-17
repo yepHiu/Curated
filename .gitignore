@@ -18,6 +18,7 @@ release/
 /backend/third_party/ffmpeg/bin/
 # Generated reports and exported scratch artifacts.
 /output/
+/.playwright-cli/
 coverage/
 playwright-report/
 blob-report/
@@ -25,6 +26,7 @@ scripts/
 !scripts/
 scripts/*
 !scripts/build/
+!scripts/analysis/
 !scripts/dev/
 scripts/dev/*
 !scripts/dev/copy-electron-preload.cjs
