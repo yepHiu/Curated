@@ -376,3 +376,18 @@ backend/ 目录：
 
 
 实现提交73fde3c1。确认任务中心running/queued均为0后，平滑停止旧开发后端40572并启动新开发二进制backend/runtime/curated-dev-subtitle.exe，PID43504；127.0.0.1:8080健康检查成功，任务中心历史仍可读取。新策略已在开发后端生效，没有自动重试历史失败任务或新增付费调用。
+
+
+## 2026-10-17 整批翻译漏句与调用状态修复
+
+17:11的JUQ-219任务（460f0681）报translation omitted cues，482条识别句子全部已就绪、ID唯一，检查点已译0条。对应17:10:14的deepseek-v4-flash调用耗时82.897秒，输入9529/输出23554/总33083 Token，旧逻辑记录completed，但后续句子完整性校验失败。未留存供应商原始正文，不能据此断言实际漏了几句或模型为何漏句。17:02同模型的JUR-075已完成609/609，证明新版整批流程可用。
+
+排查时8080运行PID29484，由go run ./cmd/curated于16:59启动，使用runtime/curated.db；已实际使用v3提示词和整批翻译。因此最新失败不是未重启造成。根因是整批返回缺少部分cue，而服务原先将整组译文作废；上层调用观察又只涵盖JSON解析，早于完整性校验，导致用量记录看似成功。
+
+改动：共用ValidateTranslations在应用层记录结束前检查ID/非空/完整性，漏句产生含应有/已收到数量的IncompleteTranslationError并返回有效子集。用量行记录failed/incomplete_translation；未知/重复ID或空译文为failed/invalid_translation，Token按实测保留。服务层再次独立校验，只接受有效子集，先写检查点并更新真实进度，再对遗漏ID最多补译两轮；已有译文不重复提交。两轮后仍不齐则保留成果报错，空结果立即失败，审核/鉴权/限流/格式/错误ID不触发补译。上下文超限和length二分逻辑继续保留，取消仍拒绝发布。整批成功时维持一次调用。
+
+本次不修改提示词版本、供应商配置、API或数据库；旧检查点继续兼容，历史调用状态不回写。JUQ-219原失败响应未保存，无法恢复其当时返回的部分译文；手动重试仍复用16段识别结果，首次重新翻译482条，之后才应用新的遗漏补译逻辑。未自动重试或新建付费调用。
+
+验证：go test ./internal/subtitles ./internal/llm通过；go test ./internal/app -run 'Subtitle|AIObservations' -count=1通过；go vet ./internal/subtitles ./internal/app ./internal/llm通过；pnpm backend:build:dev通过。新增回归验证漏译结果的保存顺序、只补遗漏ID、最多两轮及检查点恢复、空/错ID结果不重试，以及用量表对漏译/重复/未知/空译文的失败状态与Token保留。实现提交ab7b9488。
+
+确认任务中心running/queued为0后平滑停止旧go run后端，启动标准backend/runtime/curated-dev.exe（PID6788），健康检查、8080监听及任务历史读取通过，仍使用runtime/curated.db；修复已在开发后端生效。

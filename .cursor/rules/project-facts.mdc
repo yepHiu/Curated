@@ -566,3 +566,8 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 ### 字幕翻译优先整批（2026-10-17）
 
 识别仍每10分钟切片，翻译跨分片合并全部待译cue，按文本和估算输入/输出容量分组，取消固定30条。configured-ai继承contextWindow，缺省/千问入口预算65536；输出分组估算上限32768（不发送max_tokens）。显式上下文超限/输出length才二分重试，成功组写检查点，其他供应商/校验错误原样失败。翻译请求超时15分钟，取消拒绝发布；既有提示词冻结不变，无新API/config/迁移。三包Go测试、vet与开发构建通过，无本轮付费云调用。详见字幕实施计划。
+
+
+### 字幕整批漏译补齐与状态校验（2026-10-17）
+
+Translate回调在AI用量记录结束前调用共用ValidateTranslations。合法子集产生IncompleteTranslationError（Expected/Received），用量failed/incomplete_translation并保留Token；未知/重复ID或空译文为invalid_translation。服务再验子集并先写检查点/进度，只补遗漏ID每组最多两轮，空结果不重复调用；仍缺则保留成果失败。API/迁移/提示词版本不变，旧历史状态不回写。JUQ-219实因模型漏句，16段识别482条ID唯一，非旧后端；修复已编译并启动标准curated-dev.exe。详见字幕实施记录。

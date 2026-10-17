@@ -824,3 +824,8 @@ All three require existing API authentication and return no-store. Cursor order 
 ## Subtitle translation capacity — 2026-10-17
 
 Translation combines pending cues across all recognition parts, sending one request when the estimated context/output budget fits. Capacity groups replace the fixed 30-cue loop. Requests omit max_tokens; explicit context overflow or output truncation halves only the affected group. Successful groups checkpoint; auth/rate/policy/validation failures remain errors. Translation timeout is 15 minutes with cancellation. Configured AI inherits contextWindow; unknown/Qwen entries use a conservative 65536-token estimate. No API, config, schema or prompt-version changes. See the subtitle implementation record and guide.
+
+
+## Subtitle omission repair and usage validation — 2026-10-17
+
+Translation usage now includes ValidateTranslations before run completion. Safe subsets report failed/incomplete_translation with expected/received counts; unknown/duplicate IDs and blank translations report invalid_translation. Measured tokens remain recorded. Service independently validates and checkpoints safe subsets before at most two missing-ID repair rounds per group; empty results stop immediately. Full successful batches still use one call. No API/schema/config/prompt-version changes or historical status rewrites. Rebuilt/restarted development backend; see the subtitle implementation record.
