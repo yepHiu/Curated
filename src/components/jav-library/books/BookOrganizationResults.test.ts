@@ -1,5 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils"
-import { beforeEach, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, expect, it, vi } from "vitest"
+import { HttpClientError } from "@/api/http-client"
 import { i18n } from "@/i18n"
 import BookOrganizationResults from "./BookOrganizationResults.vue"
 import type { BookOrganizationJob, BookOrganizationItem } from "@/services/contracts/book-organization-service"
@@ -57,5 +58,57 @@ it.each([
   const wrapper = setup(); await flushPromises()
   expect(wrapper.text()).toContain(message)
   if (reason !== "BOOK_METADATA_PROVIDER_FAILED") expect(wrapper.text()).not.toContain("检查 AI")
+  wrapper.unmount()
+})
+
+afterEach(() => { vi.useRealTimers() })
+const limited = () => new HttpClientError(429, { code: "AI_RATE_LIMITED", message: "write rate limit reached", retryable: true })
+async function selectAndApply(wrapper: ReturnType<typeof setup>) {
+  await wrapper.findAll("button").find(b => b.text() === "选择本页待确认项")!.trigger("click")
+  await wrapper.findAll("button").find(b => b.text() === "确认应用 2 本")!.trigger("click")
+  await flushPromises()
+}
+
+it("waits on write rate limits and retries the same revision before continuing the selection", async () => {
+  const wrapper = setup(); await flushPromises(); vi.useFakeTimers()
+  api.review.mockRejectedValueOnce(limited())
+  await selectAndApply(wrapper)
+  expect(wrapper.text()).toContain("60 秒后自动继续")
+  expect(api.review).toHaveBeenCalledTimes(1)
+  await vi.advanceTimersByTimeAsync(59000)
+  expect(api.review).toHaveBeenCalledTimes(1)
+  await vi.advanceTimersByTimeAsync(1000); await flushPromises()
+  expect(api.review.mock.calls.map(call => call[1].bookId)).toEqual(["a", "a", "b"])
+  expect(api.review.mock.calls[0]).toEqual(api.review.mock.calls[1])
+  expect(wrapper.text()).toContain("已处理 2 本，失败 0 本")
+  expect(wrapper.text()).not.toContain("原资料已变化")
+  wrapper.unmount()
+})
+
+it.each(["stop", "close", "readonly", "switch"])("stops quota retries on %s and keeps unapplied results", async mode => {
+  const wrapper = setup(); await flushPromises(); vi.useFakeTimers()
+  api.review.mockRejectedValueOnce(limited())
+  await selectAndApply(wrapper)
+  if (mode === "stop") await wrapper.findAll("button").find(b => b.text() === "停止等待")!.trigger("click")
+  else if (mode === "close") wrapper.unmount()
+  else if (mode === "readonly") await wrapper.setProps({ canWrite: false })
+  else await wrapper.setProps({ job: { ...job, id: "different" } })
+  await vi.advanceTimersByTimeAsync(120000); await flushPromises()
+  expect(api.review).toHaveBeenCalledTimes(1)
+  if (mode === "stop") {
+    expect(wrapper.text()).toContain("剩余项目保持待确认")
+    expect(wrapper.findAll("button").some(b => b.text() === "确认应用 2 本")).toBe(true)
+  }
+  if (mode !== "close") wrapper.unmount()
+})
+
+it("pauses after bounded quota retries instead of looping indefinitely", async () => {
+  const wrapper = setup(); await flushPromises(); vi.useFakeTimers()
+  api.review.mockRejectedValue(limited())
+  await selectAndApply(wrapper)
+  await vi.advanceTimersByTimeAsync(180000); await flushPromises()
+  expect(api.review).toHaveBeenCalledTimes(4)
+  expect(wrapper.text()).toContain("剩余项目保持待确认")
+  expect(wrapper.findAll("button").some(b => b.text() === "确认应用 2 本")).toBe(true)
   wrapper.unmount()
 })

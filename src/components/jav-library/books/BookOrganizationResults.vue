@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
+import { HttpClientError } from "@/api/http-client"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +21,19 @@ const busy = ref(false), loading = ref(false), error = ref(""), feedback = ref("
 const ready = computed(() => items.value.filter(item => item.status === "ready"))
 const chosen = computed(() => ready.value.filter(item => selected.value[item.bookId] === item.revision))
 const mockMode = import.meta.env.VITE_USE_WEB_API !== "true"
+const quotaSeconds = ref(0)
+let cancelQuotaWait: (() => void) | undefined
+function stopQuotaWait() { cancelQuotaWait?.() }
+function waitForQuota(): Promise<boolean> {
+  return new Promise(resolve => {
+    quotaSeconds.value = 60
+    const finish = (resume: boolean) => {
+      clearInterval(timer); quotaSeconds.value = 0; cancelQuotaWait = undefined; resolve(resume)
+    }
+    const timer = setInterval(() => { if (--quotaSeconds.value <= 0) finish(true) }, 1000)
+    cancelQuotaWait = () => finish(false)
+  })
+}
 function failureMessage(reason: string) {
   const keys: Record<string, string> = {
     AI_WRITE_CONFLICT: "sourceConflict",
@@ -41,9 +55,10 @@ async function load() {
   } catch { if (alive && seq === generation && req === request) error.value = t("tasks.itemsFailed") }
   finally { if (alive && seq === generation && req === request) loading.value = false }
 }
-watch(() => props.job.id, () => { generation++; offset.value = 0; selected.value = {}; items.value = []; error.value = ""; feedback.value = ""; void load() }, { immediate: true })
+watch(() => props.job.id, () => { generation++; stopQuotaWait(); busy.value = false; offset.value = 0; selected.value = {}; items.value = []; error.value = ""; feedback.value = ""; void load() }, { immediate: true })
 watch(() => [props.job.updatedAt, props.job.processed, props.job.pendingReview, props.job.status], () => { if (!busy.value) void load() })
-onBeforeUnmount(() => { alive = false; generation++ })
+watch(() => props.canWrite, value => { if (!value) stopQuotaWait() })
+onBeforeUnmount(() => { alive = false; generation++; stopQuotaWait() })
 function select(item: BookOrganizationItem, checked: boolean | "indeterminate") {
   if (checked === true) selected.value[item.bookId] = item.revision
   else delete selected.value[item.bookId]
@@ -54,15 +69,33 @@ async function review(decision: "apply" | "discard") {
   const batch = [...chosen.value], id = props.job.id, kind = props.job.kind, seq = generation
   busy.value = true; error.value = ""; feedback.value = ""
   let succeeded = 0, failed = 0
+  let paused = false, conflict = false
+  const completed = new Set<string>()
+  const active = () => alive && seq === generation && props.canWrite
   for (const item of batch) {
-    if (!alive || seq !== generation || !props.canWrite) break
-    try { await service.review(id, { bookId: item.bookId, revision: item.revision, decision }); succeeded++ }
-    catch { failed++ }
+    let quotaRetries = 0
+    while (active()) {
+      try {
+        await service.review(id, { bookId: item.bookId, revision: item.revision, decision })
+        succeeded++; completed.add(item.bookId); break
+      } catch (err) {
+        const code = err instanceof HttpClientError ? err.apiError?.code : undefined
+        if (code === "AI_RATE_LIMITED" && decision === "apply" && active()) {
+          // Keep the confirmed revision, without regenerating metadata or bypassing the write budget.
+          if (quotaRetries++ < 3 && await waitForQuota()) continue
+          paused = true; break
+        }
+        conflict ||= code === "AI_WRITE_CONFLICT"
+        failed++; break
+      }
+    }
+    if (paused || !active()) break
   }
   window.dispatchEvent(new Event("curated:task-center-updated"))
   if (alive && seq === generation) {
-    selected.value = {}; feedback.value = t("bookAI.reviewResult", { succeeded, failed })
-    if (failed) error.value = t("bookAI.reviewFailed")
+    selected.value = Object.fromEntries(Object.entries(selected.value).filter(([bookId]) => !completed.has(bookId)))
+    feedback.value = paused ? t("bookAI.reviewPaused", { succeeded }) : t("bookAI.reviewResult", { succeeded, failed })
+    if (failed) error.value = t(conflict ? "bookAI.sourceConflict" : "bookAI.reviewFailed")
     await load(); emit("updated")
     busy.value = false
   }
@@ -87,7 +120,11 @@ async function review(decision: "apply" | "discard") {
     </div>
     <Alert v-if="error" variant="destructive"><AlertDescription>{{ error }}</AlertDescription></Alert>
     <p v-if="feedback" class="text-sm" role="status">{{ feedback }}</p>
-    <p v-if="busy || loading" class="text-sm text-muted-foreground" role="status">{{ t('tasks.loading') }}</p>
+    <div v-if="quotaSeconds" class="flex flex-wrap items-center gap-2">
+      <p class="text-sm text-muted-foreground" role="status">{{ t('bookAI.waitingQuota', { seconds: quotaSeconds }) }}</p>
+      <Button variant="outline" size="sm" @click="stopQuotaWait">{{ t('bookAI.stopWaiting') }}</Button>
+    </div>
+    <p v-else-if="busy || loading" class="text-sm text-muted-foreground" role="status">{{ t('tasks.loading') }}</p>
     <ul class="divide-y divide-border"><li v-for="item in items" :key="item.bookId" class="flex flex-col gap-3 py-4">
       <div class="flex items-start gap-3">
         <Checkbox :model-value="selected[item.bookId] === item.revision" :disabled="item.status !== 'ready' || busy || loading || !canWrite" :aria-label="t('bookAI.select', { title: item.title })" @update:model-value="select(item, $event)" />

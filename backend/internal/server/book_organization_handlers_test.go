@@ -7,12 +7,14 @@ import (
 	"strings"
 	"testing"
 
+	"curated-backend/internal/agent/core"
 	"curated-backend/internal/contracts"
 )
 
 type bookOrganizationStub struct {
 	AIChatProvider
-	started int
+	started   int
+	reviewErr error
 }
 
 func (s *bookOrganizationStub) StartBookOrganization(_ context.Context, req contracts.BookOrganizationRequest) (contracts.BookOrganizationJob, error) {
@@ -22,8 +24,8 @@ func (s *bookOrganizationStub) StartBookOrganization(_ context.Context, req cont
 func (*bookOrganizationStub) ControlBookOrganization(context.Context, string, string) error {
 	return nil
 }
-func (*bookOrganizationStub) ReviewBookOrganization(context.Context, string, contracts.BookOrganizationReview) error {
-	return nil
+func (s *bookOrganizationStub) ReviewBookOrganization(context.Context, string, contracts.BookOrganizationReview) error {
+	return s.reviewErr
 }
 
 func TestBookOrganizationSubmissionLocalAndStrict(t *testing.T) {
@@ -49,5 +51,17 @@ func TestBookOrganizationSubmissionLocalAndStrict(t *testing.T) {
 	}
 	if stub.started != 1 {
 		t.Fatalf("unauthorized or malformed request reached app: %d", stub.started)
+	}
+}
+
+func TestBookReviewRateLimitIsRetryableHTTP(t *testing.T) {
+	h := &Handler{aiChatProvider: &bookOrganizationStub{reviewErr: &core.ToolError{Code: "AI_RATE_LIMITED", Message: "write rate limit reached"}}}
+	req := httptest.NewRequest(http.MethodPost, "/api/ai/book-organizations/job/review", strings.NewReader(`{"bookId":"book","revision":1,"decision":"apply"}`))
+	req.SetPathValue("jobId", "job")
+	req.SetPathValue("operation", "review")
+	response := httptest.NewRecorder()
+	h.handleBookOrganizations(response, req)
+	if response.Code != http.StatusTooManyRequests || response.Header().Get("Retry-After") != "60" || !strings.Contains(response.Body.String(), "AI_RATE_LIMITED") || !strings.Contains(response.Body.String(), `"retryable":true`) {
+		t.Fatalf("response: %d %v %s", response.Code, response.Header(), response.Body.String())
 	}
 }

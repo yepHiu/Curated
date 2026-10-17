@@ -50,6 +50,11 @@ func topicHTTPError(w http.ResponseWriter, err error) {
 	var toolErr *core.ToolError
 	if errors.As(err, &toolErr) {
 		status := http.StatusBadRequest
+		if toolErr.Code == "AI_RATE_LIMITED" {
+			w.Header().Set("Retry-After", "60")
+			writeJSON(w, http.StatusTooManyRequests, contracts.AppError{Code: toolErr.Code, Message: toolErr.Message, Retryable: true})
+			return
+		}
 		if toolErr.Code == "AI_DISABLED" || toolErr.Code == "AI_READ_ONLY" {
 			status = http.StatusForbidden
 		}
