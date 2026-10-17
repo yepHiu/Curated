@@ -3,6 +3,8 @@
   <img src="icon/curated-wordmark.png" alt="Curated" width="520" />
 </p>
 
+Internal code explorer: run `pnpm code:atlas` and open `http://127.0.0.1:8795`. See [Code Atlas](docs/guide.md#code-atlas--代码地形图) for live scans, offline exports, and build commands.
+
 AI 字幕识别与翻译已接入源码：详情页明确发起，千问 3.1 日语识别，用户 AI / Qwen Flash / Qwen Plus 翻译（优先整批，容量不足才拆分），SRT/TXT 保存到影片旁的 `sub/`。Web 与原生播放器提供字幕设置；需更新 Server 和 Desktop。见 [使用与验证边界](docs/guide.md#ai-subtitle-recognition-and-translation)。
 
 <p align="center">

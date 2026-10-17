@@ -3,6 +3,10 @@ description: 日常开发速记（启动、联调、根目录政策）
 alwaysApply: true
 ---
 
+## Code Atlas 内部分析工具 — 2026-10-18
+
+仓库根目录 `pnpm code:atlas` → `http://127.0.0.1:8795`，Node + Vue/Vite，需 Git/Go 和现有依赖，不依赖产品 Server。页面手动重扫当前工作区，可下载离线 HTML；默认 loopback。构建 `pnpm code:atlas:build`，运行构建版 `pnpm code:atlas:preview`，CLI 导出 `pnpm code:atlas:export`，检查 `pnpm code:atlas:check`。实现位于 `scripts/analysis/`，产物 `.workspace/code-atlas-dist/`。详见 guide “Code Atlas”。
+
 ## macOS 原生播放 — 2026-10-09
 
 Mac 正式包内置固定版本 libmpv、arm64 dylib 依赖闭包、对应源码/资源、配方/SBOM 与许可；用户无需安装 MPV、Homebrew 或设置环境变量。新 Mac 安装（未保存播放偏好）默认使用原生播放器，已保存选择保留。正式包仅加载 app 内引擎，忽略开发覆盖变量；开发态仍允许 Homebrew/绝对 CURATED_NATIVE_LIBMPV。

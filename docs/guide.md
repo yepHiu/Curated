@@ -2,11 +2,22 @@
 
 ## Code Atlas / 代码地形图
 
-直接打开 [代码地形图](reference/code-atlas.html)，可以查看仓库体量、下钻目录、搜索文件与函数、按长度或分支指标排序，以及观察跨模块静态导入。页面内嵌快照数据，可离线打开，不依赖 Server 或 Vite。
+代码地形图现在是 `scripts/analysis/` 下的内部动态程序。仓库根目录运行 `pnpm code:atlas`，打开终端显示的地址（默认 `http://127.0.0.1:8795`）。需现有 Node 依赖、Git 与 Go；不依赖 Curated Server、数据库或产品 Vite 服务。首次启动自动扫描，页面“重新扫描”读取当前工作区的新内容，完成后保留视图与筛选条件。“导出离线 HTML”下载最后一次成功结果。
 
-更新快照：在仓库根目录运行 `pnpm code:atlas`（需已安装 Node 依赖与 Go）。输出覆盖 `docs/reference/code-atlas.html`，统计当前工作区的 Git 已跟踪和未忽略的新文件，包含未提交修改。仅覆盖本仓库，不合并相邻 Android / 插件项目；依赖、构建产物、运行数据及报告自身排除。
+| 命令（仓库根目录） | 用途 |
+| --- | --- |
+| `pnpm code:atlas` | 启动动态工具与 Vite 页面热更新 |
+| `pnpm code:atlas --port 8796` | 指定其他本机端口 |
+| `pnpm code:atlas:build` | 构建页面到 ignored `.workspace/code-atlas-dist/` |
+| `pnpm code:atlas:preview` | 用已构建页面运行相同动态服务，无 Vite 开发服务 |
+| `pnpm code:atlas:export` | 命令行扫描并覆盖 [仓库离线快照](reference/code-atlas.html) |
+| `pnpm code:atlas:check` | 独立 Vue 类型检查及扫描器/服务测试 |
 
-源码行数为物理行（包含空行、注释和 Vue 模板/样式）；函数识别覆盖 JS/TS、Vue script 和 Go，包含匿名回调。分支指标和静态导入仅帮助定位阅读热点，不代表完整运行时调用图或质量评分。完整口径与解析诊断在页面底部。分析器检查：`node --test scripts/analysis/code-atlas.test.mjs`。设计与验证记录见 [代码地形图记录](plan/2026-10-17-code-atlas.md)。
+停止程序用终端 Ctrl+C。扫描状态与最后成功结果保存在进程内存中；重启重新扫描。修改代码后需要点击“重新扫描”，页面不会自动监控整个仓库。扫描过程中继续显示上次成功结果；失败可重试；多标签页同时刷新共用一个任务。只轮询状态，结果修订号变化时才下载数据。
+
+源码行数为物理行（包含空行、注释和 Vue 模板/样式）；函数识别覆盖 JS/TS、Vue script 和 Go，包含匿名回调。统计 Git 已跟踪与未忽略的新文件，包含未提交修改；排除依赖、构建产物、运行数据及报告自身，仅覆盖本仓库。分支指标与静态导入不是完整运行时调用图或质量评分。完整口径与解析诊断在页面底部。
+
+工具默认只监听 loopback，拒绝其他 Host 和跨来源请求。内部接口为 `GET /api/atlas/status`、`GET /api/atlas/snapshot`、`POST /api/atlas/scan`（需要 `X-Code-Atlas: 1`）、`GET /api/atlas/export`，不属于产品 Go API。代码不会接收任意仓库路径或写入业务数据。设计与验证见 [代码地形图记录](plan/2026-10-17-code-atlas.md)。
 
 ## AI subtitle recognition and translation
 

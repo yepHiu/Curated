@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## Internal Code Atlas — 2026-10-18
+
+`scripts/analysis/` contains the Vue/Vite/shadcn-vue + Node internal analyzer. `pnpm code:atlas` starts loopback port 8795; scan work runs in a Worker, retains last successful results, and coalesces concurrent refreshes. Tool-only APIs: GET `/api/atlas/status`, GET `/api/atlas/snapshot`, POST `/api/atlas/scan` (same origin and `X-Code-Atlas: 1`), GET `/api/atlas/export`. These are not Go product APIs; no database or library-config changes. Build/preview/export/check commands and scope are in guide “Code Atlas”.
+
 ## macOS native playback — 2026-10-09
 
 Mac 正式包内置固定版本 libmpv、arm64 dylib 依赖闭包、对应源码/资源、配方/SBOM 与许可；用户无需安装 MPV、Homebrew 或设置环境变量。新 Mac 安装（未保存播放偏好）默认使用原生播放器，已保存选择保留。正式包仅加载 app 内引擎，忽略开发覆盖变量；开发态仍允许 Homebrew/绝对 CURATED_NATIVE_LIBMPV。

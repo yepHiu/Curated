@@ -3,6 +3,10 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## Internal Code Atlas — 2026-10-18
+
+`scripts/analysis/` is a standalone developer tool: Vue 3/Vite/shadcn-vue shell, shared isolated explorer, Node HTTP API and Worker-based TS/Vue/Go AST scanner. `pnpm code:atlas` serves `127.0.0.1:8795`; startup scans automatically, manual refresh replaces in-memory results while preserving filters. Build output is `.workspace/code-atlas-dist/`; `code:atlas:preview` runs it, `code:atlas:export` writes an offline HTML. `/api/atlas/{status,snapshot,scan,export}` belong only to this local tool, not Curated Server. No DB/config changes. See guide and 2026-10-17 code-atlas plan.
+
 ## 2026-10-16 AI 字幕（源码已实现，完整实机验收待补）
 
 详情 More / SubtitleJobDialog 显式发起；SettingsSubtitlesSection 配置 subtitleProvider（enabled/apiKey/translationModel），本机写入 library-config.cfg，GET 只返回密钥已配置状态。识别固定北京 qwen-audio-3.1-asr-flash-filetrans；翻译 configured-ai / qwen-flash / qwen-plus，千问使用非思考请求。内部字幕服务独立串行 worker，迁移0066 subtitle_jobs 仅元数据；每10分钟音频一片，cacheDir/subtitle-jobs/<id> JSON检查点，成功清理、失败/取消约24h清理。成品在影片旁 sub/，ja.srt/zh-CN.srt/zh-CN.txt，不覆盖旧文件。
