@@ -391,3 +391,13 @@ backend/ 目录：
 验证：go test ./internal/subtitles ./internal/llm通过；go test ./internal/app -run 'Subtitle|AIObservations' -count=1通过；go vet ./internal/subtitles ./internal/app ./internal/llm通过；pnpm backend:build:dev通过。新增回归验证漏译结果的保存顺序、只补遗漏ID、最多两轮及检查点恢复、空/错ID结果不重试，以及用量表对漏译/重复/未知/空译文的失败状态与Token保留。实现提交ab7b9488。
 
 确认任务中心running/queued为0后平滑停止旧go run后端，启动标准backend/runtime/curated-dev.exe（PID6788），健康检查、8080监听及任务历史读取通过，仍使用runtime/curated.db；修复已在开发后端生效。
+
+### 失败字幕任务支持整次重试（2026-10-17）
+
+按用户要求，任务中心和影片字幕入口共用的TaskDetailContent保留“重试未完成部分”，为failed/blocked/cancelled增加“重新执行整个任务”。确认弹窗说明从头识别、翻译和再次计费。新操作使用当前字幕默认识别/翻译模型与最新提示词，保留原文件和音轨；创建新任务并切换详情/深链，旧记录、检查点和成品不修改，过期检查点也可重新生成。原检查点续试及提示词版本保护不变。
+
+新增本机限定POST /api/subtitle-jobs/{jobId}/restart，返回新SubtitleJob；复用现有Create校验/队列限制和同文件活动任务去重。运行中/已完成任务不允许整次重试。无新配置或数据库迁移。
+
+验证：前端相关3文件17项测试、typecheck和定向ESLint通过；后端字幕/Server整包测试及go vet通过，开发后端构建通过。新增后端用例覆盖检查点存在/过期、当前配置和提示词、旧历史成品保留、重复点击、非法状态及真实FFmpeg合成音频从头执行识别翻译（供应商使用本地fixture）。未自动重试用户的付费任务。
+
+确认任务中心running/queued均为0后平滑停止旧开发后端6788，替换并启动标准backend/runtime/curated-dev.exe（PID11732）。8080健康检查和任务历史读取通过，使用原runtime/curated.db；新接口已在开发后端生效。

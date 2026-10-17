@@ -571,3 +571,7 @@ GitHub Latest now selects the highest public stable Full SemVer; standalone Serv
 ### 字幕整批漏译补齐与状态校验（2026-10-17）
 
 Translate回调在AI用量记录结束前调用共用ValidateTranslations。合法子集产生IncompleteTranslationError（Expected/Received），用量failed/incomplete_translation并保留Token；未知/重复ID或空译文为invalid_translation。服务再验子集并先写检查点/进度，只补遗漏ID每组最多两轮，空结果不重复调用；仍缺则保留成果失败。API/迁移/提示词版本不变，旧历史状态不回写。JUQ-219实因模型漏句，16段识别482条ID唯一，非旧后端；修复已编译并启动标准curated-dev.exe。详见字幕实施记录。
+
+### 字幕任务整次重试（2026-10-17）
+
+失败/受阻/已取消字幕任务在共用TaskDetailContent中同时提供检查点续试和整次重试。新增本机POST /api/subtitle-jobs/{jobId}/restart返回同文件/原音轨的新queued任务，采用当前字幕默认模型与提示词，不复用旧检查点，保留旧历史/成品，过期仍可用；同文件活动任务复用，沿用队列上限和配置校验。确认提示重新计费，详情/深链切到新任务；无配置/迁移变化。见字幕实施记录与API.md。

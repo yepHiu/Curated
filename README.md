@@ -22,7 +22,7 @@ AI 字幕识别与翻译已接入源码：详情页明确发起，千问 3.1 日
 
 # Curated
 
-任务中心已接入 AI 字幕和 AI 整理：侧栏统一查看进度、历史与任务详情，字幕发起后复用同一套详情弹窗。使用真实任务需更新 Server 和前端；见 [任务中心使用说明](docs/guide.md#task-center)。
+任务中心已接入 AI 字幕和 AI 整理：侧栏统一查看进度、历史与任务详情，字幕发起后复用同一套详情弹窗；失败字幕可选择重试未完成部分或从头执行整个任务。使用真实任务需更新 Server 和前端；见 [任务中心使用说明](docs/guide.md#task-center)。
 
 New macOS packages bundle the native MPV engine and dependencies; users need no MPV or Homebrew installation. New Mac profiles default to native playback (Apple Silicon, macOS 15+). Apple signing/notarization remains pending; see the [setup and delivery boundaries](docs/guide.md#macos-native-playback).
 

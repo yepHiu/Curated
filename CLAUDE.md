@@ -795,6 +795,7 @@ All business calls use existing authentication/PIN rules. The write/test/reveal 
 | `GET /api/subtitle-jobs` | All persisted subtitle jobs for global sidebar tracking; authenticated read, no task creation. |
 | `GET /api/subtitle-jobs/{jobId}` | State; stage; completed/total for that stage; error; timestamps; assets. |
 | `POST /api/subtitle-jobs/{jobId}/{cancel or retry}` | Local; durable cancellation or retry from checkpoints. |
+| `POST /api/subtitle-jobs/{jobId}/restart` | Local; failed/blocked/cancelled only. Returns a fresh queued job (new ID) for the same file/audio track using current subtitle defaults and prompt, without reusing checkpoints. Keeps old history/assets; works after checkpoint expiry. Reuses any active job for that file. |
 | `GET /api/library/movies/{movieId}/subtitles?fileId=…` | Latest usable completed generation for selected file. |
 | `GET /api/subtitles/{assetId}/content` | UTF-8 subtitle/text body; optional download=1 attachment. Metadata-backed ID only; size/hash/source validated. |
 | `POST /api/subtitles/{assetId}/reveal` | Local; system file browser for registered output, no path input. |
