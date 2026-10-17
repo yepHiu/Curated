@@ -2615,6 +2615,11 @@
     "noAudio": "当前视频没有可识别的音轨。"
   },
   "tasks": {
+    "pageSize": "每页条数",
+    "pagination": "任务分页",
+    "previousPage": "上一页",
+    "nextPage": "下一页",
+    "currentPage": "第 {page} 页",
     "detailTitle": "任务详情",
     "title": "任务中心",
     "runningCount": "{count} 执行中",

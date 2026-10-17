@@ -42,6 +42,12 @@ func TestTaskCenterPersistentPaginationAndSummary(t *testing.T) {
 	if err != nil || summary.Total != 56 || summary.Running != 1 || summary.History != 55 {
 		t.Fatalf("%+v %v", summary, err)
 	}
+	for _, tc := range []struct{ limit, want int }{{0, 20}, {20, 20}, {50, 50}, {100, 55}} {
+		keys, next, err := s.TaskCenterKeys(ctx, TaskCenterFilter{State: "history", Limit: tc.limit})
+		if err != nil || len(keys) != tc.want || (next != "") != (tc.want < 55) {
+			t.Fatalf("history limit %d: %d keys, cursor %q, %v", tc.limit, len(keys), next, err)
+		}
+	}
 	seen := map[string]bool{}
 	cursor := ""
 	for {

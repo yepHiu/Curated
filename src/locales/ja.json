@@ -2615,6 +2615,11 @@
     "noAudio": "認識できる音声トラックがありません。"
   },
   "tasks": {
+    "pageSize": "1ページの件数",
+    "pagination": "タスクのページ切替",
+    "previousPage": "前へ",
+    "nextPage": "次へ",
+    "currentPage": "{page} ページ目",
     "detailTitle": "タスク詳細",
     "title": "タスクセンター",
     "runningCount": "{count} 件実行中",

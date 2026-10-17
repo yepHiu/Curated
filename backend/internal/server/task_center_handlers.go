@@ -41,7 +41,7 @@ func (h *Handler) handleTaskCenterSummary(w http.ResponseWriter, r *http.Request
 func (h *Handler) handleTaskCenterTasks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	q := r.URL.Query()
-	limit := 30
+	limit := 20
 	if q.Has("limit") {
 		n, err := strconv.Atoi(q.Get("limit"))
 		if err != nil || n < 1 || n > 100 {

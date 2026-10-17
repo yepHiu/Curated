@@ -2615,6 +2615,11 @@
     "noAudio": "This video has no audio track to recognize."
   },
   "tasks": {
+    "pageSize": "Items per page",
+    "pagination": "Task pagination",
+    "previousPage": "Previous",
+    "nextPage": "Next",
+    "currentPage": "Page {page}",
     "detailTitle": "Task details",
     "title": "Task center",
     "runningCount": "{count} running",

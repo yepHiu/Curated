@@ -34,8 +34,11 @@ function restoreDetailFocus(event: Event) {
   event.preventDefault()
   if (detailTrigger?.isConnected) detailTrigger.focus({ preventScroll: true })
 }
-const pageCount = computed(() => Math.max(1, Math.min(100, Number(route.query.pages) || 1)))
-const loading = ref(true), failed = ref(false), moreBusy = ref(false)
+const pageSizes = [20, 50, 100] as const
+const pageSize = computed(() => pageSizes.includes(Number(route.query.pageSize) as typeof pageSizes[number]) ? Number(route.query.pageSize) : 20)
+const pageNumber = ref(1)
+let pageCursors = [""]
+const loading = ref(true), failed = ref(false)
 const state = computed<TaskFilter>(() => ["active", "attention", "history"].includes(String(route.query.state)) ? route.query.state as TaskFilter : "all")
 const kind = computed<TaskKind | "all">(() => ["subtitle", "organize"].includes(String(route.query.kind)) ? route.query.kind as TaskKind : "all")
 const groups = computed(() => [
@@ -44,34 +47,35 @@ const groups = computed(() => [
   { key: "finished", items: items.value.filter(item => !taskActive(item) && !taskAttention(item)) },
 ].filter(group => group.items.length))
 let generation = 0
-async function load(more = false, quiet = false) {
-  if (moreBusy.value) return
+async function load(quiet = false) {
   const seq = ++generation
-  if (more) moreBusy.value = true
-  else if (!quiet) loading.value = true
+  const requestedPage = pageNumber.value
+  if (!quiet) { loading.value = true; items.value = [] }
   try {
-    let page = await service.list({ kind: kind.value, state: state.value, cursor: more ? cursor.value : undefined, limit: 30 })
-    if (!more) {
-      const all = [...page.items]
-      for (let i = 1; i < pageCount.value && page.nextCursor; i++) {
-        if (seq !== generation) return
-        page = await service.list({ kind: kind.value, state: state.value, cursor: page.nextCursor, limit: 30 })
-        all.push(...page.items)
-      }
-      page = { ...page, items: all }
-    }
+    const page = await service.list({ kind: kind.value, state: state.value, cursor: pageCursors[requestedPage - 1] || undefined, limit: pageSize.value })
     if (seq !== generation) return
-    items.value = more ? [...items.value, ...page.items.filter(item => !items.value.some(old => old.key === item.key))] : page.items
+    items.value = page.items
     cursor.value = page.nextCursor; failed.value = false
-    if (more) void router.replace({ query: { ...route.query, pages: String(pageCount.value + 1) } })
-    if (!quiet && !more) { loading.value = false; await nextTick(); if (seq === generation && scrollEl.value) scrollEl.value.scrollTop = Number(route.query.scroll) || 0 }
+    // A refreshed boundary invalidates forward cursors, while previous pages stay reachable.
+    if (pageCursors[requestedPage] !== page.nextCursor) pageCursors = pageCursors.slice(0, requestedPage)
+    if (page.nextCursor) pageCursors[requestedPage] = page.nextCursor
+    if (!quiet) { loading.value = false; await nextTick(); if (seq === generation && scrollEl.value) scrollEl.value.scrollTop = 0 }
   } catch { if (seq === generation) failed.value = true }
-  finally { if (seq === generation) { loading.value = false; moreBusy.value = false } }
+  finally { if (seq === generation) loading.value = false }
 }
 function filter(field: "state" | "kind", value: unknown) { void router.replace({ query: { ...route.query, [field]: String(value) === "all" ? undefined : String(value), pages: undefined, scroll: undefined } }) }
-watch([state, kind], () => { generation++; moreBusy.value = false; items.value = []; void load() }, { immediate: true })
-// Refresh all loaded pages without collapsing history or moving its scroll position.
-watch(center.revision, () => { if (!loading.value && !moreBusy.value) void load(false, true) })
+function changePageSize(value: unknown) {
+  if (!pageSizes.includes(Number(value) as typeof pageSizes[number])) return
+  void router.replace({ query: { ...route.query, pageSize: String(value), pages: undefined, scroll: undefined } })
+}
+function changePage(next: number) {
+  if (loading.value || next < 1 || !pageCursors[next - 1] && next !== 1) return
+  pageNumber.value = next
+  void load()
+}
+watch([state, kind, pageSize], () => { pageNumber.value = 1; pageCursors = [""]; cursor.value = ""; void load() }, { immediate: true })
+// Refresh only the visible page, preserving its cursor and scroll position.
+watch(center.revision, () => { if (!loading.value) void load(true) })
 onBeforeUnmount(() => generation++)
 </script>
 <template>
@@ -96,7 +100,17 @@ onBeforeUnmount(() => generation++)
           </button>
         </div>
       </section>
-      <Button v-if="cursor && !loading" variant="outline" class="self-center rounded-full" :disabled="moreBusy" @click="load(true)">{{ t(moreBusy ? 'tasks.loading' : 'tasks.loadMore') }}</Button>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4" data-task-pagination>
+        <div class="flex items-center gap-2">
+          <span id="task-page-size-label" class="text-sm text-muted-foreground">{{ t('tasks.pageSize') }}</span>
+          <Select :model-value="String(pageSize)" @update:model-value="changePageSize"><SelectTrigger class="w-24" aria-labelledby="task-page-size-label" data-task-page-size><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="size in pageSizes" :key="size" :value="String(size)">{{ size }}</SelectItem></SelectGroup></SelectContent></Select>
+        </div>
+        <nav class="flex items-center gap-3" :aria-label="t('tasks.pagination')">
+          <Button variant="outline" size="sm" data-task-previous :disabled="loading || pageNumber === 1" @click="changePage(pageNumber - 1)">{{ t('tasks.previousPage') }}</Button>
+          <span class="text-sm tabular-nums text-muted-foreground" aria-live="polite">{{ t('tasks.currentPage', { page: pageNumber }) }}</span>
+          <Button variant="outline" size="sm" data-task-next :disabled="loading || failed || !cursor" @click="changePage(pageNumber + 1)">{{ t('tasks.nextPage') }}</Button>
+        </nav>
+      </div>
     </div>
     <TaskDetailDialog v-model:open="detailOpen" :task-key="selectedTaskKey" @close-auto-focus="restoreDetailFocus" />
   </div>

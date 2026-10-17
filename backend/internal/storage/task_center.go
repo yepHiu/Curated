@@ -76,7 +76,7 @@ func (s *SQLiteStore) TaskCenterKeys(ctx context.Context, f TaskCenterFilter) ([
 		args = append(args, c.Time, c.Time, c.Key)
 	}
 	if f.Limit <= 0 {
-		f.Limit = 30
+		f.Limit = 20
 	}
 	if f.Limit > 100 {
 		f.Limit = 100

@@ -37,7 +37,7 @@ const mock: TaskCenterService = {
     const all = await mockTasks()
     const filtered = all.filter(t => (!query.kind || query.kind === "all" || t.kind === query.kind) && (!query.state || query.state === "all" || query.state === "active" && taskActive(t) || query.state === "attention" && taskAttention(t) || query.state === "history" && taskHistory(t)))
     const start = query.cursor ? filtered.findIndex(t => t.key === query.cursor) + 1 : 0
-    const items = filtered.slice(start, start + (query.limit ?? 30))
+    const items = filtered.slice(start, start + (query.limit ?? 20))
     return { items, nextCursor: start + items.length < filtered.length ? items.at(-1)!.key : "", summary: summarizeTasks(all) }
   },
   async summary() { return summarizeTasks(await mockTasks()) },
