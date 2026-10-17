@@ -8,7 +8,7 @@ export interface AIGovernanceSettings {
 }
 
 export const defaultAIGovernance = (): AIGovernanceSettings => ({
-  enabled: false, readOnly: false, privacy: "auto", stepLimit: 0, writePerMinute: 10, retentionDays: 30,
+  enabled: false, readOnly: false, privacy: "auto", stepLimit: 0, writePerMinute: 10000, retentionDays: 30,
 })
 
 export interface AIRun {

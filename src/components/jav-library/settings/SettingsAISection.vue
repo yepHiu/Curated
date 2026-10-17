@@ -110,7 +110,7 @@ function viewFailures() {
   recordHeading.value?.scrollIntoView?.({ block: "nearest" })
 }
 const validSettings = computed(() => Number.isInteger(settings.value.stepLimit) && settings.value.stepLimit >= 0 && settings.value.stepLimit <= 30
-  && Number.isInteger(settings.value.writePerMinute) && settings.value.writePerMinute >= 1 && settings.value.writePerMinute <= 60
+  && Number.isInteger(settings.value.writePerMinute) && settings.value.writePerMinute >= 1 && settings.value.writePerMinute <= 1000000
   && Number.isInteger(settings.value.retentionDays) && settings.value.retentionDays >= 7 && settings.value.retentionDays <= 365)
 
 const lastStepLimit = ref(15)
@@ -351,7 +351,7 @@ function auditLine(entry: AIAuditEntry) {
               <span id="ai-step-limit-hint" class="sr-only">{{ t('aiSettings.stepLimitHint') }}</span>
               <FieldGroup class="gap-3" data-ai-limit-fields>
                 <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4" v-if="stepLimitEnabled" :data-invalid="!validSettings"><FieldLabel for="ai-steps">{{ t('aiSettings.stepLimit') }}</FieldLabel><Input class="w-full min-w-0 sm:w-52 sm:shrink-0" id="ai-steps" v-model.number="settings.stepLimit" :aria-invalid="!Number.isInteger(settings.stepLimit) || settings.stepLimit < 1 || settings.stepLimit > 30" @blur="settingsAutosave.flush()" type="number" min="1" max="30" :disabled="busy" /></Field>
-                <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><FieldLabel for="ai-rate">{{ t('aiSettings.writeLimit') }}</FieldLabel><Input class="w-full min-w-0 sm:w-52 sm:shrink-0" id="ai-rate" v-model.number="settings.writePerMinute" :aria-invalid="!Number.isInteger(settings.writePerMinute) || settings.writePerMinute < 1 || settings.writePerMinute > 60" @blur="settingsAutosave.flush()" type="number" min="1" max="60" :disabled="busy" /></Field>
+                <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><FieldLabel for="ai-rate">{{ t('aiSettings.writeLimit') }}</FieldLabel><Input class="w-full min-w-0 sm:w-52 sm:shrink-0" id="ai-rate" v-model.number="settings.writePerMinute" :aria-invalid="!Number.isInteger(settings.writePerMinute) || settings.writePerMinute < 1 || settings.writePerMinute > 1000000" @blur="settingsAutosave.flush()" type="number" min="1" max="1000000" :disabled="busy" /></Field>
                 <Field orientation="horizontal" class="flex min-w-0 flex-col items-stretch gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"><SettingsHint :text="t('aiSettings.retentionHint')">
                   <FieldLabel for="ai-retention">{{ t('aiSettings.retention') }}</FieldLabel>
                 </SettingsHint><Input class="w-full min-w-0 sm:w-52 sm:shrink-0" id="ai-retention" v-model.number="settings.retentionDays" :aria-invalid="!Number.isInteger(settings.retentionDays) || settings.retentionDays < 7 || settings.retentionDays > 365" @blur="settingsAutosave.flush()" type="number" min="7" max="365" :disabled="busy" /></Field>

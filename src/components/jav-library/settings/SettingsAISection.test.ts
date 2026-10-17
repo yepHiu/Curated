@@ -43,6 +43,21 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 describe("SettingsAISection", () => {
+  it("saves a large write budget and rejects values beyond the supported ceiling", async () => {
+    mocks.getSettings.mockResolvedValue({ ...enabledGovernance(), writePerMinute: 10 })
+    const wrapper = await setup()
+    for (const value of [10000, 1000000]) {
+      await wrapper.get("#ai-rate").setValue(String(value))
+      await wrapper.get("#ai-rate").trigger("blur"); await flushPromises()
+      expect(mocks.saveSettings).toHaveBeenLastCalledWith(expect.objectContaining({ writePerMinute: value }))
+    }
+    mocks.saveSettings.mockClear()
+    await wrapper.get("#ai-rate").setValue("1000001")
+    await wrapper.get("#ai-rate").trigger("blur"); await flushPromises()
+    expect(mocks.saveSettings).not.toHaveBeenCalled()
+    expect(wrapper.get("#ai-rate").attributes("aria-invalid")).toBe("true")
+    wrapper.unmount()
+  })
   it("uses local midnight for today's usage and audit records", async () => {
     const wrapper = await setup()
     const start = new Date()

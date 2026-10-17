@@ -12,7 +12,7 @@ type AIGovernanceConfig struct {
 }
 
 func DefaultAIGovernance() AIGovernanceConfig {
-	return AIGovernanceConfig{Privacy: "auto", StepLimit: 0, WritePerMinute: 10, RetentionDays: 30}
+	return AIGovernanceConfig{Privacy: "auto", StepLimit: 0, WritePerMinute: 10000, RetentionDays: 30}
 }
 func (c AIGovernanceConfig) Validate() error {
 	if c.Privacy != "auto" && c.Privacy != "minimal" {
@@ -21,8 +21,8 @@ func (c AIGovernanceConfig) Validate() error {
 	if c.StepLimit < 0 || c.StepLimit > 30 {
 		return fmt.Errorf("stepLimit must be 0 (unlimited) or between 1 and 30")
 	}
-	if c.WritePerMinute < 1 || c.WritePerMinute > 60 {
-		return fmt.Errorf("writePerMinute must be between 1 and 60")
+	if c.WritePerMinute < 1 || c.WritePerMinute > 1000000 {
+		return fmt.Errorf("writePerMinute must be between 1 and 1000000")
 	}
 	if c.RetentionDays < 7 || c.RetentionDays > 365 {
 		return fmt.Errorf("retentionDays must be between 7 and 365")

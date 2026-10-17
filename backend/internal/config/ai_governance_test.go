@@ -6,6 +6,19 @@ import (
 	"testing"
 )
 
+func TestAIGovernanceLargeWriteBudget(t *testing.T) {
+	if DefaultAIGovernance().WritePerMinute != 10000 {
+		t.Fatal("default must accommodate batch organization")
+	}
+	for _, limit := range []int{-1, 0, 1, 10, 60, 10000, 1000000, 1000001} {
+		cfg := DefaultAIGovernance()
+		cfg.WritePerMinute = limit
+		if valid := cfg.Validate() == nil; valid != (limit >= 1 && limit <= 1000000) {
+			t.Fatalf("write limit %d valid=%v", limit, valid)
+		}
+	}
+}
+
 func TestAIGovernanceOptionalStepLimit(t *testing.T) {
 	if DefaultAIGovernance().StepLimit != 0 {
 		t.Fatal("default tool limit must be disabled")

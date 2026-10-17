@@ -189,3 +189,45 @@ func TestProjectStripsFilesystemFields(t *testing.T) {
 		t.Fatalf("title = %v", got["title"])
 	}
 }
+
+func TestGatewayDefaultWriteBudgetAllowsBatchAndStillLimitsExtremeTraffic(t *testing.T) {
+	reg := NewRegistry()
+	if err := reg.Register(ToolDefinition{
+		Name: "batch_write", Description: "batch write", ParamsSchema: objectSchema(nil),
+		Permission: PermissionWriteApply, Domain: DomainUserWrite,
+		Handler: func(context.Context, Call) (Result, error) { return Result{OK: true}, nil },
+	}); err != nil {
+		t.Fatal(err)
+	}
+	gateway := NewGateway(reg, nil, nil, func() Settings { return Settings{WriteEnabled: true, GlobalWriteLimit: true} })
+	now := time.Now()
+	gateway.now = func() time.Time { return now }
+	invoke := func(session string) Result {
+		t.Helper()
+		args := json.RawMessage(`{}`)
+		preview, err := gateway.IssuePreview(session, "batch_write", args)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return gateway.Invoke(context.Background(), Call{Name: "batch_write", Args: args, SessionID: session, ConfirmTok: preview.Token})
+	}
+	// A full 600-book task must fit within one minute, across action sessions.
+	for i := 0; i < 600; i++ {
+		if result := invoke("batch"); !result.OK {
+			t.Fatalf("batch item %d: %+v", i, result.Error)
+		}
+	}
+	for i := 600; i < DefaultWritePerMin-1; i++ {
+		gateway.budget.addWrite("_global", now)
+	}
+	if result := invoke("last"); !result.OK {
+		t.Fatalf("last allowed write: %+v", result.Error)
+	}
+	if result := invoke("overflow"); result.OK || result.Error.Code != "AI_RATE_LIMITED" {
+		t.Fatalf("overflow: %+v", result)
+	}
+	now = now.Add(time.Minute)
+	if result := invoke("next-minute"); !result.OK {
+		t.Fatalf("window did not recover: %+v", result.Error)
+	}
+}

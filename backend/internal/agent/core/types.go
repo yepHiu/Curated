@@ -54,7 +54,7 @@ const (
 
 	DefaultListLimit   = 50
 	DefaultStepLimit   = 0 // Unlimited unless the user opts into a limit.
-	DefaultWritePerMin = 10
+	DefaultWritePerMin = 10000
 	DefaultBatchLimit  = 25
 	ReadTimeout        = 10 * time.Second
 	WriteTimeout       = 30 * time.Second

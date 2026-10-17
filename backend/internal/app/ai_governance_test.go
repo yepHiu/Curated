@@ -64,6 +64,7 @@ func TestAIGovernancePersistenceAndEnforcement(t *testing.T) {
 	settings.ReadOnly = true
 	settings.Privacy = "minimal"
 	settings.StepLimit = 3
+	settings.WritePerMinute = 1000000
 	if err := a.SetAIGovernanceSettings(settings); err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +72,7 @@ func TestAIGovernancePersistenceAndEnforcement(t *testing.T) {
 	if err := config.MergeLibrarySettingsFile(&reloaded, a.librarySettingsPath); err != nil {
 		t.Fatal(err)
 	}
-	if reloaded.AIGovernance == nil || !reloaded.AIGovernance.ReadOnly {
+	if reloaded.AIGovernance == nil || !reloaded.AIGovernance.ReadOnly || reloaded.AIGovernance.WritePerMinute != 1000000 {
 		t.Fatal("not persisted")
 	}
 	if a.aiProjection("http://127.0.0.1/v1") != core.SanitizeMinimal {
