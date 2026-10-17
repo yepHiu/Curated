@@ -1,4 +1,4 @@
-import { flushPromises, mount } from "@vue/test-utils"
+import { DOMWrapper, flushPromises, mount } from "@vue/test-utils"
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import { HttpClientError } from "@/api/http-client"
 import { i18n } from "@/i18n"
@@ -12,7 +12,7 @@ vi.mock("@/services/photo-library-service", () => ({ usePhotoLibraryService: () 
 const job: BookOrganizationJob = { id: "book-job", kind: "comic", locale: "zh-CN", status: "needs_confirmation", stage: "reviewing", total: 2, processed: 2, pendingReview: 2, applied: 0, failed: 0, createdAt: "", updatedAt: "" }
 const rows: BookOrganizationItem[] = ["a", "b"].map(bookId => ({ bookId, title: `original ${bookId}`, status: "ready", revision: 2, before: { title: `original ${bookId}`, originalTitle: "原文", sourceFileName: "source.zip" }, metadata: { cleanTitle: "原文", translatedTitle: "译文" }, reason: "" }))
 beforeEach(() => { vi.clearAllMocks(); i18n.global.locale.value = "zh-CN"; api.items.mockImplementation(async () => structuredClone(rows)); api.review.mockResolvedValue(undefined) })
-function setup() { return mount(BookOrganizationResults, { props: { job: { ...job }, canWrite: true }, global: { plugins: [i18n] } }) }
+function setup() { return mount(BookOrganizationResults, { attachTo: document.body, props: { job: { ...job }, canWrite: true }, global: { plugins: [i18n] } }) }
 
 it("only applies explicitly selected persisted revisions and refreshes the library", async () => {
   const wrapper = setup(); await flushPromises()
@@ -56,7 +56,9 @@ it.each([
 ])("shows the specific failure reason for %s", async (reason, message) => {
   api.items.mockResolvedValue([{ ...rows[0], status: "failed", metadata: {}, reason }])
   const wrapper = setup(); await flushPromises()
-  expect(wrapper.text()).toContain(message)
+  expect(wrapper.text()).not.toContain(message)
+  await wrapper.get("[data-processing-item]").trigger("click"); await flushPromises()
+  await vi.waitFor(() => expect(document.body.textContent).toContain(message))
   if (reason !== "BOOK_METADATA_PROVIDER_FAILED") expect(wrapper.text()).not.toContain("检查 AI")
   wrapper.unmount()
 })
@@ -110,5 +112,50 @@ it("pauses after bounded quota retries instead of looping indefinitely", async (
   expect(api.review).toHaveBeenCalledTimes(4)
   expect(wrapper.text()).toContain("剩余项目保持待确认")
   expect(wrapper.findAll("button").some(b => b.text() === "确认应用 2 本")).toBe(true)
+  wrapper.unmount()
+})
+
+it.each(['comic', 'photo'] as const)("paginates compact %s items without mixing page selections", async kind => {
+  const all = Array.from({ length: 51 }, (_, i) => ({ ...rows[0]!, bookId: `book-${i}`, title: `Book ${i}` }))
+  api.items.mockImplementation(async (_id: string, offset = 0) => all.slice(offset, offset + 25))
+  const wrapper = setup()
+  await wrapper.setProps({ job: { ...job, kind, total: 51 } }); await flushPromises()
+  expect(wrapper.findAll('[data-processing-item]')).toHaveLength(25)
+  expect(wrapper.text()).not.toContain('译文')
+  await wrapper.findAll('[data-processing-item]')[0]!.trigger('click'); await flushPromises()
+  await vi.waitFor(() => expect(new DOMWrapper(document.body).get('[data-processing-item-detail]').text()).toContain('译文'))
+  await new DOMWrapper(document.body).get('[data-slot="dialog-close"]').trigger('click'); await flushPromises()
+  await wrapper.findAll('[role="checkbox"]')[0]!.trigger('click')
+  const next = () => wrapper.get('[data-items-pagination]').findAll('button')[1]!
+  api.items.mockRejectedValueOnce(new Error('offline'))
+  await next().trigger('click'); await flushPromises()
+  expect(wrapper.get('[data-items-pagination]').text()).toContain('1 / 3')
+  expect(wrapper.text()).toContain('确认应用 1 本')
+  await next().trigger('click'); await flushPromises()
+  expect(api.items).toHaveBeenLastCalledWith('book-job', 25)
+  expect(wrapper.findAll('[data-processing-item]')[0]!.text()).toContain('Book 25')
+  expect(wrapper.text()).toContain('确认应用 0 本')
+  await wrapper.setProps({ job: { ...job, kind, total: 51, updatedAt: 'later' } }); await flushPromises()
+  expect(api.items).toHaveBeenLastCalledWith('book-job', 25)
+  await next().trigger('click'); await flushPromises()
+  expect(wrapper.findAll('[data-processing-item]')).toHaveLength(1)
+  expect(next().attributes('disabled')).toBeDefined()
+  expect(api.review).not.toHaveBeenCalled()
+  wrapper.unmount()
+})
+
+it("keeps the requested book page when polling overlaps navigation", async () => {
+  const wrapper = setup(); await flushPromises()
+  await wrapper.setProps({ job: { ...job, total: 51 } }); await flushPromises()
+  let finish!: (items: BookOrganizationItem[]) => void
+  api.items.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  await wrapper.get('[data-items-pagination]').findAll('button')[1]!.trigger('click')
+  const nextRows = [{ ...rows[0]!, bookId: 'next', title: 'Next page' }]
+  api.items.mockResolvedValue(nextRows)
+  await wrapper.setProps({ job: { ...job, total: 51, updatedAt: 'polled' } }); await flushPromises()
+  expect(api.items).toHaveBeenLastCalledWith('book-job', 25)
+  finish(rows); await flushPromises()
+  expect(wrapper.get('[data-items-pagination]').text()).toContain('2 / 3')
+  expect(wrapper.get('[data-processing-item]').text()).toContain('Next page')
   wrapper.unmount()
 })

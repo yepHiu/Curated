@@ -4,7 +4,6 @@ import { RouterLink } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { Captions, Download, FileText, FolderOpen, Sparkles } from "lucide-vue-next"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -13,6 +12,8 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import TaskStageNode, { type TaskStageNodeState } from "@/components/jav-library/TaskStageNode.vue"
 import BookOrganizationResults from "@/components/jav-library/books/BookOrganizationResults.vue"
+import TaskProcessingItem from "@/components/jav-library/TaskProcessingItem.vue"
+import TaskItemsPagination from "@/components/jav-library/TaskItemsPagination.vue"
 import TaskStatusBadge from "@/components/jav-library/TaskStatusBadge.vue"
 import MediaEmptyState from "@/components/jav-library/MediaEmptyState.vue"
 import { HttpClientError } from "@/api/http-client"
@@ -37,7 +38,7 @@ const task = ref<CenterTask>(), loading = ref(true), unavailable = ref(false), d
 const error = ref(""), busy = ref(false), feedback = ref("")
 const confirm = ref<"cancel" | "retry" | "restart" | "undo" | "">("")
 const preview = ref(""), previewName = ref(""), previewOpen = ref(false)
-const items = ref<TagOrganizationItem[]>([]), itemsLoading = ref(false), itemsError = ref(false), itemsMore = ref(false)
+const items = ref<TagOrganizationItem[]>([]), itemsLoading = ref(false), itemsError = ref(false), itemsOffset = ref(0)
 const issuesOnly = ref(false)
 const visibleItems = computed(() => issuesOnly.value ? items.value.filter(item => ["failed", "conflict"].includes(item.status)) : items.value)
 const key = computed(() => props.taskKey)
@@ -84,28 +85,27 @@ async function load(quiet = false) {
     if (unavailable.value) task.value = undefined
   } finally { if (alive && seq === generation && req === request) loading.value = false }
 }
-async function loadItems(more = false) {
+async function loadItems(offset = itemsOffset.value) {
   const current = task.value
   if (!current?.organization || itemsLoading.value) return
   const seq = ++itemGeneration, scope = generation
   itemsLoading.value = true; itemsError.value = false
-  const offset = more ? items.value.length : 0
   try {
     const page = await useAIService().getTagOrganizationItems(current.id, offset)
     if (scope !== generation || seq !== itemGeneration) return
-    items.value = more ? [...items.value, ...page] : page; itemsMore.value = page.length === 25
+    items.value = page; itemsOffset.value = offset
   } catch { if (scope === generation && seq === itemGeneration) itemsError.value = true }
   finally { if (scope === generation && seq === itemGeneration) itemsLoading.value = false }
 }
 watch(key, async () => {
-  generation++; itemGeneration++; task.value = undefined; items.value = []; itemsLoading.value = false; itemsMore.value = false; itemsError.value = false
+  generation++; itemGeneration++; task.value = undefined; items.value = []; itemsLoading.value = false; itemsOffset.value = 0; itemsError.value = false
   error.value = ""; feedback.value = ""; confirm.value = ""; previewOpen.value = false; busy.value = false; issuesOnly.value = false
   const scope = generation
   await load()
   if (scope === generation) void loadItems()
 }, { immediate: true })
 watch(center.revision, () => { if (!loading.value && !busy.value) void load(true) })
-watch(() => task.value?.organization?.revision, (value, old) => { if (old !== undefined && value !== old && items.value.length <= 25) void loadItems() })
+watch(() => task.value?.organization?.revision, (value, old) => { if (old !== undefined && value !== old) void loadItems() })
 onBeforeUnmount(() => { alive = false; generation++; itemGeneration++ })
 
 async function perform() {
@@ -169,8 +169,16 @@ async function assetAction(asset: SubtitleAsset, action: "preview" | "download" 
               <Separator /><div class="flex flex-wrap items-center justify-between gap-2"><Button variant="outline" size="sm" :aria-pressed="issuesOnly" @click="issuesOnly = !issuesOnly">{{ t(issuesOnly ? 'tasks.showAllItems' : 'tasks.showIssues') }}</Button><Button variant="ghost" size="sm" :disabled="itemsLoading" @click="loadItems()">{{ t('tasks.reload') }}</Button></div>
               <Alert v-if="itemsError" variant="destructive"><AlertDescription>{{ t('tasks.itemsFailed') }}</AlertDescription></Alert>
               <p v-if="!visibleItems.length && !itemsLoading" class="text-sm text-muted-foreground">{{ t('tasks.noLoadedItems') }}</p>
-              <ul class="divide-y divide-border"><li v-for="item in visibleItems" :key="item.movieId" class="flex flex-col gap-2 py-4"><div class="flex flex-wrap items-center justify-between gap-2"><RouterLink :to="{ name: 'detail', params: { id: item.movieId } }" class="text-sm font-medium hover:underline">{{ item.title || item.movieId }}</RouterLink><Badge :variant="['failed','conflict'].includes(item.status) ? 'warning' : 'secondary'">{{ t(te(`tasks.itemStates.${item.status}`) ? `tasks.itemStates.${item.status}` : 'tasks.states.unknown') }}</Badge></div><p v-for="translation in item.translations" :key="translation.kind" class="text-xs text-muted-foreground">{{ t(`organizationConfirm.options.${translation.kind}`) }} · {{ t(`tasks.itemStates.${translation.status}`) }}<span v-if="translation.reason"> · {{ organizationErrorText(translation.reason) }}</span></p><p v-if="item.reason" class="text-xs text-muted-foreground">{{ organizationErrorText(item.reason) }}</p><details v-if="item.evidence.length"><summary class="cursor-pointer text-xs text-muted-foreground">{{ t('tasks.evidence') }}</summary><blockquote v-for="(evidence, index) in item.evidence" :key="index" class="mt-2 border-l-2 border-border pl-3 text-xs"><span class="font-medium">{{ evidence.topic }} · {{ evidence.field }}</span><p class="mt-1 whitespace-pre-wrap break-words text-muted-foreground">{{ evidence.quote }}</p></blockquote></details></li></ul>
-              <Button v-if="itemsMore" variant="outline" :disabled="itemsLoading" @click="loadItems(true)">{{ t(itemsLoading ? 'tasks.loading' : 'tasks.loadMore') }}</Button><p v-if="itemsLoading" class="text-xs text-muted-foreground" role="status">{{ t('tasks.loading') }}</p>
+              <ul class="divide-y divide-border" :aria-busy="itemsLoading"><li v-for="item in visibleItems" :key="item.movieId" class="flex min-w-0 py-0.5">
+                <TaskProcessingItem :title="item.title || item.movieId" :status="t(te(`tasks.itemStates.${item.status}`) ? `tasks.itemStates.${item.status}` : 'tasks.states.unknown')" :warning="['failed', 'conflict'].includes(item.status)">
+                  <p v-for="translation in item.translations" :key="translation.kind" class="text-sm text-muted-foreground">{{ t(`organizationConfirm.options.${translation.kind}`) }} · {{ t(`tasks.itemStates.${translation.status}`) }}<span v-if="translation.reason"> · {{ organizationErrorText(translation.reason) }}</span></p>
+                  <p v-if="item.reason" class="text-sm text-muted-foreground">{{ organizationErrorText(item.reason) }}</p>
+                  <div v-if="item.evidence.length" class="flex flex-col gap-3"><p class="text-sm font-medium">{{ t('tasks.evidence') }}</p><blockquote v-for="(evidence, index) in item.evidence" :key="index" class="border-l-2 border-border pl-3 text-xs"><span class="font-medium">{{ evidence.topic }} · {{ evidence.field }}</span><p class="mt-1 whitespace-pre-wrap text-muted-foreground">{{ evidence.quote }}</p></blockquote></div>
+                  <Button as-child variant="outline" class="min-h-11 self-start rounded-full"><RouterLink :to="{ name: 'detail', params: { id: item.movieId } }">{{ t('tasks.movie') }}</RouterLink></Button>
+                </TaskProcessingItem>
+              </li></ul>
+              <TaskItemsPagination :offset="itemsOffset" :total="task.organization.total" :disabled="itemsLoading" @change="loadItems" />
+              <p v-if="itemsLoading" class="text-xs text-muted-foreground" role="status">{{ t('tasks.loading') }}</p>
             </CardContent></Card>
           </div>
           <Card><CardHeader><CardTitle>{{ t('tasks.info') }}</CardTitle></CardHeader><CardContent class="flex flex-col gap-5"><dl class="flex flex-col gap-4 text-sm"><div v-if="task.organization"><dt class="text-xs text-muted-foreground">{{ t('organizationConfirm.tasks') }}</dt><dd class="mt-1">{{ (task.organization.tasks ?? ['tags']).map(kind => t(`organizationConfirm.options.${kind}`)).join(' · ') }}</dd></div><div><dt class="text-xs text-muted-foreground">{{ t('tasks.subject') }}</dt><dd class="mt-1 break-words">{{ taskSubject(task) }}</dd></div><div><dt class="text-xs text-muted-foreground">{{ t('tasks.created') }}</dt><dd class="mt-1">{{ taskDate(task.createdAt) }}</dd></div><div><dt class="text-xs text-muted-foreground">{{ t('tasks.updated') }}</dt><dd class="mt-1">{{ taskDate(task.updatedAt) }}</dd></div><div><dt class="text-xs text-muted-foreground">{{ t('tasks.id') }}</dt><dd class="mt-1 break-all">{{ task.key }}</dd></div></dl><Separator /><details v-if="task.subtitle"><summary class="cursor-pointer text-xs text-muted-foreground">{{ t('tasks.parameters') }}</summary><dl class="mt-3 flex flex-col gap-3 text-xs"><div><dt class="text-muted-foreground">{{ t('subtitles.recognitionModel') }}</dt><dd class="mt-1 break-all">{{ task.subtitle.recognitionModel || 'qwen-audio-3.1-asr-flash-filetrans' }}</dd></div><div><dt class="text-muted-foreground">{{ t('subtitles.translationModel') }}</dt><dd class="mt-1 break-all">{{ task.textModel || task.subtitle.translationModel }}</dd></div><div v-if="task.audioTrack !== undefined"><dt class="text-muted-foreground">{{ t('subtitles.audioTrack') }}</dt><dd>{{ task.audioTrack + 1 }}</dd></div></dl></details><p class="text-xs text-muted-foreground">{{ t('tasks.timeNote') }}</p></CardContent></Card>

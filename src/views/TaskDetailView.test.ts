@@ -5,18 +5,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { i18n } from "@/i18n"
 import TaskDetailView from "./TaskDetailView.vue"
 import TaskDetailContent from "@/components/jav-library/TaskDetailContent.vue"
-import { projectSubtitle, summarizeTasks } from "@/lib/task-center"
-const api = vi.hoisted(() => ({ get: vi.fn(), action: vi.fn(), refresh: vi.fn(), reloadMoviesFromApi: vi.fn() }))
+import { projectSubtitle, projectOrganization, summarizeTasks } from "@/lib/task-center"
+const api = vi.hoisted(() => ({ get: vi.fn(), action: vi.fn(), refresh: vi.fn(), reloadMoviesFromApi: vi.fn(), getTagOrganizationItems: vi.fn() }))
 const revision = ref(0)
 vi.mock("@/services/task-center-service", () => ({ useTaskCenterService: () => api }))
 vi.mock("@/composables/use-task-center", () => ({ useTaskCenter: () => ({ revision, refresh: api.refresh }) }))
 vi.mock("@/composables/use-tag-organization", () => ({ useTagOrganization: () => api, organizationErrorText: (s: string) => s }))
 vi.mock("@/composables/use-subtitle-jobs", () => ({ useSubtitleJobs: () => api }))
 vi.mock("@/services/library-service", () => ({ useLibraryService: () => api }))
-vi.mock("@/services/ai-service", () => ({ useAIService: () => ({ getTagOrganizationItems: vi.fn(async () => []) }) }))
+vi.mock("@/services/ai-service", () => ({ useAIService: () => api }))
 vi.mock("@/services/subtitle-service", () => ({ useSubtitleService: () => ({}) }))
 vi.mock("@/lib/experimental-agent", () => ({ useExperimentalAgent: () => ({ writeEnabled: ref(true) }) }))
 vi.mock("@/components/ui/dialog", () => ({ Dialog: { props: ["open"], template: '<section v-if="open" role="dialog"><slot /></section>' }, ...Object.fromEntries(["DialogContent", "DialogHeader", "DialogTitle", "DialogDescription", "DialogFooter"].map(name => [name, { template: '<div><slot /></div>' }])) }))
+vi.mock("@/components/jav-library/TaskProcessingItem.vue", () => ({ default: { props: ["title", "status"], template: '<button data-processing-item>{{ title }} {{ status }}</button>' } }))
 const job = projectSubtitle({ id: "a", movieId: "movie", fileId: "file", fileName: "part.mp4", state: "running", stage: "translating", completed: 8, total: 12, assets: [], createdAt: "2026-10-17T00:00:00Z", updatedAt: "2026-10-17T00:01:00Z", translationModel: "qwen-flash" })
 async function setup() {
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/tasks/:taskKey", component: TaskDetailView }, { path: "/tasks", component: { template: '<div />' } }, { path: "/detail/:id", name: "detail", component: { template: '<div />' } }] })
@@ -24,7 +25,7 @@ async function setup() {
   const wrapper = mount(TaskDetailView, { global: { plugins: [router, i18n] } }); await flushPromises()
   return { wrapper, router }
 }
-beforeEach(() => { vi.clearAllMocks(); i18n.global.locale.value = "zh-CN"; api.get.mockResolvedValue(structuredClone(job)) })
+beforeEach(() => { vi.clearAllMocks(); i18n.global.locale.value = "zh-CN"; api.get.mockResolvedValue(structuredClone(job)); api.getTagOrganizationItems.mockResolvedValue([]) })
 describe("task detail behavior", () => {
   it("keeps superseded failures in history with a replacement link and no retry actions", async () => {
     const old = { ...job, state: "failed" as const, subtitle: { ...job.subtitle!, state: "failed", supersededBy: "new" } }
@@ -143,4 +144,56 @@ describe("task detail behavior", () => {
     expect(wrapper.text()).toContain("other.mp4"); expect(wrapper.text()).not.toContain("part.mp4")
     wrapper.unmount()
   })
+})
+
+const organization = projectOrganization({ id: "org", taskId: "org", status: "completed", stage: "done", triggerReason: "selected", total: 51, processed: 51, succeeded: 50, unresolved: 0, failed: 1, revision: 1, createdAt: "", updatedAt: "" })
+const organizationRows = Array.from({ length: 51 }, (_, i) => ({ movieId: `movie-${i}`, title: `Title ${i}`, status: i === 26 ? "failed" : "succeeded", reason: "Detailed reason", evidence: [], translations: [] }))
+
+it("replaces movie item pages, refreshes the current page and retains it on failure", async () => {
+  api.get.mockResolvedValue(organization)
+  api.getTagOrganizationItems.mockImplementation(async (_id: string, offset = 0) => organizationRows.slice(offset, offset + 25))
+  const { wrapper } = await setup()
+  const next = () => wrapper.get('[data-items-pagination]').findAll('button')[1]!
+  const previous = () => wrapper.get('[data-items-pagination]').findAll('button')[0]!
+  expect(wrapper.findAll('[data-processing-item]')).toHaveLength(25)
+  expect(wrapper.text()).not.toContain("Detailed reason")
+  expect(previous().attributes('disabled')).toBeDefined()
+  await next().trigger('click'); await flushPromises()
+  expect(api.getTagOrganizationItems).toHaveBeenLastCalledWith('org', 25)
+  expect(wrapper.findAll('[data-processing-item]')).toHaveLength(25)
+  expect(wrapper.findAll('[data-processing-item]')[0]!.text()).toContain('Title 25')
+  api.get.mockResolvedValue({ ...organization, organization: { ...organization.organization!, revision: 2 } })
+  revision.value++; await flushPromises()
+  expect(api.getTagOrganizationItems).toHaveBeenLastCalledWith('org', 25)
+  await wrapper.findAll('button').find(b => b.text() === '只看本页问题')!.trigger('click')
+  expect(wrapper.findAll('[data-processing-item]')).toHaveLength(1)
+  expect(wrapper.find('[data-processing-item]').text()).toContain('Title 26')
+  api.getTagOrganizationItems.mockRejectedValueOnce(new Error('offline'))
+  await next().trigger('click'); await flushPromises()
+  expect(wrapper.get('[data-items-pagination]').text()).toContain('2 / 3')
+  expect(wrapper.find('[data-processing-item]').text()).toContain('Title 26')
+  await wrapper.findAll('button').find(b => b.text() === '显示本页全部')!.trigger('click')
+  await next().trigger('click'); await flushPromises()
+  expect(wrapper.findAll('[data-processing-item]')).toHaveLength(1)
+  expect(next().attributes('disabled')).toBeDefined()
+  await previous().trigger('click'); await flushPromises()
+  expect(wrapper.findAll('[data-processing-item]')).toHaveLength(25)
+  wrapper.unmount()
+})
+
+it("ignores a late movie item page after switching tasks", async () => {
+  api.get.mockResolvedValue(organization)
+  api.getTagOrganizationItems.mockResolvedValue(organizationRows.slice(0, 25))
+  const { wrapper, router } = await setup()
+  let finish!: (rows: typeof organizationRows) => void
+  api.getTagOrganizationItems.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  await wrapper.get('[data-items-pagination]').findAll('button')[1]!.trigger('click')
+  api.get.mockResolvedValue({ ...organization, key: 'organize:other', id: 'other', organization: { ...organization.organization!, id: 'other', total: 1 } })
+  api.getTagOrganizationItems.mockResolvedValue([{ ...organizationRows[0], title: 'Other task' }])
+  await router.push('/tasks/organize:other'); await flushPromises()
+  finish(organizationRows.slice(25, 50)); await flushPromises()
+  expect(wrapper.findAll('[data-processing-item]')).toHaveLength(1)
+  expect(wrapper.text()).toContain('Other task')
+  expect(wrapper.text()).not.toContain('Title 25')
+  wrapper.unmount()
 })

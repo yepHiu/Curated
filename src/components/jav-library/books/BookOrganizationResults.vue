@@ -4,7 +4,8 @@ import { useI18n } from "vue-i18n"
 import { HttpClientError } from "@/api/http-client"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
+import TaskProcessingItem from "@/components/jav-library/TaskProcessingItem.vue"
+import TaskItemsPagination from "@/components/jav-library/TaskItemsPagination.vue"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import BookMetadataFacts from "./BookMetadataFacts.vue"
@@ -43,19 +44,22 @@ function failureMessage(reason: string) {
   }
   return t(`bookAI.${keys[reason] ?? "recognitionFailed"}`)
 }
-let generation = 0, request = 0, alive = true
-async function load() {
+let generation = 0, request = 0, alive = true, requestedOffset = 0
+async function load(nextOffset = requestedOffset) {
   const seq = generation, req = ++request, id = props.job.id
+  requestedOffset = nextOffset
   loading.value = true
   try {
-    const next = await service.items(id, offset.value)
+    const next = await service.items(id, nextOffset)
     if (!alive || seq !== generation || req !== request) return
+    if (offset.value !== nextOffset) selected.value = {}
+    offset.value = nextOffset
     items.value = next
     selected.value = Object.fromEntries(next.filter(i => i.status === "ready" && selected.value[i.bookId] === i.revision).map(i => [i.bookId, i.revision]))
-  } catch { if (alive && seq === generation && req === request) error.value = t("tasks.itemsFailed") }
+  } catch { if (alive && seq === generation && req === request) { requestedOffset = offset.value; error.value = t("tasks.itemsFailed") } }
   finally { if (alive && seq === generation && req === request) loading.value = false }
 }
-watch(() => props.job.id, () => { generation++; stopQuotaWait(); busy.value = false; offset.value = 0; selected.value = {}; items.value = []; error.value = ""; feedback.value = ""; void load() }, { immediate: true })
+watch(() => props.job.id, () => { generation++; stopQuotaWait(); busy.value = false; requestedOffset = 0; offset.value = 0; selected.value = {}; items.value = []; error.value = ""; feedback.value = ""; void load() }, { immediate: true })
 watch(() => [props.job.updatedAt, props.job.processed, props.job.pendingReview, props.job.status], () => { if (!busy.value) void load() })
 watch(() => props.canWrite, value => { if (!value) stopQuotaWait() })
 onBeforeUnmount(() => { alive = false; generation++; stopQuotaWait() })
@@ -63,7 +67,7 @@ function select(item: BookOrganizationItem, checked: boolean | "indeterminate") 
   if (checked === true) selected.value[item.bookId] = item.revision
   else delete selected.value[item.bookId]
 }
-function page(delta: number) { offset.value += delta * 25; selected.value = {}; error.value = ""; void load() }
+function page(nextOffset: number) { error.value = ""; void load(nextOffset) }
 async function review(decision: "apply" | "discard") {
   if (busy.value || loading.value || !props.canWrite || !chosen.value.length) return
   const batch = [...chosen.value], id = props.job.id, kind = props.job.kind, seq = generation
@@ -125,19 +129,20 @@ async function review(decision: "apply" | "discard") {
       <Button variant="outline" size="sm" @click="stopQuotaWait">{{ t('bookAI.stopWaiting') }}</Button>
     </div>
     <p v-else-if="busy || loading" class="text-sm text-muted-foreground" role="status">{{ t('tasks.loading') }}</p>
-    <ul class="divide-y divide-border"><li v-for="item in items" :key="item.bookId" class="flex flex-col gap-3 py-4">
-      <div class="flex items-start gap-3">
+    <ul class="divide-y divide-border" :aria-busy="loading"><li v-for="item in items" :key="item.bookId" class="flex min-w-0 items-center gap-1 py-0.5">
+      <label class="flex size-11 shrink-0 cursor-pointer items-center justify-center">
         <Checkbox :model-value="selected[item.bookId] === item.revision" :disabled="item.status !== 'ready' || busy || loading || !canWrite" :aria-label="t('bookAI.select', { title: item.title })" @update:model-value="select(item, $event)" />
-        <span class="min-w-0 flex-1 break-words text-sm font-medium">{{ item.title }}</span><Badge :variant="['failed', 'conflict'].includes(item.status) ? 'warning' : 'secondary'">{{ t(`bookAI.status.${item.status}`) }}</Badge>
-      </div>
-      <template v-if="item.metadata.cleanTitle">
-        <p class="break-words text-sm text-muted-foreground">{{ t('bookAI.before') }} · {{ item.before.title }}</p>
-        <p class="break-words text-sm font-medium">{{ t('bookAI.after') }} · {{ item.metadata.translatedTitle }}</p>
-        <details v-if="item.before.metadata?.cleanTitle"><summary class="cursor-pointer text-sm text-muted-foreground">{{ t('bookAI.saved') }}</summary><BookMetadataFacts :metadata="item.before.metadata" evidence /></details>
-        <BookMetadataFacts :metadata="item.metadata" evidence />
-      </template>
-      <p v-if="item.reason" class="text-sm text-muted-foreground">{{ failureMessage(item.reason) }}</p>
+      </label>
+      <TaskProcessingItem :title="item.title || item.bookId" :status="t(`bookAI.status.${item.status}`)" :warning="['failed', 'conflict'].includes(item.status)">
+        <template v-if="item.metadata.cleanTitle">
+          <p class="text-sm text-muted-foreground">{{ t('bookAI.before') }} · {{ item.before.title }}</p>
+          <p class="text-sm font-medium">{{ t('bookAI.after') }} · {{ item.metadata.translatedTitle }}</p>
+          <details v-if="item.before.metadata?.cleanTitle"><summary class="cursor-pointer text-sm text-muted-foreground">{{ t('bookAI.saved') }}</summary><BookMetadataFacts :metadata="item.before.metadata" evidence /></details>
+          <BookMetadataFacts :metadata="item.metadata" evidence />
+        </template>
+        <p v-if="item.reason" class="text-sm text-muted-foreground">{{ failureMessage(item.reason) }}</p>
+      </TaskProcessingItem>
     </li></ul>
-    <div v-if="job.total > 25" class="flex items-center justify-between gap-2"><Button variant="outline" :disabled="offset === 0 || busy || loading" @click="page(-1)">{{ t('bookAI.previous') }}</Button><span class="text-sm text-muted-foreground">{{ offset / 25 + 1 }} / {{ Math.ceil(job.total / 25) }}</span><Button variant="outline" :disabled="offset + 25 >= job.total || busy || loading" @click="page(1)">{{ t('bookAI.next') }}</Button></div>
+    <TaskItemsPagination :offset="offset" :total="job.total" :disabled="busy || loading" @change="page" />
   </CardContent></Card>
 </template>
