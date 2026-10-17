@@ -54,6 +54,9 @@ type checkpoint struct {
 	Version  int                       `json:"version"`
 	Duration float64                   `json:"duration"`
 	Parts    []part                    `json:"parts"`
+	// Learned only from explicit provider capacity failures. Persist before
+	// retrying so interruption cannot replay a known oversized request.
+	TranslationBatchLimit int `json:"translationBatchLimit,omitempty"`
 }
 
 func (s *Service) AudioTracks(ctx context.Context, movieID, fileID string) ([]contracts.SubtitleAudioTrack, error) {
@@ -705,6 +708,12 @@ func (s *Service) translatePending(ctx context.Context, r *storage.SubtitleRecor
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		if limit := cp.TranslationBatchLimit; limit > 0 && len(batch) > limit {
+			if err := translate(batch[:limit], repairs); err != nil {
+				return err
+			}
+			return translate(batch[limit:], repairs)
+		}
 		if err := s.update(ctx, r, "translating", *completed, total); err != nil {
 			return err
 		}
@@ -714,6 +723,11 @@ func (s *Service) translatePending(ctx context.Context, r *storage.SubtitleRecor
 		if err != nil && !errors.As(err, &incomplete) {
 			if ctx.Err() == nil && len(batch) > 1 && translationCapacityError(err) {
 				mid := len(batch) / 2
+				cp.TranslationBatchLimit = mid
+				if saveErr := writeJSON(s.cpPath(checkpointID(*r)), cp); saveErr != nil {
+					return saveErr
+				}
+				slog.Warn("subtitle translation capacity exceeded; reducing batch", "taskId", r.Job.ID, "cues", len(batch), "nextBatchLimit", mid)
 				if err := translate(batch[:mid], repairs); err != nil {
 					return err
 				}

@@ -160,6 +160,55 @@ func TestTranslationOnlySplitsOnExplicitCapacityErrors(t *testing.T) {
 	}
 }
 
+func TestCapacityFallbackSurvivesInterruptionBeforeAnyTranslation(t *testing.T) {
+	opt, r := fixture(t)
+	cp := checkpoint{Version: 1, Duration: 10, Parts: []part{{Recognized: true, Cues: dialogue(8, "原文")}}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var calls []int
+	opt.Translate = func(_ context.Context, _ storage.SubtitleRecord, batch []Cue) ([]Cue, error) {
+		calls = append(calls, len(batch))
+		if len(batch) > 2 {
+			return nil, &TranslationError{Cause: llm.ErrOutputTruncated}
+		}
+		cancel()
+		return nil, context.Canceled
+	}
+	s := &Service{opt: opt}
+	completed := 0
+	err := s.translatePending(ctx, &r, &cp, TranslationLimits{}, &completed, 8)
+	if !errors.Is(err, context.Canceled) || completed != 0 || !reflect.DeepEqual(calls, []int{8, 4, 2}) {
+		t.Fatalf("calls=%v completed=%d err=%v", calls, completed, err)
+	}
+	raw, err := os.ReadFile(s.cpPath(r.Job.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored checkpoint
+	if err := json.Unmarshal(raw, &restored); err != nil {
+		t.Fatal(err)
+	}
+	if restored.TranslationBatchLimit != 2 {
+		t.Fatalf("lost learned capacity before first successful result: %+v", restored)
+	}
+	calls = nil
+	var ids []int
+	s.opt.Translate = func(_ context.Context, _ storage.SubtitleRecord, batch []Cue) ([]Cue, error) {
+		calls = append(calls, len(batch))
+		for i := range batch {
+			ids = append(ids, batch[i].ID)
+			batch[i].Translation = "完成"
+		}
+		return batch, nil
+	}
+	if err := s.translatePending(context.Background(), &r, &restored, TranslationLimits{}, &completed, 8); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(calls, []int{2, 2, 2, 2}) || !reflect.DeepEqual(ids, []int{1, 2, 3, 4, 5, 6, 7, 8}) || completed != 8 {
+		t.Fatalf("resume replayed oversized request or lost dialogue: calls=%v ids=%v completed=%d", calls, ids, completed)
+	}
+}
+
 func TestOmittedCuesAreCheckpointedAndOnlyMissingIDsAreRepaired(t *testing.T) {
 	opt, r := fixture(t)
 	cp := checkpoint{Version: 1, Duration: 10, Parts: []part{{Recognized: true, Cues: dialogue(4, "原文")}}}

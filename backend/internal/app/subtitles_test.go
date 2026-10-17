@@ -64,14 +64,23 @@ func TestSubtitleTranslationSendsAllCuesWithoutFixedOutputLimit(t *testing.T) {
 
 func TestSubtitleTranslationPreservesTruncationCauseForCapacityFallback(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"length","message":{"content":"[{"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"length","message":{"content":"[{"}}],"usage":{"prompt_tokens":9063,"completion_tokens":32768,"total_tokens":41831}}`))
 	}))
 	defer server.Close()
-	a := &App{cfg: config.Config{AIProvider: config.AIProviderConfig{BaseURL: server.URL, Model: "fixture"}}}
+	a := governanceTestApp(t)
+	a.cfg.AIProvider = config.AIProviderConfig{BaseURL: server.URL, Model: "fixture"}
 	r := storage.SubtitleRecord{TextBaseURL: server.URL, TextModel: "fixture", Job: contracts.SubtitleJob{TranslationModel: "configured-ai"}}
 	_, err := a.translateSubtitleCues(context.Background(), r, []subtitles.Cue{{ID: 1, Text: "原文"}})
 	if !errors.Is(err, llm.ErrOutputTruncated) {
 		t.Fatalf("lost truncation cause: %v", err)
+	}
+	report, err := a.GetAIReport(context.Background(), contracts.AIReportQuery{Days: 30, Limit: 10, Channel: "subtitle"})
+	if err != nil || len(report.Items) != 1 {
+		t.Fatalf("missing usage: report=%+v error=%v", report, err)
+	}
+	row := report.Items[0]
+	if row.Status != "failed" || row.ErrorCode != "output_truncated" || row.CompletionTokens != 32768 || row.TotalTokens != 41831 {
+		t.Fatalf("lost truncation diagnostic or measured usage: %+v", row)
 	}
 }
 

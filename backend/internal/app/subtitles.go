@@ -118,7 +118,12 @@ func (a *App) translateSubtitleCues(ctx context.Context, r storage.SubtitleRecor
 	// Omit max_tokens so the provider applies its default output budget.
 	text, err := completer.Complete(ctx, []llm.ChatMessage{{Role: "system", Content: prompts.SubtitleTranslationPrompt().Text}, {Role: "user", Content: string(raw)}}, 0)
 	if err != nil {
-		return nil, &subtitles.TranslationError{Category: llm.ErrorCategory(err), Cause: err}
+		category := llm.ErrorCategory(err)
+		if errors.Is(err, llm.ErrOutputTruncated) {
+			category = "output_truncated"
+			observation.row.ErrorCode = category
+		}
+		return nil, &subtitles.TranslationError{Category: category, Cause: err}
 	}
 	if err = json.Unmarshal([]byte(text), &result); err != nil {
 		return nil, fmt.Errorf("translation response is not a JSON cue array")
