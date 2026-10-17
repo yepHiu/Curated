@@ -844,7 +844,7 @@ On Server startup, interrupted running subtitle records are requeued before the 
 - `GET /api/ai/book-organizations/{jobId}/items?limit=25&offset=0`: persisted original values, metadata, evidence, status and revision; never invokes a model.
 - `POST /api/ai/book-organizations/{jobId}/{cancel|retry}`: local-only lifecycle controls; retry skips applied/discarded/ready items.
 - `POST /api/ai/book-organizations/{jobId}/review`: local-only `{bookId,revision,decision:apply|discard}`. Reissues a gateway ticket from the saved proposal, checks source/version and applies metadata, receipt and item state in one transaction. No model call or dependence on an old ticket.
-- Task Center projects `book-organize:{id}` as kind `organize`, unit `books`; `needs_confirmation` is an attention state. Submit from library/detail, review in shared task details. Proposals survive page close and Server restart.
+- Task Center projects `book-organize:{id}` as kind `organize`, unit `books`; `needs_confirmation` is an attention state. Submit one book from detail More or the card context menu; submit selected books from Batch management. No AI action in the normal library toolbar and no implicit filtered-list scope. Review in shared task details. Proposals survive page close and Server restart.
 - Internal recognition continues through `POST /api/ai/actions/recognize_book_metadata` and existing `update_book_metadata` confirmation tool. Only original titles/filenames are sent to the provider; roles require source evidence. Migration 0068 stores book metadata; 0069 stores task proposals. No cfg change. Mock tasks/results persist in localStorage and are explicitly simulated.
 
 ### Movie organization tasks (2026-10-17)
