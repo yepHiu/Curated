@@ -283,6 +283,14 @@ test("locked startup defers protected hydration until a successful unlock", asyn
       await route.fulfill({ json: { items: [] } })
       return
     }
+    if (path === "/api/subtitle-jobs") {
+      await route.fulfill({ json: { items: [] } })
+      return
+    }
+    if (path === "/api/task-center/summary") {
+      await route.fulfill({ json: { total: 0, running: 0, queued: 0, waiting: 0, attention: 0, history: 0 } })
+      return
+    }
     if (path === "/api/ai/settings") {
       await route.fulfill({ json: { enabled: false } })
       return
@@ -427,6 +435,14 @@ test("maintenance backup flow creates verifies and preflights without online res
     }
     if (path === "/api/ai/tag-organizations") {
       await route.fulfill({ json: { items: [] } })
+      return
+    }
+    if (path === "/api/subtitle-jobs") {
+      await route.fulfill({ json: { items: [] } })
+      return
+    }
+    if (path === "/api/task-center/summary") {
+      await route.fulfill({ json: { total: 0, running: 0, queued: 0, waiting: 0, attention: 0, history: 0 } })
       return
     }
     if (path === "/api/ai/settings") {
