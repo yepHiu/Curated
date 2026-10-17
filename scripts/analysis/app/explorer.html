@@ -1,0 +1,116 @@
+<a class="skip" href="#main">跳到代码地图</a>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path
+          d="M4 23V13l8-5 8 5v10l-8 5-8-5Z"
+          stroke="#81dec0"
+          stroke-width="1.4"
+        />
+        <path
+          d="m12 8 8-5 8 5v10l-8 5M4 13l8 5 8-5m-8 5v10m8-15 8-5"
+          stroke="#81dec0"
+          stroke-width="1.4"
+        /></svg
+      >Curated<span>CODE ATLAS / 代码地形图</span>
+    </div>
+    <span class="tag"><i class="dot"></i>本地代码快照 · 离线可用</span>
+  </header>
+  <section class="intro">
+    <div>
+      <div class="eyebrow">A LANDSCAPE OF WHAT WE BUILT</div>
+      <h1>看看代码，长成了什么样。</h1>
+      <p>
+        从整个项目，到一个函数。把散落的文件、累积的体量和交织的依赖，放回同一张地图。
+      </p>
+    </div>
+    <div class="snapshot" id="snapshot"></div>
+  </section>
+  <section class="metrics" id="metrics" aria-label="仓库总览"></section>
+  <main id="main">
+    <div class="controls">
+      <label class="field search"
+        >搜索文件 / 函数<input
+          id="search"
+          type="search"
+          placeholder="试试 player、subtitle、agent…"
+          autocomplete="off" /></label
+      ><label class="field scope"
+        >统计范围<select id="scope">
+          <option value="source">实现源码</option>
+          <option value="code">源码 + 测试</option>
+          <option value="test">仅测试</option>
+          <option value="all">全部仓库文件</option>
+        </select></label
+      ><button id="reset">重置视图</button>
+    </div>
+    <nav class="tabs" aria-label="观察角度">
+      <button data-view="map" aria-pressed="true">
+        <span class="index">01</span>代码地形</button
+      ><button data-view="functions" aria-pressed="false">
+        <span class="index">02</span>函数放大镜</button
+      ><button data-view="network" aria-pressed="false">
+        <span class="index">03</span>依赖脉络</button
+      ><button data-view="files" aria-pressed="false">
+        <span class="index">04</span>文件清单
+      </button>
+    </nav>
+    <div id="view"></div>
+    <details id="method">
+      <summary>这些数字如何计算？查看范围、算法和边界</summary>
+      <ul>
+        <li>
+          范围：当前 jav-shadcn 仓库，Git 已跟踪文件 +
+          未忽略的新文件，读取生成时磁盘上的内容。包含工作区修改；不包含相邻
+          Android /
+          插件仓库。默认排除依赖、vendor、构建产物、运行数据及报告自身。
+        </li>
+        <li>
+          体量：物理行数包含空行与注释，Vue 包含 template / script /
+          style；非空行仍包含注释。字节数来自文件内容，二进制不计算行数。不是安装包大小，也不是整个硬盘占用。
+        </li>
+        <li>
+          分类：测试目录与 .test / .spec / _test / test_ 命名归为测试；docs
+          与文档扩展名归为文档；声明文件 .d.ts
+          归为配置。实现源码包含脚本、SQL、CSS 和原生
+          C/C++。按路径分类，不代表每个文件都由项目原创。
+        </li>
+        <li>
+          函数：TypeScript 编译器解析 JS/TS，Vue SFC 解析器提取 script，Go 使用
+          go/parser。包含有函数体的声明、方法、访问器及匿名回调；不含类型签名。Vue
+          模板表达式、Python、C/C++、Shell
+          等只统计文件，未做函数分析。函数长度是起止行跨度，嵌套函数的跨度会重叠，不能求和当作总行数。
+        </li>
+        <li>
+          分支指标：每函数基数 1，加 if、循环、非 default
+          case、catch、三元条件及 && / || / ??；Go 还计非 default select
+          分支。跳过嵌套函数内部。不是严格 CFG 圈复杂度，也不包含 optional
+          chaining
+          等所有语义路径。不同语言的分数仅作阅读线索，长函数或高分不直接表示缺陷。
+        </li>
+        <li>
+          依赖：JS/TS 的静态 import / export、字面量 dynamic import /
+          require；支持 @/ 和相对路径。Go 的项目内 import
+          按包统计，包含平台专用文件，未应用 build
+          tags。线条是跨模块导入引用数，不是函数调用数、HTTP / IPC
+          调用链或运行时频次。外部包不进入关系图；同模块依赖保留在文件详情。
+        </li>
+        <li>
+          图表与排行受当前范围及搜索影响，顶部四个总览数字始终表示整个快照。地图点击目录下钻，点击文件查看细节；极小方块可从下方目录列表访问。
+        </li>
+      </ul>
+      <div id="diagnostics"></div>
+    </details>
+  </main>
+  <footer class="foot">
+    <div>
+      CURATED / ENGINEERING OBSERVATORY<br />没有一个总分能概括项目。先看到规模，再找到值得读的地方。
+    </div>
+    <div>在仓库根目录更新快照<br /><code>pnpm code:atlas:export</code></div>
+  </footer>
+</div>
+<dialog id="detail" aria-labelledby="detail-title">
+  <div id="detail-content"></div>
+</dialog>
+<div id="toast" class="toast" role="status" hidden></div>

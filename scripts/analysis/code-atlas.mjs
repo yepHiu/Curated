@@ -62,7 +62,7 @@ export function category(p) {
     /\.(md|mdc|txt|rst)$/i.test(p)
   )
     return "docs";
-  if (/\.d\.ts$/.test(p)) return "config";
+  if (/\.d\.[mc]?ts$/.test(p)) return "config";
   if (sourceExtensions.has(path.extname(p))) return "source";
   if (
     /\.(json|ya?ml|toml|cfg|ini|xml|lock)$|(^|\/)(Dockerfile|Makefile|go\.(mod|sum)|\.\w+)$/.test(
@@ -271,7 +271,8 @@ function git(...args) {
   });
 }
 
-export function generate() {
+export function scanRepository({ onProgress = () => {} } = {}) {
+  onProgress({ phase: "inventory", message: "读取 Git 文件清单" });
   const paths = [
     ...new Set(
       git("ls-files", "-z", "--cached", "--others", "--exclude-standard")
@@ -284,7 +285,15 @@ export function generate() {
     warnings = [],
     excluded = [];
   const imports = new Map();
+  let processed = 0;
   for (const p of paths) {
+    if (processed++ % 100 === 0)
+      onProgress({
+        phase: "scripts",
+        message: "分析文件与前端语法树",
+        completed: processed - 1,
+        total: paths.length,
+      });
     if (p === output || ignored.test(p)) {
       excluded.push(p);
       continue;
@@ -324,7 +333,7 @@ export function generate() {
       parsedExtensions.has(ext) &&
       ext !== ".go" &&
       kind !== "docs" &&
-      !p.endsWith(".d.ts")
+      !/\.d\.[mc]?ts$/.test(p)
     ) {
       const analysis =
         ext === ".vue" ? analyzeVue(p, text) : analyzeScript(p, text);
@@ -353,6 +362,7 @@ export function generate() {
   }
   const goFiles = files.filter((f) => f.ext === ".go" && f.kind !== "docs");
   if (goFiles.length) {
+    onProgress({ phase: "go", message: `分析 ${goFiles.length} 个 Go 文件` });
     // Go's system caches remain untouched; this helper uses only the standard library.
     const results = JSON.parse(
       execFileSync("go", ["run", path.join(here, "go-atlas.go")], {
@@ -360,6 +370,7 @@ export function generate() {
         input: JSON.stringify(goFiles.map((f) => path.join(root, f.path))),
         encoding: "utf8",
         maxBuffer: 50 * 1024 * 1024,
+        timeout: 90_000,
       }),
     );
     results.forEach((result, i) => {
@@ -373,6 +384,7 @@ export function generate() {
     });
   }
   const fileSet = new Set(files.map((f) => f.path));
+  onProgress({ phase: "dependencies", message: "解析本地依赖关系" });
   const packageSet = new Set(goFiles.map((f) => path.posix.dirname(f.path)));
   const goModule = fs
     .readFileSync(path.join(root, "backend/go.mod"), "utf8")
@@ -431,6 +443,10 @@ export function generate() {
       parsedFiles: files.filter((f) => f.parsed).length,
     },
   };
+  return data;
+}
+
+export function renderOfflineHtml(data) {
   const template = fs.readFileSync(
     path.join(here, "code-atlas.template.html"),
     "utf8",
@@ -439,18 +455,29 @@ export function generate() {
     .replace(/</g, "\\u003c")
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029");
-  fs.writeFileSync(
-    path.join(root, output),
-    template.replace("/*__ATLAS_DATA__*/", () => json),
-  );
+  const css = fs.readFileSync(path.join(here, "app/explorer.css"), "utf8");
+  const markup = fs.readFileSync(path.join(here, "app/explorer.html"), "utf8");
+  const engine = fs
+    .readFileSync(path.join(here, "app/explorer.mjs"), "utf8")
+    .replace("export function mountAtlas", "function mountAtlas");
+  return template
+    .replace("/*__ATLAS_CSS__*/", () => css)
+    .replace("<!--__ATLAS_MARKUP__-->", () => markup)
+    .replace("/*__ATLAS_DATA__*/", () => json)
+    .replace("/*__ATLAS_ENGINE__*/", () => engine);
+}
+
+export function generate() {
+  const data = scanRepository();
+  fs.writeFileSync(path.join(root, output), renderOfflineHtml(data));
   console.log(
     JSON.stringify(
       {
         output,
         ...data.counts,
-        edges: edges.length,
-        warnings,
-        unresolved: unresolved.length,
+        edges: data.edges.length,
+        warnings: data.warnings,
+        unresolved: data.unresolved.length,
       },
       null,
       2,

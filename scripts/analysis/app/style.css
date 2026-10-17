@@ -1,0 +1,86 @@
+@import "tailwindcss" source(none);
+@source "./**/*.vue";
+@source "../../../src/components/ui/button";
+@source "../../../src/components/ui/alert";
+@source "../../../src/components/ui/skeleton";
+
+/* Local tool palette: no change to the product's global theme. */
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  --background: #0b1018;
+  --foreground: #e8eef5;
+  --primary: #81dec0;
+  --primary-foreground: #10251e;
+  --muted: #182331;
+  --muted-foreground: #9aadc2;
+  --accent: #253547;
+  --accent-foreground: #e8eef5;
+  --border: #2a3848;
+  --ring: #81dec0;
+  --destructive: #ffb4b4;
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+}
+.app-shell {
+  max-width: 1640px;
+  margin: auto;
+  padding: 0 44px;
+}
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--border);
+}
+.status-strip {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 15px 0 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.loading-panel {
+  padding: 48px 0;
+}
+.atlas-explorer {
+  display: block;
+}
+@media (max-width: 1050px) {
+  .app-shell {
+    padding: 0 24px;
+  }
+}
+@media (max-width: 600px) {
+  .app-shell {
+    padding: 0 16px;
+  }
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .app-header button {
+    min-height: 44px;
+  }
+}
