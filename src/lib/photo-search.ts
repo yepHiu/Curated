@@ -1,4 +1,4 @@
-import { bookMetadataSearchText } from "@/lib/book-metadata"
+import { bookMetadataSearchText, bookMetadataTags } from "@/lib/book-metadata"
 import type { PhotoBook } from "@/domain/photo/types"
 
 export interface PhotoSearchFilters {
@@ -18,7 +18,7 @@ export function filterPhotos(
     // 精确标签与自由文本同时收窄结果。
     // 精确标签与自由文本同时收窄结果。
     // 精确标签与自由文本同时收窄结果。
-    if (tag && !photo.tags.includes(tag)) {
+    if (tag && !photo.tags.includes(tag) && !bookMetadataTags(photo.metadata).includes(tag)) {
       return false
     }
     if (!q) return true

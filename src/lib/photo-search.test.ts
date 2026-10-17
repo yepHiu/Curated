@@ -43,3 +43,16 @@ describe("photo search", () => {
     expect(filterPhotos(photos, { tag: "portrait" }).map((photo) => photo.id)).toEqual(["exact"])
   })
 })
+
+it("browses confirmed credit names as exact tags alongside manual tags", () => {
+  const metadata = { cleanTitle: "作品", translatedTitle: "作品", models: [{ name: "青井", evidence: "青井" }], photographers: [{ name: "Studio", evidence: "Studio" }] }
+  const book = makePhoto({ tags: [], metadata })
+  expect(filterPhotos([book], { tag: " 青井 " })).toEqual([book])
+  expect(filterPhotos([book], { tag: "Studio" })).toEqual([book])
+  expect(filterPhotos([book], { tag: "青" })).toEqual([])
+  expect(filterPhotos([book], { tag: "青井", q: "missing" })).toEqual([])
+  expect(filterPhotos([{ ...book, metadata: undefined }], { tag: "青井" })).toEqual([])
+  const manual = { ...book, tags: ["青井"], metadata: undefined }
+  expect(filterPhotos([manual], { tag: "青井" })).toEqual([manual])
+  expect(book.tags).toEqual([])
+})

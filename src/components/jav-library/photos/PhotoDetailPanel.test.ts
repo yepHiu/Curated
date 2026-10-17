@@ -220,3 +220,13 @@ describe("PhotoDetailPanel", () => {
     ).toBe(true)
   })
 })
+
+it("routes confirmed credit tags through existing library tag browsing", async () => {
+  const wrapper = mount(PhotoDetailPanel, { props: { photo: makePhoto({
+    metadata: { cleanTitle: "作品", translatedTitle: "作品", models: [{ name: "青井", evidence: "青井" }] },
+  }) } })
+  await wrapper.get('[data-book-credit-tag="青井"]').trigger("click")
+  expect(wrapper.emitted("browseByTag")).toEqual([[{ tag: "青井" }]])
+  expect(wrapper.emitted("patch")).toBeUndefined()
+  wrapper.unmount()
+})

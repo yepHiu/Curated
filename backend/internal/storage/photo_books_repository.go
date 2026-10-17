@@ -247,8 +247,10 @@ func photoBookWhere(req contracts.ListPhotoBooksRequest) (string, []any) {
 		args = append(args, like, like, like, like, like, like)
 	}
 	if tag := strings.TrimSpace(req.Tag); tag != "" {
-		clauses = append(clauses, `EXISTS (SELECT 1 FROM photo_book_tags pbt WHERE pbt.photo_id = pb.id AND pbt.tag = ?)`)
-		args = append(args, tag)
+		clauses = append(clauses, `(EXISTS (SELECT 1 FROM photo_book_tags pbt WHERE pbt.photo_id = pb.id AND pbt.tag = ?)
+			OR EXISTS (SELECT 1 FROM json_each(pb.metadata_json, '$.models') WHERE json_extract(value, '$.name') = ?)
+			OR EXISTS (SELECT 1 FROM json_each(pb.metadata_json, '$.photographers') WHERE json_extract(value, '$.name') = ?))`)
+		args = append(args, tag, tag, tag)
 	}
 	if req.Favorite != nil {
 		v := 0

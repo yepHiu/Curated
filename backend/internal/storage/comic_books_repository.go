@@ -249,8 +249,10 @@ func comicBookWhere(req contracts.ListComicBooksRequest) (string, []any) {
 		args = append(args, like, like, like, like, like, like)
 	}
 	if tag := strings.TrimSpace(req.Tag); tag != "" {
-		clauses = append(clauses, `EXISTS (SELECT 1 FROM comic_book_tags cbt WHERE cbt.comic_id = cb.id AND cbt.tag = ?)`)
-		args = append(args, tag)
+		clauses = append(clauses, `(EXISTS (SELECT 1 FROM comic_book_tags cbt WHERE cbt.comic_id = cb.id AND cbt.tag = ?)
+			OR EXISTS (SELECT 1 FROM json_each(cb.metadata_json, '$.authors') WHERE json_extract(value, '$.name') = ?)
+			OR EXISTS (SELECT 1 FROM json_each(cb.metadata_json, '$.circles') WHERE json_extract(value, '$.name') = ?))`)
+		args = append(args, tag, tag, tag)
 	}
 	if req.Favorite != nil {
 		v := 0

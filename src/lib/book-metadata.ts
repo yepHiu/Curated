@@ -2,6 +2,11 @@ import type { BookMetadata } from "@/api/types"
 
 export const bookCreditRoles = ["authors", "circles", "models", "photographers"] as const
 
+/** Confirmed credits participate in tag browsing without copying them into editable tags. */
+export function bookMetadataTags(metadata?: BookMetadata): string[] {
+  return [...new Set(bookCreditRoles.flatMap(role => metadata?.[role]?.map(credit => credit.name) ?? []))]
+}
+
 export function bookMetadataSearchText(metadata?: BookMetadata): string {
   if (!metadata) return ""
   return [metadata.cleanTitle, metadata.translatedTitle, ...bookCreditRoles.flatMap(role => metadata[role]?.map(item => item.name) ?? [])].filter(Boolean).join(" ")

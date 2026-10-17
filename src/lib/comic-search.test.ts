@@ -62,3 +62,16 @@ describe("comic search", () => {
     expect(filterComics(list, { readStatus: "read" }).map((comic) => comic.id)).toEqual(["read"])
   })
 })
+
+it("browses confirmed credit names as exact tags alongside manual tags", () => {
+  const metadata = { cleanTitle: "作品", translatedTitle: "作品", authors: [{ name: "青井", evidence: "青井" }], circles: [{ name: "Studio", evidence: "Studio" }] }
+  const book = makeComic({ tags: [], metadata })
+  expect(filterComics([book], { tag: " 青井 " })).toEqual([book])
+  expect(filterComics([book], { tag: "Studio" })).toEqual([book])
+  expect(filterComics([book], { tag: "青" })).toEqual([])
+  expect(filterComics([book], { tag: "青井", q: "missing" })).toEqual([])
+  expect(filterComics([{ ...book, metadata: undefined }], { tag: "青井" })).toEqual([])
+  const manual = { ...book, tags: ["青井"], metadata: undefined }
+  expect(filterComics([manual], { tag: "青井" })).toEqual([manual])
+  expect(book.tags).toEqual([])
+})

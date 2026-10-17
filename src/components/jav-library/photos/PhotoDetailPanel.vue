@@ -124,7 +124,7 @@ function browseByTag(tag: string) {
           <CardTitle data-photo-detail-title class="break-words pr-12 text-2xl leading-snug sm:pr-14 sm:text-3xl">
             {{ photo.title }}
           </CardTitle>
-          <BookMetadataFacts :metadata="photo.metadata" />
+          <BookMetadataFacts :metadata="photo.metadata" browseable @browse-by-tag="browseByTag" />
         </div>
 
         <div class="flex flex-wrap items-center gap-3">

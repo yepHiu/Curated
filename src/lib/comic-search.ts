@@ -1,4 +1,4 @@
-import { bookMetadataSearchText } from "@/lib/book-metadata"
+import { bookMetadataSearchText, bookMetadataTags } from "@/lib/book-metadata"
 import type { ComicBook, ComicReadStatus } from "@/domain/comic/types"
 
 export type ComicLibraryFilter = {
@@ -48,7 +48,7 @@ export function filterComics(
     if (readStatus && readStatus !== "all" && comic.readStatus !== readStatus) {
       return false
     }
-    if (tag && !comic.tags.includes(tag)) {
+    if (tag && !comic.tags.includes(tag) && !bookMetadataTags(comic.metadata).includes(tag)) {
       return false
     }
     if (q && !comicSearchHaystack(comic).includes(q)) {

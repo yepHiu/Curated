@@ -176,7 +176,7 @@ function commitRating(value: number | null) {
           <CardTitle data-comic-detail-title class="break-words pr-12 text-2xl leading-snug sm:pr-14 sm:text-3xl">
             {{ comic.title }}
           </CardTitle>
-          <BookMetadataFacts :metadata="comic.metadata" />
+          <BookMetadataFacts :metadata="comic.metadata" browseable @browse-by-tag="browseByTagLabel" />
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
