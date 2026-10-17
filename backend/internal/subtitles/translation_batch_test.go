@@ -159,3 +159,100 @@ func TestTranslationOnlySplitsOnExplicitCapacityErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestOmittedCuesAreCheckpointedAndOnlyMissingIDsAreRepaired(t *testing.T) {
+	opt, r := fixture(t)
+	cp := checkpoint{Version: 1, Duration: 10, Parts: []part{{Recognized: true, Cues: dialogue(4, "原文")}}}
+	s := &Service{opt: opt}
+	requests := [][]int{}
+	s.opt.Translate = func(_ context.Context, _ storage.SubtitleRecord, batch []Cue) ([]Cue, error) {
+		ids := []int{}
+		for _, c := range batch {
+			ids = append(ids, c.ID)
+		}
+		requests = append(requests, ids)
+		if len(requests) == 1 {
+			// The real app returns a validated subset plus an explicit error.
+			return []Cue{{ID: 1, Translation: "第一条"}, {ID: 3, Translation: "第三条"}}, &IncompleteTranslationError{Expected: 4, Received: 2}
+		}
+		var saved checkpoint
+		raw, err := os.ReadFile(s.cpPath(r.Job.ID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(raw, &saved); err != nil {
+			t.Fatal(err)
+		}
+		if saved.Parts[0].Cues[0].Translation != "第一条" || saved.Parts[0].Cues[2].Translation != "第三条" || r.Job.Completed != 2 {
+			t.Fatal("repair began before partial results and progress were saved")
+		}
+		for i := range batch {
+			batch[i].Translation = "补译"
+		}
+		return batch, nil
+	}
+	completed := 0
+	if err := s.translatePending(context.Background(), &r, &cp, TranslationLimits{}, &completed, 4); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(requests, [][]int{{1, 2, 3, 4}, {2, 4}}) || completed != 4 || r.Job.Completed != 4 {
+		t.Fatalf("requests=%v completed=%d record=%d", requests, completed, r.Job.Completed)
+	}
+}
+
+func TestOmissionRepairIsBoundedAndRetryRetainsProgress(t *testing.T) {
+	opt, r := fixture(t)
+	cp := checkpoint{Version: 1, Duration: 10, Parts: []part{{Recognized: true, Cues: dialogue(5, "原文")}}}
+	s := &Service{opt: opt}
+	calls := 0
+	s.opt.Translate = func(_ context.Context, _ storage.SubtitleRecord, batch []Cue) ([]Cue, error) {
+		calls++
+		// Callbacks with nil error still receive service-boundary validation.
+		return []Cue{{ID: batch[0].ID, Translation: "已译"}}, nil
+	}
+	completed := 0
+	err := s.translatePending(context.Background(), &r, &cp, TranslationLimits{}, &completed, 5)
+	var incomplete *IncompleteTranslationError
+	if !errors.As(err, &incomplete) || calls != 3 || completed != 3 || r.Job.Completed != 3 {
+		t.Fatalf("repair loop not bounded or progress lost: calls=%d completed=%d error=%v", calls, completed, err)
+	}
+	raw, err := os.ReadFile(s.cpPath(r.Job.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored checkpoint
+	if err := json.Unmarshal(raw, &restored); err != nil {
+		t.Fatal(err)
+	}
+	s.opt.Translate = func(_ context.Context, _ storage.SubtitleRecord, batch []Cue) ([]Cue, error) {
+		if len(batch) != 2 || batch[0].ID != 4 || batch[1].ID != 5 {
+			t.Fatalf("retry lost progress: %+v", batch)
+		}
+		for i := range batch {
+			batch[i].Translation = "完成"
+		}
+		return batch, nil
+	}
+	if err := s.translatePending(context.Background(), &r, &restored, TranslationLimits{}, &completed, 5); err != nil || completed != 5 {
+		t.Fatalf("retry failed: completed=%d error=%v", completed, err)
+	}
+}
+
+func TestInvalidOrEmptyResultsDoNotTriggerOmissionRepair(t *testing.T) {
+	for _, result := range [][]Cue{
+		nil,
+		{{ID: 1, Translation: "有效"}, {ID: 1, Translation: "重复"}},
+		{{ID: 1, Translation: "有效"}, {ID: 99, Translation: "未知"}},
+		{{ID: 1, Translation: "有效"}, {ID: 2, Translation: " "}},
+	} {
+		opt, r := fixture(t)
+		cp := checkpoint{Parts: []part{{Cues: dialogue(2, "原文")}}}
+		calls := 0
+		opt.Translate = func(context.Context, storage.SubtitleRecord, []Cue) ([]Cue, error) { calls++; return result, nil }
+		s := &Service{opt: opt}
+		completed := 0
+		if err := s.translatePending(context.Background(), &r, &cp, TranslationLimits{}, &completed, 2); err == nil || calls != 1 || completed != 0 || cp.Parts[0].Cues[0].Translation != "" {
+			t.Fatalf("invalid result repaired or persisted: calls=%d completed=%d error=%v", calls, completed, err)
+		}
+	}
+}

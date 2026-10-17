@@ -603,8 +603,9 @@ func (s *Service) translatePending(ctx context.Context, r *storage.SubtitleRecor
 	// Recognition chunks are an upload concern; translation sees the complete
 	// remaining dialogue, in playback order, whenever request capacity permits.
 	sort.SliceStable(pending, func(i, j int) bool { return pending[i].Begin < pending[j].Begin })
-	var translate func([]Cue) error
-	translate = func(batch []Cue) error {
+	const maxOmissionRepairs = 2
+	var translate func([]Cue, int) error
+	translate = func(batch []Cue, repairs int) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -613,38 +614,65 @@ func (s *Service) translatePending(ctx context.Context, r *storage.SubtitleRecor
 		}
 		// Keep the expected IDs separate from the callback's mutable slice.
 		translated, err := s.opt.Translate(ctx, *r, append([]Cue(nil), batch...))
-		if err != nil {
+		var incomplete *IncompleteTranslationError
+		if err != nil && !errors.As(err, &incomplete) {
 			if ctx.Err() == nil && len(batch) > 1 && translationCapacityError(err) {
 				mid := len(batch) / 2
-				if err := translate(batch[:mid]); err != nil {
+				if err := translate(batch[:mid], repairs); err != nil {
 					return err
 				}
-				return translate(batch[mid:])
+				return translate(batch[mid:], repairs)
 			}
 			return err
 		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		values, err := validateTranslations(batch, translated)
-		if err != nil {
+		// Validate again at the service boundary, including callbacks that return
+		// a subset with nil error. Do not trust a provider's error classification.
+		values, err := ValidateTranslations(batch, translated)
+		if err != nil && !errors.As(err, &incomplete) {
 			return err
+		}
+		if len(values) == 0 {
+			return err // No progress: avoid repeatedly paying for an empty answer.
 		}
 		for id, value := range values {
 			positions[id].Translation = value
-			(*completed)++
 		}
-		return writeJSON(s.cpPath(r.Job.ID), cp)
+		if saveErr := writeJSON(s.cpPath(r.Job.ID), cp); saveErr != nil {
+			return saveErr
+		}
+		*completed += len(values)
+		if updateErr := s.update(ctx, r, "translating", *completed, total); updateErr != nil {
+			return updateErr
+		}
+		if err != nil {
+			if repairs >= maxOmissionRepairs {
+				return err
+			}
+			remaining := make([]Cue, 0, len(batch)-len(values))
+			for _, c := range batch {
+				if _, ok := values[c.ID]; !ok {
+					remaining = append(remaining, c)
+				}
+			}
+			return translate(remaining, repairs+1)
+		}
+		return nil
 	}
 	for _, batch := range translationBatches(pending, limits) {
-		if err := translate(batch); err != nil {
+		if err := translate(batch, 0); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateTranslations(input, output []Cue) (map[int]string, error) {
+// ValidateTranslations returns usable translations only when every returned ID
+// is unique, expected and nonempty. An incomplete but valid subset is returned
+// with IncompleteTranslationError; malformed results return no usable values.
+func ValidateTranslations(input, output []Cue) (map[int]string, error) {
 	expected := map[int]bool{}
 	for _, c := range input {
 		expected[c.ID] = true
@@ -657,7 +685,7 @@ func validateTranslations(input, output []Cue) (map[int]string, error) {
 		values[c.ID] = strings.TrimSpace(c.Translation)
 	}
 	if len(values) != len(input) {
-		return nil, fmt.Errorf("translation omitted cues; retry remaining translation")
+		return values, &IncompleteTranslationError{Expected: len(input), Received: len(values)}
 	}
 	return values, nil
 }

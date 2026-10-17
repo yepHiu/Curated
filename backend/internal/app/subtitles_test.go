@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -71,5 +72,48 @@ func TestSubtitleTranslationPreservesTruncationCauseForCapacityFallback(t *testi
 	_, err := a.translateSubtitleCues(context.Background(), r, []subtitles.Cue{{ID: 1, Text: "原文"}})
 	if !errors.Is(err, llm.ErrOutputTruncated) {
 		t.Fatalf("lost truncation cause: %v", err)
+	}
+}
+
+func TestSubtitleUsageIncludesTranslationValidation(t *testing.T) {
+	for _, test := range []struct {
+		name, content, status, code string
+		partial                     bool
+	}{
+		{"missing", `[{"id":1,"translation":"你好"}]`, "failed", "incomplete_translation", true},
+		{"empty", `[]`, "failed", "incomplete_translation", true},
+		{"duplicate", `[{"id":1,"translation":"你好"},{"id":1,"translation":"重复"}]`, "failed", "invalid_translation", false},
+		{"unknown", `[{"id":99,"translation":"错误"}]`, "failed", "invalid_translation", false},
+		{"blank", `[{"id":1,"translation":" "}]`, "failed", "invalid_translation", false},
+		{"complete", `[{"id":2,"translation":"再见"},{"id":1,"translation":"你好"}]`, "completed", "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprintf(w, `{"choices":[{"finish_reason":"stop","message":{"content":%q}}],"usage":{"prompt_tokens":100,"completion_tokens":30,"total_tokens":130}}`, test.content)
+			}))
+			defer server.Close()
+			a := governanceTestApp(t)
+			a.cfg.AIProvider = config.AIProviderConfig{BaseURL: server.URL, Model: "fixture"}
+			r := storage.SubtitleRecord{TextBaseURL: server.URL, TextModel: "fixture", Job: contracts.SubtitleJob{ID: "job", TranslationModel: "configured-ai"}}
+			result, err := a.translateSubtitleCues(context.Background(), r, []subtitles.Cue{{ID: 1, Text: "原文"}, {ID: 2, Text: "原文"}})
+			if (err != nil) != (test.status == "failed") {
+				t.Fatalf("unexpected validation error: %v", err)
+			}
+			var incomplete *subtitles.IncompleteTranslationError
+			if errors.As(err, &incomplete) != test.partial {
+				t.Fatalf("wrong repair classification: %v", err)
+			}
+			if test.name == "missing" && (len(result) != 1 || incomplete.Expected != 2 || incomplete.Received != 1) {
+				t.Fatalf("lost validated subset or counts: result=%+v error=%v", result, err)
+			}
+			report, err := a.GetAIReport(context.Background(), contracts.AIReportQuery{Days: 30, Limit: 10, Channel: "subtitle"})
+			if err != nil || len(report.Items) != 1 {
+				t.Fatalf("missing usage: report=%+v error=%v", report, err)
+			}
+			row := report.Items[0]
+			if row.Status != test.status || row.ErrorCode != test.code || row.TotalTokens != 130 || row.ModelCalls != 1 || row.Action != "job" {
+				t.Fatalf("usage excludes validation or token counts: %+v", row)
+			}
+		})
 	}
 }

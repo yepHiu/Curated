@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -121,6 +122,14 @@ func (a *App) translateSubtitleCues(ctx context.Context, r storage.SubtitleRecor
 	}
 	if err = json.Unmarshal([]byte(text), &result); err != nil {
 		return nil, fmt.Errorf("translation response is not a JSON cue array")
+	}
+	if _, err = subtitles.ValidateTranslations(cues, result); err != nil {
+		observation.row.ErrorCode = "invalid_translation"
+		var incomplete *subtitles.IncompleteTranslationError
+		if errors.As(err, &incomplete) {
+			observation.row.ErrorCode = "incomplete_translation"
+		}
+		return result, err
 	}
 	return result, nil
 }

@@ -171,10 +171,10 @@ func TestPublishPreservesExistingFilesAndValidatesTranslationIDs(t *testing.T) {
 	if first[0].Name == second[0].Name {
 		t.Fatal("overwrote prior generation")
 	}
-	if _, e = validateTranslations(cues, []Cue{{ID: 2, Translation: "wrong"}}); e == nil {
+	if _, e = ValidateTranslations(cues, []Cue{{ID: 2, Translation: "wrong"}}); e == nil {
 		t.Fatal("accepted unknown cue ID")
 	}
-	if _, e = validateTranslations(cues, nil); e == nil {
+	if _, e = ValidateTranslations(cues, nil); e == nil {
 		t.Fatal("accepted missing cue")
 	}
 }

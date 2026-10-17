@@ -72,7 +72,7 @@ func TestLiveBailianShortAudioAndTranslationModels(t *testing.T) {
 		if e = json.Unmarshal([]byte(body), &translated); e != nil {
 			t.Fatalf("%s invalid JSON", model)
 		}
-		if _, e = validateTranslations(cues, translated); e != nil {
+		if _, e = ValidateTranslations(cues, translated); e != nil {
 			var shapes []map[string]any
 			_ = json.Unmarshal([]byte(body), &shapes)
 			for _, shape := range shapes {
