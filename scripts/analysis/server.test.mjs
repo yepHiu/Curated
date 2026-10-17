@@ -21,6 +21,19 @@ const snapshot = () => ({
   counts: { files: 0, source: 0, sourceLines: 0, functions: 0, parsedFiles: 0 },
 });
 
+test("atlas and product dev servers resolve separate dependency caches", async () => {
+  const { resolveConfig } = await import("vite");
+  const { fileURLToPath } = await import("node:url");
+  const config = async (relative) =>
+    resolveConfig({
+      configFile: fileURLToPath(new URL(relative, import.meta.url)),
+      configLoader: "native",
+    }, "serve");
+  const product = await config("../../vite.config.ts");
+  const atlas = await config("./vite.config.ts");
+  assert.notEqual(atlas.cacheDir, product.cacheDir);
+});
+
 test("concurrent scans share a task; failed refresh preserves successful data and can retry", async () => {
   let resolve,
     reject,
