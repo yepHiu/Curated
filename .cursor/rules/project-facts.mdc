@@ -586,3 +586,8 @@ Translate回调在AI用量记录结束前调用共用ValidateTranslations。合�
 ## 2026-10-17 影片 AI 整理确认与任务选择
 
 单片/批量已选入口改为二次确认，展示标题与番号，Checkbox 选择 tags/title/summary（默认 tags），不展示覆盖统计、历史或执行状态。POST /api/ai/tag-organizations 增加可选 tasks，仅 selected 支持，省略兼容旧标签流程；0067 保存任务选项和逐字段翻译检查点。翻译目标固定为提交时界面语言，仅写 user_title/user_summary，原文和并发人工修改受保护；内部任务网关共享权限、频控与审计。统一任务中心显示所选项、翻译阶段和逐字段结果；重试保留成功字段，标签撤销不撤销翻译。无配置键，需更新 Server 与前端。详见任务中心计划 §14.8。
+
+
+## 2026-10-17 书库识别角色纠正
+
+书库提示词版本 book-metadata-v2 按库类型渲染角色限制，禁止依据文件名重分类或把作者改认作模特。JSON/角色/来源证据校验失败最多一次模型纠正，共用 Action 两分钟期限与用量统计；纠正提示词为 book-metadata-correction.txt。任务 reason 区分 BOOK_METADATA_INVALID_RESULT、BOOK_METADATA_PROVIDER_FAILED、BOOK_METADATA_TRUNCATED，前端三语显示对应原因；历史通用错误不再提示必须检查配置。仍需任务详情确认才写资料，无新增端点/迁移/配置。

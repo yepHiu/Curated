@@ -45,3 +45,15 @@
 - Playwright Mock 浏览器验证两库详情「更多」、卡片右键及批量管理入口：漫画选中 2 本提交后持久任务仅包含这 2 本；写真空选择禁用、选中 1 本仅预览该本。控制台 0 错误。截图：`output/playwright/book-entry-photo-batch.png`。这些为 Mock 交互验证，未调用真实 AI。
 
 - 测试服务退出时检查 Vite 日志，发现两次 `ResizeObserver loop completed with undelivered notifications` 开发期提示；最终浏览器控制台查询为 0 错误。上述菜单、弹窗和选择范围检查均完成，未在本次入口修正中扩展修改虚拟列表尺寸观察逻辑。
+
+
+## 真实识别失败修复（2026-10-17）
+
+- 现场两个写真任务共 5 个条目识别失败。AI 用量证明模型已返回结果；对其中一条只生成预览的复现返回 `roles do not match book kind`，原界面将所有识别错误归因于设置，无法区分原因。
+- 提示词按漫画/写真分别渲染角色规则，禁止模型因文件名推翻库类型，也禁止把不适用角色直接映射成模特/作者。疑似错库的信息留在 uncertainty，保留标题整理能力。
+- 格式、角色、证据校验失败最多补充一次纠正请求；再次失败保持失败，不绕过验证、不回写资料。Provider 失败不自动纠正；取消/超时保留原期限。提示词审计版本 book-metadata-v2，新增独立 TXT 纠正规则。
+- 持久任务 reason 与详情文案区分模型结果不合规、模型连接失败、输出截断；旧通用错误提示改为重试，避免误导用户更改有效配置。
+- 新增回归覆盖写真角色纠正、Markdown JSON 纠正、重复不合规/伪造证据拒绝、Provider/截断不纠正、失败原因持久化，以及识别全程不修改作品资料。前端结果提示 7 项测试通过；后端定向书库/模板测试通过，lint、类型检查与 Web API 构建通过。
+- 已重新编译并重启开发后端。两条历史失败任务（1 本 + 4 本）均已通过原任务 retry 接口重试。真实模型全部成功，任务中心接口返回待确认 1/4 本、失败 0、已应用 0；使用 book-metadata-v2，提案未应用。
+
+- 最终后端回归：`go test ./internal/app ./internal/agent/prompts ./internal/storage ./internal/server` 全部通过，`go vet ./internal/app ./internal/agent/prompts` 通过；开发后端健康检查正常。
