@@ -62,7 +62,9 @@ func (a *App) runBookMetadataAction(ctx context.Context, completer commentComple
 		if err := ctx.Err(); err != nil {
 			return contracts.AIActionPreviewDTO{}, err
 		}
-		raw, err := completer.Complete(ctx, messages, 4096)
+		// Reasoning-capable models may spend the output budget before emitting JSON.
+		// Match other translation actions: leave the token ceiling to the provider.
+		raw, err := completer.Complete(ctx, messages, 0)
 		if err != nil {
 			if ctx.Err() != nil {
 				return contracts.AIActionPreviewDTO{}, ctx.Err()

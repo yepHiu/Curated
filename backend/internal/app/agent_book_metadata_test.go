@@ -63,7 +63,10 @@ func TestBookMetadataPreviewApplyConflictAndReceipt(t *testing.T) {
 				req.PhotoID = id
 			}
 			encoded, _ := json.Marshal(metadata)
-			model := metadataCompleter(func(_ context.Context, messages []llm.ChatMessage, _ int) (string, error) {
+			model := metadataCompleter(func(_ context.Context, messages []llm.ChatMessage, maxTokens int) (string, error) {
+				if maxTokens != 0 {
+					t.Fatalf("book recognition must not cap reasoning and JSON output: %d", maxTokens)
+				}
 				if len(messages) != 2 || strings.Contains(messages[1].Content, "private") || !strings.Contains(messages[1].Content, source) {
 					t.Fatalf("unexpected model input: %+v", messages)
 				}
@@ -190,7 +193,10 @@ func TestBookMetadataCorrectsInvalidOutputOnce(t *testing.T) {
 				t.Fatal(err)
 			}
 			calls := 0
-			model := metadataCompleter(func(_ context.Context, messages []llm.ChatMessage, _ int) (string, error) {
+			model := metadataCompleter(func(_ context.Context, messages []llm.ChatMessage, maxTokens int) (string, error) {
+				if maxTokens != 0 {
+					t.Fatalf("recognition and correction must omit the output token ceiling: %d", maxTokens)
+				}
 				calls++
 				if calls == 1 {
 					return tc.first, tc.providerErr
