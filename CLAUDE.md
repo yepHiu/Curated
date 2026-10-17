@@ -816,7 +816,7 @@ Subtitle creation and task-center rows share `TaskDetailDialog` and `TaskDetailC
 | Method | Endpoint | Contract |
 | --- | --- | --- |
 | GET | `/api/task-center/summary` | Full persisted-source counts: total/running/queued/waiting/attention/history. |
-| GET | `/api/task-center/tasks` | kind=all/subtitle/organize; state=all/active/attention/history; cursor; limit=1..100 (default 30). Returns items/nextCursor/summary. |
+| GET | `/api/task-center/tasks` | kind=all/subtitle/organize; state=all/active/attention/history; cursor; limit=1..100 (default 20). Returns items/nextCursor/summary. The UI replaces pages with previous/next navigation and offers 20/50/100 rows. |
 | GET | `/api/task-center/tasks/{taskKey}` | URL-encoded subtitle:id or organize:id; common task fields and typed business data; 404 for unavailable records. |
 
 All three require existing API authentication and return no-store. Cursor order is createdAt then stable key descending. Soft-deleted organization records are excluded. `canManage` reflects a direct Server-local request; existing business mutation endpoints still enforce their own permissions and current-state rules. No generic write endpoint, migration or new config. Subtitle provider errors are reduced to a safe category; credentials and internal paths are not part of the projection. The UI shows stage-specific units rather than invented total progress. See docs/plan/2026-10-16-ai-task-center-requirements.md §14.
