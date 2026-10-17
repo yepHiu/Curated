@@ -581,7 +581,7 @@ Translate回调在AI用量记录结束前调用共用ValidateTranslations。合�
 
 ## 2026-10-17 书库 AI 资料整理
 
-漫画/写真列表及详情新增 AI 整理资料，共用 recognize_book_metadata Action 和确认网关。仅原始标题、源文件名送模型，区分漫画作者/社团与写真模特/摄影师，名称保留原文，证据须为来源连续片段且包含名称。预览前不写库；确认事务检查来源、当前展示标题与已有资料，持久回执防止重复写入。迁移0068分别添加metadata_json；列表/详情增加originalTitle和metadata，自由文本搜索包含资料。扫描保留展示标题/资料，文件/个人标签不变，无cfg新增。前台每组5本，支持停止/失败重试/逐组确认，未接任务中心；Mock明示模拟。需重编译/重启Server；真实Provider质量待验收。详见guide的Book AI metadata及对应计划。
+漫画/写真列表及详情新增 AI 整理资料，共用 recognize_book_metadata Action 和确认网关。仅原始标题、源文件名送模型，区分漫画作者/社团与写真模特/摄影师，名称保留原文，证据须为来源连续片段且包含名称。预览前不写库；确认事务检查来源、当前展示标题与已有资料，持久回执防止重复写入。迁移0068分别添加metadata_json；列表/详情增加originalTitle和metadata，自由文本搜索包含资料。扫描保留展示标题/资料，文件/个人标签不变，无cfg新增。迁移0069持久化任务与带版本的提案；POST /api/ai/book-organizations 提交，GET /{jobId}/items 分页，POST /{jobId}/{cancel|retry|review} 管理/确认（写仅本机）。复用影片后台整理worker；任务中心键book-organize:id，kind=organize，needs_confirmation计入需要处理。入口只提交，任务详情按25本分页勾选应用或忽略；关闭/重启保留提案，确认重新签发网关票据且不调模型；资料/回执/条目应用状态原子提交。取消保留已生成项，重试跳过已应用/忽略项。Mock明示模拟并持久化。需重编译/重启Server；真实Provider质量待验收。详见guide的Book AI metadata及对应计划。
 
 ## 2026-10-17 影片 AI 整理确认与任务选择
 

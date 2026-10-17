@@ -840,10 +840,12 @@ On Server startup, interrupted running subtitle records are requeued before the 
 
 ### Book metadata AI (2026-10-17)
 
-- `POST /api/ai/actions/recognize_book_metadata`: exactly one comicId or photoId, optional targetLocale. Generates source-backed title/credit preview using the configured AI provider.
-- `POST /api/ai/confirm`: existing confirmation endpoint, new `update_book_metadata` tool; transactional source/current-value comparison and durable receipt.
-- Comic/photo list and detail DTOs add `originalTitle` and `metadata` (cleanTitle, translatedTitle, authors/circles/models/photographers with name/evidence, uncertainty).
-- Migration 0068 adds metadata_json to both book tables; no new configuration keys. Foreground review groups, not background task-center jobs. See docs/guide.md#book-ai-metadata.
+- `POST /api/ai/book-organizations`: local-only task submission, `{kind: comic|photo, bookIds: [1–600 IDs], locale, requestId}`. Existing organization worker generates durable proposals without writing library metadata.
+- `GET /api/ai/book-organizations/{jobId}/items?limit=25&offset=0`: persisted original values, metadata, evidence, status and revision; never invokes a model.
+- `POST /api/ai/book-organizations/{jobId}/{cancel|retry}`: local-only lifecycle controls; retry skips applied/discarded/ready items.
+- `POST /api/ai/book-organizations/{jobId}/review`: local-only `{bookId,revision,decision:apply|discard}`. Reissues a gateway ticket from the saved proposal, checks source/version and applies metadata, receipt and item state in one transaction. No model call or dependence on an old ticket.
+- Task Center projects `book-organize:{id}` as kind `organize`, unit `books`; `needs_confirmation` is an attention state. Submit from library/detail, review in shared task details. Proposals survive page close and Server restart.
+- Internal recognition continues through `POST /api/ai/actions/recognize_book_metadata` and existing `update_book_metadata` confirmation tool. Only original titles/filenames are sent to the provider; roles require source evidence. Migration 0068 stores book metadata; 0069 stores task proposals. No cfg change. Mock tasks/results persist in localStorage and are explicitly simulated.
 
 ### Movie organization tasks (2026-10-17)
 
