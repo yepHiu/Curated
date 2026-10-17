@@ -582,3 +582,7 @@ Translate回调在AI用量记录结束前调用共用ValidateTranslations。合�
 ## 2026-10-17 书库 AI 资料整理
 
 漫画/写真列表及详情新增 AI 整理资料，共用 recognize_book_metadata Action 和确认网关。仅原始标题、源文件名送模型，区分漫画作者/社团与写真模特/摄影师，名称保留原文，证据须为来源连续片段且包含名称。预览前不写库；确认事务检查来源、当前展示标题与已有资料，持久回执防止重复写入。迁移0068分别添加metadata_json；列表/详情增加originalTitle和metadata，自由文本搜索包含资料。扫描保留展示标题/资料，文件/个人标签不变，无cfg新增。前台每组5本，支持停止/失败重试/逐组确认，未接任务中心；Mock明示模拟。需重编译/重启Server；真实Provider质量待验收。详见guide的Book AI metadata及对应计划。
+
+## 2026-10-17 影片 AI 整理确认与任务选择
+
+单片/批量已选入口改为二次确认，展示标题与番号，Checkbox 选择 tags/title/summary（默认 tags），不展示覆盖统计、历史或执行状态。POST /api/ai/tag-organizations 增加可选 tasks，仅 selected 支持，省略兼容旧标签流程；0067 保存任务选项和逐字段翻译检查点。翻译目标固定为提交时界面语言，仅写 user_title/user_summary，原文和并发人工修改受保护；内部任务网关共享权限、频控与审计。统一任务中心显示所选项、翻译阶段和逐字段结果；重试保留成功字段，标签撤销不撤销翻译。无配置键，需更新 Server 与前端。详见任务中心计划 §14.8。

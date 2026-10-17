@@ -844,3 +844,7 @@ On Server startup, interrupted running subtitle records are requeued before the 
 - `POST /api/ai/confirm`: existing confirmation endpoint, new `update_book_metadata` tool; transactional source/current-value comparison and durable receipt.
 - Comic/photo list and detail DTOs add `originalTitle` and `metadata` (cleanTitle, translatedTitle, authors/circles/models/photographers with name/evidence, uncertainty).
 - Migration 0068 adds metadata_json to both book tables; no new configuration keys. Foreground review groups, not background task-center jobs. See docs/guide.md#book-ai-metadata.
+
+### Movie organization tasks (2026-10-17)
+
+`POST /api/ai/tag-organizations` accepts optional `tasks: ["tags", "title", "summary"]` for selected scope only; omitted means tags. Empty, duplicate or unknown tasks are rejected. Migration 0067 persists chosen tasks and per-field translation checkpoints. Existing job DTO adds tasks/translationProcessed; item DTO adds translations. Internal task-only translation writes share gateway permission/rate/audit controls and atomically compare source/override plus save the checkpoint. Task center projects translating_metadata; tag undo preserves translations. No new endpoints/configuration keys.

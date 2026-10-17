@@ -977,3 +977,11 @@ AI 用量统计的时间范围支持「今天」及近 7／30／90 天。「今�
 此入口是前台分组预览，未接入后台任务中心。停止会取消当前生成及后续排队操作，已受理保存会完成；关闭弹窗会丢弃未应用预览。Mock 提供明确标记的模拟结果，保存到当前浏览器 localStorage，不调用真实模型。
 
 服务复用 `POST /api/ai/actions/recognize_book_metadata` 与 `/api/ai/confirm`；列表和详情新增 `originalTitle` / `metadata`。迁移 `0068_book_metadata.sql` 在两个书库各加 `metadata_json`；无新 library-config 字段。提示词 `book-metadata.txt` 随 Server 编译，需要重编译、重启后端才生效。真实识别质量尚需实际标题验收。实施记录见 [写真与漫画 AI 资料整理](plan/2026-10-17-book-ai-metadata.md)。
+
+## Movie AI organization confirmation
+
+2026-10-17：影片详情／右键和批量已选的「AI 整理」先显示确认弹窗，逐部展示标题与番号；默认勾选标签，可独立或组合勾选标题、简介翻译。至少选择一项，点击「确认并开始」后创建任务并关闭弹窗，状态和记录在任务中心查看。取消不创建任务；提交失败保留选择供重试。全库题材整理入口继续使用原有范围管理。
+
+翻译目标为提交时的界面语言。译文替换用户展示标题／简介，保留刮削原文；原文或用户字段在模型执行期间发生变化时，该项报告冲突而不覆盖。每个字段独立保存检查点，重启恢复和失败重试保留成功字段。空原文跳过并报告问题。任务中心的「撤销标签整理」仅撤销标签，保留译文。Mock 使用明确标记的模拟文本，不调用模型。
+
+需更新并重启 Server（自动执行0067迁移）及重新构建前端。既有 POST /api/ai/tag-organizations 新增 tasks 数组（tags/title/summary）；省略保持旧标签行为。无新增端点或 library-config 配置。
