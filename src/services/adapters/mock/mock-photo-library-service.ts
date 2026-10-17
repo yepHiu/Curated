@@ -1,3 +1,5 @@
+import type { BookMetadata } from "@/api/types"
+import { readMockBookMetadata, writeMockBookMetadata } from "@/lib/mock-book-metadata"
 import { computed, ref } from "vue"
 import type { PutBookCommentBody, TaskDTO } from "@/api/types"
 import type { PhotoLibraryService } from "@/services/contracts/photo-library-service"
@@ -42,6 +44,8 @@ function photoSeed(
   return {
     id,
     title,
+    originalTitle: title,
+    metadata: readMockBookMetadata("photo", id),
     tags,
     rating: index === 0 ? 4.4 : null,
     isFavorite: index === 0,
@@ -302,4 +306,13 @@ export const mockPhotoLibraryService: PhotoLibraryService = {
   async scanPhotos() {
     return null
   },
+}
+
+/** Apply the mock Action result to the shared cache after confirmation. */
+export async function applyMockPhotoMetadata(id: string, metadata: BookMetadata) {
+  const book = photosState.value.find(item => item.id === id)
+  if (!book) throw new Error("Book not found")
+  writeMockBookMetadata("photo", id, metadata)
+  await mockPhotoLibraryService.patchPhoto(id, { title: metadata.translatedTitle })
+  photosState.value = photosState.value.map(item => item.id === id ? { ...item, metadata } : item)
 }

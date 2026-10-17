@@ -90,7 +90,7 @@ func (s *SQLiteStore) GetPhotoBookDetail(ctx context.Context, id string) (contra
 	var favoriteInt int
 	var rating sql.NullFloat64
 	err := s.db.QueryRowContext(ctx,
-		`SELECT pb.id, `+photoDisplayTitleSQL+`, pb.source_file_name, pb.location, pb.page_count, pb.is_favorite,
+		`SELECT pb.title, pb.metadata_json, pb.id, `+photoDisplayTitleSQL+`, pb.source_file_name, pb.location, pb.page_count, pb.is_favorite,
 		        pb.user_rating, pb.added_at, pb.updated_at, pb.last_viewed_at, pb.completed_at,
 		        COALESCE(pvp.current_page_index, 0)
 		   FROM photo_books pb
@@ -98,6 +98,8 @@ func (s *SQLiteStore) GetPhotoBookDetail(ctx context.Context, id string) (contra
 		  WHERE pb.id = ?`,
 		id,
 	).Scan(
+		&item.OriginalTitle,
+		&bookMetadataScanner{target: &item.Metadata},
 		&item.ID,
 		&item.Title,
 		&item.SourceFileName,
@@ -168,7 +170,7 @@ func (s *SQLiteStore) ListPhotoBooks(ctx context.Context, req contracts.ListPhot
 	listArgs := append([]any{}, args...)
 	listArgs = append(listArgs, limit, offset)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT pb.id, `+photoDisplayTitleSQL+`, pb.source_file_name, pb.location, pb.page_count, pb.is_favorite,
+		`SELECT pb.title, pb.metadata_json, pb.id, `+photoDisplayTitleSQL+`, pb.source_file_name, pb.location, pb.page_count, pb.is_favorite,
 		        pb.user_rating, pb.added_at, pb.updated_at, pb.last_viewed_at, pb.completed_at,
 		        COALESCE(pvp.current_page_index, 0)
 		   FROM photo_books pb
@@ -189,6 +191,8 @@ func (s *SQLiteStore) ListPhotoBooks(ctx context.Context, req contracts.ListPhot
 		var favoriteInt int
 		var rating sql.NullFloat64
 		if err := rows.Scan(
+			&item.OriginalTitle,
+			&bookMetadataScanner{target: &item.Metadata},
 			&item.ID,
 			&item.Title,
 			&item.SourceFileName,
@@ -236,10 +240,10 @@ func photoBookWhere(req contracts.ListPhotoBooksRequest) (string, []any) {
 	var args []any
 	if q := strings.TrimSpace(req.Query); q != "" {
 		like := "%" + strings.ToLower(q) + "%"
-		clauses = append(clauses, `(LOWER(`+photoDisplayTitleSQL+`) LIKE ? OR LOWER(pb.title) LIKE ? OR LOWER(pb.source_file_name) LIKE ? OR LOWER(pb.location) LIKE ? OR EXISTS (
+		clauses = append(clauses, `(LOWER(`+photoDisplayTitleSQL+`) LIKE ? OR LOWER(pb.title) LIKE ? OR LOWER(pb.source_file_name) LIKE ? OR LOWER(pb.location) LIKE ? OR LOWER(pb.metadata_json) LIKE ? OR EXISTS (
 			SELECT 1 FROM photo_book_tags pbt WHERE pbt.photo_id = pb.id AND LOWER(pbt.tag) LIKE ?
 		))`)
-		args = append(args, like, like, like, like, like)
+		args = append(args, like, like, like, like, like, like)
 	}
 	if tag := strings.TrimSpace(req.Tag); tag != "" {
 		clauses = append(clauses, `EXISTS (SELECT 1 FROM photo_book_tags pbt WHERE pbt.photo_id = pb.id AND pbt.tag = ?)`)

@@ -1,3 +1,4 @@
+import { bookMetadataSearchText } from "@/lib/book-metadata"
 import type { ComicBook, ComicReadStatus } from "@/domain/comic/types"
 
 export type ComicLibraryFilter = {
@@ -17,6 +18,8 @@ export function comicSearchHaystack(comic: ComicBook): string {
   return [
     comic.title,
     comic.sourceFileName,
+      comic.originalTitle,
+      bookMetadataSearchText(comic.metadata),
     comic.location,
     ...comic.tags,
   ]

@@ -27,20 +27,22 @@ type UpdatePhotoLibraryPathRequest struct {
 }
 
 type PhotoBookListItemDTO struct {
-	ID               string   `json:"id"`
-	Title            string   `json:"title"`
-	Tags             []string `json:"tags"`
-	Rating           *float64 `json:"rating,omitempty"`
-	IsFavorite       bool     `json:"isFavorite"`
-	PageCount        int      `json:"pageCount"`
-	CurrentPageIndex int      `json:"currentPageIndex"`
-	CoverURL         string   `json:"coverUrl,omitempty"`
-	SourceFileName   string   `json:"sourceFileName"`
-	Location         string   `json:"location"`
-	AddedAt          string   `json:"addedAt"`
-	UpdatedAt        string   `json:"updatedAt"`
-	LastViewedAt     string   `json:"lastViewedAt,omitempty"`
-	CompletedAt      string   `json:"completedAt,omitempty"`
+	OriginalTitle    string       `json:"originalTitle"`
+	Metadata         BookMetadata `json:"metadata"`
+	ID               string       `json:"id"`
+	Title            string       `json:"title"`
+	Tags             []string     `json:"tags"`
+	Rating           *float64     `json:"rating,omitempty"`
+	IsFavorite       bool         `json:"isFavorite"`
+	PageCount        int          `json:"pageCount"`
+	CurrentPageIndex int          `json:"currentPageIndex"`
+	CoverURL         string       `json:"coverUrl,omitempty"`
+	SourceFileName   string       `json:"sourceFileName"`
+	Location         string       `json:"location"`
+	AddedAt          string       `json:"addedAt"`
+	UpdatedAt        string       `json:"updatedAt"`
+	LastViewedAt     string       `json:"lastViewedAt,omitempty"`
+	CompletedAt      string       `json:"completedAt,omitempty"`
 }
 
 type PhotoBookDetailDTO struct {

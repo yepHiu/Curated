@@ -90,7 +90,7 @@ func (s *SQLiteStore) GetComicBookDetail(ctx context.Context, id string) (contra
 	var favoriteInt int
 	var rating sql.NullFloat64
 	err := s.db.QueryRowContext(ctx,
-		`SELECT cb.id, `+comicDisplayTitleSQL+`, cb.source_file_name, cb.location, cb.page_count, cb.is_favorite,
+		`SELECT cb.title, cb.metadata_json, cb.id, `+comicDisplayTitleSQL+`, cb.source_file_name, cb.location, cb.page_count, cb.is_favorite,
 		        cb.user_rating, cb.read_status, cb.added_at, cb.updated_at, cb.last_read_at, cb.completed_at,
 		        COALESCE(crp.current_page_index, 0)
 		   FROM comic_books cb
@@ -98,6 +98,8 @@ func (s *SQLiteStore) GetComicBookDetail(ctx context.Context, id string) (contra
 		  WHERE cb.id = ?`,
 		id,
 	).Scan(
+		&item.OriginalTitle,
+		&bookMetadataScanner{target: &item.Metadata},
 		&item.ID,
 		&item.Title,
 		&item.SourceFileName,
@@ -169,7 +171,7 @@ func (s *SQLiteStore) ListComicBooks(ctx context.Context, req contracts.ListComi
 	listArgs := append([]any{}, args...)
 	listArgs = append(listArgs, limit, offset)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT cb.id, `+comicDisplayTitleSQL+`, cb.source_file_name, cb.location, cb.page_count, cb.is_favorite,
+		`SELECT cb.title, cb.metadata_json, cb.id, `+comicDisplayTitleSQL+`, cb.source_file_name, cb.location, cb.page_count, cb.is_favorite,
 		        cb.user_rating, cb.read_status, cb.added_at, cb.updated_at, cb.last_read_at, cb.completed_at,
 		        COALESCE(crp.current_page_index, 0)
 		   FROM comic_books cb
@@ -190,6 +192,8 @@ func (s *SQLiteStore) ListComicBooks(ctx context.Context, req contracts.ListComi
 		var favoriteInt int
 		var rating sql.NullFloat64
 		if err := rows.Scan(
+			&item.OriginalTitle,
+			&bookMetadataScanner{target: &item.Metadata},
 			&item.ID,
 			&item.Title,
 			&item.SourceFileName,
@@ -238,10 +242,10 @@ func comicBookWhere(req contracts.ListComicBooksRequest) (string, []any) {
 	var args []any
 	if q := strings.TrimSpace(req.Query); q != "" {
 		like := "%" + strings.ToLower(q) + "%"
-		clauses = append(clauses, `(LOWER(`+comicDisplayTitleSQL+`) LIKE ? OR LOWER(cb.title) LIKE ? OR LOWER(cb.source_file_name) LIKE ? OR LOWER(cb.location) LIKE ? OR EXISTS (
+		clauses = append(clauses, `(LOWER(`+comicDisplayTitleSQL+`) LIKE ? OR LOWER(cb.title) LIKE ? OR LOWER(cb.source_file_name) LIKE ? OR LOWER(cb.location) LIKE ? OR LOWER(cb.metadata_json) LIKE ? OR EXISTS (
 			SELECT 1 FROM comic_book_tags cbt WHERE cbt.comic_id = cb.id AND LOWER(cbt.tag) LIKE ?
 		))`)
-		args = append(args, like, like, like, like, like)
+		args = append(args, like, like, like, like, like, like)
 	}
 	if tag := strings.TrimSpace(req.Tag); tag != "" {
 		clauses = append(clauses, `EXISTS (SELECT 1 FROM comic_book_tags cbt WHERE cbt.comic_id = cb.id AND cbt.tag = ?)`)

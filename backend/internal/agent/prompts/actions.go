@@ -5,10 +5,11 @@ import (
 )
 
 const (
-	ActionPolishComment     = "polish_comment"
-	ActionTranslateSummary  = "translate_summary"
-	ActionTranslateTitle    = "translate_title"
-	ActionInsightsNarrative = "insights_narrative"
+	ActionRecognizeBookMetadata = "recognize_book_metadata"
+	ActionPolishComment         = "polish_comment"
+	ActionTranslateSummary      = "translate_summary"
+	ActionTranslateTitle        = "translate_title"
+	ActionInsightsNarrative     = "insights_narrative"
 )
 
 // IsCommentAction 判断动作是否为笔记润色。
@@ -33,7 +34,7 @@ func IsInsightsAction(name string) bool {
 
 // KnownAction 限定受支持的独立 AI 动作。
 func KnownAction(name string) bool {
-	return IsCommentAction(name) || IsDisplayAction(name) || IsInsightsAction(name)
+	return name == ActionRecognizeBookMetadata || IsCommentAction(name) || IsDisplayAction(name) || IsInsightsAction(name)
 }
 
 // CommentActionPrompt returns reusable instructions; source data is sent once in user.
@@ -81,4 +82,11 @@ func InsightsNarrativePrompt(locale string) string {
 // FormatPlainUser renders source data once without interpreting its template syntax.
 func FormatPlainUser(kind, body string) string {
 	return renderPrompt("action-source.txt", map[string]string{"Kind": kind, "Source": body})
+}
+
+func BookMetadataPrompt(kind, locale string) string {
+	if locale == "" {
+		locale = "zh-CN"
+	}
+	return renderPrompt("book-metadata.txt", map[string]string{"Kind": kind, "Locale": locale})
 }

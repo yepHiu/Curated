@@ -9,6 +9,8 @@ import {
 } from "lucide-vue-next"
 import type { PhotoBook } from "@/domain/photo/types"
 import DetailTagAddControl from "../DetailTagAddControl.vue"
+import BookMetadataAction from "@/components/jav-library/books/BookMetadataAction.vue"
+import BookMetadataFacts from "@/components/jav-library/books/BookMetadataFacts.vue"
 import BookDetailFacts from "@/components/jav-library/books/BookDetailFacts.vue"
 import BookMediaInfoDialog from "@/components/jav-library/books/BookMediaInfoDialog.vue"
 import BookRatingCard from "@/components/jav-library/books/BookRatingCard.vue"
@@ -120,6 +122,8 @@ function browseByTag(tag: string) {
           <CardTitle data-photo-detail-title class="break-words pr-12 text-2xl leading-snug sm:pr-14 sm:text-3xl">
             {{ photo.title }}
           </CardTitle>
+          <BookMetadataFacts :metadata="photo.metadata" />
+          <BookMetadataAction kind="photo" :books="[photo]" @applied="emit('reload')" />
         </div>
 
         <div class="flex flex-wrap items-center gap-3">

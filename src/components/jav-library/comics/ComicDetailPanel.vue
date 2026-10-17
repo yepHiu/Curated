@@ -12,6 +12,8 @@ import {
 } from "lucide-vue-next"
 import type { ComicBook, ComicPatch } from "@/domain/comic/types"
 import DetailTagAddControl from "../DetailTagAddControl.vue"
+import BookMetadataAction from "@/components/jav-library/books/BookMetadataAction.vue"
+import BookMetadataFacts from "@/components/jav-library/books/BookMetadataFacts.vue"
 import BookDetailFacts from "@/components/jav-library/books/BookDetailFacts.vue"
 import BookMediaInfoDialog from "@/components/jav-library/books/BookMediaInfoDialog.vue"
 import { Badge } from "@/components/ui/badge"
@@ -172,6 +174,8 @@ function commitRating(value: number | null) {
           <CardTitle data-comic-detail-title class="break-words pr-12 text-2xl leading-snug sm:pr-14 sm:text-3xl">
             {{ comic.title }}
           </CardTitle>
+          <BookMetadataFacts :metadata="comic.metadata" />
+          <BookMetadataAction kind="comic" :books="[comic]" @applied="emit('reload')" />
         </div>
 
         <div class="flex flex-wrap items-center gap-3">

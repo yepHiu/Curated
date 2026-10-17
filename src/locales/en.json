@@ -2737,6 +2737,35 @@
       "restart": "Run audio recognition and all subtitle translation again on this task. Its ID stays the same and its state returns to queued. Uses current subtitle recognition/translation models and the latest prompt, keeping the original file, audio track and existing outputs without reusing old checkpoints. Recognition and translation will be charged again.",
       "undo": "Restore user tags changed by this task. Later edits and conflicts are skipped and reported."
     }
+  },
+  "bookAI": {
+    "action": "AI metadata",
+    "description": "{count} books, {size} per group. Review titles, credits and evidence before applying. Stopping preserves completed results.",
+    "mock": "Mock preview. No real AI request; simulated results are stored only in this browser.",
+    "select": "Select {title}",
+    "cleanTitle": "Original main title",
+    "authors": "Authors",
+    "circles": "Circles",
+    "models": "Models",
+    "photographers": "Photographers",
+    "uncertainty": "Needs review",
+    "before": "Current title",
+    "after": "Translated title",
+    "saved": "View saved metadata",
+    "regenerate": "New preview",
+    "previous": "Previous group",
+    "next": "Next group",
+    "stop": "Stop remaining work",
+    "generate": "Generate selected previews",
+    "apply": "Confirm {count} books",
+    "status": {
+      "pending": "Pending",
+      "generating": "Analyzing",
+      "ready": "Review",
+      "applying": "Saving",
+      "applied": "Applied",
+      "unchanged": "Unchanged",
+      "failed": "Failed"
+    }
   }
-
 }

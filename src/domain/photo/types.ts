@@ -1,3 +1,5 @@
+import type { BookMetadata } from "@/api/types"
+
 export type PhotoViewerMode = "page" | "scroll"
 export type PhotoFitMode = "contain" | "width"
 export type PhotoViewingDirection = "ltr" | "rtl"
@@ -15,6 +17,8 @@ export interface PhotoPage {
 }
 
 export interface PhotoBook {
+  originalTitle?: string
+  metadata?: BookMetadata
   id: string
   title: string
   tags: string[]

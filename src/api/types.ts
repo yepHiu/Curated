@@ -268,6 +268,8 @@ export interface UpdateComicLibraryPathBody {
 export type ComicReadStatus = "unread" | "reading" | "read"
 
 export interface ComicBookListItemDTO {
+  originalTitle?: string
+  metadata?: BookMetadata
   id: string
   title: string
   tags: string[]
@@ -352,6 +354,8 @@ export interface UpdatePhotoLibraryPathBody {
 }
 
 export interface PhotoBookListItemDTO {
+  originalTitle?: string
+  metadata?: BookMetadata
   id: string
   title: string
   tags: string[]
@@ -1817,4 +1821,16 @@ export interface RefreshHomepageDailyRecommendationsBody {
 export interface BackupFileSelectionDTO { backupPath: string }
 export interface BackupFileInspectionDTO extends BackupFileSelectionDTO {
   preflight: BackupRestorePreflightDTO
+}
+
+/** Confirmed title-derived bibliography; role names retain their source spelling. */
+export interface BookCredit { name: string; evidence: string }
+export interface BookMetadata {
+  cleanTitle?: string
+  translatedTitle?: string
+  authors?: BookCredit[]
+  circles?: BookCredit[]
+  models?: BookCredit[]
+  photographers?: BookCredit[]
+  uncertainty?: string
 }

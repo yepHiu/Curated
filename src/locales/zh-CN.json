@@ -2737,6 +2737,35 @@
       "restart": "在当前任务上从头识别音频并翻译全部字幕，任务编号保持不变，状态重置为排队中。使用当前字幕设置中的识别与翻译模型及最新提示词，保留原文件、音轨选择和已有成品，不复用旧检查点；会重新产生识别和翻译费用。",
       "undo": "恢复本次整理应用的用户标签。后续人工修改或其他任务产生的冲突会被跳过，并报告恢复与冲突数量。"
     }
+  },
+  "bookAI": {
+    "action": "AI 整理资料",
+    "description": "共 {count} 本，每组 {size} 本。核对标题、人物及依据后再应用；停止会保留已完成结果。",
+    "mock": "当前为模拟预览，不调用真实 AI；模拟结果仅保存在此浏览器。",
+    "select": "选择 {title}",
+    "cleanTitle": "原文主标题",
+    "authors": "作者",
+    "circles": "社团",
+    "models": "模特",
+    "photographers": "摄影师",
+    "uncertainty": "待核对",
+    "before": "当前标题",
+    "after": "译文标题",
+    "saved": "查看已有资料",
+    "regenerate": "重新预览",
+    "previous": "上一组",
+    "next": "下一组",
+    "stop": "停止后续处理",
+    "generate": "生成所选预览",
+    "apply": "确认应用 {count} 本",
+    "status": {
+      "pending": "待处理",
+      "generating": "识别中",
+      "ready": "待确认",
+      "applying": "保存中",
+      "applied": "已应用",
+      "unchanged": "无变化",
+      "failed": "失败"
+    }
   }
-
 }

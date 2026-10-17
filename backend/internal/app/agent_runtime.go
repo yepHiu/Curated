@@ -89,6 +89,9 @@ func (a *App) ensureAgentGateway() *core.Gateway {
 		if err := tools.RegisterBookWriteTools(reg, a); err != nil && a.logger != nil {
 			a.logger.Warn("register agent book write tools failed")
 		}
+		if err := tools.RegisterBookMetadataTool(reg, a); err != nil && a.logger != nil {
+			a.logger.Warn("register book metadata tool failed")
+		}
 		a.agentRT.gateway = gw
 	})
 	return a.agentRT.gateway

@@ -86,6 +86,8 @@ function mapComicListItem(dto: ComicBookListItemDTO): ComicBook {
     pageCount: dto.pageCount,
     currentPageIndex: dto.currentPageIndex,
     coverUrl: dto.coverUrl,
+    originalTitle: dto.originalTitle,
+    metadata: dto.metadata,
     sourceFileName: dto.sourceFileName,
     location: dto.location,
     addedAt: dto.addedAt,

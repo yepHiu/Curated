@@ -1,3 +1,4 @@
+import { isBookMetadata } from "@/lib/book-metadata"
 import type { AIActionPreviewDTO, AIChatSessionDTO, AIChatStoredMessageDTO, AIToolApplyDTO } from "@/api/types"
 import type {
   AIChatStreamHandlers,
@@ -294,6 +295,16 @@ export const mockAIService: AIService = {
     if (index >= 0) sessions.splice(index, 1)
   },
   async runAction(name, body): Promise<AIActionPreviewDTO> {
+    if (name === "recognize_book_metadata") {
+      const kind = body.comicId ? "comic" : "photo"
+      const id = body.comicId || body.photoId || ""
+      const book = kind === "comic"
+        ? (await import("./mock-comic-library-service")).mockComicLibraryService.getComicById(id)
+        : (await import("./mock-photo-library-service")).mockPhotoLibraryService.getPhotoById(id)
+      if (!book) throw new AIServiceError("Book not found")
+      const metadata = { cleanTitle: book.originalTitle || book.title, translatedTitle: `Mock: ${book.originalTitle || book.title}`, uncertainty: "Mock preview — no real translation or identity recognition." }
+      return { action: name, name: "update_book_metadata", sessionId: nextId("act_mock_"), originalText: book.title, proposedText: metadata.translatedTitle, confirmToken: nextId("cfm_mock_"), arguments: { kind, id, metadata, snapshot: JSON.stringify({ title: book.title, metadata: book.metadata }) }, changes: [{ path: "metadata", before: book.metadata, after: metadata }] }
+    }
     if (name === "insights_narrative") {
       return {
         action: name,
@@ -361,6 +372,17 @@ export const mockAIService: AIService = {
     }
   },
   async confirmTool(body): Promise<AIToolApplyDTO> {
+    if (body.name === "update_book_metadata") {
+      const { kind, id, metadata, snapshot } = body.arguments
+      if (typeof id !== "string" || !isBookMetadata(metadata)) throw new AIServiceError("Invalid metadata")
+      const comic = await import("./mock-comic-library-service")
+      const photo = await import("./mock-photo-library-service")
+      const book = kind === "comic" ? comic.mockComicLibraryService.getComicById(id) : photo.mockPhotoLibraryService.getPhotoById(id)
+      if (!book || JSON.stringify({ title: book.title, metadata: book.metadata }) !== snapshot) throw new AIServiceError("Content changed; generate a new preview", "AI_WRITE_CONFLICT")
+      if (kind === "comic") await comic.applyMockComicMetadata(id, metadata)
+      else await photo.applyMockPhotoMetadata(id, metadata)
+      return { ok: true, name: body.name }
+    }
     const proposed =
       typeof body.arguments.body === "string" ? body.arguments.body : "saved"
     return { ok: true, name: body.name, data: { body: proposed, updatedAt: nowIso() } }

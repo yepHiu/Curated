@@ -1,3 +1,5 @@
+import type { BookMetadata } from "@/api/types"
+
 export type ComicReadStatus = "unread" | "reading" | "read"
 export type ComicReaderMode = "page" | "scroll"
 export type ComicFitMode = "contain" | "width"
@@ -23,6 +25,8 @@ export interface ComicPage {
 }
 
 export interface ComicBook {
+  originalTitle?: string
+  metadata?: BookMetadata
   id: string
   title: string
   tags: string[]

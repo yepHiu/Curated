@@ -5,6 +5,7 @@ import { CheckSquare, ListChecks, X } from "lucide-vue-next"
 import type { ComicBook, ComicReadStatus } from "@/domain/comic/types"
 import type { BookLibrarySortValue } from "@/lib/book-library-query"
 import BookLibraryToolbar from "@/components/jav-library/books/BookLibraryToolbar.vue"
+import BookMetadataAction from "@/components/jav-library/books/BookMetadataAction.vue"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -84,6 +85,7 @@ function openReader(comicId: string, pageIndex: number) {
       @update-favorite="emit('updateFavorite', $event)"
       @update-read-status="emit('updateReadStatus', $event)"
     >
+      <BookMetadataAction kind="comic" :books="props.batchMode ? props.comics.filter(book => props.batchSelectedIds.includes(book.id)) : props.comics" />
       <template v-if="!batchModeOn">
         <Button
           type="button"

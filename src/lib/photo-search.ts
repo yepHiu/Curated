@@ -1,3 +1,4 @@
+import { bookMetadataSearchText } from "@/lib/book-metadata"
 import type { PhotoBook } from "@/domain/photo/types"
 
 export interface PhotoSearchFilters {
@@ -24,6 +25,8 @@ export function filterPhotos(
     const haystack = [
       photo.title,
       photo.sourceFileName,
+      photo.originalTitle,
+      bookMetadataSearchText(photo.metadata),
       photo.location,
       ...photo.tags,
     ]

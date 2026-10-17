@@ -58,6 +58,8 @@ function mapPhotoListItem(dto: PhotoBookListItemDTO): PhotoBook {
     pageCount: Number(dto.pageCount ?? 0),
     currentPageIndex: Number(dto.currentPageIndex ?? 0),
     coverUrl: dto.coverUrl,
+    originalTitle: dto.originalTitle,
+    metadata: dto.metadata,
     sourceFileName: dto.sourceFileName,
     location: dto.location,
     addedAt: dto.addedAt,

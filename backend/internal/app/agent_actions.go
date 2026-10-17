@@ -55,6 +55,8 @@ func (a *App) RunAIAction(ctx context.Context, name string, req contracts.AIActi
 	}, client)
 	completer.Observe = observation.observe
 	switch {
+	case name == prompts.ActionRecognizeBookMetadata:
+		return a.runBookMetadataAction(ctx, completer, req)
 	case prompts.IsCommentAction(name):
 		return a.runCommentAction(ctx, completer, name, req)
 	case prompts.IsDisplayAction(name):

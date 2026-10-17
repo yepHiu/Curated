@@ -1,3 +1,5 @@
+import type { BookMetadata } from "@/api/types"
+import { readMockBookMetadata, writeMockBookMetadata } from "@/lib/mock-book-metadata"
 import { computed, ref } from "vue"
 import { HttpClientError } from "@/api/http-client"
 import type {
@@ -70,6 +72,8 @@ function comicSeed(
   return {
     id,
     title,
+    originalTitle: title,
+    metadata: readMockBookMetadata("comic", id),
     tags,
     rating: index === 0 ? 4.6 : null,
     isFavorite: index === 0,
@@ -438,4 +442,13 @@ export const mockComicLibraryService: ComicLibraryService = {
   async cleanupComicCache(): Promise<ComicCacheStatusDTO> {
     return await this.getComicCacheStatus()
   },
+}
+
+/** Apply the mock Action result to the shared cache after confirmation. */
+export async function applyMockComicMetadata(id: string, metadata: BookMetadata) {
+  const book = comicsState.value.find(item => item.id === id)
+  if (!book) throw new Error("Book not found")
+  writeMockBookMetadata("comic", id, metadata)
+  await mockComicLibraryService.patchComic(id, { title: metadata.translatedTitle })
+  comicsState.value = comicsState.value.map(item => item.id === id ? { ...item, metadata } : item)
 }

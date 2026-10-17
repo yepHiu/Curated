@@ -4,6 +4,7 @@ import { CheckSquare, ListChecks, X } from "lucide-vue-next"
 import type { PhotoBook } from "@/domain/photo/types"
 import type { BookLibrarySortValue } from "@/lib/book-library-query"
 import BookLibraryToolbar from "@/components/jav-library/books/BookLibraryToolbar.vue"
+import BookMetadataAction from "@/components/jav-library/books/BookMetadataAction.vue"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -70,6 +71,7 @@ function openViewer(photoId: string, pageIndex: number) {
       @clear-search="emit('updateSearch', '')"
       @clear-tag="emit('clearTag')"
     >
+      <BookMetadataAction kind="photo" :books="props.batchMode ? props.photos.filter(book => props.batchSelectedIds.includes(book.id)) : props.photos" />
       <Button v-if="!props.batchMode" type="button" variant="outline" data-photo-enter-batch class="min-h-11 shrink-0 rounded-full px-3 sm:min-h-8" @click="emit('enterBatchMode')">
         <ListChecks data-icon="inline-start" aria-hidden="true" />{{ t('photos.batchManage') }}
       </Button>
