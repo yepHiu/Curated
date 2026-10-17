@@ -4,7 +4,6 @@ import { CheckSquare, ListChecks, X } from "lucide-vue-next"
 import type { PhotoBook } from "@/domain/photo/types"
 import type { BookLibrarySortValue } from "@/lib/book-library-query"
 import BookLibraryToolbar from "@/components/jav-library/books/BookLibraryToolbar.vue"
-import BookMetadataAction from "@/components/jav-library/books/BookMetadataAction.vue"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -20,6 +19,7 @@ const props = withDefaults(
     hasConstraints?: boolean
     loading?: boolean
     loadError?: string
+    canOrganize?: boolean
     batchMode?: boolean
     batchSelectedIds?: readonly string[]
   }>(),
@@ -35,6 +35,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
+  organize: [book: PhotoBook]
   retry: []
   updateSearch: [value: string]
   clearTag: []
@@ -71,7 +72,6 @@ function openViewer(photoId: string, pageIndex: number) {
       @clear-search="emit('updateSearch', '')"
       @clear-tag="emit('clearTag')"
     >
-      <BookMetadataAction kind="photo" :books="props.batchMode ? props.photos.filter(book => props.batchSelectedIds.includes(book.id)) : props.photos" />
       <Button v-if="!props.batchMode" type="button" variant="outline" data-photo-enter-batch class="min-h-11 shrink-0 rounded-full px-3 sm:min-h-8" @click="emit('enterBatchMode')">
         <ListChecks data-icon="inline-start" aria-hidden="true" />{{ t('photos.batchManage') }}
       </Button>
@@ -95,6 +95,8 @@ function openViewer(photoId: string, pageIndex: number) {
     >
       <VirtualPhotoGrid
         :photos="props.photos"
+        :can-organize="props.canOrganize"
+        @organize="emit('organize', $event)"
         :batch-mode="props.batchMode"
         :batch-selected-ids="props.batchSelectedIds"
         @open-details="emit('openDetails', $event)"

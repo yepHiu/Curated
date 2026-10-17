@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest"
 import type { ComicBook } from "@/domain/comic/types"
 import VirtualComicGrid from "./VirtualComicGrid.vue"
 
+vi.mock("@/components/jav-library/books/BookCardContextMenu.vue", () => ({ default: { template: '<slot />' } }))
+
 vi.mock("@vueuse/core", () => ({
   useResizeObserver: vi.fn(),
   useMediaQuery: vi.fn(() => ({ value: false, __v_isRef: true })),

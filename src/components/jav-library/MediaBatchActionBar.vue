@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { Heart, HeartOff, Tag, Trash2 } from "lucide-vue-next"
+import { Heart, HeartOff, Sparkles, Tag, Trash2 } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -16,11 +16,13 @@ import { Input } from "@/components/ui/input"
 
 const props = defineProps<{
   kind: "photos" | "comics"
+  canOrganize?: boolean
   selectedCount: number
   operationBusy: boolean
 }>()
 
 const emit = defineEmits<{
+  organize: []
   clearSelection: []
   addFavorite: []
   removeFavorite: []
@@ -100,6 +102,7 @@ function confirmDelete() {
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
+        <Button v-if="canOrganize" variant="outline" size="sm" class="gap-1.5 rounded-xl" v-bind="testId('organize')" :disabled="selectedCount === 0 || operationBusy" @click="emit('organize')"><Sparkles aria-hidden="true" />{{ t('topics.action') }}</Button>
         <Button
           v-for="action in actions"
           :key="action.id"

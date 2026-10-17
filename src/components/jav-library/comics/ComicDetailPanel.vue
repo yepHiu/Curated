@@ -6,13 +6,14 @@ import {
   FolderOpen,
   Info,
   MoreVertical,
+  Sparkles,
   Pencil,
   Trash2,
   X,
 } from "lucide-vue-next"
 import type { ComicBook, ComicPatch } from "@/domain/comic/types"
 import DetailTagAddControl from "../DetailTagAddControl.vue"
-import BookMetadataAction from "@/components/jav-library/books/BookMetadataAction.vue"
+import BookOrganizationConfirmDialog from "@/components/jav-library/books/BookOrganizationConfirmDialog.vue"
 import BookMetadataFacts from "@/components/jav-library/books/BookMetadataFacts.vue"
 import BookDetailFacts from "@/components/jav-library/books/BookDetailFacts.vue"
 import BookMediaInfoDialog from "@/components/jav-library/books/BookMediaInfoDialog.vue"
@@ -48,6 +49,7 @@ const emit = defineEmits<{
   reload: []
 }>()
 
+const bookAI = ref<InstanceType<typeof BookOrganizationConfirmDialog>>()
 const { t } = useI18n()
 
 const editOpen = ref(false)
@@ -175,7 +177,6 @@ function commitRating(value: number | null) {
             {{ comic.title }}
           </CardTitle>
           <BookMetadataFacts :metadata="comic.metadata" />
-          <BookMetadataAction kind="comic" :books="[comic]" />
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
@@ -260,8 +261,9 @@ function commitRating(value: number | null) {
               <MoreVertical />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" class="min-w-[11rem]">
+          <DropdownMenuContent align="end" class="min-w-[11rem]" @close-auto-focus="bookAI?.isOpen && $event.preventDefault()">
             <DropdownMenuGroup>
+              <DropdownMenuItem v-if="bookAI?.canSubmit" data-book-ai-organize @select="bookAI?.openFor([comic])"><Sparkles aria-hidden="true" />{{ t('topics.action') }}</DropdownMenuItem>
               <DropdownMenuItem data-comic-media-info @click="mediaInfoOpen = true">
                 <Info aria-hidden="true" />
                 {{ t("bookBrowser.mediaInfo") }}
@@ -292,6 +294,7 @@ function commitRating(value: number | null) {
         </DropdownMenu>
       </div>
 
+      <BookOrganizationConfirmDialog ref="bookAI" kind="comic" />
       <BookMediaInfoDialog
         v-model:open="mediaInfoOpen"
         kind="comics"

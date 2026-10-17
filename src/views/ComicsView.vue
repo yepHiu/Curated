@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
+import BookOrganizationConfirmDialog from "@/components/jav-library/books/BookOrganizationConfirmDialog.vue"
 import MediaBatchActionBar from "@/components/jav-library/MediaBatchActionBar.vue"
 import ComicLibraryPage from "@/components/jav-library/comics/ComicLibraryPage.vue"
 import { pushAppToast } from "@/composables/use-app-toast"
@@ -18,6 +19,7 @@ import { sortComics } from "@/lib/comic-sort"
 import { buildComicReaderRouteFromSource } from "@/lib/navigation-intent"
 import { useComicLibraryService } from "@/services/comic-library-service"
 
+const bookAI = ref<InstanceType<typeof BookOrganizationConfirmDialog>>()
 const route = useRoute()
 const router = useRouter()
 const comicService = useComicLibraryService()
@@ -281,6 +283,8 @@ async function runBatchDeleteComics() {
     >
       <ComicLibraryPage
         :comics="visibleComics"
+        :can-organize="bookAI?.canSubmit"
+        @organize="bookAI?.openFor([$event])"
         :active-sort="activeSort"
         :search-query="searchQuery"
         :tag="browse.tag"
@@ -311,6 +315,8 @@ async function runBatchDeleteComics() {
     <MediaBatchActionBar
       kind="comics"
       v-if="batchMode"
+      :can-organize="bookAI?.canSubmit"
+      @organize="bookAI?.openFor(visibleComics.filter(book => batchSelectedIds.has(book.id)))"
       :selected-count="batchSelectedCount"
       :operation-busy="batchOperationBusy"
       @clear-selection="clearBatchSelection"
@@ -319,5 +325,6 @@ async function runBatchDeleteComics() {
       @add-tag="runBatchAddTag"
       @delete-selection="runBatchDeleteComics"
     />
+    <BookOrganizationConfirmDialog ref="bookAI" kind="comic" />
   </div>
 </template>

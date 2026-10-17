@@ -957,6 +957,7 @@
     "discovered": "已发现"
   },
   "bookBrowser": {
+    "viewDetails": "查看详情",
     "mediaInfo": "媒体信息",
     "displayTitle": "标题",
     "saveTitle": "保存",

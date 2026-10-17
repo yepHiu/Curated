@@ -5,7 +5,6 @@ import { CheckSquare, ListChecks, X } from "lucide-vue-next"
 import type { ComicBook, ComicReadStatus } from "@/domain/comic/types"
 import type { BookLibrarySortValue } from "@/lib/book-library-query"
 import BookLibraryToolbar from "@/components/jav-library/books/BookLibraryToolbar.vue"
-import BookMetadataAction from "@/components/jav-library/books/BookMetadataAction.vue"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -23,6 +22,7 @@ const props = withDefaults(
     hasConstraints?: boolean
     loading?: boolean
     loadError?: string
+    canOrganize?: boolean
     batchMode?: boolean
     batchSelectedIds?: readonly string[]
   }>(),
@@ -40,6 +40,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
+  organize: [book: ComicBook]
   retry: []
   updateSearch: [value: string]
   clearTag: []
@@ -85,7 +86,6 @@ function openReader(comicId: string, pageIndex: number) {
       @update-favorite="emit('updateFavorite', $event)"
       @update-read-status="emit('updateReadStatus', $event)"
     >
-      <BookMetadataAction kind="comic" :books="props.batchMode ? props.comics.filter(book => props.batchSelectedIds.includes(book.id)) : props.comics" />
       <template v-if="!batchModeOn">
         <Button
           type="button"
@@ -133,6 +133,8 @@ function openReader(comicId: string, pageIndex: number) {
     >
       <VirtualComicGrid
         :comics="props.comics"
+        :can-organize="props.canOrganize"
+        @organize="emit('organize', $event)"
         :batch-mode="batchModeOn"
         :batch-selected-ids="props.batchSelectedIds"
         @open-details="emit('openDetails', $event)"

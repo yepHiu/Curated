@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BookCardContextMenu from "@/components/jav-library/books/BookCardContextMenu.vue"
 import { computed, nextTick, ref } from "vue"
 import { useMediaQuery, useResizeObserver } from "@vueuse/core"
 import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller"
@@ -27,6 +28,7 @@ const props = withDefaults(
   defineProps<{
     comics: readonly ComicBook[]
     selectedComicId?: string
+    canOrganize?: boolean
     batchMode?: boolean
     batchSelectedIds?: readonly string[]
   }>(),
@@ -37,6 +39,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
+  organize: [book: ComicBook]
   openDetails: [comicId: string]
   openReader: [comicId: string, pageIndex: number]
   toggleFavorite: [payload: { comicId: string; nextValue: boolean }]
@@ -211,18 +214,20 @@ function onScrollerScroll(event: Event) {
                 class="w-full min-w-0"
                 :style="comicCardFrameStyle"
               >
-                <ComicCard
-                  :comic="comic"
-                  :selected="comic.id === props.selectedComicId"
-                  :batch-mode="props.batchMode"
-                  :batch-checked="batchSelectedSet.has(comic.id)"
-                  :poster-loading="posterLoadPolicyForChunk(index).loading"
-                  :poster-fetch-priority="posterLoadPolicyForChunk(index).fetchPriority"
-                  @open-details="emit('openDetails', $event)"
-                  @open-reader="(comicId, pageIndex) => emit('openReader', comicId, pageIndex)"
-                  @toggle-favorite="emit('toggleFavorite', $event)"
-                  @toggle-batch-select="emit('toggleBatchSelect', $event)"
-                />
+                <BookCardContextMenu :disabled="props.batchMode" :can-organize="props.canOrganize" @organize="emit('organize', comic)" @open-details="emit('openDetails', comic.id)">
+                  <ComicCard
+                    :comic="comic"
+                    :selected="comic.id === props.selectedComicId"
+                    :batch-mode="props.batchMode"
+                    :batch-checked="batchSelectedSet.has(comic.id)"
+                    :poster-loading="posterLoadPolicyForChunk(index).loading"
+                    :poster-fetch-priority="posterLoadPolicyForChunk(index).fetchPriority"
+                    @open-details="emit('openDetails', $event)"
+                    @open-reader="(comicId, pageIndex) => emit('openReader', comicId, pageIndex)"
+                    @toggle-favorite="emit('toggleFavorite', $event)"
+                    @toggle-batch-select="emit('toggleBatchSelect', $event)"
+                  />
+                </BookCardContextMenu>
               </div>
             </div>
           </div>

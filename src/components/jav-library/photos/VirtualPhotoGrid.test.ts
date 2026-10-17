@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest"
 import type { PhotoBook } from "@/domain/photo/types"
 import VirtualPhotoGrid from "./VirtualPhotoGrid.vue"
 
+vi.mock("@/components/jav-library/books/BookCardContextMenu.vue", () => ({ default: { template: '<slot />' } }))
+
 vi.mock("@vueuse/core", () => ({
   useResizeObserver: vi.fn(),
   useMediaQuery: vi.fn(() => ({ value: false, __v_isRef: true })),

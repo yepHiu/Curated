@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
+import BookOrganizationConfirmDialog from "@/components/jav-library/books/BookOrganizationConfirmDialog.vue"
 import MediaBatchActionBar from "@/components/jav-library/MediaBatchActionBar.vue"
 import PhotoLibraryPage from "@/components/jav-library/photos/PhotoLibraryPage.vue"
 import { pushAppToast } from "@/composables/use-app-toast"
@@ -16,6 +17,7 @@ import { filterPhotos } from "@/lib/photo-search"
 import { sortPhotos } from "@/lib/photo-sort"
 import { usePhotoLibraryService } from "@/services/photo-library-service"
 
+const bookAI = ref<InstanceType<typeof BookOrganizationConfirmDialog>>()
 const route = useRoute()
 const router = useRouter()
 const photoService = usePhotoLibraryService()
@@ -182,6 +184,8 @@ function runBatchDeletePhotos() {
     >
       <PhotoLibraryPage
         :photos="visiblePhotos"
+        :can-organize="bookAI?.canSubmit"
+        @organize="bookAI?.openFor([$event])"
         :active-sort="activeSort"
         :search-query="searchQuery"
         :tag="browse.tag"
@@ -203,6 +207,19 @@ function runBatchDeletePhotos() {
         @toggle-batch-select="toggleBatchSelect"
       />
     </div>
-    <MediaBatchActionBar kind="photos" v-if="batchMode" :selected-count="batchSelectedCount" :operation-busy="batchOperationBusy" @clear-selection="clearBatchSelection" @add-favorite="runBatchAddFavorite" @remove-favorite="runBatchRemoveFavorite" @add-tag="runBatchAddTag" @delete-selection="runBatchDeletePhotos" />
+    <MediaBatchActionBar
+      v-if="batchMode"
+      kind="photos"
+      :can-organize="bookAI?.canSubmit"
+      :selected-count="batchSelectedCount"
+      :operation-busy="batchOperationBusy"
+      @organize="bookAI?.openFor(visiblePhotos.filter(book => batchSelectedIds.has(book.id)))"
+      @clear-selection="clearBatchSelection"
+      @add-favorite="runBatchAddFavorite"
+      @remove-favorite="runBatchRemoveFavorite"
+      @add-tag="runBatchAddTag"
+      @delete-selection="runBatchDeletePhotos"
+    />
+    <BookOrganizationConfirmDialog ref="bookAI" kind="photo" />
   </div>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BookCardContextMenu from "@/components/jav-library/books/BookCardContextMenu.vue"
 import { computed, nextTick, ref } from "vue"
 import { useMediaQuery, useResizeObserver } from "@vueuse/core"
 import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller"
@@ -25,11 +26,13 @@ import { buildMovieGridChunkStyle } from "@/lib/movie-grid-template"
 
 const props = defineProps<{
   photos: readonly PhotoBook[]
+  canOrganize?: boolean
   batchMode?: boolean
   batchSelectedIds?: readonly string[]
 }>()
 
 const emit = defineEmits<{
+  organize: [book: PhotoBook]
   openDetails: [photoId: string]
   openViewer: [photoId: string, pageIndex: number]
   toggleBatchSelect: [photoId: string]
@@ -204,16 +207,18 @@ function onScrollerScroll(event: Event) {
                 class="w-full min-w-0"
                 :style="photoCardFrameStyle"
               >
-                <PhotoCard
-                  :photo="photo"
-                  :batch-mode="props.batchMode"
-                  :batch-checked="batchSelectedSet.has(photo.id)"
-                  :poster-loading="posterLoadPolicyForChunk(index).loading"
-                  :poster-fetch-priority="posterLoadPolicyForChunk(index).fetchPriority"
-                  @open-details="emit('openDetails', $event)"
-                  @open-viewer="(photoId, pageIndex) => emit('openViewer', photoId, pageIndex)"
-                  @toggle-batch-select="emit('toggleBatchSelect', $event)"
-                />
+                <BookCardContextMenu :disabled="props.batchMode" :can-organize="props.canOrganize" @organize="emit('organize', photo)" @open-details="emit('openDetails', photo.id)">
+                  <PhotoCard
+                    :photo="photo"
+                    :batch-mode="props.batchMode"
+                    :batch-checked="batchSelectedSet.has(photo.id)"
+                    :poster-loading="posterLoadPolicyForChunk(index).loading"
+                    :poster-fetch-priority="posterLoadPolicyForChunk(index).fetchPriority"
+                    @open-details="emit('openDetails', $event)"
+                    @open-viewer="(photoId, pageIndex) => emit('openViewer', photoId, pageIndex)"
+                    @toggle-batch-select="emit('toggleBatchSelect', $event)"
+                  />
+                </BookCardContextMenu>
               </div>
             </div>
           </div>

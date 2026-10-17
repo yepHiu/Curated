@@ -6,10 +6,11 @@ import {
   Images,
   Info,
   MoreVertical,
+  Sparkles,
 } from "lucide-vue-next"
 import type { PhotoBook } from "@/domain/photo/types"
 import DetailTagAddControl from "../DetailTagAddControl.vue"
-import BookMetadataAction from "@/components/jav-library/books/BookMetadataAction.vue"
+import BookOrganizationConfirmDialog from "@/components/jav-library/books/BookOrganizationConfirmDialog.vue"
 import BookMetadataFacts from "@/components/jav-library/books/BookMetadataFacts.vue"
 import BookDetailFacts from "@/components/jav-library/books/BookDetailFacts.vue"
 import BookMediaInfoDialog from "@/components/jav-library/books/BookMediaInfoDialog.vue"
@@ -38,6 +39,7 @@ const emit = defineEmits<{
   reload: []
 }>()
 
+const bookAI = ref<InstanceType<typeof BookOrganizationConfirmDialog>>()
 const { t } = useI18n()
 const mediaInfoOpen = ref(false)
 watch(() => props.photo.id, () => { mediaInfoOpen.value = false })
@@ -123,7 +125,6 @@ function browseByTag(tag: string) {
             {{ photo.title }}
           </CardTitle>
           <BookMetadataFacts :metadata="photo.metadata" />
-          <BookMetadataAction kind="photo" :books="[photo]" />
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
@@ -185,8 +186,9 @@ function browseByTag(tag: string) {
               <MoreVertical />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" class="min-w-[11rem]">
+          <DropdownMenuContent align="end" class="min-w-[11rem]" @close-auto-focus="bookAI?.isOpen && $event.preventDefault()">
             <DropdownMenuGroup>
+              <DropdownMenuItem v-if="bookAI?.canSubmit" data-book-ai-organize @select="bookAI?.openFor([photo])"><Sparkles aria-hidden="true" />{{ t('topics.action') }}</DropdownMenuItem>
               <DropdownMenuItem data-photo-media-info @click="mediaInfoOpen = true">
                 <Info aria-hidden="true" />
                 {{ t("bookBrowser.mediaInfo") }}
@@ -195,6 +197,7 @@ function browseByTag(tag: string) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <BookOrganizationConfirmDialog ref="bookAI" kind="photo" />
       <BookMediaInfoDialog
         v-model:open="mediaInfoOpen"
         kind="photos"
