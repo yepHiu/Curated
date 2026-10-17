@@ -1,5 +1,13 @@
 # Curated Handbook
 
+## Code Atlas / 代码地形图
+
+直接打开 [代码地形图](reference/code-atlas.html)，可以查看仓库体量、下钻目录、搜索文件与函数、按长度或分支指标排序，以及观察跨模块静态导入。页面内嵌快照数据，可离线打开，不依赖 Server 或 Vite。
+
+更新快照：在仓库根目录运行 `pnpm code:atlas`（需已安装 Node 依赖与 Go）。输出覆盖 `docs/reference/code-atlas.html`，统计当前工作区的 Git 已跟踪和未忽略的新文件，包含未提交修改。仅覆盖本仓库，不合并相邻 Android / 插件项目；依赖、构建产物、运行数据及报告自身排除。
+
+源码行数为物理行（包含空行、注释和 Vue 模板/样式）；函数识别覆盖 JS/TS、Vue script 和 Go，包含匿名回调。分支指标和静态导入仅帮助定位阅读热点，不代表完整运行时调用图或质量评分。完整口径与解析诊断在页面底部。分析器检查：`node --test scripts/analysis/code-atlas.test.mjs`。设计与验证记录见 [代码地形图记录](plan/2026-10-17-code-atlas.md)。
+
 ## AI subtitle recognition and translation
 
 源码已集成字幕生成与播放，需重新构建并重启 Server；原生字幕控制还需更新 Desktop。当前未发布安装包。
