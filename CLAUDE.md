@@ -840,6 +840,7 @@ On Server startup, interrupted running subtitle records are requeued before the 
 
 ### Book metadata AI (2026-10-17)
 
+- `GET/PATCH /api/ai/settings`: `writePerMinute` accepts 1–1,000,000, default 10,000 globally; existing explicit values persist. The settings UI and gateway fallback use the same default.
 - `POST /api/ai/book-organizations`: local-only task submission, `{kind: comic|photo, bookIds: [1–600 IDs], locale, requestId}`. Existing organization worker generates durable proposals without writing library metadata.
 - `GET /api/ai/book-organizations/{jobId}/items?limit=25&offset=0`: persisted original values, metadata, evidence, status and revision; never invokes a model.
 - `POST /api/ai/book-organizations/{jobId}/{cancel|retry}`: local-only lifecycle controls; retry skips applied/discarded/ready items.
