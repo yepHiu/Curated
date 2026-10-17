@@ -417,3 +417,13 @@ backend/ 目录：
 启动核对进一步修正：启动worker前将持久running记录恢复为queued，保留ID、attemptId、阶段/计数、时间和检查点，worker真正领取后才标记running，避免重启后显示多个实际未执行的running任务。新增幂等恢复与进度保留测试；字幕整包测试、go vet及开发构建通过。实现提交f61f396d。
 
 开发后端最终运行标准backend/runtime/curated-dev.exe，PID31908，8080健康检查通过。实际任务中心total=11/running=1/queued=1/attention=0/history=9，attention筛选为空；旧JUR-067与STAR-684失败记录分别关联81eb047719854a118fdd0eb2b1ca529d、7d4aacf47305fe88509782d0ded3f50c。JUR-067从739/1165条译文继续翻译，STAR-684排队并保留4/14段识别检查点；没有声称整片已完成。
+
+### JUR-067 长时间翻译与容量恢复修正（2026-10-17）
+
+只读排查任务81eb047719854a118fdd0eb2b1ca529d：14段识别已完成，共1165条；17:45:29保存739条译文，此后426条未完成。17:45:29和18:01:47开始的qwen-plus调用分别耗时721918ms、721704ms，均记录9063输入token、32768输出token，状态failed/invalid_response；紧接着开始下一次调用，符合输出length截断后二分回退路径。原始响应未保存，不能判断是否存在重复生成。中间亦有cancelled调用。18:32:23读取仍为running/translating，739/1165，阶段更新时间18:20:28；PID31908自18:01:47持续运行，不能把18:20的取消归因于后端重启。
+
+发现容量回退仅存在调用栈内，中断恢复会丢失已知拆分限制，可能再次提交已失败的大批次。检查点增加可选translationBatchLimit，仅在供应商明确截断或上下文超限后设置，在下一次调用之前落盘；恢复、遗漏补译和后续兄弟组均遵守该上限，继续按文本容量分组。未遇容量错误仍尽可能整批翻译；不是固定30条。旧检查点缺少该字段时行为兼容，整次重试使用新attempt检查点，不继承旧限制。字幕AI用量新增明确output_truncated错误分类，保留实测token数，历史记录不回写。
+
+实现提交d03a402a。go test ./internal/subtitles、go vet ./internal/subtitles、go test ./internal/app -run 'Subtitle|AIObservations' -count=1与go vet ./internal/app通过。新增回归模拟8→4→2条容量回退，首次成功前取消，读取检查点后直接按2条恢复并逐条验证无遗漏/重复；应用层确认length原因和32768输出token保留。以HEAD后端快照加本次4个源码文件，通过同一scripts/dev/build-backend.ps1构建至忽略目录.workspace/subtitle-capacity-build/bin/curated-dev.exe，未混入其它会话正在修改的整理功能。
+
+本轮未重启当前后端、未手动重试付费任务，构建产物尚未激活。此修复防止后续重复走已知失败容量，但不能保证供应商一次返回成功或缩短既有请求；当前内存中任务仍运行旧逻辑。
