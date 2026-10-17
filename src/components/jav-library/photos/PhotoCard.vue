@@ -51,8 +51,12 @@ const progressPercent = computed(() => {
 const ratingLabel = computed(() =>
   props.photo.rating == null ? t("photos.noRating") : String(props.photo.rating),
 )
-const visibleTags = computed(() => props.photo.tags.slice(0, 3))
-const hiddenTagCount = computed(() => Math.max(0, props.photo.tags.length - visibleTags.value.length))
+const cardTags = computed(() => [...new Set([
+  ...(props.photo.metadata?.models?.map(model => model.name) ?? []),
+  ...props.photo.tags,
+])])
+const visibleTags = computed(() => cardTags.value.slice(0, 3))
+const hiddenTagCount = computed(() => Math.max(0, cardTags.value.length - visibleTags.value.length))
 
 /** 单击封面或正文打开写真详情。 */
 function openDetails() {
@@ -147,6 +151,7 @@ function openDetails() {
           <Badge
             v-for="tag in visibleTags"
             :key="tag"
+            :title="tag"
             variant="secondary"
             class="max-w-[4.75rem] truncate rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight"
           >

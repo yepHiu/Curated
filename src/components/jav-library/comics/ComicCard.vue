@@ -54,8 +54,12 @@ const progressPercent = computed(() => {
 const ratingLabel = computed(() =>
   props.comic.rating == null ? t("comics.noRating") : String(props.comic.rating),
 )
-const visibleTags = computed(() => props.comic.tags.slice(0, 3))
-const hiddenTagCount = computed(() => Math.max(0, props.comic.tags.length - visibleTags.value.length))
+const cardTags = computed(() => [...new Set([
+  ...(props.comic.metadata?.authors?.map(author => author.name) ?? []),
+  ...props.comic.tags,
+])])
+const visibleTags = computed(() => cardTags.value.slice(0, 3))
+const hiddenTagCount = computed(() => Math.max(0, cardTags.value.length - visibleTags.value.length))
 
 /** 批量模式下改勾选当前卡片，否则打开详情。 */
 function handleOpenDetails() {
@@ -167,6 +171,7 @@ function onBatchCheckboxChange() {
           <Badge
             v-for="tag in visibleTags"
             :key="tag"
+            :title="tag"
             variant="secondary"
             class="max-w-[4.75rem] truncate rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight"
           >
