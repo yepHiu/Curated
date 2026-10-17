@@ -129,7 +129,7 @@ async function review(decision: "apply" | "discard") {
       <Button variant="outline" size="sm" @click="stopQuotaWait">{{ t('bookAI.stopWaiting') }}</Button>
     </div>
     <p v-else-if="busy || loading" class="text-sm text-muted-foreground" role="status">{{ t('tasks.loading') }}</p>
-    <ul class="divide-y divide-border" :aria-busy="loading"><li v-for="item in items" :key="item.bookId" class="flex min-w-0 items-center gap-1 py-0.5">
+    <ul class="divide-y divide-border" :aria-busy="loading"><li v-for="item in items" :key="item.bookId" class="flex min-w-0 items-start gap-1 py-0.5">
       <label class="flex size-11 shrink-0 cursor-pointer items-center justify-center">
         <Checkbox :model-value="selected[item.bookId] === item.revision" :disabled="item.status !== 'ready' || busy || loading || !canWrite" :aria-label="t('bookAI.select', { title: item.title })" @update:model-value="select(item, $event)" />
       </label>

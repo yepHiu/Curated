@@ -1,4 +1,4 @@
-import { DOMWrapper, flushPromises, mount } from "@vue/test-utils"
+import { flushPromises, mount } from "@vue/test-utils"
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import { HttpClientError } from "@/api/http-client"
 import { i18n } from "@/i18n"
@@ -12,7 +12,7 @@ vi.mock("@/services/photo-library-service", () => ({ usePhotoLibraryService: () 
 const job: BookOrganizationJob = { id: "book-job", kind: "comic", locale: "zh-CN", status: "needs_confirmation", stage: "reviewing", total: 2, processed: 2, pendingReview: 2, applied: 0, failed: 0, createdAt: "", updatedAt: "" }
 const rows: BookOrganizationItem[] = ["a", "b"].map(bookId => ({ bookId, title: `original ${bookId}`, status: "ready", revision: 2, before: { title: `original ${bookId}`, originalTitle: "原文", sourceFileName: "source.zip" }, metadata: { cleanTitle: "原文", translatedTitle: "译文" }, reason: "" }))
 beforeEach(() => { vi.clearAllMocks(); i18n.global.locale.value = "zh-CN"; api.items.mockImplementation(async () => structuredClone(rows)); api.review.mockResolvedValue(undefined) })
-function setup() { return mount(BookOrganizationResults, { attachTo: document.body, props: { job: { ...job }, canWrite: true }, global: { plugins: [i18n] } }) }
+function setup() { return mount(BookOrganizationResults, { props: { job: { ...job }, canWrite: true }, global: { plugins: [i18n] } }) }
 
 it("only applies explicitly selected persisted revisions and refreshes the library", async () => {
   const wrapper = setup(); await flushPromises()
@@ -58,7 +58,7 @@ it.each([
   const wrapper = setup(); await flushPromises()
   expect(wrapper.text()).not.toContain(message)
   await wrapper.get("[data-processing-item]").trigger("click"); await flushPromises()
-  await vi.waitFor(() => expect(document.body.textContent).toContain(message))
+  await vi.waitFor(() => expect(wrapper.text()).toContain(message))
   if (reason !== "BOOK_METADATA_PROVIDER_FAILED") expect(wrapper.text()).not.toContain("检查 AI")
   wrapper.unmount()
 })
@@ -123,8 +123,12 @@ it.each(['comic', 'photo'] as const)("paginates compact %s items without mixing 
   expect(wrapper.findAll('[data-processing-item]')).toHaveLength(25)
   expect(wrapper.text()).not.toContain('译文')
   await wrapper.findAll('[data-processing-item]')[0]!.trigger('click'); await flushPromises()
-  await vi.waitFor(() => expect(new DOMWrapper(document.body).get('[data-processing-item-detail]').text()).toContain('译文'))
-  await new DOMWrapper(document.body).get('[data-slot="dialog-close"]').trigger('click'); await flushPromises()
+  await vi.waitFor(() => expect(wrapper.get('[data-processing-item-detail]').text()).toContain('译文'))
+  expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  expect(wrapper.findAll('[data-processing-item]')[0]!.attributes('aria-expanded')).toBe('true')
+  await wrapper.findAll('[data-processing-item]')[0]!.trigger('click'); await flushPromises()
+  expect(wrapper.findAll('[data-processing-item]')[0]!.attributes('aria-expanded')).toBe('false')
+  expect(wrapper.text()).not.toContain('译文')
   await wrapper.findAll('[role="checkbox"]')[0]!.trigger('click')
   const next = () => wrapper.get('[data-items-pagination]').findAll('button')[1]!
   api.items.mockRejectedValueOnce(new Error('offline'))
