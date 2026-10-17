@@ -105,6 +105,10 @@ func active(state string) bool { return state == "queued" || state == "running" 
 func (s *Service) Create(ctx context.Context, movieID string, req contracts.SubtitleRequest) (contracts.SubtitleJob, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.createLocked(ctx, movieID, req)
+}
+
+func (s *Service) createLocked(ctx context.Context, movieID string, req contracts.SubtitleRequest) (contracts.SubtitleJob, error) {
 	if len(req.RequestID) < 8 || len(req.RequestID) > 128 || req.AudioTrack < 0 || req.AudioTrack > 31 {
 		return contracts.SubtitleJob{}, fmt.Errorf("invalid subtitle request")
 	}
@@ -187,6 +191,18 @@ func (s *Service) Action(ctx context.Context, id, action string) (contracts.Subt
 		return r.Job, e
 	}
 	switch action {
+	case "restart":
+		if r.Job.State != "failed" && r.Job.State != "blocked" && r.Job.State != "cancelled" {
+			return r.Job, fmt.Errorf("only failed, blocked or cancelled subtitle tasks can restart")
+		}
+		if _, ok := s.active[id]; ok {
+			return r.Job, fmt.Errorf("task is still stopping; retry shortly")
+		}
+		// A new job gets current provider/model/prompt configuration and no old
+		// checkpoint. Keep the original job, partial results and assets intact.
+		return s.createLocked(ctx, r.Job.MovieID, contracts.SubtitleRequest{
+			RequestID: "restart-" + newID(), FileID: r.Job.FileID, AudioTrack: r.AudioTrack,
+		})
 	case "cancel":
 		if !active(r.Job.State) {
 			return r.Job, nil

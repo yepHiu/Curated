@@ -2633,6 +2633,7 @@
     "back": "Back to tasks",
     "cancel": "Cancel task",
     "retry": "Retry unfinished work",
+    "restart": "Restart entire task",
     "undo": "Undo organization",
     "close": "Back",
     "confirmAction": "Confirm",
@@ -2731,6 +2732,7 @@
     "confirm": {
       "cancel": "Stop subsequent work. Applied tags and saved subtitles are retained. Cancellation does not undo results.",
       "retry": "Retry unfinished work using the original checkpoints and retain successful results. Invalid sources, settings or checkpoints may require a new task.",
+      "restart": "Create a new task for the same file, recognizing audio and translating all subtitles from scratch using the current subtitle models and prompt. Keep the original audio track selection, task history and outputs. Existing checkpoints are not reused; recognition and translation incur new charges.",
       "undo": "Restore user tags changed by this task. Later edits and conflicts are skipped and reported."
     }
   }

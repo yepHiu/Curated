@@ -30,16 +30,19 @@ import type { SubtitleAsset } from "@/services/contracts/subtitle-service"
 import type { TagOrganizationItem } from "@/services/contracts/topic-service"
 
 const props = defineProps<{ taskKey: string }>()
+const emit = defineEmits<{ restarted: [taskKey: string] }>()
 const { t, te } = useI18n(), service = useTaskCenterService(), center = useTaskCenter()
 const { writeEnabled } = useExperimentalAgent()
 const task = ref<CenterTask>(), loading = ref(true), unavailable = ref(false), disconnected = ref(false)
 const error = ref(""), busy = ref(false), feedback = ref("")
-const confirm = ref<"cancel" | "retry" | "undo" | "">("")
+const confirm = ref<"cancel" | "retry" | "restart" | "undo" | "">("")
 const preview = ref(""), previewName = ref(""), previewOpen = ref(false)
 const items = ref<TagOrganizationItem[]>([]), itemsLoading = ref(false), itemsError = ref(false), itemsMore = ref(false)
 const issuesOnly = ref(false)
 const visibleItems = computed(() => issuesOnly.value ? items.value.filter(item => ["failed", "conflict"].includes(item.status)) : items.value)
-const key = computed(() => props.taskKey)
+const restartedKey = ref("")
+const key = computed(() => restartedKey.value || props.taskKey)
+watch(() => props.taskKey, () => { restartedKey.value = "" })
 const canWrite = computed(() => task.value?.canManage && !disconnected.value && (task.value.kind === "subtitle" || writeEnabled.value))
 const canRetry = computed(() => {
   const current = task.value
@@ -47,6 +50,7 @@ const canRetry = computed(() => {
   if (current.subtitle?.expiresAt && Date.parse(current.subtitle.expiresAt) <= Date.now()) return false
   return true
 })
+const canRestart = computed(() => task.value?.kind === "subtitle" && ["failed", "blocked", "cancelled"].includes(task.value.state))
 const steps = computed(() => {
   const current = task.value
   if (!current) return []
@@ -113,7 +117,14 @@ async function perform() {
     const result = await service.action(current, operation)
     if (!alive || seq !== generation) return
     confirm.value = ""
-    if (result) feedback.value = t("topics.undoResult", result)
+    if (result && "taskKey" in result) {
+      restartedKey.value = result.taskKey
+      emit("restarted", result.taskKey)
+      await useSubtitleJobs().refresh()
+      await center.refresh()
+      return
+    }
+    if (result && "restored" in result) feedback.value = t("topics.undoResult", result)
     await load(true)
     if (!alive || seq !== generation) return
     if (current.organization) {
@@ -146,7 +157,7 @@ async function assetAction(asset: SubtitleAsset, action: "preview" | "download" 
       <MediaEmptyState v-else-if="unavailable" :title="t('tasks.unavailable')" :description="t('tasks.unavailableDescription')" />
       <Alert v-if="disconnected"><AlertDescription class="flex flex-wrap items-center justify-between gap-3"><span>{{ task ? t('tasks.stale', { time: taskDate(task.updatedAt) }) : t('tasks.loadFailed') }}</span><Button variant="outline" size="sm" @click="load()">{{ t('tasks.reload') }}</Button></AlertDescription></Alert>
       <template v-if="task">
-        <div class="flex flex-wrap items-center justify-between gap-4"><div class="flex min-w-0 items-center gap-3"><span class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary"><Captions v-if="task.kind === 'subtitle'" class="size-6" /><Sparkles v-else class="size-6" /></span><div class="min-w-0"><h2 class="text-xl font-semibold tracking-tight sm:text-2xl">{{ taskTitle(task) }}</h2><p class="mt-1 break-words text-xs text-muted-foreground">{{ taskSubject(task) }}</p></div></div><div class="flex flex-wrap gap-2"><Button v-if="taskActive(task)" variant="outline" class="rounded-full" :disabled="!canWrite || busy" @click="confirm = 'cancel'">{{ t('tasks.cancel') }}</Button><Button v-if="canRetry" class="rounded-full" :disabled="!canWrite || busy" @click="confirm = 'retry'">{{ t('tasks.retry') }}</Button><Button v-if="task.organization && !taskActive(task) && task.organization.succeeded > 0" variant="outline" class="rounded-full" :disabled="!canWrite || busy" @click="confirm = 'undo'">{{ t('tasks.undo') }}</Button></div></div>
+        <div class="flex flex-wrap items-center justify-between gap-4"><div class="flex min-w-0 items-center gap-3"><span class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary"><Captions v-if="task.kind === 'subtitle'" class="size-6" /><Sparkles v-else class="size-6" /></span><div class="min-w-0"><h2 class="text-xl font-semibold tracking-tight sm:text-2xl">{{ taskTitle(task) }}</h2><p class="mt-1 break-words text-xs text-muted-foreground">{{ taskSubject(task) }}</p></div></div><div class="flex flex-wrap gap-2"><Button v-if="taskActive(task)" variant="outline" class="rounded-full" :disabled="!canWrite || busy" @click="confirm = 'cancel'">{{ t('tasks.cancel') }}</Button><Button v-if="canRetry" class="rounded-full" :disabled="!canWrite || busy" @click="confirm = 'retry'">{{ t('tasks.retry') }}</Button><Button v-if="canRestart" variant="outline" class="rounded-full" :disabled="!canWrite || busy" @click="confirm = 'restart'">{{ t('tasks.restart') }}</Button><Button v-if="task.organization && !taskActive(task) && task.organization.succeeded > 0" variant="outline" class="rounded-full" :disabled="!canWrite || busy" @click="confirm = 'undo'">{{ t('tasks.undo') }}</Button></div></div>
         <Alert v-if="!task.canManage || task.kind === 'organize' && !writeEnabled"><AlertDescription>{{ t(!task.canManage ? 'tasks.readOnly' : 'tasks.aiReadOnly') }}</AlertDescription></Alert>
         <Alert v-if="error" variant="destructive"><AlertDescription>{{ error }}</AlertDescription></Alert>
         <Alert v-if="feedback"><AlertDescription>{{ feedback }}</AlertDescription></Alert>

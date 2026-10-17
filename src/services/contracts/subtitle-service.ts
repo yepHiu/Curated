@@ -26,7 +26,7 @@ export interface SubtitleService {
   saveSettings(patch: { recognitionModel?: RecognitionModel; enabled?: boolean; apiKey?: string; translationModel?: SubtitleModel }): Promise<SubtitleSettings>
   jobs(movieId?: string): Promise<SubtitleJob[]>
   create(movieId: string, request: { requestId: string; fileId?: string; translationModel: SubtitleModel; audioTrack: number }): Promise<SubtitleJob>
-  action(id: string, action: "cancel" | "retry"): Promise<SubtitleJob>
+  action(id: string, action: "cancel" | "retry" | "restart"): Promise<SubtitleJob>
   assets(movieId: string, fileId?: string): Promise<SubtitleAsset[]>
   content(id: string): Promise<string>
   reveal(id: string): Promise<void>

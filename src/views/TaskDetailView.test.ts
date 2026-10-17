@@ -4,6 +4,7 @@ import { createMemoryHistory, createRouter } from "vue-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { i18n } from "@/i18n"
 import TaskDetailView from "./TaskDetailView.vue"
+import TaskDetailContent from "@/components/jav-library/TaskDetailContent.vue"
 import { projectSubtitle } from "@/lib/task-center"
 const api = vi.hoisted(() => ({ get: vi.fn(), action: vi.fn(), refresh: vi.fn(), reloadMoviesFromApi: vi.fn() }))
 const revision = ref(0)
@@ -25,6 +26,60 @@ async function setup() {
 }
 beforeEach(() => { vi.clearAllMocks(); i18n.global.locale.value = "zh-CN"; api.get.mockResolvedValue(structuredClone(job)) })
 describe("task detail behavior", () => {
+  it("switches shared dialog content to the restarted task without changing its parent key", async () => {
+    api.get.mockResolvedValue({ ...job, state: "failed" })
+    const wrapper = mount(TaskDetailContent, { props: { taskKey: "subtitle:a" }, global: { plugins: [i18n], stubs: { RouterLink: true } } })
+    await flushPromises()
+    await wrapper.findAll("button").find(b => b.text() === "重新执行整个任务")!.trigger("click")
+    api.action.mockResolvedValueOnce({ taskKey: "subtitle:new" })
+    api.get.mockResolvedValue({ ...job, id: "new", key: "subtitle:new", state: "queued", stage: "preparing", completed: 0 })
+    await wrapper.get('[role="dialog"]').findAll("button").find(b => b.text() === "确认")!.trigger("click")
+    await flushPromises()
+    expect(wrapper.props("taskKey")).toBe("subtitle:a")
+    expect(wrapper.emitted("restarted")).toEqual([["subtitle:new"]])
+    expect(api.get).toHaveBeenLastCalledWith("subtitle:new")
+    expect(wrapper.findAll("button").some(b => b.text() === "重新执行整个任务")).toBe(false)
+    wrapper.unmount()
+  })
+  it("offers both retry modes and confirms a full restart before opening the new task", async () => {
+    api.get.mockResolvedValue({ ...job, state: "failed" })
+    const { wrapper, router } = await setup()
+    expect(wrapper.findAll("button").some(b => b.text() === "重试未完成部分")).toBe(true)
+    const restart = wrapper.findAll("button").find(b => b.text() === "重新执行整个任务")!
+    await restart.trigger("click")
+    expect(api.action).not.toHaveBeenCalled()
+    expect(wrapper.get('[role="dialog"]').text()).toContain("不复用旧检查点")
+    expect(wrapper.get('[role="dialog"]').text()).toContain("费用")
+    api.action.mockResolvedValueOnce({ taskKey: "subtitle:new" })
+    api.get.mockResolvedValue({ ...job, id: "new", key: "subtitle:new", state: "queued", stage: "preparing", completed: 0 })
+    await wrapper.get('[role="dialog"]').findAll("button").find(b => b.text() === "确认")!.trigger("click")
+    await flushPromises()
+    expect(api.action).toHaveBeenCalledWith(expect.objectContaining({ key: "subtitle:a" }), "restart")
+    expect(api.get).toHaveBeenCalledWith("subtitle:new")
+    expect(router.currentRoute.value.params.taskKey).toBe("subtitle:new")
+    wrapper.unmount()
+  })
+  it("allows a full restart after checkpoint expiry but disables it for remote connections", async () => {
+    api.get.mockResolvedValue({ ...job, state: "failed", subtitle: { ...job.subtitle!, expiresAt: "2020-01-01T00:00:00Z" } })
+    const { wrapper } = await setup()
+    expect(wrapper.findAll("button").some(b => b.text() === "重试未完成部分")).toBe(false)
+    expect(wrapper.findAll("button").find(b => b.text() === "重新执行整个任务")!.attributes("disabled")).toBeUndefined()
+    api.get.mockResolvedValue({ ...job, state: "failed", canManage: false })
+    revision.value++; await flushPromises()
+    expect(wrapper.findAll("button").find(b => b.text() === "重新执行整个任务")!.attributes("disabled")).toBeDefined()
+    wrapper.unmount()
+  })
+  it("keeps the failed task and reports a full-restart error without switching task", async () => {
+    api.get.mockResolvedValue({ ...job, state: "failed" })
+    const { wrapper, router } = await setup()
+    await wrapper.findAll("button").find(b => b.text() === "重新执行整个任务")!.trigger("click")
+    api.action.mockRejectedValueOnce(new Error("subtitle queue is full"))
+    await wrapper.get('[role="dialog"]').findAll("button").find(b => b.text() === "确认")!.trigger("click")
+    await flushPromises()
+    expect(wrapper.get('[role="dialog"]').text()).toContain("subtitle queue is full")
+    expect(router.currentRoute.value.params.taskKey).toBe("subtitle:a")
+    wrapper.unmount()
+  })
   it("shows persisted provider diagnostics as text on failed subtitle tasks", async () => {
     const providerError = 'HTTP 400: {"code":"DataInspectionFailed","message":"<script>alert(1)</script>","request_id":"req-123"}'
     api.get.mockResolvedValue({ ...job, state: "failed", subtitle: { ...job.subtitle!, providerError } })

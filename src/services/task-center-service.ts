@@ -8,8 +8,10 @@ const action: TaskCenterService["action"] = async (task, operation) => {
   if (!task.canManage) throw new Error("TASK_READ_ONLY")
   if (task.kind === "subtitle") {
     if (operation === "undo") throw new Error("TASK_ACTION_UNAVAILABLE")
-    await useSubtitleService().action(task.id, operation)
+    const next = await useSubtitleService().action(task.id, operation)
+    if (operation === "restart") return { taskKey: `subtitle:${next.id}` }
   } else {
+    if (operation === "restart") throw new Error("TASK_ACTION_UNAVAILABLE")
     const service = useAIService()
     if (operation === "undo") return service.undoTagOrganization(task.id)
     if (operation === "cancel") await service.cancelTagOrganization(task.id)
