@@ -838,6 +838,7 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 		Offset:     offset,
 	}
 
+	queryStarted := time.Now()
 	result, err := h.store.ListMovies(r.Context(), request)
 	if err != nil {
 		if h.logger != nil {
@@ -846,7 +847,10 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list movies")
 		return
 	}
+	queryDuration := time.Since(queryStarted)
+	assetsStarted := time.Now()
 	h.enrichMovieListItemsLocalPosters(r.Context(), result.Items)
+	w.Header().Set("Server-Timing", fmt.Sprintf("sql;dur=%.2f, assets;dur=%.2f", float64(queryDuration.Microseconds())/1000, float64(time.Since(assetsStarted).Microseconds())/1000))
 	writeJSON(w, http.StatusOK, result)
 }
 
