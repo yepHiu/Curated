@@ -1038,7 +1038,7 @@ Mock 立即提供明确标记的模拟任务和提案，结果保存在当前浏
 
 ## Android 播放启动协商（2026-11-23）
 
-当前源码提供 `native-playback-v1`（`GET /api/server/info` 的 capabilities）。手机先用既有 `POST /api/library/movies/{movieId}/playback-session` 的 `mode: "plan"` 获取准确片源格式，再用 `mode: "auto"` 与版本化的 `nativePlayback` 选择播放方式；旧 GET/POST 行为保留。plan 不启动 FFmpeg 转码，返回的 token 绑定选中文件、size/mtime 和探测信息，auto 校验后再次检查文件访问权限并保留强制推流、时间戳保护和续播。
+当前源码提供 `native-playback-v1`（`GET /api/server-info` 的 capabilities）。手机先用既有 `POST /api/library/movies/{movieId}/playback-session` 的 `mode: "plan"` 获取准确片源格式，再用 `mode: "auto"` 与版本化的 `nativePlayback` 选择播放方式；旧 GET/POST 行为保留。plan 不启动 FFmpeg 转码，返回的 token 绑定选中文件、size/mtime 和探测信息，auto 校验后再次检查文件访问权限并保留强制推流、时间戳保护和续播。
 
 Android 首轮对单视频/单音频、8-bit H.264 或 HEVC Main、AAC-LC/MP3 的 MP4/MKV 做实际 MediaCodec 格式检查（含 profile/level、尺寸、帧率、码率和声道/采样率）。支持则请求 direct；明确不支持则请求转码；未知格式、10-bit/HDR 或多轨保留旧决策，发生明确解码错误时最多一次转码恢复。旧 Server 不声明能力时走旧 GET；鉴权/网络失败不伪装成旧版本。客户端固定原 Server/fileId 写回进度并在退出时有界关闭 session；HLS 本地位置与原文件时间分别换算。
 

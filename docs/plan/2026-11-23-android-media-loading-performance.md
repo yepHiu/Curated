@@ -484,7 +484,7 @@ P0 的 Android/Server 计时可以分别提交；P1 是独立可靠性修复；P
 
 ### 方案收敛与剩余边界
 
-本轮以“先返回准确片源，再由手机判断”的两阶段协议替代发送一大份设备能力范围。原因是 codec MIME 或矩形最大分辨率不足以证明该具体 profile/尺寸组合可解码；采用设备 `isFormatSupported` 可直接检查当前片源。新路径首次包含 server/info、plan、auto 三个 JSON 请求；旧 Server 能力查询后继续原 GET。尚未缓存服务器能力握手，必须将新增请求成本计入真实首帧总耗时。
+本轮以“先返回准确片源，再由手机判断”的两阶段协议替代发送一大份设备能力范围。原因是 codec MIME 或矩形最大分辨率不足以证明该具体 profile/尺寸组合可解码；采用设备 `isFormatSupported` 可直接检查当前片源。新路径首次包含 server-info、plan、auto 三个 JSON 请求；旧 Server 能力查询后继续原 GET。尚未缓存服务器能力握手，必须将新增请求成本计入真实首帧总耗时。
 
 详细 native 探测复用已有 size/mtime 内存缓存；不复用缺少新字段的 SQLite 旧探测行，未新增迁移或伪造持久化命中。重启后的第一次 native plan 仍可能重新运行 ffprobe，这是后续持久缓存扩充的明确余项。
 
@@ -497,3 +497,12 @@ P0 的 Android/Server 计时可以分别提交；P1 是独立可靠性修复；P
 - Android 最终 data 56 项、phone 135 项测试通过，Libre Debug APK 已构建；定向 ktfmt 格式检查通过（临时 init 将现有 formatter 限定到本次 Kotlin 文件）。最终 Lint 通过。
 - `pnpm backend:build:dev` 已生成 backend/runtime/curated-dev.exe。已只读核对手机连接与安装版本，未安装/替换手机应用，未替换运行中的 release Server，未推送或发布。
 - 已向用户请求具体慢片编号及等待时间。真实首帧 P50/P95 和持续稳定性仍待使用新两端构建进行前台对照，不提供未经实测的提速百分比。
+
+
+### 2026-11-23 测试环境安装与重启
+
+按用户明确要求，已重启测试 Server（8080），保留原 runtime/curated.db；health 正常，实际 GET /api/server-info 返回 native-playback-v1。正式 Server 8081 进程保持原状态。
+
+部署前发现 Android 能力查询误用 /api/server/info（404 会导致走旧协议），已改为实际路由 /api/server-info，并补充请求路径断言。NativePlaybackRepositoryTest 与 Libre Debug APK 重建通过。通过 ADB install -r 将最新 arm64-v8a APK 覆盖安装到已连接手机 dev.curated.app.debug，保留应用数据，随后 force-stop/冷启动 MainActivity；安装 Success，启动 Status ok，运行进程确认存在。版本仍为 1.0.2 / versionCode 32，因此以本次 APK 构建和 lastUpdateTime 识别更新，不能仅凭版本名判断。
+
+本次已完成测试后端重启及手机 APK 安装启动；尚未测量具体影片首帧或验证长时间播放。没有推送 Git 远程，也没有发布正式包。
