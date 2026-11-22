@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/scraper"
@@ -61,7 +62,7 @@ func TestBatchMoviePosterLocalReady_UnderCacheDir(t *testing.T) {
 		t.Fatalf("update local path: %v", err)
 	}
 
-	flags, err := store.BatchMoviePosterLocalReady(ctx, []string{outcome.MovieID}, cacheDir)
+	flags, err := store.batchMoviePosterLocalReady(ctx, []string{outcome.MovieID}, cacheDir, assertAssetProbeReleasesDatabase(t, store))
 	if err != nil {
 		t.Fatalf("batch: %v", err)
 	}
@@ -256,7 +257,7 @@ func TestOpenActorAvatarFile(t *testing.T) {
 	if err := store.UpdateActorAvatarCache(ctx, "Alice", avatarPath, 200, ""); err != nil {
 		t.Fatalf("update actor avatar cache: %v", err)
 	}
-	ready, err := store.BatchActorAvatarLocalReady(ctx, []string{"Alice"}, cacheDir)
+	ready, err := store.batchActorAvatarLocalReady(ctx, []string{"Alice"}, cacheDir, assertAssetProbeReleasesDatabase(t, store))
 	if err != nil {
 		t.Fatalf("batch actor avatar: %v", err)
 	}
@@ -271,4 +272,18 @@ func TestOpenActorAvatarFile(t *testing.T) {
 		t.Fatalf("open actor avatar: %v", err)
 	}
 	_ = f.Close()
+}
+
+// Reentrant SQL models an unrelated request while filesystem inspection is in progress.
+func assertAssetProbeReleasesDatabase(t *testing.T, store *SQLiteStore) func(string, posterPathPolicy) (os.FileInfo, bool) {
+	t.Helper()
+	return func(path string, policy posterPathPolicy) (os.FileInfo, bool) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		var n int
+		if err := store.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM movies").Scan(&n); err != nil {
+			t.Fatalf("asset inspection held database connection: %v", err)
+		}
+		return mediaAssetFileInfoAllowedWithPolicy(path, policy)
+	}
 }

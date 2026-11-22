@@ -104,6 +104,10 @@ func (s *SQLiteStore) mediaAssetPathAllowed(ctx context.Context, absPath, cacheD
 
 // BatchMoviePosterLocalReady returns, per movie id, whether cover/thumb rows point to existing allowed files.
 func (s *SQLiteStore) BatchMoviePosterLocalReady(ctx context.Context, movieIDs []string, cacheDir string) (map[string]MoviePosterLocalFlags, error) {
+	return s.batchMoviePosterLocalReady(ctx, movieIDs, cacheDir, mediaAssetFileInfoAllowedWithPolicy)
+}
+
+func (s *SQLiteStore) batchMoviePosterLocalReady(ctx context.Context, movieIDs []string, cacheDir string, inspect func(string, posterPathPolicy) (os.FileInfo, bool)) (map[string]MoviePosterLocalFlags, error) {
 	out := make(map[string]MoviePosterLocalFlags)
 	if len(movieIDs) == 0 {
 		return out, nil
@@ -124,17 +128,34 @@ func (s *SQLiteStore) BatchMoviePosterLocalReady(ctx context.Context, movieIDs [
 			return err
 		}
 
+		type assetRow struct{ movieID, assetType, localPath string }
+		var assets []assetRow
 		for rows.Next() {
-			var movieID, assetType, localPath string
-			if err := rows.Scan(&movieID, &assetType, &localPath); err != nil {
+			var asset assetRow
+			if err := rows.Scan(&asset.movieID, &asset.assetType, &asset.localPath); err != nil {
 				_ = rows.Close()
 				return err
 			}
+			assets = append(assets, asset)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		// File I/O must never hold the store's only database connection.
+		for _, asset := range assets {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			movieID, assetType, localPath := asset.movieID, asset.assetType, asset.localPath
 			absPath, err := absCleanPath(localPath)
 			if err != nil {
 				continue
 			}
-			st, ok := mediaAssetFileInfoAllowedWithPolicy(absPath, policy)
+			st, ok := inspect(absPath, policy)
 			if !ok {
 				continue
 			}
@@ -150,11 +171,7 @@ func (s *SQLiteStore) BatchMoviePosterLocalReady(ctx context.Context, movieIDs [
 			}
 			out[movieID] = flags
 		}
-		if err := rows.Err(); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		return rows.Close()
+		return nil
 	}); err != nil {
 		return nil, err
 	}

@@ -498,6 +498,10 @@ type ActorAvatarLocalStatus struct {
 
 // BatchActorAvatarLocalReady returns which actor names have a cached avatar file on disk within allowed paths.
 func (s *SQLiteStore) BatchActorAvatarLocalReady(ctx context.Context, actorNames []string, cacheDir string) (map[string]ActorAvatarLocalStatus, error) {
+	return s.batchActorAvatarLocalReady(ctx, actorNames, cacheDir, mediaAssetFileInfoAllowedWithPolicy)
+}
+
+func (s *SQLiteStore) batchActorAvatarLocalReady(ctx context.Context, actorNames []string, cacheDir string, inspect func(string, posterPathPolicy) (os.FileInfo, bool)) (map[string]ActorAvatarLocalStatus, error) {
 	out := make(map[string]ActorAvatarLocalStatus, len(actorNames))
 	if len(actorNames) == 0 {
 		return out, nil
@@ -527,17 +531,34 @@ func (s *SQLiteStore) BatchActorAvatarLocalReady(ctx context.Context, actorNames
 			return err
 		}
 
+		type assetRow struct{ name, localPath string }
+		var assets []assetRow
 		for rows.Next() {
-			var name, localPath string
-			if err := rows.Scan(&name, &localPath); err != nil {
+			var asset assetRow
+			if err := rows.Scan(&asset.name, &asset.localPath); err != nil {
 				_ = rows.Close()
 				return err
 			}
+			assets = append(assets, asset)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		// File I/O must never hold the store's only database connection.
+		for _, asset := range assets {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			name, localPath := asset.name, asset.localPath
 			absPath, err := absCleanPath(localPath)
 			if err != nil {
 				continue
 			}
-			st, ok := mediaAssetFileInfoAllowedWithPolicy(absPath, policy)
+			st, ok := inspect(absPath, policy)
 			if !ok {
 				continue
 			}
@@ -546,11 +567,7 @@ func (s *SQLiteStore) BatchActorAvatarLocalReady(ctx context.Context, actorNames
 				Version: localAssetVersionFromStat(st),
 			}
 		}
-		if err := rows.Err(); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		return rows.Close()
+		return nil
 	}); err != nil {
 		return nil, err
 	}
