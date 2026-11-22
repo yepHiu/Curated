@@ -41,6 +41,8 @@
 
 ## 4. 页面与壳层
 
+- Desktop 主页面与连接页的空白处右键提供“重新加载”，沿用 shadcn-vue 菜单样式和键盘交互，刷新当前 URL。输入/可编辑区、交互控件、媒体、选中文字和业务右键菜单优先；Web 和独立原生播放窗口不挂载。自定义交互区域可用 `data-desktop-reload-exclude` 排除。菜单随 Esc、外部点击、滚动和窗口失焦关闭。
+
 macOS 原生播放器共用 Desktop HUD，窗口模式顶部预留系统红黄绿与 36px 拖动区域，标题内容避让；系统全屏取消额外留白。视频使用 Retina backing pixels，控件仍按 CSS pixels 布局，不改 Windows 播放窗口的系统标题栏。此为原生独立窗口的局部规则。
 
 - 常规业务页面继续运行在 `AppShell` 内。

@@ -28,6 +28,8 @@ Desktop 连接页 Debug 复用右下角入口与 Dialog/Tabs，限高内部滚�
 
 ## 分层（MUST）
 
+- Desktop 空白处刷新菜单复用 `DesktopReloadMenu`，仅在主页面/连接页 bridge 存在时挂载。保留交互控件、媒体、选区与业务菜单优先级；自定义区域用 `data-desktop-reload-exclude` 排除。详见 UI 规范 §4。
+
 - **`src/components/ui`**：`shadcn-vue` 基元与通用复合件（Button、Card、Dialog、Input…）。不放影片/库领域逻辑。
 - **`src/components/jav-library`**：Curated 领域 UI（`MovieCard`、`DetailPanel`、`PlayerPage`…）。组合 `ui`，经 **`useLibraryService()`** / **`src/api`** 取数，不绕过服务层。
 - **`src/views`** + **`src/layouts/AppShell.vue`**：路由级页面与壳层；以组合 `jav-library` / `ui` 为主，避免在 view 里堆叠一次性大块业务逻辑。
