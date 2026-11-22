@@ -1034,3 +1034,14 @@ Mock 立即提供明确标记的模拟任务和提案，结果保存在当前浏
 诊断：影片列表响应的 Server-Timing 区分 sql/assets；首页与摘要批量请求分别返回 homepage/cards 处理耗时；派生图响应 X-Curated-Image-Cache 为 hit 或 pending。这些不包含手机解码、渲染和首帧时间。Android 已将协程取消连接到 Call.cancel，媒体流不再沿用 JSON 30 秒整体超时，保留连接/读超时。
 
 源码完成不等于运行实例升级。先构建并验证新 Server，再与新 Android 联调；旧 Web/Electron 和旧 Android 字段保持兼容。本轮不自动覆盖正式包、安装或重启当前服务。前台 release 等价包 P50/P95 仍需实测，见 [详细计划与进度](plan/2026-11-23-android-media-loading-performance.md)。
+
+
+## Android 播放启动协商（2026-11-23）
+
+当前源码提供 `native-playback-v1`（`GET /api/server/info` 的 capabilities）。手机先用既有 `POST /api/library/movies/{movieId}/playback-session` 的 `mode: "plan"` 获取准确片源格式，再用 `mode: "auto"` 与版本化的 `nativePlayback` 选择播放方式；旧 GET/POST 行为保留。plan 不启动 FFmpeg 转码，返回的 token 绑定选中文件、size/mtime 和探测信息，auto 校验后再次检查文件访问权限并保留强制推流、时间戳保护和续播。
+
+Android 首轮对单视频/单音频、8-bit H.264 或 HEVC Main、AAC-LC/MP3 的 MP4/MKV 做实际 MediaCodec 格式检查（含 profile/level、尺寸、帧率、码率和声道/采样率）。支持则请求 direct；明确不支持则请求转码；未知格式、10-bit/HDR 或多轨保留旧决策，发生明确解码错误时最多一次转码恢复。旧 Server 不声明能力时走旧 GET；鉴权/网络失败不伪装成旧版本。客户端固定原 Server/fileId 写回进度并在退出时有界关闭 session；HLS 本地位置与原文件时间分别换算。
+
+诊断：Android Debug 日志记录 descriptor 与点击到 `onRenderedFirstFrame` 的耗时；新 POST 返回 `Server-Timing` 的 file/probe/playback 及 HLS queue/first_segment/prebuffer 阶段。详细 native 探测使用已有 size/mtime 内存缓存，尚未写入旧 SQLite 探测缓存；Server 重启后首次 native plan 可能重新探测。首次播放多出能力/计划请求，净收益需真机对照。没有降低现有软件转码预缓冲，未新增数据库迁移或 library-config 字段。
+
+两端必须使用包含此改动的构建才能启用新协商；源码、测试与合成媒体通过不代表已安装、已发布或首帧达标。操作与待验收项见 `docs/plan/2026-11-23-android-media-loading-performance.md`。

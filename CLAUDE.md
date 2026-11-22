@@ -866,3 +866,14 @@ Existing DELETE /api/library/{comics|photos}/paths/{id} now transactionally deta
 ## Android media loading — 2026-11-23
 
 New source supports optional `GET /api/homepage/recommendations?include=cards` and read-only `POST /api/library/movies/summaries` (1–50 movieIds, 16 KiB request, ordered deduplicated items/missingIds). Card DTOs omit full details. Capabilities: movie-cards-v1, movie-image-variants-v1. Movie list/detail/card DTOs add optional coverVariants/thumbVariants; details add previewVariants keyed by original preview URL. Existing movie cover/thumb/preview GETs accept width=320/640/960, validating source access before serving derived files. Missing variants redirect to the original with no-store. Background cache: 2 workers, 64 jobs, 1 GiB, versioned by source size/mtime and encoding policy; first access may still use originals. No new library-config field or migration; remote preview persistence and foreground device benchmarks remain pending. See guide and the 2026-11-23 media loading plan.
+
+
+## Android 播放启动协商（2026-11-23）
+
+当前源码提供 `native-playback-v1`（`GET /api/server/info` 的 capabilities）。手机先用既有 `POST /api/library/movies/{movieId}/playback-session` 的 `mode: "plan"` 获取准确片源格式，再用 `mode: "auto"` 与版本化的 `nativePlayback` 选择播放方式；旧 GET/POST 行为保留。plan 不启动 FFmpeg 转码，返回的 token 绑定选中文件、size/mtime 和探测信息，auto 校验后再次检查文件访问权限并保留强制推流、时间戳保护和续播。
+
+Android 首轮对单视频/单音频、8-bit H.264 或 HEVC Main、AAC-LC/MP3 的 MP4/MKV 做实际 MediaCodec 格式检查（含 profile/level、尺寸、帧率、码率和声道/采样率）。支持则请求 direct；明确不支持则请求转码；未知格式、10-bit/HDR 或多轨保留旧决策，发生明确解码错误时最多一次转码恢复。旧 Server 不声明能力时走旧 GET；鉴权/网络失败不伪装成旧版本。客户端固定原 Server/fileId 写回进度并在退出时有界关闭 session；HLS 本地位置与原文件时间分别换算。
+
+诊断：Android Debug 日志记录 descriptor 与点击到 `onRenderedFirstFrame` 的耗时；新 POST 返回 `Server-Timing` 的 file/probe/playback 及 HLS queue/first_segment/prebuffer 阶段。详细 native 探测使用已有 size/mtime 内存缓存，尚未写入旧 SQLite 探测缓存；Server 重启后首次 native plan 可能重新探测。首次播放多出能力/计划请求，净收益需真机对照。没有降低现有软件转码预缓冲，未新增数据库迁移或 library-config 字段。
+
+两端必须使用包含此改动的构建才能启用新协商；源码、测试与合成媒体通过不代表已安装、已发布或首帧达标。操作与待验收项见 `docs/plan/2026-11-23-android-media-loading-performance.md`。

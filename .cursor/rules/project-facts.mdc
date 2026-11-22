@@ -612,3 +612,14 @@ Translate回调在AI用量记录结束前调用共用ValidateTranslations。合�
 源码新增 `GET /api/homepage/recommendations?include=cards`（可选 cards，空数组与缺字段有区别）和只读 `POST /api/library/movies/summaries`（movieIds 1–50 个，16 KiB body 上限）。批量查询只取卡片字段，保持顺序、去重、跳过缺失/回收影片。server-info 能力增加 movie-cards-v1、movie-image-variants-v1。列表/详情/卡片可返回 coverVariants/thumbVariants，详情还可返回 previewVariants；已存在的原图 URL 保持不变。
 
 本地图片访问触发 `<cacheDir>/movie-images-v1` 后台派生，宽度档 320/640/960、保持比例/方向/透明度、不放大；2 个 worker、64 个待处理键、1 GiB 可再生缓存。只有已生成文件进入变体字段；首次浏览仍可能原图，派生图失效 GET 临时重定向原图且 no-store。原资产入口支持 width 固定枚举；每次仍验证源文件路径与版本。远端预览代理未新增落盘缓存。无配置字段或迁移；需重建 Server 与 Android 才能联用，未自动部署。详细状态见 docs/plan/2026-11-23-android-media-loading-performance.md。
+
+
+## Android 播放启动协商（2026-11-23）
+
+当前源码提供 `native-playback-v1`（`GET /api/server/info` 的 capabilities）。手机先用既有 `POST /api/library/movies/{movieId}/playback-session` 的 `mode: "plan"` 获取准确片源格式，再用 `mode: "auto"` 与版本化的 `nativePlayback` 选择播放方式；旧 GET/POST 行为保留。plan 不启动 FFmpeg 转码，返回的 token 绑定选中文件、size/mtime 和探测信息，auto 校验后再次检查文件访问权限并保留强制推流、时间戳保护和续播。
+
+Android 首轮对单视频/单音频、8-bit H.264 或 HEVC Main、AAC-LC/MP3 的 MP4/MKV 做实际 MediaCodec 格式检查（含 profile/level、尺寸、帧率、码率和声道/采样率）。支持则请求 direct；明确不支持则请求转码；未知格式、10-bit/HDR 或多轨保留旧决策，发生明确解码错误时最多一次转码恢复。旧 Server 不声明能力时走旧 GET；鉴权/网络失败不伪装成旧版本。客户端固定原 Server/fileId 写回进度并在退出时有界关闭 session；HLS 本地位置与原文件时间分别换算。
+
+诊断：Android Debug 日志记录 descriptor 与点击到 `onRenderedFirstFrame` 的耗时；新 POST 返回 `Server-Timing` 的 file/probe/playback 及 HLS queue/first_segment/prebuffer 阶段。详细 native 探测使用已有 size/mtime 内存缓存，尚未写入旧 SQLite 探测缓存；Server 重启后首次 native plan 可能重新探测。首次播放多出能力/计划请求，净收益需真机对照。没有降低现有软件转码预缓冲，未新增数据库迁移或 library-config 字段。
+
+两端必须使用包含此改动的构建才能启用新协商；源码、测试与合成媒体通过不代表已安装、已发布或首帧达标。操作与待验收项见 `docs/plan/2026-11-23-android-media-loading-performance.md`。
