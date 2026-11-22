@@ -23,6 +23,8 @@ type playbackDecisionInput struct {
 	// codecs from the `clientVideoCodecs` descriptor query parameter. Nil keeps
 	// the static whitelist behavior for callers that report nothing.
 	ClientVideoCodecs []string
+	NativeDirect      *bool
+	ForceTranscode    bool
 }
 
 type playbackDecision struct {
@@ -43,6 +45,12 @@ func buildPlaybackDecision(input playbackDecisionInput) playbackDecision {
 	audioCodec := normalizeCodecName(input.MediaInfo.AudioCodec)
 	directEligible := isBrowserDirectPlayCandidate(input.Location, container, videoCodec, audioCodec, input.ClientVideoCodecs)
 	remuxEligible := canRemuxToHLS(videoCodec, audioCodec)
+	if input.NativeDirect != nil {
+		directEligible = *input.NativeDirect && !input.ForceTranscode
+	}
+	if input.ForceTranscode {
+		remuxEligible = false
+	}
 	// Discarded priming IDRs / negative PTS still jitter after stream-copy remux
 	// because B-frames keep the original cadence. Re-encode those to CFR.
 	if remuxEligible && input.MediaInfo.HasNegativeVideoPTS {
@@ -58,6 +66,10 @@ func buildPlaybackDecision(input playbackDecisionInput) playbackDecision {
 		SourceContainer:  container,
 		SourceVideoCodec: videoCodec,
 		SourceAudioCodec: audioCodec,
+	}
+	if input.NativeDirect != nil {
+		decision.ReasonCode = "native_source_supported"
+		decision.ReasonMessage = "Native decoder supports the selected source."
 	}
 
 	if input.StreamPushEnabled && input.ForceStreamPush && strings.TrimSpace(input.Location) != "" {
@@ -96,6 +108,14 @@ func buildPlaybackDecision(input playbackDecisionInput) playbackDecision {
 	decision.SessionKind = chooseHLSSessionKind(remuxEligible)
 	decision.PreferRemux = remuxEligible
 	decision.CanDirectPlay = false
+	if input.NativeDirect != nil {
+		decision.ReasonCode = "native_source_unsupported"
+		decision.ReasonMessage = "Native decoder requires a compatible stream for this source."
+		if input.ForceTranscode {
+			decision.ReasonCode = "native_transcode_required"
+		}
+		return decision
+	}
 	if browserContainerSupportedByExtension(input.Location) {
 		decision.ReasonCode = "browser_codec_unsupported"
 		decision.ReasonMessage = "Container is browser-friendly, but source codecs still need an HLS fallback."

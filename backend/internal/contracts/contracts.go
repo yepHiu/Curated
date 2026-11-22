@@ -1592,8 +1592,11 @@ type PlaybackDescriptorDTO struct {
 
 // CreatePlaybackSessionRequest allows the client to request a specific playback mode.
 type CreatePlaybackSessionRequest struct {
-	Mode             PlaybackMode `json:"mode,omitempty"`
-	StartPositionSec float64      `json:"startPositionSec,omitempty"`
+	Mode             PlaybackMode             `json:"mode,omitempty"`
+	StartPositionSec float64                  `json:"startPositionSec,omitempty"`
+	NativePlayback   *NativePlaybackSelection `json:"nativePlayback,omitempty"`
+	// AutoStartPositionSec distinguishes a fresh resume request from an explicit zero.
+	AutoStartPositionSec *float64 `json:"autoStartPositionSec,omitempty"`
 }
 
 // PlaybackSessionStatusDTO is a snapshot of a playback session for diagnostics.

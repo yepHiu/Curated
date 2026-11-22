@@ -17,10 +17,14 @@ func (h *Handler) serverInfo() contracts.ServerInfoDTO {
 	if name == "" {
 		name = "Curated Server"
 	}
+	capabilities := []string{"web-ui", "movie-cards-v1", "movie-image-variants-v1"}
+	if _, ok := h.playbackResolver.(nativePlaybackResolver); ok {
+		capabilities = append(capabilities, "native-playback-v1")
+	}
 	return contracts.ServerInfoDTO{
 		Product: "curated-server", ServerID: h.cfg.ServerID, Name: name,
 		Version: version.ProductVersion(), ProtocolVersion: 1,
-		DesktopBridgeVersion: 1, Capabilities: []string{"web-ui", "movie-cards-v1", "movie-image-variants-v1"},
+		DesktopBridgeVersion: 1, Capabilities: capabilities,
 	}
 }
 

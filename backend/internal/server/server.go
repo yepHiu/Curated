@@ -1236,10 +1236,24 @@ func (h *Handler) handleCreatePlaybackSession(w http.ResponseWriter, r *http.Req
 	var body contracts.CreatePlaybackSessionRequest
 	if r.Body != nil {
 		defer r.Body.Close()
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+		if err := decoder.Decode(&body); err != nil && !errors.Is(err, io.EOF) {
 			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
 			return
 		}
+		var extra any
+		if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+			writeAppError(w, 400, contracts.ErrorCodeBadRequest, "invalid trailing body")
+			return
+		}
+	}
+	if body.Mode == "plan" || body.Mode == "auto" {
+		h.handleNativePlayback(w, r, movieID, body)
+		return
+	}
+	if body.NativePlayback != nil || body.AutoStartPositionSec != nil {
+		writeAppError(w, 400, contracts.ErrorCodeBadRequest, "native fields require auto mode")
+		return
 	}
 	if body.Mode == "" {
 		body.Mode = contracts.PlaybackModeDirect

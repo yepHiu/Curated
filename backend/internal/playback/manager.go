@@ -5,6 +5,7 @@ package playback
 import (
 	"context"
 	"crypto/rand"
+	"curated-backend/internal/contracts"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -228,6 +229,7 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 	defer m.startWG.Done()
 	stopCancel := context.AfterFunc(m.lifetime, cancel)
 	defer stopCancel()
+	queueStarted := time.Now()
 	if err := acquireSessionSlot(ctx, m.sessionSlots); err != nil {
 		return Session{}, err
 	}
@@ -243,6 +245,7 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 		return Session{}, err
 	}
 	defer func() { <-m.startSlots }()
+	contracts.RecordPlaybackTiming(ctx, "queue", queueStarted)
 
 	m.mu.RLock()
 	cfg := m.cfg
@@ -690,6 +693,7 @@ func startTranscodeSession(
 		close(state.done)
 	}()
 
+	firstSegmentStarted := time.Now()
 	if err := waitForFileOrProcessExit(ctx, playlistPath, state.waitCh, 12*time.Second); err != nil {
 		cancel()
 		stderrText := strings.TrimSpace(stderr.String())
@@ -712,6 +716,8 @@ func startTranscodeSession(
 		stderrText := strings.TrimSpace(stderr.String())
 		return nil, fmt.Errorf("%s playlist readiness failed: %w: %s", profile.Name, err, stderrText)
 	}
+	contracts.RecordPlaybackTiming(ctx, "first_segment", firstSegmentStarted)
+	bufferStarted := time.Now()
 	if profile.SessionKind == "transcode-hls" && profile.Name == "libx264" {
 		if _, err := waitForPlaylistSegmentReferenceOptional(ctx, playlistPath, hlsFourthSegmentName, state.waitCh, hlsStartupTranscodeLeadTimeout); err != nil {
 			cancel()
@@ -720,6 +726,7 @@ func startTranscodeSession(
 		}
 	}
 
+	contracts.RecordPlaybackTiming(ctx, "prebuffer", bufferStarted)
 	ready = true
 	return state, nil
 }

@@ -24,6 +24,17 @@ type MediaInfo struct {
 	RFrameRate          string
 	AvgFrameRate        string
 	HasNegativeVideoPTS bool
+	VideoProfile        string
+	VideoLevel          int
+	PixelFormat         string
+	Width               int
+	Height              int
+	BitRate             int64
+	AudioProfile        string
+	AudioChannels       int
+	AudioSampleRate     int
+	VideoStreams        int
+	AudioStreams        int
 }
 
 type mediaInfoCacheKey struct {
@@ -38,6 +49,13 @@ type ffprobeMediaInfo struct {
 		CodecName    string `json:"codec_name"`
 		RFrameRate   string `json:"r_frame_rate"`
 		AvgFrameRate string `json:"avg_frame_rate"`
+		Profile      string `json:"profile"`
+		Level        int    `json:"level"`
+		PixelFormat  string `json:"pix_fmt"`
+		Width        int    `json:"width"`
+		Height       int    `json:"height"`
+		Channels     int    `json:"channels"`
+		SampleRate   string `json:"sample_rate"`
 	} `json:"streams"`
 	Packets []struct {
 		CodecType string `json:"codec_type"`
@@ -46,6 +64,7 @@ type ffprobeMediaInfo struct {
 	Format struct {
 		FormatName string `json:"format_name"`
 		Duration   string `json:"duration"`
+		BitRate    string `json:"bit_rate"`
 	} `json:"format"`
 }
 
@@ -91,7 +110,7 @@ func probeMediaInfoViaFFprobe(ctx context.Context, sourcePath string, ffmpegComm
 			candidate,
 			"-v", "error",
 			"-read_intervals", "%+#16",
-			"-show_entries", "format=format_name,duration:stream=codec_type,codec_name,r_frame_rate,avg_frame_rate:packet=codec_type,pts_time",
+			"-show_entries", "format=format_name,duration,bit_rate:stream=codec_type,codec_name,r_frame_rate,avg_frame_rate,profile,level,pix_fmt,width,height,channels,sample_rate:packet=codec_type,pts_time",
 			"-of", "json",
 			sourcePath,
 		)
@@ -124,6 +143,7 @@ func mediaInfoFromFFprobe(raw ffprobeMediaInfo) MediaInfo {
 	mediaInfo := MediaInfo{
 		Container: strings.TrimSpace(raw.Format.FormatName),
 	}
+	mediaInfo.BitRate, _ = strconv.ParseInt(raw.Format.BitRate, 10, 64)
 	if raw.Format.Duration != "" {
 		duration, err := parseNumericDuration(raw.Format.Duration)
 		if err == nil {
@@ -133,13 +153,22 @@ func mediaInfoFromFFprobe(raw ffprobeMediaInfo) MediaInfo {
 	for _, stream := range raw.Streams {
 		switch strings.ToLower(strings.TrimSpace(stream.CodecType)) {
 		case "video":
+			mediaInfo.VideoStreams++
 			if mediaInfo.VideoCodec == "" {
+				mediaInfo.VideoProfile = stream.Profile
+				mediaInfo.VideoLevel = stream.Level
+				mediaInfo.PixelFormat = stream.PixelFormat
+				mediaInfo.Width, mediaInfo.Height = stream.Width, stream.Height
 				mediaInfo.VideoCodec = strings.TrimSpace(stream.CodecName)
 				mediaInfo.RFrameRate = strings.TrimSpace(stream.RFrameRate)
 				mediaInfo.AvgFrameRate = strings.TrimSpace(stream.AvgFrameRate)
 			}
 		case "audio":
+			mediaInfo.AudioStreams++
 			if mediaInfo.AudioCodec == "" {
+				mediaInfo.AudioProfile = stream.Profile
+				mediaInfo.AudioChannels = stream.Channels
+				mediaInfo.AudioSampleRate, _ = strconv.Atoi(stream.SampleRate)
 				mediaInfo.AudioCodec = strings.TrimSpace(stream.CodecName)
 			}
 		}

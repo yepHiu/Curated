@@ -3176,15 +3176,28 @@ func (a *App) resolvePlayback(ctx context.Context, movieID string, clientVideoCo
 	}
 
 	location := strings.TrimSpace(detail.Location)
-	mediaInfo := a.resolvePlaybackMediaInfo(ctx, location)
+	nativeChoice, nativeRequest := ctx.Value(nativePlaybackKey{}).(nativePlaybackChoice)
+	mediaInfo := nativeChoice.info
+	if !nativeRequest {
+		mediaInfo = a.resolvePlaybackMediaInfo(ctx, location)
+	}
 	durationSec := a.resolvePlaybackDurationSec(ctx, location, detail, progress, mediaInfo)
+	var nativeDirect *bool
+	if nativeRequest {
+		nativeDirect = &nativeChoice.direct
+	}
 	decision := buildPlaybackDecision(playbackDecisionInput{
 		Location:          location,
 		MediaInfo:         mediaInfo,
 		StreamPushEnabled: !forceDirect && a.streams != nil && a.streams.Enabled(),
 		ForceStreamPush:   a.cfg.Player.ForceStreamPush,
 		ClientVideoCodecs: clientVideoCodecs,
+		NativeDirect:      nativeDirect,
+		ForceTranscode:    nativeChoice.forceTranscode,
 	})
+	if nativeRequest && !decision.CanDirectPlay && decision.Mode != contracts.PlaybackModeHLS {
+		return contracts.PlaybackDescriptorDTO{}, playback.ErrStreamPushDisabled
+	}
 	descriptor := buildDirectPlaybackDescriptor(movieID, detail, progress, durationSec, decision)
 	startPositionSec := normalizePlaybackStart(requestedStart, descriptor.ResumePositionSec, durationSec)
 	descriptor.ResumePositionSec = startPositionSec
@@ -3197,6 +3210,9 @@ func (a *App) resolvePlayback(ctx context.Context, movieID string, clientVideoCo
 			SourceContainer:  decision.SourceContainer,
 		})
 		if err != nil {
+			if nativeRequest || ctx.Err() != nil {
+				return contracts.PlaybackDescriptorDTO{}, err
+			}
 			if a.logger != nil {
 				a.logger.Warn("failed to start HLS playback session; falling back to direct", zap.Error(err), zap.String("movieId", movieID))
 			}
