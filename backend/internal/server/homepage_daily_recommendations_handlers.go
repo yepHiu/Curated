@@ -3,8 +3,10 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -21,12 +23,25 @@ func (h *Handler) handleGetHomepageRecommendations(w http.ResponseWriter, r *htt
 		return
 	}
 
+	started := time.Now()
 	dto, err := h.homepageRecommendations.GetOrCreateHomepageDailyRecommendations(r.Context(), "")
 	if err != nil {
 		h.logger.Error("get homepage recommendations", zap.Error(err))
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load homepage recommendations")
 		return
 	}
+
+	if r.URL.Query().Get("include") == "cards" {
+		ids := append(append([]string(nil), dto.HeroMovieIDs...), dto.RecommendationMovieIDs...)
+		cards, err := h.loadMovieCards(r.Context(), ids)
+		if err != nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load homepage cards")
+			return
+		}
+		dto.Cards = &cards.Items
+	}
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("Server-Timing", fmt.Sprintf("homepage;dur=%.2f", float64(time.Since(started).Microseconds())/1000))
 
 	writeJSON(w, http.StatusOK, dto)
 }

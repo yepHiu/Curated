@@ -1735,6 +1735,7 @@ type PlayedMoviesListDTO struct {
 
 // HomepageDailyRecommendationsDTO carries the hero and recommendation movie IDs for a UTC day.
 type HomepageDailyRecommendationsDTO struct {
+	Cards                  *[]MovieCardDTO                 `json:"cards,omitempty"`
 	DateUTC                string                          `json:"dateUtc"`
 	GeneratedAt            string                          `json:"generatedAt"`
 	GenerationVersion      string                          `json:"generationVersion,omitempty"`

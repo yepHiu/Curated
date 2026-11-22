@@ -573,6 +573,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("PATCH /api/library/saved-views/{savedViewId}", h.handlePatchSavedView)
 	mux.HandleFunc("DELETE /api/library/saved-views/{savedViewId}", h.handleDeleteSavedView)
 	mux.HandleFunc("GET /api/library/movies", h.handleListMovies)
+	mux.HandleFunc("POST /api/library/movies/summaries", h.handleMovieCards)
 	mux.HandleFunc("GET /api/library/actors", h.handleListActors)
 	mux.HandleFunc("GET /api/library/actors/profile", h.handleGetActorProfile)
 	mux.HandleFunc("GET /api/library/actors/{name}/asset/avatar", h.handleGetActorAvatarAsset)
