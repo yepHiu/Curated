@@ -2536,6 +2536,8 @@
   },
   "subtitles": {
     "title": "AI 字幕認識・翻訳",
+    "consoleLink": "Alibaba Cloud 百錬コンソール",
+    "consoleHint": "百錬で API キー、モデルサービス、使用量を管理できます。",
     "providerDescription": "Qwen 3.1 ファイル文字起こし · 日本語から簡体字中国語",
     "enable": "クラウド字幕認識を有効化",
     "showKey": "APIキーを表示",

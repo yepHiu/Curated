@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Captions, Check, Eye, EyeOff, Loader2, X } from "lucide-vue-next"
+import { Captions, Check, ExternalLink, Eye, EyeOff, Loader2, X } from "lucide-vue-next"
 import SettingsScopeBadge from "./SettingsScopeBadge.vue"
 import SettingsHint from "./SettingsHint.vue"
 import SubtitleModelSelect from "../SubtitleModelSelect.vue"
@@ -97,6 +97,13 @@ onMounted(async () => {
     </CardHeader>
     <CardContent class="flex min-w-0 flex-col gap-3 pt-0">
       <Alert v-if="error || autosave.error.value" variant="destructive"><AlertDescription>{{ error || autosave.error.value }}</AlertDescription></Alert>
+      <div class="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <p class="min-w-0 text-sm text-muted-foreground">{{ t('subtitles.consoleHint') }}</p>
+        <Button as="a" variant="outline" size="sm" class="min-h-11 shrink-0 rounded-full sm:min-h-9" data-settings-comfortable-control href="https://bailian.console.aliyun.com/?region=cn-beijing" target="_blank" rel="noopener noreferrer">
+          {{ t('subtitles.consoleLink') }}
+          <ExternalLink data-icon="inline-end" aria-hidden="true" />
+        </Button>
+      </div>
       <FieldGroup v-if="cfg" class="gap-3">
         <Field orientation="horizontal" class="items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" :data-disabled="!cfg.canManage || busy || undefined">
           <SettingsHint :text="t('subtitles.cloudNotice')"><FieldLabel for="subtitle-enabled" class="text-sm font-semibold text-foreground">{{ t('subtitles.enable') }}</FieldLabel></SettingsHint>

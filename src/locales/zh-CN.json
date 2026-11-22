@@ -2536,6 +2536,8 @@
   },
   "subtitles": {
     "title": "AI 字幕识别与翻译",
+    "consoleLink": "阿里云百炼控制台",
+    "consoleHint": "前往百炼平台管理 API Key、模型服务及用量。",
     "providerDescription": "千问 3.1 文件转写 · 日语识别 / 简体中文翻译",
     "enable": "启用云端字幕识别",
     "showKey": "显示 API Key",

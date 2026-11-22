@@ -2536,6 +2536,8 @@
   },
   "subtitles": {
     "title": "AI subtitle recognition & translation",
+    "consoleLink": "Alibaba Cloud Bailian console",
+    "consoleHint": "Manage API keys, model services, and usage on Bailian.",
     "providerDescription": "Qwen 3.1 file transcription · Japanese to Simplified Chinese",
     "enable": "Enable cloud subtitles",
     "showKey": "Show API key",
