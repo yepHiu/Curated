@@ -3,6 +3,7 @@ import { onErrorCaptured, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { RouterView } from "vue-router"
 import { Toaster } from "@/components/ui/sonner"
+import DesktopReloadMenu from "@/components/jav-library/DesktopReloadMenu.vue"
 import { useTheme } from "@/composables/use-theme"
 import { syncHtmlLang } from "@/i18n"
 import { persistLocale, type SupportedLocale } from "@/lib/locale-storage"
@@ -11,6 +12,7 @@ const { resolvedMode } = useTheme()
 
 const { locale, t } = useI18n()
 const appFault = ref(false)
+const isDesktop = Boolean(window.javLibrary)
 
 watch(
   locale,
@@ -61,4 +63,5 @@ function reloadApp() {
   </main>
   <RouterView v-else />
   <Toaster :theme="resolvedMode" />
+  <DesktopReloadMenu v-if="isDesktop" :label="t('common.reload')" />
 </template>

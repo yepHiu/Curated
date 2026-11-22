@@ -924,6 +924,7 @@
     "description": "当前应用壳中不存在该路由。"
   },
   "common": {
+    "reload": "重新加载",
     "loading": "加载中…",
     "cancel": "取消",
     "save": "保存",

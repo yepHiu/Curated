@@ -11,6 +11,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useTheme } from "@/composables/use-theme"
 import DesktopSettingsDialog from "./DesktopSettingsDialog.vue"
+import DesktopReloadMenu from "@/components/jav-library/DesktopReloadMenu.vue"
 import DesktopDebugDialog from "./DesktopDebugDialog.vue"
 import type { DesktopDebugAPI } from "./debug-contract"
 import type { DesktopSettingsAPI } from "./settings-contract"
@@ -164,6 +165,7 @@ onMounted(async () => {
 </script>
 
 <template>
+  <DesktopReloadMenu v-if="api" :label="t('reload')" />
   <div class="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
     <div v-if="integratedWindowControls" class="desktop-window-controls h-11 shrink-0" aria-hidden="true" />
     <div class="desktop-window-heading mx-auto flex w-full max-w-xl shrink-0 items-center justify-between gap-3 px-5 pb-4 sm:px-6" :class="integratedWindowControls ? 'pt-2' : 'pt-6'">

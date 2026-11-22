@@ -924,6 +924,7 @@
     "description": "This route does not exist in the current app shell."
   },
   "common": {
+    "reload": "Reload",
     "loading": "Loading…",
     "cancel": "Cancel",
     "save": "Save",

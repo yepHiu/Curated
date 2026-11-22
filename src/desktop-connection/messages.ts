@@ -1,6 +1,7 @@
 /** 连接页独立词典，不依赖 Server 的业务语言包或网络请求。 */
 export const connectionMessages = {
   "zh-CN": {
+    reload: "重新加载",
     openSettings: "打开设置", deviceSettings: "此设备设置", deviceSettingsScope: "仅影响这台电脑上的 Desktop。",
     proxyMode: "代理", proxySystem: "跟随系统", proxyDirect: "不使用代理", proxyManual: "手动代理", proxyAddress: "代理地址",
     proxyHint: "支持 HTTP、HTTPS、SOCKS5，无账号密码。本机与局域网地址直连。",
@@ -21,6 +22,7 @@ export const connectionMessages = {
     debugDevTools: "连接页开发者工具", debugOpenDevTools: "打开 DevTools",
   },
   en: {
+    reload: "Reload",
     openSettings: "Open settings", deviceSettings: "This device", deviceSettingsScope: "Applies only to Desktop on this computer.",
     proxyMode: "Proxy", proxySystem: "Use system proxy", proxyDirect: "No proxy", proxyManual: "Manual proxy", proxyAddress: "Proxy address",
     proxyHint: "HTTP, HTTPS or SOCKS5 without credentials. Local and private network addresses connect directly.",
@@ -41,6 +43,7 @@ export const connectionMessages = {
     debugDevTools: "Connection page DevTools", debugOpenDevTools: "Open DevTools",
   },
   ja: {
+    reload: "再読み込み",
     openSettings: "設定を開く", deviceSettings: "このデバイスの設定", deviceSettingsScope: "このパソコンの Desktop のみに適用します。",
     proxyMode: "プロキシ", proxySystem: "システム設定を使用", proxyDirect: "使用しない", proxyManual: "手動設定", proxyAddress: "プロキシアドレス",
     proxyHint: "認証なしの HTTP・HTTPS・SOCKS5 に対応。ローカル・プライベートネットワークへは直接接続します。",

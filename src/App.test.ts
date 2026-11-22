@@ -46,5 +46,17 @@ describe("App", () => {
     expect(wrapper.get("[data-app-fault]").text()).toContain("app.faultTitle")
     expect(wrapper.text()).toContain("app.faultDescription")
     expect(wrapper.findComponent({ name: "Toaster" }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: "DesktopReloadMenu" }).exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it("keeps desktop reload available even when the routed page fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined)
+    window.javLibrary = {}
+    const wrapper = mount(App)
+    await nextTick()
+    expect(wrapper.findComponent({ name: "DesktopReloadMenu" }).exists()).toBe(true)
+    wrapper.unmount()
+    delete window.javLibrary
   })
 })
