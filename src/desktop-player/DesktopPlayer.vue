@@ -35,6 +35,7 @@ const diagnostics = ref(false)
 const infoBusy = ref(false)
 const infoFeedback = ref("")
 const settings = ref(false)
+const subtitleSettings = ref(false)
 const focusedControl = ref(false)
 const draft = ref<number>()
 const surface = ref<HTMLElement>()
@@ -62,7 +63,7 @@ const state = computed(() => snapshot.value?.state)
 const playing = computed(() => state.value?.status === "playing")
 const active = computed(() => state.value?.status === "playing" || state.value?.status === "paused")
 const immersive = usePlayerImmersiveChrome({ hasPlayback: active, isPlaying: playing })
-const chromeShown = computed(() => immersive.chromeVisible.value || diagnostics.value || settings.value || focusedControl.value || busy.value || capture.busy.value || Boolean(clipFeedback.value) || Boolean(capture.receipt.value) || capture.previewOpen.value || Boolean(error.value))
+const chromeShown = computed(() => immersive.chromeVisible.value || diagnostics.value || settings.value || subtitleSettings.value || focusedControl.value || busy.value || capture.busy.value || Boolean(clipFeedback.value) || Boolean(capture.receipt.value) || capture.previewOpen.value || Boolean(error.value))
 const files = computed(() => snapshot.value?.movie?.files.map((file, index) => ({ ...file, partIndex: index + 1 })) ?? [])
 const currentFile = computed(() => files.value.find(file => file.id === state.value?.fileId))
 const queueIndex = computed(() => snapshot.value?.queue.indexOf(snapshot.value?.movie?.id ?? "") ?? -1)
@@ -144,6 +145,7 @@ function doubleClick() { clearTimeout(clickTimer); void command({ action: "fulls
 function focusIn(event: FocusEvent) { focusedControl.value = event.target instanceof HTMLElement && event.target.tabIndex >= 0; immersive.revealChrome() }
 function focusOut(event: FocusEvent) { focusedControl.value = event.relatedTarget instanceof HTMLElement && event.relatedTarget.tabIndex >= 0 }
 function keydown(event: KeyboardEvent) {
+  if (event.defaultPrevented || settings.value || subtitleSettings.value) return
   if (event.key === "Escape" && diagnostics.value && !capture.previewOpen.value) { event.preventDefault(); closeDiagnostics(); return }
   if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || capture.previewOpen.value || shouldIgnoreGlobalPlaybackHotkeysForTarget(event.target)) return
   if (event.code === capture.keyCode.value) {
@@ -242,7 +244,7 @@ onBeforeUnmount(() => {
         <Button data-player-capture variant="ghost" size="icon" class="rounded-full" :disabled="!capture.available.value || busy" :aria-label="captureLabel" :title="captureLabel" @pointerdown="startCapture" @pointerup="capture.finishPress" @pointercancel="capture.cancelPress" @click="captureClick"><Loader2 v-if="capture.busy.value" class="animate-spin motion-reduce:animate-none" /><Camera v-else /></Button>
         <Button data-player-capture variant="ghost" size="icon" class="rounded-full" :disabled="((!playing || !capture.available.value) && !capture.recording.value) || busy" :aria-label="capture.recording.value ? uiT('curated.stopClip') : 'GIF'" :title="capture.recording.value ? uiT('curated.stopClip') : 'GIF'" :aria-pressed="capture.recording.value" @click="toggleGif"><Film /></Button>
         <Button data-player-auxiliary variant="ghost" size="icon" class="rounded-full" :aria-label="extra.auto" :aria-pressed="snapshot?.autoAdvance" @click="command({ action: 'autoAdvance', enabled: !snapshot?.autoAdvance })"><Repeat2 /></Button>
-        <PlayerSubtitleMenu :model-value="subtitleDisplay" :available="snapshot?.subtitles?.available ?? []" :error="snapshot?.subtitles?.error" :disabled="!active || busy" @update:model-value="updateSubtitles" @update:open="settings = $event" />
+        <PlayerSubtitleMenu native :model-value="subtitleDisplay" :available="snapshot?.subtitles?.available ?? []" :error="snapshot?.subtitles?.error" :disabled="!active || busy" @update:model-value="updateSubtitles" @update:open="subtitleSettings = $event" />
         <PlayerPlaybackSettingsMenu native :disabled="!active || busy" :playback-rate="state?.speed ?? 1" @update:playback-rate="command({ action: 'speed', value: $event })" @update:open="settings = $event" />
         <Button data-player-auxiliary variant="ghost" size="icon" class="rounded-full" :aria-label="extra.web" :title="extra.web" @click="command({ action: 'web' })"><Monitor /></Button>
         <Button data-player-auxiliary data-native-info-trigger variant="ghost" size="icon" class="rounded-full" :aria-label="nativePlaybackInfoMessages[lang].title" :aria-pressed="diagnostics" @click="diagnostics = !diagnostics"><Info /></Button>

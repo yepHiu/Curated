@@ -2,6 +2,8 @@
 @source "../components/ui";
 @source "../components/jav-library/PlayerTransportControls.vue";
 @source "../components/jav-library/PlayerPlaybackSettingsMenu.vue";
+@source "../components/jav-library/PlayerSubtitleMenu.vue";
+@source "../components/jav-library/settings/SettingsHint.vue";
 @source "../components/jav-library/MoviePartSelect.vue";
 @source "../components/jav-library/CaptureReceipt.vue";
 @source "../components/jav-library/FrameImageViewer.vue";
