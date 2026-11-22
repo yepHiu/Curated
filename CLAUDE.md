@@ -861,3 +861,8 @@ On Server startup, interrupted running subtitle records are requeued before the 
 ### Book path removal (2026-10-17)
 
 Existing DELETE /api/library/{comics|photos}/paths/{id} now transactionally detaches books that lose all root coverage and rebinds overlaps to a remaining root. Migration 0070 repairs legacy unbound books. Lists/search/details exclude detached books; rescanning the same location restores the original record and user metadata. Source files are untouched. Web invalidates list caches and rejects stale list/detail responses after removal. No new endpoints or cfg keys.
+
+
+## Android media loading — 2026-11-23
+
+New source supports optional `GET /api/homepage/recommendations?include=cards` and read-only `POST /api/library/movies/summaries` (1–50 movieIds, 16 KiB request, ordered deduplicated items/missingIds). Card DTOs omit full details. Capabilities: movie-cards-v1, movie-image-variants-v1. Movie list/detail/card DTOs add optional coverVariants/thumbVariants; details add previewVariants keyed by original preview URL. Existing movie cover/thumb/preview GETs accept width=320/640/960, validating source access before serving derived files. Missing variants redirect to the original with no-store. Background cache: 2 workers, 64 jobs, 1 GiB, versioned by source size/mtime and encoding policy; first access may still use originals. No new library-config field or migration; remote preview persistence and foreground device benchmarks remain pending. See guide and the 2026-11-23 media loading plan.

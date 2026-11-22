@@ -605,3 +605,10 @@ Translate回调在AI用量记录结束前调用共用ValidateTranslations。合�
 ## 2026-10-17 书库批量确认限流
 
 书库确认 AI_RATE_LIMITED 返回429/Retry-After:60，前端按原bookId/revision等待60秒重试，每条最多3次，成功后继续已确认选择。停止等待、关闭/切换详情、失去写权限即停止后续应用；成功项移出选择，待确认失败项保留。未绕过全局写频控，不重新识别；限流不再当作来源冲突。无新端点/配置/迁移。
+
+
+## Android 浏览性能第一批 — 2026-11-23
+
+源码新增 `GET /api/homepage/recommendations?include=cards`（可选 cards，空数组与缺字段有区别）和只读 `POST /api/library/movies/summaries`（movieIds 1–50 个，16 KiB body 上限）。批量查询只取卡片字段，保持顺序、去重、跳过缺失/回收影片。server-info 能力增加 movie-cards-v1、movie-image-variants-v1。列表/详情/卡片可返回 coverVariants/thumbVariants，详情还可返回 previewVariants；已存在的原图 URL 保持不变。
+
+本地图片访问触发 `<cacheDir>/movie-images-v1` 后台派生，宽度档 320/640/960、保持比例/方向/透明度、不放大；2 个 worker、64 个待处理键、1 GiB 可再生缓存。只有已生成文件进入变体字段；首次浏览仍可能原图，派生图失效 GET 临时重定向原图且 no-store。原资产入口支持 width 固定枚举；每次仍验证源文件路径与版本。远端预览代理未新增落盘缓存。无配置字段或迁移；需重建 Server 与 Android 才能联用，未自动部署。详细状态见 docs/plan/2026-11-23-android-media-loading-performance.md。

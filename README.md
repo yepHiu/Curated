@@ -166,3 +166,5 @@ When a later large language model takes over work in this repository, add its na
 Server identity and LAN discovery, Desktop device settings, upgrade compatibility and release packaging: [guide](docs/guide.md).
 
 AI 字幕任务支持侧栏进度与恢复弹窗，成品按历史记录展示；操作见 [使用手册](docs/guide.md)。
+
+- Android 媒体加载：首批摘要接口与派生缩略图源码已实现，使用与兼容边界见 [操作指南](docs/guide.md#android-媒体加载优化2026-11-23-第一批源码) 和 [实施进度](docs/plan/2026-11-23-android-media-loading-performance.md)。

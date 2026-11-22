@@ -1021,3 +1021,16 @@ Mock 立即提供明确标记的模拟任务和提案，结果保存在当前浏
 漫画库和写真库移除存储目录后，不再被其他已配置目录覆盖的作品会立即退出列表与搜索；旧详情也不可继续访问。移除操作保留磁盘文件及作品的标题、AI 资料、收藏、评分、标签、备注和阅读进度，重新添加目录并扫描相同文件可恢复显示。若父子目录同时存在，仍由另一个目录覆盖的作品继续显示。
 
 新版 Server 的迁移 0070 会修复旧版本移除目录后遗留的无关联作品；需更新并重启 Server，同时更新前端。迁移不删除源文件或作品资料，无新增配置项。详见 [实现与验证记录](plan/2026-10-17-book-path-removal.md)。
+
+
+## Android 媒体加载优化（2026-11-23 第一批源码）
+
+新 Android 首页请求 `/api/homepage/recommendations?include=cards`，新 Server 一次返回所需卡片摘要；旧 Server 不返回 cards 时，手机继续最多 4 路详情请求并渐进显示。`cards: []` 表示有效空结果，不触发旧协议补请求。单条影片缺失跳过，鉴权失效仍中止并清空私有内容。
+
+影片卡片和详情预览条按实际显示像素从 320/640/960 档派生图中选择；全屏图片和原始封面 URL 不变。Server 在浏览到本地资产时后台生成，完成后后续列表/详情响应才包含变体 URL；首访未生成时仍取原图，不承诺首次打开全部图片已变小。缓存位于配置 cacheDir 下的 `movie-images-v1`，限额 1 GiB，按访问更新淘汰顺序；源图片不删除。损坏/超大源保留原图能力，失败一分钟内不重复生成。远端预览代理缓存、扫描时预热和更大规模回填仍待后续。
+
+媒体 API 新增只读 `POST /api/library/movies/summaries`，Body `{ "movieIds": ["id"] }`，1–50 个输入 ID、16 KiB body，响应 `{items, missingIds}`，不返回完整详情。Server-info 的 capabilities 声明 `movie-cards-v1`、`movie-image-variants-v1`。既有资产 GET 可带 `width=320|640|960`；变体过期或未就绪时 307 到原图，重定向 no-store。
+
+诊断：影片列表响应的 Server-Timing 区分 sql/assets；首页与摘要批量请求分别返回 homepage/cards 处理耗时；派生图响应 X-Curated-Image-Cache 为 hit 或 pending。这些不包含手机解码、渲染和首帧时间。Android 已将协程取消连接到 Call.cancel，媒体流不再沿用 JSON 30 秒整体超时，保留连接/读超时。
+
+源码完成不等于运行实例升级。先构建并验证新 Server，再与新 Android 联调；旧 Web/Electron 和旧 Android 字段保持兼容。本轮不自动覆盖正式包、安装或重启当前服务。前台 release 等价包 P50/P95 仍需实测，见 [详细计划与进度](plan/2026-11-23-android-media-loading-performance.md)。
