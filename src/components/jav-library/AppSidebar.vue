@@ -269,7 +269,7 @@ const getNavigationTarget = (page: AppPage) => {
 
     <div class="app-sidebar-scroll min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
       <div class="flex flex-col pt-1.5" :class="props.compact ? 'gap-3 pb-1' : 'gap-5'">
-        <template v-for="(section, sectionIndex) in sidebarSections" :key="section.key">
+        <template v-for="section in sidebarSections" :key="section.key">
           <section
             class="flex flex-col gap-2"
             :class="{ 'pr-2.5': !props.compact }"
@@ -314,12 +314,6 @@ const getNavigationTarget = (page: AppPage) => {
               </span>
             </RouterLink>
           </section>
-
-          <Separator
-            v-if="sectionIndex === 0"
-            class="my-2.5 shrink-0 bg-sidebar-border/80"
-            :class="props.compact ? 'mx-auto w-10' : ''"
-          />
         </template>
       </div>
     </div>
