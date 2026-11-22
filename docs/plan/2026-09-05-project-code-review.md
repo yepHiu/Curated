@@ -1,5 +1,116 @@
 # Curated 项目关键功能代码审查（2026-09-05）
 
+## 代码质量复审（2026-11-22，已修复）
+
+初始审查基线为 HEAD `04284d3d` 加当时工作区。用户随后要求修复下述五项问题，已按独立修改单元提交；下方问题描述、行号及“本轮验证”保留修复前现场，2026-09-05 的章节仍为历史记录。
+
+### 修复状态与验证（2026-11-22）
+
+| 问题 | 实现与验证 | 提交 |
+| --- | --- | --- |
+| 正文读取期间取消失效 | `monitoredRequest` 包含正文消费；错误页仅忽略 JSON 语法错误，保留取消/网络错误；覆盖 JSON、字幕、Blob、错误响应、无期限主动取消及完成后回收 | `cc600138` |
+| 原生播放不识别 423 | 共用 `isPlaybackAuthStatus` 覆盖 API、媒体代理及字幕；字幕列表锁定异常不再吞掉；验证启动竞争、字幕列表/内容、真实 loopback 媒体代理、截图及片段路径 | `bbbd6d36` |
+| 测试受开发环境影响 | 禁用 `.env` 加载并固定 Mock/空 API base；保留 `vi.stubEnv` 的 Web 分支覆盖；默认最多 4 workers；外部传入 Web/无效 API 地址的 5 文件 20 用例通过 | `ff1b45d8` |
+| 字体配置 XML 非法 | 转义动态路径的 XML 文本，真实 XML 解析器验证含 `&`、尖括号、中文、引号的路径往返 | `b47b3f00` |
+| 快捷键反馈图标缺失 | 补齐四个 lucide 图标显式导入；复用播放器 loading/i18n 的 22 项测试验证 | `ee43d64b` |
+
+字体配置及其测试此前为未跟踪文件，本次作为独立字体配置单元纳入版本控制；其他原有字幕资产、选轨和桌面接入改动仍留在工作区。协调器文件采用仅暂存本次修复的补丁，未混入这些已有修改。
+
+修复后验证：前端类型检查、仓库 ESLint、Electron `tsc --noEmit` 均通过；Electron 全套 169 项通过、5 项平台集成测试跳过。直接执行默认 `pnpm test`，无需覆盖环境变量或 worker 参数，336 文件、1847 用例全部通过（192.73 秒）。不涉及 Go 代码修改，未重复已在审查阶段通过的 Go 全套测试。Windows 上的 XML 解析与 Electron 模拟测试不替代 macOS 真机字体验收。
+
+轻量 e2e 使用 `pnpm test:e2e --workers=1`：首次 8 通过、1 失败；锁定启动用例在一次页面启动中观察到两次 `/api/auth/status` 而非一次。仅复跑 `-g 'locked startup'` 后通过（22.3 秒），重复请求未复现，尚未确定首次失败根因；没有将首次全套描述为通过，也未据此扩大修改启动逻辑。日志保存在系统临时目录 `curated-fixes-e2e.log` / `curated-fixes-e2e-lock.log`。
+
+原始复现探针仍保留用于审查溯源，其中断言的是修复前错误行为；修复后以已纳入正式测试集的回归用例为准。
+
+### 原始审查范围与发现
+
+覆盖当前 Electron 字幕改动、原生播放器与 Server 的鉴权调用链、前端 HTTP 客户端、播放器模板、字幕任务/存储约束，以及仓库既有质量检查。不是 976 个生产源码文件的逐行审计，也未运行真实 macOS 播放、生产打包、浏览器 e2e 或付费供应商调用。
+
+### 结论
+
+分层、输入校验、数据库约束和自动化测试基础较完整，但跨层错误合约、异步请求生命周期和测试环境隔离仍有实际缺口。本轮确认 4 项 P2、1 项 P3，其中字体 XML 问题位于当前未提交新增文件，其余是现有代码。没有在已审范围内确认 P0/P1。
+
+### 1. [P2] 收到响应头后，HTTP 超时和外部取消失效
+
+位置：`src/api/http-client.ts:150–152`，正文读取发生于 `156–157` 及各调用方。
+
+`fetch()` 在响应头到达时返回，`monitoredFetch` 随即清除 timeout 并移除外部 AbortSignal 监听；`response.text()` / `response.blob()` 尚未完成。如果 Server 或网络在发送响应头后阻塞正文，页面加载可无限等待；切换影片或页面后取消请求，也无法中止这部分传输。
+
+隔离复现调用真实 `httpClient.get`，让 fetch 返回响应头而正文保持 pending，再取消调用方 signal 并推进 31 秒：调用方 `aborted=true`，实际 fetch signal 仍 `aborted=false`，请求也未完成。已有测试只覆盖响应头到达前的超时与取消，未覆盖此阶段。
+
+修复方向：让超时、取消转发及错误转换持续到正文读取完成；统一封装响应消费，避免每个调用方各自处理生命周期。
+
+### 2. [P2] 原生播放未识别 Server 实际使用的 HTTP 423 锁定响应
+
+位置：`electron/playback-coordinator.ts:143`，同类分支还有 `188`、`489`；媒体代理对应 `electron/native-media-proxy.ts` 的错误状态映射。
+
+Server 的 `auth_middleware.go` 对锁定请求返回 `http.StatusLocked`（423），原生播放层仅识别 401/403。会话在 `/api/auth/status` 检查后被撤销时，后续详情/字幕/截图/媒体请求会走普通 HTTP 或媒体错误，而非 `SERVER_LOCKED` 收尾和解锁跳转。启动失败可因此误走 Web fallback；播放中的常规状态轮询有机会补救，但不能代替对已收到锁定响应的正确处理。
+
+隔离复现让公开 status 返回 unlocked、随后受保护详情返回 423，`open()` 实际抛出 `SERVER_HTTP_423`。前端 `desktop-playback-service.ts` 只有识别 `SERVER_LOCKED` 才进入锁屏分支。现有 Electron 鉴权测试多使用 401/403，未覆盖真实 Server 合约。
+
+修复方向：统一锁定状态/错误码判断，将 423 纳入 API、字幕内容和媒体代理路径，补充真实状态码的跨层测试。
+
+### 3. [P2] 默认前端测试依赖开发者的 VITE_USE_WEB_API 配置
+
+位置：`vitest.config.ts:16–19`；典型受影响用例为 `SettingsSecuritySection.test.ts`。
+
+单元测试默认加载本机 Vite 环境，却没有固定服务模式。多个设置组件用例假定本机管理权限立即可用，而真实 `useServerLocalAccess` 在 Web 模式会请求 health，再决定权限；相关用例没有 mock 这条边界。开发机常用的 `VITE_USE_WEB_API=true` 因此会隐藏测试预期的控件，制造与产品逻辑无关的失败，并允许单元测试发出真实 health 请求。
+
+单独控制变量复现：保留相同 Node 参数及 `--maxWorkers=2`，显式 Web 模式下 `SettingsSecuritySection` 6 失败/1 通过；Mock 模式下该文件全部通过。首次全量默认运行为 27 失败/1810 通过，其中还包含播放器超时；不能将全部 27 项都归因为环境变量。固定 Mock、使用 CI 的 `NODE_OPTIONS=--no-experimental-webstorage` 并限制 2 workers 后，6 个失败文件共 53 项全部通过。
+
+修复方向：测试配置显式固定默认服务模式，需要 Web 行为的测试单独声明环境并 mock health/桌面权限边界；不要依赖开发者删除本机 `.env`。并发导致的超时应与确定性失败分开诊断。
+
+### 4. [P2] macOS 字体配置直接插入未转义路径
+
+位置：当前新增 `electron/mac-subtitle-fonts.ts:48–53`。
+
+`cacheDirectory` 来自 userData 路径，合法路径中的 `&`、`<` 等字符被直接写入 XML 文本。例如 `/Users/A&B/Library/Application Support/Curated/fontconfig` 会生成无法解析的 `fonts.conf`。随后该文件仍被设置为 `FONTCONFIG_FILE`，会破坏新加入的字体初始化路径。
+
+隔离验证使用真实 `buildMacFontConfigBody` 生成上述配置，标准 XML 解析器返回 parsererror。现有测试仅检查字符串包含字体/目录，没有验证 XML 合法性。没有在 Windows 上声称完成 macOS libmpv 字体验收。
+
+修复方向：用 XML 文本转义或 XML writer 输出动态路径，并覆盖特殊字符路径。
+
+### 5. [P3] Web 播放器快捷键反馈的四个图标未导入
+
+位置：`src/components/jav-library/PlayerPage.vue:3135–3160`，关联顶部 lucide import。
+
+模板使用 `Rewind`、`FastForward`、`VolumeX`、`Volume2`，但 `<script setup>` 未导入这些组件，应用也没有全局注册或自动导入插件。隐藏控制栏后快进/后退、静音或调音量的反馈图标不会正常渲染。实际组件测试输出四个 `Failed to resolve component` 警告；当前 typecheck/lint 均未拦住这类模板错误。
+
+修复方向：补齐显式导入，并让相关行为测试验证图标解析或针对未解析组件告警失败。
+
+### 可维护性观察与处理顺序
+
+按 `src/`、`electron/`、`backend/internal/` 下 `.ts/.vue/.go` 文件统计，排除 `.test.*` 和 `_test.go`，共有 976 个源码文件，其中 14 个超过 1000 行。`server.go` 4128 行、`app.go` 3932 行、`PlayerPage.vue` 3597 行、`SettingsPage.vue` 2365 行。行数本身不构成缺陷，但播放器已同时承载网络、媒体状态、快捷键、字幕、截图及展示，审查与定位成本较高。
+
+先修请求生命周期和锁定合约，再稳定测试环境、补齐字体与图标边界。模块拆分应结合后续功能修改，按独立职责逐步进行，不建议仅为缩短文件进行全仓重写。每个缺陷应有独立提交和对应行为验证。
+
+排除项：曾怀疑字幕检查点续试允许同文件多活动任务；使用临时数据库复现时，`subtitle_active_file` 唯一索引正确拒绝第二个活动任务，因此未将其列为缺陷。临时 Go 探针已移除。
+
+### 本轮验证
+
+| 检查 | 结果 |
+| --- | --- |
+| `pnpm typecheck`、`pnpm lint` | 通过 |
+| `pnpm exec tsc -p electron/tsconfig.json --noEmit` | 通过 |
+| `pnpm test:electron` | 22 文件/156 用例通过；3 文件/5 用例跳过 |
+| `backend/` 的 `go test ./...`、`go vet ./...` | 通过；部分 Go 包使用缓存 |
+| 默认 `pnpm test` | 329 文件通过、6 失败；1810 用例通过、27 失败 |
+| 固定 Mock、CI Node 参数、2 workers，复跑上述 6 文件 | 53 用例全部通过 |
+| 同环境全量前端复跑 | 335 文件、1837 用例全部通过，耗时 338.54 秒 |
+| 3 个隔离行为探针 | HTTP 正文取消失效、423 错误分类、非法字体 XML 均复现 |
+
+复现文件保留于被 Git 忽略的 `.workspace/review-quality.config.ts`、`.workspace/review-quality.test.ts`；这些用例断言缺陷实际表现，因此“通过”表示复现成功，不表示业务正确。命令：`pnpm exec vitest run --config .workspace/review-quality.config.ts --configLoader native --pool threads --reporter verbose`。
+
+前端可重复执行环境（PowerShell，仅影响当前 shell）：
+
+```powershell
+$env:VITE_USE_WEB_API = 'false'
+$env:NODE_OPTIONS = '--no-experimental-webstorage'
+pnpm test --maxWorkers=2
+```
+
+---
+
 ## 修复状态（2026-09-05）
 
 用户随后要求修复全部问题，以下四项已实现并分别提交。后续各节保留初始审查现场与复现记录，其中行号对应修复前基线。

@@ -178,6 +178,8 @@ pnpm test path/to/file.test.ts
 
 `pnpm test:e2e` 会自动在独立的 4173（Mock）与 4174（Web API stub）端口启动 Vite，覆盖 Mock 导航不访问后端、锁定启动不请求受保护资源、解锁后只 hydrate 一次等日常运行时流程。它不依赖本机 5173/8080 开发服务。`pnpm test:display` 是独立的跨浏览器/多 viewport 长耗时套件，仍需按 UI 规范获得明确同意后才能运行，不纳入日常 CI。
 
+前端单元测试配置不加载开发机 `.env`，并显式设置 `VITE_USE_WEB_API=false`、`VITE_API_BASE_URL` 为空，避免本地 Web 开发配置触发真实 Server 请求。需要 Web 行为的用例通过 `vi.stubEnv` 显式启用并 mock HTTP / Desktop 权限边界，结束后恢复环境。默认最多 4 个 worker，避免大量 jsdom 实例争用资源产生超时；资源受限时可用 `pnpm test --maxWorkers=2`。该设置不改变开发服务器、生产构建或独立 e2e 的服务模式。
+
 ---
 
 ## 5. 后端：测试与编译
