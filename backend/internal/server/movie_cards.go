@@ -27,6 +27,8 @@ func (h *Handler) loadMovieCards(ctx context.Context, ids []string) (contracts.M
 	for i := range result.Items {
 		result.Items[i].CoverURL = items[i].CoverURL
 		result.Items[i].ThumbURL = items[i].ThumbURL
+		result.Items[i].CoverVariants = items[i].CoverVariants
+		result.Items[i].ThumbVariants = items[i].ThumbVariants
 	}
 	return result, nil
 }

@@ -29,6 +29,7 @@ import (
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/diskutil"
+	"curated-backend/internal/movieimages"
 	"curated-backend/internal/proxyenv"
 	"curated-backend/internal/scraper/metatube"
 	"curated-backend/internal/shellopen"
@@ -316,6 +317,7 @@ type BackupProvider interface {
 
 // Handler holds all HTTP handler dependencies and implements the API route handlers.
 type Handler struct {
+	movieImages                    *movieimages.Cache
 	subtitles                      *subtitles.Service
 	subtitleSettingsCtl            SubtitleSettingsController
 	runtimeContext                 context.Context
@@ -452,7 +454,12 @@ func NewHandler(deps Deps) *Handler {
 			deps.Logger.Error("mark interrupted library health repairs failed", zap.Error(err))
 		}
 	}
+	imageRoot := ""
+	if strings.TrimSpace(deps.Cfg.CacheDir) != "" {
+		imageRoot = filepath.Join(deps.Cfg.CacheDir, "movie-images-v1")
+	}
 	h := &Handler{
+		movieImages:                    movieimages.New(deps.RuntimeContext, imageRoot),
 		comicScanStarter:               deps.ComicScanStarter,
 		photoScanStarter:               deps.PhotoScanStarter,
 		comicSettingsCtl:               deps.ComicSettingsCtl,

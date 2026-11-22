@@ -63,6 +63,7 @@ func (h *Handler) enrichMovieListItemsLocalPosters(ctx context.Context, items []
 			continue
 		}
 		applyLocalPosterURLs(&items[i], flags)
+		h.enrichPosterVariants(&items[i])
 	}
 }
 
@@ -76,10 +77,21 @@ func (h *Handler) enrichMovieDetailLocalPosters(ctx context.Context, movie *cont
 		f := flags[movie.ID]
 		if f.Cover || f.Thumb {
 			applyLocalPosterURLs(&movie.MovieListItemDTO, f)
+			h.enrichPosterVariants(&movie.MovieListItemDTO)
 		}
 	}
 	if len(movie.PreviewImages) > 0 {
 		movie.PreviewImages = h.store.RewritePreviewImageURLsPreferLocal(ctx, movie.ID, h.cfg.CacheDir, movie.PreviewImages)
+		movie.PreviewVariants = make(map[string][]contracts.ImageVariantDTO)
+		for i, source := range movie.PreviewImages {
+			u, err := url.Parse(source)
+			if err == nil && strings.HasPrefix(source, "/api/library/movies/") && u.Query().Get("v") != "" {
+				variants := h.readyMovieVariants(movie.ID, "preview/"+strconv.Itoa(i+1), u.Query().Get("v"))
+				if len(variants) > 0 {
+					movie.PreviewVariants[source] = variants
+				}
+			}
+		}
 	}
 	h.enrichMovieDetailLocalActorAvatars(ctx, movie)
 }
@@ -120,6 +132,9 @@ func (h *Handler) handleGetMovieAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.serveMovieImageVariant(w, r, movieID, kind, st) {
+		return
+	}
 	name := kind + pickImageExtFromPath(f.Name())
 	setReusableLocalImageCacheHeaders(w)
 	http.ServeContent(w, r, name, st.ModTime(), f)
@@ -169,6 +184,9 @@ func (h *Handler) handleGetMoviePreviewAsset(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if h.serveMovieImageVariant(w, r, movieID, "preview/"+strconv.Itoa(seq), st) {
+		return
+	}
 	name := "preview-" + strconv.Itoa(seq) + pickImageExtFromPath(f.Name())
 	setReusableLocalImageCacheHeaders(w)
 	http.ServeContent(w, r, name, st.ModTime(), f)

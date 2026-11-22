@@ -20,7 +20,7 @@ func (h *Handler) serverInfo() contracts.ServerInfoDTO {
 	return contracts.ServerInfoDTO{
 		Product: "curated-server", ServerID: h.cfg.ServerID, Name: name,
 		Version: version.ProductVersion(), ProtocolVersion: 1,
-		DesktopBridgeVersion: 1, Capabilities: []string{"web-ui", "movie-cards-v1"},
+		DesktopBridgeVersion: 1, Capabilities: []string{"web-ui", "movie-cards-v1", "movie-image-variants-v1"},
 	}
 }
 

@@ -547,33 +547,36 @@ type ScanSummaryDTO struct {
 
 // MovieListItemDTO is a compact movie row for library list views.
 type MovieListItemDTO struct {
-	FileCount      int      `json:"fileCount"`
-	ID             string   `json:"id"`
-	Title          string   `json:"title"`
-	Code           string   `json:"code"`
-	Studio         string   `json:"studio"`
-	Actors         []string `json:"actors"`
-	Tags           []string `json:"tags"`
-	UserTags       []string `json:"userTags,omitempty"`
-	RuntimeMinutes int      `json:"runtimeMinutes"`
-	Rating         float64  `json:"rating"`
-	UserRating     *float64 `json:"userRating,omitempty"`
-	IsFavorite     bool     `json:"isFavorite"`
-	AddedAt        string   `json:"addedAt"`
-	Location       string   `json:"location"`
-	Resolution     string   `json:"resolution"`
-	Year           int      `json:"year"`
-	ReleaseDate    string   `json:"releaseDate,omitempty"`
-	CoverURL       string   `json:"coverUrl,omitempty"`
-	ThumbURL       string   `json:"thumbUrl,omitempty"`
+	CoverVariants  []ImageVariantDTO `json:"coverVariants,omitempty"`
+	ThumbVariants  []ImageVariantDTO `json:"thumbVariants,omitempty"`
+	FileCount      int               `json:"fileCount"`
+	ID             string            `json:"id"`
+	Title          string            `json:"title"`
+	Code           string            `json:"code"`
+	Studio         string            `json:"studio"`
+	Actors         []string          `json:"actors"`
+	Tags           []string          `json:"tags"`
+	UserTags       []string          `json:"userTags,omitempty"`
+	RuntimeMinutes int               `json:"runtimeMinutes"`
+	Rating         float64           `json:"rating"`
+	UserRating     *float64          `json:"userRating,omitempty"`
+	IsFavorite     bool              `json:"isFavorite"`
+	AddedAt        string            `json:"addedAt"`
+	Location       string            `json:"location"`
+	Resolution     string            `json:"resolution"`
+	Year           int               `json:"year"`
+	ReleaseDate    string            `json:"releaseDate,omitempty"`
+	CoverURL       string            `json:"coverUrl,omitempty"`
+	ThumbURL       string            `json:"thumbUrl,omitempty"`
 	// TrashedAt is RFC3339 when the movie is in the recycle bin; omitted when active.
 	TrashedAt string `json:"trashedAt,omitempty"`
 }
 
 // MovieDetailDTO extends MovieListItemDTO with full details for the detail page.
 type MovieDetailDTO struct {
-	Files          []MovieFileDTO `json:"files,omitempty"`
-	SelectedFileID string         `json:"-"`
+	PreviewVariants map[string][]ImageVariantDTO `json:"previewVariants,omitempty"`
+	Files           []MovieFileDTO               `json:"files,omitempty"`
+	SelectedFileID  string                       `json:"-"`
 	MovieListItemDTO
 	Summary         string   `json:"summary"`
 	PreviewImages   []string `json:"previewImages,omitempty"`
