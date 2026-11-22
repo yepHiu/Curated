@@ -276,7 +276,7 @@ const getNavigationTarget = (page: AppPage) => {
             :aria-label="section.title"
           >
             <span
-              class="overflow-hidden text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground transition-[opacity,max-height,padding] duration-200 motion-reduce:transition-none"
+              class="overflow-hidden text-sm font-medium uppercase tracking-normal text-muted-foreground transition-[opacity,max-height,padding] duration-200 motion-reduce:transition-none"
               :class="props.compact ? 'max-h-0 px-0 opacity-0' : 'max-h-8 px-2 opacity-100'"
               :aria-hidden="props.compact"
             >
