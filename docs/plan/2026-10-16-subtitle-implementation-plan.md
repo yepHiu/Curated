@@ -427,3 +427,21 @@ backend/ 目录：
 实现提交d03a402a。go test ./internal/subtitles、go vet ./internal/subtitles、go test ./internal/app -run 'Subtitle|AIObservations' -count=1与go vet ./internal/app通过。新增回归模拟8→4→2条容量回退，首次成功前取消，读取检查点后直接按2条恢复并逐条验证无遗漏/重复；应用层确认length原因和32768输出token保留。以HEAD后端快照加本次4个源码文件，通过同一scripts/dev/build-backend.ps1构建至忽略目录.workspace/subtitle-capacity-build/bin/curated-dev.exe，未混入其它会话正在修改的整理功能。
 
 本轮未重启当前后端、未手动重试付费任务，构建产物尚未激活。此修复防止后续重复走已知失败容量，但不能保证供应商一次返回成功或缩短既有请求；当前内存中任务仍运行旧逻辑。
+
+### 原生播放器已生成 AI 字幕不显示（2026-11-22）
+
+核对并保留工作区已有的 restart 长资产 ID 兼容和 macOS 系统字体修复。原生播放器旧 ID 过滤只接受首次成品，重新生成后的合法成品会被排除。补齐字幕轨 ID 缓存：关闭后重开、语言切换和修改样式时明确选择对应轨，避免 `sid=auto` 重新自动选轨。已缓存字幕的命令重试成功后清除错误提示；独立播放器入口加载现有中英日字幕翻译，使菜单和加载错误可读。没有改变字幕生成任务、公共 API 或配置。
+
+验证：4 个 Electron 测试文件 40 项通过，Web 字幕与原生音量 2 文件 7 项通过；两套 Electron TypeScript 检查、前端 typecheck 和入口 ESLint 通过。Electron 主进程、连接页和播放器 Vite 页面已编译。真实引擎集成在 FFmpeg 启动时收到 `EPERM`，因此未完成字幕画面验收；开发 Server 8080 未运行，未对用户片源进行联调。需要在可运行原生工具的环境完成 Desktop 构建并重开播放器，已安装客户端不会因源文件修改自动更新。
+
+完整 Desktop 构建在 Windows 宿主资源编译处失败：显式指定现有 gcc 后，windres 返回 `preprocessing failed` / `NATIVE_HOST_RESOURCE_BUILD_FAILED`。播放器页面单独构建通过，不将其视为完整 Desktop 出包成功。尝试按最小单元提交菜单翻译时，`.git/index.lock` 写入被拒绝；修改保留在工作区，未提交或推送。
+
+### 原生字幕设置窗口适配（2026-11-22，后续）
+
+独立播放器沿用严格 CSP，禁止 `unsafe-eval`。字幕菜单此前未注册文案，直接导入 JSON 字符串又会触发 vue-i18n 运行时编译；现在仅注册菜单所需的中英日消息函数，与现有原生文案一致，不放宽 CSP。独立样式入口显式包含字幕面板与偏移提示。原生字幕按钮使用 HUD 图标样式并标出字幕启用状态；面板提供关闭按钮，窄窗限高滚动，语言下拉和开关标签随当前语言更新。
+
+字幕与倍速菜单分别保存展开状态，展开期间禁用播放器快捷键，避免空格切换背景时暂停、Esc 关闭菜单时退出全屏。数字控件保留输入草稿，在失焦或 Enter 时提交并校验范围，允许输入完整字号及负数偏移，清空输入则恢复原值。共享 Web 字幕面板同步获得数字编辑和关闭按钮改进。
+
+验证：4 个相关前端测试文件共 13 项通过（含禁止 Function 编译的三语回归、数字编辑回归）；前端 typecheck 和定向 ESLint 通过。权限调整后显式指定现有 MinGW gcc，完整 `pnpm build:electron:main` 成功；随后播放器页面按最终修改重新构建。真实 Windows mpv 集成 2 项通过，覆盖字幕加载、关闭后重开、样式参数与播放控制，解决上一节环境阻断，但不代表 macOS 或用户片源画面验收。
+
+Playwright 使用最终生产播放器页面、保留 CSP，以模拟 Desktop bridge 验证 1000×720、720×480、390×600 面板边界及无横向溢出，检查字号 32、偏移 -1.5、空格切换背景、双语选择、全屏状态下 Esc 只关面板并恢复触发器焦点，以及英文加载失败和日文无字幕状态。截图位于忽略目录 `output/playwright/native-subtitles-*.png`；此 UI 检查不把浏览器画面当作 mpv 视频合成验收。产物已更新至 `electron-dist/`，未修改已安装客户端或发布安装包。
