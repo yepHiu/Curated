@@ -4,6 +4,7 @@ import path from "node:path"
 import { defaultSubtitleDisplay, validateSubtitleDisplay, mergeSubtitleSRT, plainSubtitleSRT, type SubtitleDisplay } from "./subtitle-format.js"
 import { randomUUID } from "node:crypto"
 import { EventEmitter } from "node:events"
+import { isPlaybackAuthStatus } from "./playback-auth.js"
 import { NativeMediaProxy, type MediaFetcher } from "./native-media-proxy.js"
 import { NativeMpvPlayer } from "./native-mpv-player.js"
 import { emptyNativePlayerState, type NativeLabMovie, type NativePlayerState } from "./native-player-contract.js"
@@ -140,7 +141,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       redirect: "error", signal: AbortSignal.timeout(5000) })
     if (!response.ok) {
       await response.body?.cancel()
-      throw new Error(response.status === 401 || response.status === 403 ? "SERVER_LOCKED" : `SERVER_HTTP_${response.status}`)
+      throw new Error(isPlaybackAuthStatus(response.status) ? "SERVER_LOCKED" : `SERVER_HTTP_${response.status}`)
     }
     return response.status === 204 ? undefined as T : await response.json() as T
   }
@@ -185,7 +186,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       await this.surface.setTitle(movie.code?.trim() || "Curated")
       const proxy = new NativeMediaProxy(`${context.origin}/api/library/movies/${encodeURIComponent(movie.id)}/stream?fileId=${encodeURIComponent(fileId)}`, async (url, init) => {
         const response = await context.fetch(url, init)
-        if (response.status === 401 || response.status === 403) {
+        if (isPlaybackAuthStatus(response.status)) {
           active.locked = true
           void this.run(async () => { if (this.active === active) await this.finish("SERVER_LOCKED") })
         }
@@ -220,7 +221,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
         void this.run(async () => {
           if (this.active !== active) return
           try { await this.ensureUnlocked(context) }
-          catch { return } // 临时网络错误保留播放；401/403 已停止并发布锁定状态。
+          catch { return } // 临时网络错误保留播放；认证失效已停止并发布锁定状态。
           await this.save(active)
         }).finally(() => { this.periodicPending = false })
       }, 5000)
@@ -479,13 +480,18 @@ export class NativePlaybackCoordinator extends EventEmitter {
       active.subtitleAssets = assets.filter(asset => /^[a-f0-9]{32}-[012]$/.test(asset.id) && asset.fileId === active.fileId && asset.format === "srt" && ["zh-CN", "ja"].includes(asset.language))
       const preferenceScope = `${active.context.origin}:${active.fileId}:${active.subtitleAssets.map(asset => asset.id).sort().join(",")}`
       this.snapshotState.subtitles = { available: active.subtitleAssets.map(asset => asset.language), display: { ...defaultSubtitleDisplay }, preferenceScope }
-    } catch { active.subtitleAssets = []; this.snapshotState.subtitles = { available: [], display: { ...defaultSubtitleDisplay }, error: "SUBTITLE_LOAD_FAILED" } }
+    } catch (error) {
+      // 字幕是可选能力，但锁定响应必须交给调用方停止播放，不能降级为无字幕。
+      if (error instanceof Error && error.message === "SERVER_LOCKED") throw error
+      active.subtitleAssets = []
+      this.snapshotState.subtitles = { available: [], display: { ...defaultSubtitleDisplay }, error: "SUBTITLE_LOAD_FAILED" }
+    }
   }
   private async subtitleText(active: Active, language: string): Promise<string> {
     const asset = active.subtitleAssets?.find(item => item.language === language)
     if (!asset) throw new Error("SUBTITLE_NOT_AVAILABLE")
     const response = await active.context.fetch(`${active.context.origin}/api/subtitles/${encodeURIComponent(asset.id)}/content`, { redirect: "error", signal: AbortSignal.timeout(10000) })
-    if (!response.ok) { await response.body?.cancel(); throw new Error(response.status === 401 || response.status === 403 ? "SERVER_LOCKED" : "SUBTITLE_LOAD_FAILED") }
+    if (!response.ok) { await response.body?.cancel(); throw new Error(isPlaybackAuthStatus(response.status) ? "SERVER_LOCKED" : "SUBTITLE_LOAD_FAILED") }
     const reader = response.body?.getReader()
     if (!reader) throw new Error("SUBTITLE_LOAD_FAILED")
     const chunks: Uint8Array[] = []; let total = 0

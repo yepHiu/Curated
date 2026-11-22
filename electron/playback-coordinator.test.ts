@@ -70,6 +70,71 @@ function fixture() {
     lock: (status = 200) => { unlocked = false; authStatus = status } }
 }
 describe("production native coordinator", () => {
+  // 公开状态检查和受保护请求之间撤销会话，必须走锁定收尾。
+  it.each(["detail", "descriptor", "subtitle-list"])("handles HTTP 423 during startup %s", async phase => {
+    const f = fixture()
+    const fetcher = f.context.fetch
+    f.context.fetch = async (url, init) => {
+      // 仅在指定启动阶段模拟 Server 实际的锁定响应。
+      const route = new URL(url).pathname
+      if (phase === "detail" && route === "/api/library/movies/a"
+        || phase === "descriptor" && route.endsWith("/playback-session")
+        || phase === "subtitle-list" && route.endsWith("/subtitles")) return new Response(null, { status: 423 })
+      return fetcher(url, init)
+    }
+    try {
+      await expect(f.coordinator.open(f.context, { movieId: "a", autoplay: true })).rejects.toThrow("SERVER_LOCKED")
+      expect(f.coordinator.snapshot()).toMatchObject({ windowOpen: false, state: { error: "SERVER_LOCKED" } })
+      expect(f.players.every(player => {
+        // 即使媒体已预加载，仍须释放对应引擎。
+        return player.stopped
+      })).toBe(true)
+    } finally { await f.coordinator.stop() }
+  })
+
+  // 字幕下载和重新读取列表都可能在预检后遭到会话撤销。
+  it.each(["list", "content"])("stops playback on HTTP 423 from subtitle %s", async phase => {
+    const f = fixture()
+    const fetcher = f.context.fetch
+    const asset = "a".repeat(32) + "-1"
+    let revoked = false
+    f.context.fetch = async (url, init) => {
+      // 启动时可读列表；命令阶段才模拟鉴权竞争。
+      const route = new URL(url).pathname
+      if (route.endsWith("/subtitles")) return revoked && phase === "list" ? new Response(null, { status: 423 })
+        : Response.json([{ id: asset, fileId: "p1", language: "zh-CN", format: "srt" }])
+      if (route === `/api/subtitles/${asset}/content`) return new Response(null, { status: 423 })
+      return fetcher(url, init)
+    }
+    try {
+      const session = await f.coordinator.open(f.context, { movieId: "a", autoplay: true })
+      revoked = true
+      await expect(f.coordinator.command(session.sessionId, { action: "subtitles", display: defaultSubtitleDisplay })).rejects.toThrow("SERVER_LOCKED")
+      expect(f.players[0]!.stopped).toBe(true)
+      expect(f.coordinator.snapshot()).toMatchObject({ windowOpen: false, state: { error: "SERVER_LOCKED" } })
+    } finally { await f.coordinator.stop() }
+  })
+
+  // 真实 loopback 媒体请求收到 423 后立即回收播放器，无需等待周期轮询。
+  it("stops playback when its media proxy receives HTTP 423", async () => {
+    const f = fixture()
+    const fetcher = f.context.fetch
+    const start = vi.spyOn(Player.prototype, "start")
+    f.context.fetch = async (url, init) => {
+      // 媒体流独立于公开 auth/status 返回锁定。
+      return new URL(url).pathname.endsWith("/stream") ? new Response(null, { status: 423 }) : fetcher(url, init)
+    }
+    try {
+      await f.coordinator.open(f.context, { movieId: "a", autoplay: true })
+      const mediaUrl = start.mock.calls[0]![1]
+      try { await (await fetch(mediaUrl)).body?.cancel() }
+      catch { /* 收尾可先关闭 loopback 连接；状态才是权威结果。 */ }
+      await f.coordinator.run(async () => { /* 等待已排队的锁定收尾。 */ })
+      expect(f.players[0]!.stopped).toBe(true)
+      expect(f.coordinator.snapshot()).toMatchObject({ windowOpen: false, state: { error: "SERVER_LOCKED" } })
+    } finally { start.mockRestore(); await f.coordinator.stop() }
+  })
+
   it("prepares a frozen frame without writes, discards cancelled presses and rejects recording across seeks", async () => {
     const f = fixture()
     try {
@@ -187,7 +252,7 @@ describe("production native coordinator", () => {
       f.players[0]!.state.positionSec = 14
       vi.useFakeTimers()
       await f.coordinator.capture(session.sessionId, frame.id, "gif")
-      if (failure === "locked") f.clipTaskHttp(403)
+      if (failure === "locked") f.clipTaskHttp(423)
       if (failure === "unavailable") f.clipTaskHttp(503)
       await vi.advanceTimersByTimeAsync(failure === "locked" ? 0 : 150_000)
       if (failure === "locked") expect(f.coordinator.snapshot()).toMatchObject({ windowOpen: false, state: { error: "SERVER_LOCKED" } })
@@ -197,7 +262,7 @@ describe("production native coordinator", () => {
       expect(f.requests.filter(request => request.path === "/api/tasks/clip-task")).toHaveLength(calls)
     } finally { await f.coordinator.stop(); vi.useRealTimers() }
   })
-  it.each([401, 403])("stops playback when cancellation is rejected with HTTP %i", async status => {
+  it.each([401, 403, 423])("stops playback when cancellation is rejected with HTTP %i", async status => {
     const f = fixture()
     const fetcher = f.context.fetch
     f.context.fetch = (url, init) => new URL(url).pathname.endsWith('/clip') ? Promise.resolve(new Response(null, {status})) : fetcher(url, init)
@@ -274,7 +339,7 @@ describe("production native coordinator", () => {
       expect(f.uploads).toHaveLength(1)
     } finally { await f.coordinator.stop() }
   })
-  it.each([401, 403])("closes playback when the frame upload returns HTTP %i", async status => {
+  it.each([401, 403, 423])("closes playback when the frame upload returns HTTP %i", async status => {
     const f = fixture()
     try {
       const session = await f.coordinator.open(f.context, { movieId: "a", autoplay: true })
@@ -366,7 +431,7 @@ describe("production native coordinator", () => {
       expect(f.coordinator.snapshot().windowOpen).toBe(false)
     } finally { await f.coordinator.stop() }
   })
-  it.each([401, 403])("stops and closes the native surface when periodic authentication returns HTTP %i", async status => {
+  it.each([401, 403, 423])("stops and closes the native surface when periodic authentication returns HTTP %i", async status => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] })
     const f = fixture()
     try {

@@ -17,6 +17,18 @@ async function close(server: Server): Promise<void> {
 }
 
 describe("native media proxy", () => {
+  // 上游真实的 423 锁定与网关认证失败均映射为权限错误，而非媒体网络错误。
+  it.each([401, 403, 423])("maps upstream HTTP %i to a media authorization failure", async status => {
+    const proxy = new NativeMediaProxy("http://server.invalid/stream", async () => {
+      // 只提供隔离响应，不访问实际 Server。
+      return new Response("locked", { status })
+    })
+    try {
+      const response = await fetch(await proxy.start())
+      expect(response.status).toBe(403)
+      expect(await response.text()).toBe("")
+    } finally { await proxy.stop() }
+  })
   it("counts actual media bytes including repeated ranges, excludes HEAD and resets on restart", async () => {
     const proxy = new NativeMediaProxy("https://user:password@server.test:8443/private?token=secret", async (_url, init) =>
       new Response(init?.method === "HEAD" ? null : "data", { status: 206, headers: { "Content-Type": "video/mp4; codecs=avc1" } }))

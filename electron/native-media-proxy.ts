@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto"
 import { Readable, Transform } from "node:stream"
 import { pipeline } from "node:stream/promises"
 import { EventEmitter } from "node:events"
+import { isPlaybackAuthStatus } from "./playback-auth.js"
 import type { NativeNetworkDiagnostics } from "./native-player-contract.js"
 
 export type MediaFetcher = (url: string, init?: RequestInit) => Promise<Response>
@@ -90,7 +91,7 @@ export class NativeMediaProxy extends EventEmitter {
       clearTimeout(deadline)
       if (![200, 206, 416].includes(upstream.status)) {
         await upstream.body?.cancel()
-        output.writeHead(upstream.status === 401 || upstream.status === 403 ? 403 : 502).end()
+        output.writeHead(isPlaybackAuthStatus(upstream.status) ? 403 : 502).end()
         return
       }
       const mime = upstream.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase()
