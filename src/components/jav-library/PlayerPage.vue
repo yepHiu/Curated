@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Circle,
   ExternalLink,
+  FastForward,
   Film,
   Info,
   Loader2,
@@ -21,8 +22,11 @@ import {
   PictureInPicture2,
   Play,
   Repeat2,
+  Rewind,
   SkipBack,
   SkipForward,
+  Volume2,
+  VolumeX,
 } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { HttpClientError } from "@/api/http-client"
