@@ -83,6 +83,19 @@ func buildPlaybackDecision(input playbackDecisionInput) playbackDecision {
 	}
 
 	if directEligible {
+		// A large MP4 sample index must be downloaded before Media3 can decode
+		// any frame. For a supported native source, stream-copy HLS replaces that
+		// startup transfer with a small init segment without changing codecs.
+		if input.NativeDirect != nil && input.StreamPushEnabled && remuxEligible &&
+			input.MediaInfo.MP4InitializationBytes > 4<<20 && !input.MediaInfo.TimestampsUnstable() {
+			decision.Mode = contracts.PlaybackModeHLS
+			decision.SessionKind = playbackSessionKindRemuxHLS
+			decision.PreferRemux = true
+			decision.CanDirectPlay = false
+			decision.ReasonCode = "native_large_mp4_index"
+			decision.ReasonMessage = "Stream-copy HLS avoids downloading a large MP4 initialization index before playback."
+			return decision
+		}
 		if input.StreamPushEnabled && input.MediaInfo.TimestampsUnstable() {
 			decision.Mode = contracts.PlaybackModeHLS
 			decision.SessionKind = chooseHLSSessionKind(remuxEligible)

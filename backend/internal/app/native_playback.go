@@ -42,6 +42,10 @@ func (a *App) nativePlaybackSource(ctx context.Context, movieID string) (contrac
 	if err != nil {
 		return contracts.NativePlaybackPlanDTO{}, info, err
 	}
+	container := normalizeSourceContainer(info.Container, detail.Location)
+	if container == "mov" || container == "mp4" {
+		info.MP4InitializationBytes = playback.MP4InitializationBytes(detail.Location)
+	}
 	after, err := os.Stat(detail.Location)
 	if err != nil {
 		return contracts.NativePlaybackPlanDTO{}, info, err

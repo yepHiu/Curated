@@ -17,24 +17,25 @@ import (
 // MediaInfo is the lightweight probe result used by playback planning.
 // It intentionally keeps only the fields needed to choose direct play, remux, or transcode.
 type MediaInfo struct {
-	Container           string
-	VideoCodec          string
-	AudioCodec          string
-	DurationSec         float64
-	RFrameRate          string
-	AvgFrameRate        string
-	HasNegativeVideoPTS bool
-	VideoProfile        string
-	VideoLevel          int
-	PixelFormat         string
-	Width               int
-	Height              int
-	BitRate             int64
-	AudioProfile        string
-	AudioChannels       int
-	AudioSampleRate     int
-	VideoStreams        int
-	AudioStreams        int
+	Container              string
+	VideoCodec             string
+	AudioCodec             string
+	DurationSec            float64
+	RFrameRate             string
+	AvgFrameRate           string
+	HasNegativeVideoPTS    bool
+	MP4InitializationBytes int64
+	VideoProfile           string
+	VideoLevel             int
+	PixelFormat            string
+	Width                  int
+	Height                 int
+	BitRate                int64
+	AudioProfile           string
+	AudioChannels          int
+	AudioSampleRate        int
+	VideoStreams           int
+	AudioStreams           int
 }
 
 type mediaInfoCacheKey struct {
