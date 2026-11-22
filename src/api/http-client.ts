@@ -97,20 +97,26 @@ function buildMonitorPath(path: string, params?: Record<string, string | number 
   return `${url.pathname}${url.search}`
 }
 
-async function monitoredFetch(
+/** 将响应正文消费纳入同一次请求的超时、取消和性能记录生命周期。 */
+async function monitoredRequest<T>(
   method: string,
   path: string,
   init: RequestInit,
+  consume: (response: Response) => Promise<T>,
   params?: Record<string, string | number | undefined>,
   options?: RequestOptions,
-): Promise<Response> {
+): Promise<T> {
   const controller = new AbortController()
   const externalSignal = init.signal
+  // 调用方取消应一直转发到正文读取结束。
   const abort = () => controller.abort()
   if (externalSignal?.aborted) abort()
   externalSignal?.addEventListener("abort", abort, { once: true })
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS
-  const timeoutId = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined
+  const timeoutId = timeoutMs > 0 ? setTimeout(() => {
+    // 同一截止时间覆盖响应头及完整正文。
+    controller.abort()
+  }, timeoutMs) : undefined
   const requestId = DEV_REQUEST_MONITOR_ENABLED
     ? devRequestMonitor.startRequest({
       method,
@@ -118,6 +124,7 @@ async function monitoredFetch(
     })
     : null
 
+  let status: number | null = null
   try {
     const response = await fetch(buildUrl(path, params), {
       method,
@@ -125,20 +132,23 @@ async function monitoredFetch(
       signal: controller.signal,
       credentials: "include",
     })
+    status = response.status
+    const result = await consume(response)
     if (requestId) {
       devRequestMonitor.finishRequest(requestId, {
         status: response.status,
       })
     }
-    return response
+    return result
   } catch (error) {
     if (requestId) {
       devRequestMonitor.finishRequest(requestId, {
-        status: null,
+        status,
         failed: true,
       })
     }
-    if (error instanceof Error && error.name === "AbortError") {
+    // 以本次控制器状态区分超时和主动取消，兼容跨 realm 的 DOMException。
+    if (controller.signal.aborted) {
       if (externalSignal?.aborted) throw error
       throw new HttpClientError(0, {
         code: "COMMON_TIMEOUT",
@@ -153,6 +163,7 @@ async function monitoredFetch(
   }
 }
 
+/** 读取完整 JSON 正文；兼容无正文的成功响应。 */
 async function parseJsonBody<T>(response: Response): Promise<T> {
   const text = await response.text()
   if (!text.trim()) {
@@ -161,19 +172,13 @@ async function parseJsonBody<T>(response: Response): Promise<T> {
   return JSON.parse(text) as T
 }
 
+/** 在请求生命周期内解析成功响应或服务端错误。 */
 async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    let apiError: ApiError | undefined
-    try {
-      apiError = await parseJsonBody<ApiError>(response)
-    } catch {
-      // response body was not JSON
-    }
-    throw new HttpClientError(response.status, apiError)
-  }
+  if (!response.ok) await handleErrorResponse(response)
   return parseJsonBody<T>(response)
 }
 
+/** 容忍非 JSON 错误页，但保留正文读取的取消和网络异常。 */
 async function handleErrorResponse(response: Response): Promise<never> {
   let apiError: ApiError | undefined
   try {
@@ -181,10 +186,29 @@ async function handleErrorResponse(response: Response): Promise<never> {
     if (text.trim()) {
       apiError = JSON.parse(text) as ApiError
     }
-  } catch {
-    // ignore
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error
   }
   throw new HttpClientError(response.status, apiError)
+}
+
+/** 有界读取字幕正文；声明超限时立即释放未读取的响应体。 */
+async function handleTextResponse(response: Response): Promise<string> {
+  if (!response.ok) await handleErrorResponse(response)
+  const length = Number(response.headers.get("Content-Length"))
+  if (length > 16 * 1024 * 1024) {
+    await response.body?.cancel()
+    throw new Error("Subtitle file exceeds size limit")
+  }
+  const text = await response.text()
+  if (text.length > 16 * 1024 * 1024) throw new Error("Subtitle file exceeds size limit")
+  return text
+}
+
+/** 在请求截止时间内完成二进制下载，并保留下载文件名头。 */
+async function handleBlobResponse(response: Response): Promise<{ blob: Blob; contentDisposition: string | null }> {
+  if (!response.ok) await handleErrorResponse(response)
+  return { blob: await response.blob(), contentDisposition: response.headers.get("Content-Disposition") }
 }
 
 function parseXHRJsonBody<T>(text: string): T {
@@ -217,41 +241,36 @@ function formatUploadDiagnosticContext(context?: UploadDiagnosticContext): strin
 }
 
 export const httpClient = {
+  /** 获取完整字幕文本。 */
   async getText(path: string): Promise<string> {
-    const response = await monitoredFetch("GET", path, { headers: { Accept: "text/plain" } })
-    if (!response.ok) await handleErrorResponse(response)
-    const length = Number(response.headers.get("Content-Length"))
-    if (length > 16 * 1024 * 1024) throw new Error("Subtitle file exceeds size limit")
-    const text = await response.text()
-    if (text.length > 16 * 1024 * 1024) throw new Error("Subtitle file exceeds size limit")
-    return text
+    return monitoredRequest("GET", path, { headers: { Accept: "text/plain" } }, handleTextResponse)
   },
+  /** 获取 JSON；调用方可取消响应头或正文读取。 */
   async get<T>(path: string, params?: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<T> {
-    const response = await monitoredFetch("GET", path, {
+    return monitoredRequest("GET", path, {
       headers: { "Accept": "application/json" },
       signal,
-    }, params)
-    return handleResponse<T>(response)
+    }, handleResponse<T>, params)
   },
 
+  /** 提交 JSON，允许显式调整长任务的整次请求期限。 */
   async post<T>(path: string, body?: unknown, signal?: AbortSignal, options?: RequestOptions): Promise<T> {
-    const response = await monitoredFetch("POST", path, {
+    return monitoredRequest("POST", path, {
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal,
-    }, undefined, options)
-    return handleResponse<T>(response)
+    }, handleResponse<T>, undefined, options)
   },
 
+  /** 提交 multipart 并读取 JSON 结果。 */
   async postForm<T>(path: string, body: FormData): Promise<T> {
-    const response = await monitoredFetch("POST", path, {
+    return monitoredRequest("POST", path, {
       headers: { "Accept": "application/json" },
       body,
-    })
-    return handleResponse<T>(response)
+    }, handleResponse<T>)
   },
 
   async postFormWithProgress<T>(
@@ -392,53 +411,46 @@ export const httpClient = {
     })
   },
 
+  /** 局部更新资源并读取 JSON 结果。 */
   async patch<T>(path: string, body?: unknown): Promise<T> {
-    const response = await monitoredFetch("PATCH", path, {
+    return monitoredRequest("PATCH", path, {
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    })
-    return handleResponse<T>(response)
+    }, handleResponse<T>)
   },
 
+  /** 替换资源并兼容无正文的成功响应。 */
   async put<T = void>(path: string, body?: unknown): Promise<T> {
-    const response = await monitoredFetch("PUT", path, {
+    return monitoredRequest("PUT", path, {
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    })
-    return handleResponse<T>(response)
+    }, handleResponse<T>)
   },
 
+  /** 删除资源并等待响应读取完成。 */
   async delete<T = void>(path: string): Promise<T> {
-    const response = await monitoredFetch("DELETE", path, {
+    return monitoredRequest("DELETE", path, {
       headers: { "Accept": "application/json" },
-    })
-    return handleResponse<T>(response)
+    }, handleResponse<T>)
   },
 
+  /** 请求导出资源；下载正文同样受请求期限约束。 */
   async postBlob(
     path: string,
     body?: unknown,
   ): Promise<{ blob: Blob; contentDisposition: string | null }> {
-    const response = await monitoredFetch("POST", path, {
+    return monitoredRequest("POST", path, {
       headers: {
         "Content-Type": "application/json",
         "Accept": "image/webp,application/zip,application/json;q=0.1,*/*;q=0.05",
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    })
-    if (!response.ok) {
-      await handleErrorResponse(response)
-    }
-    const blob = await response.blob()
-    return {
-      blob,
-      contentDisposition: response.headers.get("Content-Disposition"),
-    }
+    }, handleBlobResponse)
   },
 }

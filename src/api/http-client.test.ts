@@ -68,7 +68,89 @@ describe("resolveApiBaseUrl", () => {
   })
 })
 
+/** 返回真实流式 Response，模拟已收响应头但正文仍在传输的 fetch。 */
+function streamingFetch(status = 200) {
+  let signal: AbortSignal | null | undefined
+  let streamController: ReadableStreamDefaultController<Uint8Array>
+  const fetch = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+    // 模拟浏览器在请求取消时同时中止响应体读取。
+    signal = init?.signal
+    return new Response(new ReadableStream<Uint8Array>({
+      /** 保持正文打开，交由测试显式完成或取消。 */
+      start(controller) {
+        streamController = controller
+        signal?.addEventListener("abort", () => {
+          // 与原生 fetch 的正文读取错误保持一致。
+          controller.error(new DOMException("Aborted", "AbortError"))
+        }, { once: true })
+      },
+    }), { status })
+  })
+  return {
+    fetch,
+    /** 暴露传输 signal，验证取消真正到达网络层。 */
+    signal: () => signal,
+    /** 完成正文传输，验证完成后的计时器回收。 */
+    finish(text: string) {
+      streamController.enqueue(new TextEncoder().encode(text))
+      streamController.close()
+    },
+  }
+}
+
 describe("httpClient", () => {
+  // 不同正文类型及错误响应都必须受相同截止时间保护。
+  it.each(["json", "text", "blob", "error"])("times out a stalled %s body after headers arrive", async kind => {
+    vi.useFakeTimers()
+    const transport = streamingFetch(kind === "error" ? 500 : 200)
+    vi.stubGlobal("fetch", transport.fetch)
+    const request = kind === "text" ? httpClient.getText("/subtitles")
+      : kind === "blob" ? httpClient.postBlob("/export") : httpClient.get("/slow-body")
+    const result = expect(request).rejects.toMatchObject({ status: 0, apiError: { code: "COMMON_TIMEOUT", retryable: true } })
+    await vi.advanceTimersByTimeAsync(30_000)
+    await result
+    expect(transport.signal()?.aborted).toBe(true)
+  })
+
+  // 关闭请求期限的长任务仍须允许用户在正文阶段取消。
+  it.each([200, 500])("forwards cancellation while reading an HTTP %i body with no deadline", async status => {
+    vi.useFakeTimers()
+    const transport = streamingFetch(status)
+    vi.stubGlobal("fetch", transport.fetch)
+    const caller = new AbortController()
+    const request = httpClient.post("/slow-body", {}, caller.signal, { timeoutMs: 0 })
+    const result = expect(request).rejects.toMatchObject({ name: "AbortError" })
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(transport.signal()?.aborted).toBe(false)
+    caller.abort()
+    await result
+    expect(transport.signal()?.aborted).toBe(true)
+  })
+
+  // 成功后的迟到取消不能再作用于已经结束的传输。
+  it("releases the deadline and cancellation listener after consuming the body", async () => {
+    vi.useFakeTimers()
+    const transport = streamingFetch()
+    vi.stubGlobal("fetch", transport.fetch)
+    const caller = new AbortController()
+    const request = httpClient.get("/complete", undefined, caller.signal)
+    await vi.advanceTimersByTimeAsync(0)
+    transport.finish('{"ok":true}')
+    await expect(request).resolves.toEqual({ ok: true })
+    caller.abort()
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(transport.signal()?.aborted).toBe(false)
+  })
+
+  // 非 JSON 服务端错误页保持 HTTP 状态；不能把解析错误当作网络故障。
+  it("preserves the status of a non-JSON error response", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      // 模拟代理返回的 HTML 错误页。
+      return new Response("<html>unavailable</html>", { status: 502 })
+    }))
+    await expect(httpClient.get("/failed")).rejects.toMatchObject({ status: 502 })
+  })
+
   it("waits for a long-running POST when its deadline is disabled", async () => {
     vi.useFakeTimers()
     let signal: AbortSignal | null | undefined
