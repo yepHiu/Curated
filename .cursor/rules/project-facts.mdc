@@ -13,7 +13,7 @@ alwaysApply: true
 
 新增 API：GET /api/subtitles/settings；POST /api/subtitles/provider/test；GET /api/library/movies/{movieId}/subtitle-audio-tracks；POST/GET .../subtitle-jobs；GET /api/subtitle-jobs/{jobId}；POST .../{cancel|retry}；GET .../movies/{movieId}/subtitles；GET /api/subtitles/{assetId}/content；POST .../reveal。写入/测试/定位仅本机，远端认证只读/下载。弹窗每2秒读取持久化进度，未接通用任务中心/SSE。测试密钥只验证上传授权。正文提示词 subtitle-translation-v2；翻译 token 沿用AI usage的subtitle渠道。
 
-Web使用绝对媒体时间的纯文本字幕层；原生由main认证下载到私有临时文件并控制mpv，renderer不传路径或URL；四种语言模式、样式和正值延后偏移，截图维持video-only。样式按设备；偏移按Server/file/资产版本。当前会话生成新版后需重开播放器。普通整理复制受管字幕并更新索引；永久删除只删登记且hash未变化文件。离线路径迁移同一事务更新字幕源路径，成品仍需随媒体搬迁。短音频真实供应商及Windows mpv命令验证通过，macOS字幕画面和整片质量未验收。详见docs/guide.md和字幕实施计划。
+Web使用绝对媒体时间的纯文本字幕层；原生由main认证下载到私有临时文件并控制mpv，renderer不传路径或URL；四种语言模式、样式和正值延后偏移，截图维持video-only。样式按设备；偏移按Server/file/资产版本。当前会话生成新版后需重开播放器。普通整理复制受管字幕并更新索引；永久删除只删登记且hash未变化文件。离线路径迁移同一事务更新字幕源路径，成品仍需随媒体搬迁。短音频真实供应商及Windows mpv命令验证通过。**2026-11-01**：原生侧资产 ID 与 Server 对齐（含 restart 长 ID）；macOS 准备系统字体 fontconfig 并固定 PingFang SC。正式包字幕画面与整片质量仍待实机验收。详见docs/guide.md和字幕实施计划。
 
 ## macOS Desktop 原生播放 — 2026-10-09
 
