@@ -1,7 +1,7 @@
 import { mkdtemp, writeFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { defaultSubtitleDisplay, validateSubtitleDisplay, mergeSubtitleSRT, plainSubtitleSRT, type SubtitleDisplay } from "./subtitle-format.js"
+import { defaultSubtitleDisplay, isManagedSubtitleAssetId, validateSubtitleDisplay, mergeSubtitleSRT, plainSubtitleSRT, type SubtitleDisplay } from "./subtitle-format.js"
 import { randomUUID } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { isPlaybackAuthStatus } from "./playback-auth.js"
@@ -477,7 +477,8 @@ export class NativePlaybackCoordinator extends EventEmitter {
     try {
       const assets = await this.api<{ id: string; language: string; format: string; fileId: string }[]>(active.context,
         `/api/library/movies/${encodeURIComponent(active.movie.id)}/subtitles?fileId=${encodeURIComponent(active.fileId)}`)
-      active.subtitleAssets = assets.filter(asset => /^[a-f0-9]{32}-[012]$/.test(asset.id) && asset.fileId === active.fileId && asset.format === "srt" && ["zh-CN", "ja"].includes(asset.language))
+      // 与 Server AssetPath 对齐：首次生成短 ID，整次 restart 后为含 attemptId 的长 ID；过严过滤会在默认原生的 Mac 上表现为“无字幕”。
+      active.subtitleAssets = assets.filter(asset => isManagedSubtitleAssetId(asset.id) && asset.fileId === active.fileId && asset.format === "srt" && ["zh-CN", "ja"].includes(asset.language))
       const preferenceScope = `${active.context.origin}:${active.fileId}:${active.subtitleAssets.map(asset => asset.id).sort().join(",")}`
       this.snapshotState.subtitles = { available: active.subtitleAssets.map(asset => asset.language), display: { ...defaultSubtitleDisplay }, preferenceScope }
     } catch (error) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { activeSubtitleText, defaultSubtitleDisplay, mergeSubtitleSRT, parseSRT, validateSubtitleDisplay } from "./subtitle-format"
+import { activeSubtitleText, defaultSubtitleDisplay, isManagedSubtitleAssetId, mergeSubtitleSRT, parseSRT, validateSubtitleDisplay } from "./subtitle-format"
 describe("subtitle timeline and display boundaries", () => {
   it("parses CRLF/BOM safely, strips markup and handles overlapping and half-open cues", () => {
     const cues = parseSRT('\uFEFF1\r\n00:00:01,000 --> 00:00:04,000\r\n<b>你好</b>\r\n\r\n2\r\n00:00:02,000 --> 00:00:03,000\r\n{\\pos(0,0)}世界\r\n')
@@ -15,5 +15,14 @@ describe("subtitle timeline and display boundaries", () => {
     expect(parseSRT(mergeSubtitleSRT(zh, ja))[0]).toMatchObject({ begin: 4200.1, end: 4201.9, text: "你好\nこんにちは" })
     expect(() => validateSubtitleDisplay({ ...defaultSubtitleDisplay, offset: Infinity })).toThrow()
     expect(() => validateSubtitleDisplay({ ...defaultSubtitleDisplay, size: 200 })).toThrow()
+  })
+  it("accepts first-generation and restart subtitle asset IDs used by Server AssetPath", () => {
+    const job = "a".repeat(32)
+    const attempt = "b".repeat(32)
+    expect(isManagedSubtitleAssetId(`${job}-1`)).toBe(true)
+    expect(isManagedSubtitleAssetId(`${job}-${attempt}-0`)).toBe(true)
+    expect(isManagedSubtitleAssetId(`${job}-3`)).toBe(false)
+    expect(isManagedSubtitleAssetId(`${job}-${attempt}-9`)).toBe(false)
+    expect(isManagedSubtitleAssetId(`${job}-zh`)).toBe(false)
   })
 })

@@ -3,6 +3,15 @@ export type SubtitleDisplayMode = "off" | "zh-CN" | "ja" | "bilingual"
 export interface SubtitleDisplay { mode: SubtitleDisplayMode; size: number; background: boolean; position: number; offset: number }
 export const defaultSubtitleDisplay: SubtitleDisplay = { mode: "zh-CN", size: 28, background: true, position: 8, offset: 0 }
 export interface SubtitleCue { begin: number; end: number; text: string; maxEnd: number }
+
+/**
+ * 判断字幕资产 ID 是否与 Server AssetPath 规则一致。
+ * 首次生成为 `{jobId}-{0|1|2}`（34），整次重试为 `{jobId}-{attemptId}-{0|1|2}`（67）。
+ */
+export function isManagedSubtitleAssetId(id: string): boolean {
+  return /^[a-f0-9]{32}-([a-f0-9]{32}-)?[012]$/.test(id)
+}
+
 export function validateSubtitleDisplay(value: SubtitleDisplay): SubtitleDisplay {
   if (!value || !["off", "zh-CN", "ja", "bilingual"].includes(value.mode) || typeof value.background !== "boolean"
     || !Number.isFinite(value.size) || value.size < 16 || value.size > 64

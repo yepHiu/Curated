@@ -504,4 +504,31 @@ describe("authenticated session-bound subtitles", () => {
       expect(f.players[1]!.subtitleLoads).toHaveLength(0)
     } finally { await f.coordinator.stop() }
   })
+
+  it("loads restart-scoped long subtitle asset IDs that Server AssetPath accepts", async () => {
+    const f = fixture()
+    const fetch = f.context.fetch
+    const asset = `${"c".repeat(32)}-${"d".repeat(32)}-1`
+    f.context.fetch = async (url, init) => {
+      const route = new URL(url)
+      if (route.pathname.endsWith("/subtitles")) {
+        return Response.json([
+          { id: asset, fileId: "p1", language: "zh-CN", format: "srt" },
+          { id: "not-a-managed-id", fileId: "p1", language: "zh-CN", format: "srt" },
+        ])
+      }
+      if (route.pathname === `/api/subtitles/${asset}/content`) {
+        return new Response("1\n00:00:00,000 --> 00:00:02,000\n重启后字幕\n")
+      }
+      return fetch(url, init)
+    }
+    try {
+      const session = await f.coordinator.open(f.context, { movieId: "a", fileId: "p1", autoplay: true })
+      await f.coordinator.command(session.sessionId, { action: "subtitles", display: defaultSubtitleDisplay })
+      const file = f.players[0]!.subtitleLoads.at(-1)?.filename
+      expect(file).toBeTruthy()
+      expect(await readFile(file!, "utf8")).toContain("重启后字幕")
+      expect(f.coordinator.snapshot().subtitles?.available).toEqual(["zh-CN"])
+    } finally { await f.coordinator.stop() }
+  })
 })
