@@ -1045,3 +1045,10 @@ Android 首轮对单视频/单音频、8-bit H.264 或 HEVC Main、AAC-LC/MP3 �
 诊断：Android Debug 日志记录 descriptor 与点击到 `onRenderedFirstFrame` 的耗时；新 POST 返回 `Server-Timing` 的 file/probe/playback 及 HLS queue/first_segment/prebuffer 阶段。详细 native 探测使用已有 size/mtime 内存缓存，尚未写入旧 SQLite 探测缓存；Server 重启后首次 native plan 可能重新探测。首次播放多出能力/计划请求，净收益需真机对照。没有降低现有软件转码预缓冲，未新增数据库迁移或 library-config 字段。
 
 两端必须使用包含此改动的构建才能启用新协商；源码、测试与合成媒体通过不代表已安装、已发布或首帧达标。操作与待验收项见 `docs/plan/2026-11-23-android-media-loading-performance.md`。
+
+
+### Android 大 MP4 索引起播（2026-11-23）
+
+native-playback-v1 的支持源若 MP4 moov >4 MiB、推流可用、时间戳正常且可无损复制，则优先 remux-hls，reasonCode=native_large_mp4_index，避免手机先下载大索引。保持原文件与音视频编码；旧客户端、小索引、HEVC 不因此转码。只读扫描最多64个顶层box头；无新端点、配置或数据库迁移。MOGI-141 的 moov 为16,650,985字节，无损封装服务端准备约1秒；手机首帧需另测。证据见媒体性能计划。
+
+Android HLS 播放必须按 descriptor.mode 使用 Media3 的 application/x-mpegURL；直接透传服务端 application/vnd.apple.mpegurl 会错误进入 progressive extractor。本次已修正、构建并覆盖安装测试 APK；首帧结论以真机日志为准。

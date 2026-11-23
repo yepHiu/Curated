@@ -169,4 +169,4 @@ AI 字幕任务支持侧栏进度与恢复弹窗，成品按历史记录展示�
 
 - Android 媒体加载：首批摘要接口与派生缩略图源码已实现，使用与兼容边界见 [操作指南](docs/guide.md#android-媒体加载优化2026-11-23-第一批源码) 和 [实施进度](docs/plan/2026-11-23-android-media-loading-performance.md)。
 
-Android 播放启动优化：片源能力协商与恢复已接入源码；两端构建及真机验收边界见[性能计划](docs/plan/2026-11-23-android-media-loading-performance.md)。
+Android 播放启动优化：片源能力协商、恢复与大 MP4 索引无损封装已接入源码；两端构建及真机验收边界见[性能计划](docs/plan/2026-11-23-android-media-loading-performance.md)。

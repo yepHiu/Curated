@@ -506,3 +506,26 @@ P0 的 Android/Server 计时可以分别提交；P1 是独立可靠性修复；P
 部署前发现 Android 能力查询误用 /api/server/info（404 会导致走旧协议），已改为实际路由 /api/server-info，并补充请求路径断言。NativePlaybackRepositoryTest 与 Libre Debug APK 重建通过。通过 ADB install -r 将最新 arm64-v8a APK 覆盖安装到已连接手机 dev.curated.app.debug，保留应用数据，随后 force-stop/冷启动 MainActivity；安装 Success，启动 Status ok，运行进程确认存在。版本仍为 1.0.2 / versionCode 32，因此以本次 APK 构建和 lastUpdateTime 识别更新，不能仅凭版本名判断。
 
 本次已完成测试后端重启及手机 APK 安装启动；尚未测量具体影片首帧或验证长时间播放。没有推送 Git 远程，也没有发布正式包。
+
+
+### MOGI-141 起播调查与大索引修复（2026-11-23）
+
+用户在升级后的手机上反馈 MOGI-141 仍慢。该次 App 日志显示 descriptor 355 ms、Direct/native_source_supported；server plan 约 103 ms、auto 约 1 ms。随后约 29 秒直到退出没有记录到 onRenderedFirstFrame，因此不能把这次等待归因于服务端转码，也不能报告已测得首帧耗时。
+
+实际文件为 H.264 Main L4.0、1920×1080、29.97 fps、AAC-LC 双声道，约 6.0 Mbps。MP4 顶层结构：ftyp 32 字节，紧随的 moov 为 16,650,985 字节，mdat 从 16,651,017 开始。直放需要先传输/解析约 16.7 MB 索引；文件已经是 moov 在前，单纯 faststart 不会缩小它。Range 请求验证为 206。
+
+同一片源显式无损 HLS 对照：本机 descriptor 1027 ms、首段等待 1002 ms，sessionKind=remux-hls、profile=remux_copy、prebuffer=0；临时测试会话已删除。这是服务端准备耗时，不是手机首帧结论。
+
+修复：仅对已声明可解码的 native 请求，在 stream push 可用、源时间戳正常、可 stream-copy 且 MP4 moov 超过 4 MiB 时优先 remux，reasonCode=native_large_mp4_index。4 MiB 是首版保守阈值，非跨网络最优值。普通小索引、旧 Web/Electron、不可 remux 的 HEVC、关闭推流保持原规则；负时间戳继续原保护。源文件和画质不改，不采用后台完整转码/预下载。
+
+新增解析器只读取最多 64 个顶层 box 的 8/16 字节头，通过偏移跳过媒体体，检查尺寸/溢出/截断；无法识别返回未知并保持旧决策。新索引大小进入 native 文件版本 token，不修改 SQLite schema。协商协议无需变化；实际手机复测另发现既有 HLS MIME 兼容问题，修复与重新安装记录见下。
+
+验证：MP4 前置/后置索引、损坏/溢出/扫描上限，以及大索引、小索引、旧客户端、推流关闭、HEVC、负 PTS 决策测试通过；真实 FFmpeg 合成媒体集成测试通过。部署后还需用这部实际片源确认 auto 决策、初始化字节与手机首帧。
+
+
+测试 Server 已重启至本轮构建。对 MOGI-141 发送 directPlay=true 的真实 auto 请求，返回 native_large_mp4_index / remux-hls / remux_copy，耗时1027 ms；init.mp4 为1374字节，首段为440773字节；测试会话已清理。已请求用户在手机重新打开该片进行首帧复测。协议层原 native-playback-v1 客户端可接收新决策，但实际播放器仍需下述 MIME 修复。
+
+
+手机第一次复测（01:37）确认 descriptor=Hls/native_large_mp4_index、耗时1401 ms，但紧接着 Media3 报 UnrecognizedInputFormatException，调用栈为 ProgressiveMediaPeriod。原因是服务端 application/vnd.apple.mpegurl 被客户端按普通 progressive 媒体处理。已按 descriptor.mode 将 HLS 规范化为 Media3 APPLICATION_M3U8（application/x-mpegURL），保留 direct 的原 MIME；新增有/无 MIME 与 direct 的回归测试。
+
+Android 定向测试、ktfmt 和 APK 构建通过，已再次 ADB install -r 并冷启动成功（新进程12193）。Server app/playback/server 完整测试与对应 go vet 通过。已请用户再次播放，以本轮新日志作为首帧验收，不能将第一次 HLS 解析失败写成优化成功。
