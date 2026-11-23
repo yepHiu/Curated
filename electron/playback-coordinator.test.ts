@@ -498,6 +498,12 @@ describe("authenticated session-bound subtitles", () => {
       expect(file).toBeTruthy()
       expect(await readFile(file!, "utf8")).toContain("你好")
       expect(contentRequests).toEqual([`${f.context.origin}/api/subtitles/${asset}/content`])
+      // 文件已缓存后的命令失败不能让恢复成功的字幕菜单一直显示错误。
+      vi.spyOn(f.players[0]!, "subtitles").mockRejectedValueOnce(new Error("MPV_COMMAND_FAILED"))
+      await expect(f.coordinator.command(first.sessionId, { action: "subtitles", display: defaultSubtitleDisplay })).rejects.toThrow("MPV_COMMAND_FAILED")
+      expect(f.coordinator.snapshot().subtitles?.error).toBe("SUBTITLE_LOAD_FAILED")
+      await f.coordinator.command(first.sessionId, { action: "subtitles", display: defaultSubtitleDisplay })
+      expect(f.coordinator.snapshot().subtitles?.error).toBeUndefined()
       await f.coordinator.command(first.sessionId, { action: "part", fileId: "p2" })
       await expect(stat(file!)).rejects.toThrow()
       await expect(f.coordinator.command(first.sessionId, { action: "subtitles", display: defaultSubtitleDisplay })).rejects.toThrow("STALE_PLAYBACK_SESSION")

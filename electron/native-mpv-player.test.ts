@@ -14,6 +14,7 @@ function fixture(status: "playing" | "paused") {
   }
   transport.loaded = true
   const commands: { command: unknown[]; request_id: number; async: boolean }[] = []
+  let subtitleTrack = 0
   let finish: ((error?: string) => void) | undefined
   let ready!: () => void
   const writing = new Promise<void>(resolve => { ready = resolve })
@@ -34,10 +35,11 @@ function fixture(status: "playing" | "paused") {
         })
       } else {
         queueMicrotask(() => {
+          if (message.command[0] === "sub-add") subtitleTrack++
           if (message.command[0] === "set_property" && message.command[1] === "pause") {
             transport.receive(JSON.stringify({ event: "property-change", name: "pause", data: message.command[2] }) + "\n")
           }
-          reply(message.command[1] === "time-pos" ? 12.5 : false)
+          reply(message.command[1] === "time-pos" ? 12.5 : message.command[0] === "get_property" && message.command[1] === "sid" ? subtitleTrack : false)
         })
       }
     },
@@ -46,12 +48,24 @@ function fixture(status: "playing" | "paused") {
 }
 
 describe("native frame capture during playback", () => {
+  it("restores the exact subtitle track after disabling, changing language and adjusting style", async () => {
+    const f = fixture("paused")
+    const chinese = "/main-owned/chinese.srt", japanese = "/main-owned/japanese.srt"
+    await f.player.subtitles(chinese, defaultSubtitleDisplay)
+    await f.player.subtitles(japanese, { ...defaultSubtitleDisplay, mode: "ja" })
+    await f.player.subtitles(undefined, { ...defaultSubtitleDisplay, mode: "off" })
+    await f.player.subtitles(japanese, { ...defaultSubtitleDisplay, mode: "ja", size: 32 })
+    await f.player.subtitles(chinese, defaultSubtitleDisplay)
+    expect(f.commands.filter(item => item.command[0] === "sub-add")).toHaveLength(2)
+    expect(f.commands.filter(item => item.command[0] === "set_property" && item.command[1] === "sid").map(item => item.command[2])).toEqual(["no", 2, 1])
+  })
   it("loads a main-resolved subtitle once, applies positive delay and keeps captures video-only", async () => {
     const f = fixture("paused")
     await f.player.subtitles("/main-owned/chinese.srt", { ...defaultSubtitleDisplay, offset: 1.5 })
     await f.player.subtitles("/main-owned/chinese.srt", { ...defaultSubtitleDisplay, size: 32 })
     await f.player.subtitles(undefined, { ...defaultSubtitleDisplay, mode: "off" })
     expect(f.commands.filter(item => item.command[0] === "sub-add")).toHaveLength(1)
+    expect(f.commands.some(item => JSON.stringify(item.command) === JSON.stringify(["set_property", "sub-visibility", "yes"]))).toBe(true)
     expect(f.commands.some(item => JSON.stringify(item.command) === JSON.stringify(["set_property", "sub-delay", 1.5]))).toBe(true)
     expect(f.commands.at(-1)?.command).toEqual(["set_property", "sid", "no"])
     const frame = f.player.captureFrame(); await f.writing; f.finish(); await frame

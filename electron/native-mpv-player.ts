@@ -20,7 +20,7 @@ export type NativeEngineLauncher = (executable: string, args: string[]) => Nativ
 
 /** 一次会话对应一个 mpv 引擎实例；命令关联和状态事件不跨会话。 */
 export class NativeMpvPlayer extends EventEmitter {
-  private subtitleFile?: string
+  private readonly subtitleTracks = new Map<string, number>()
   private child?: NativeEngine
   private ipcDirectory?: string
   private ipcCleanup?: Promise<void>
@@ -242,10 +242,19 @@ export class NativeMpvPlayer extends EventEmitter {
   async subtitles(filename: string | undefined, input: SubtitleDisplay): Promise<void> {
     const display = validateSubtitleDisplay(input)
     if (display.mode === "off" || !filename) { await this.command(["set_property", "sid", "no"]); return }
-    if (this.subtitleFile !== filename) { await this.command(["sub-add", filename, "select"]); this.subtitleFile = filename }
-    else await this.command(["set_property", "sid", "auto"])
+    const track = this.subtitleTracks.get(filename)
+    if (track === undefined) {
+      await this.command(["sub-add", filename, "select"])
+      const selected = await this.command(["get_property", "sid"])
+      if (typeof selected !== "number" || !Number.isSafeInteger(selected) || selected <= 0) throw new Error("SUBTITLE_LOAD_FAILED")
+      this.subtitleTracks.set(filename, selected)
+    } else {
+      // 自动选轨可能选中其它语言或内嵌轨；重开和样式更新必须保留用户选定的 AI 字幕。
+      await this.command(["set_property", "sid", track])
+    }
     // 再次固定字体：sub-add 后部分引擎会回落到缺字字体；Mac 尤其依赖系统 CJK 族。
     if (process.platform === "darwin") await this.command(["set_property", "sub-font", MAC_SUBTITLE_FONT])
+    await this.command(["set_property", "sub-visibility", "yes"])
     await this.command(["set_property", "sub-font-size", display.size])
     await this.command(["set_property", "sub-pos", 100 - display.position])
     await this.command(["set_property", "sub-delay", display.offset])

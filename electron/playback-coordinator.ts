@@ -317,7 +317,7 @@ export class NativePlaybackCoordinator extends EventEmitter {
       if (input.action === "subtitles") {
         const display = validateSubtitleDisplay(input.display)
         await this.ensureUnlocked(active.context)
-        try { await this.applySubtitles(active, display); this.snapshotState.subtitles = { ...this.snapshotState.subtitles, available: (active.subtitleAssets ?? []).map(asset => asset.language), display } }
+        try { await this.applySubtitles(active, display); this.snapshotState.subtitles = { ...this.snapshotState.subtitles, available: (active.subtitleAssets ?? []).map(asset => asset.language), display, error: undefined } }
         catch (failure) {
           if (failure instanceof Error && failure.message === "SERVER_LOCKED") { await this.finish("SERVER_LOCKED"); throw failure }
           this.snapshotState.subtitles = { ...this.snapshotState.subtitles, available: (active.subtitleAssets ?? []).map(asset => asset.language), display, error: "SUBTITLE_LOAD_FAILED" }; this.publish(); throw failure
