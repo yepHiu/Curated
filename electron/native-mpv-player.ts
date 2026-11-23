@@ -8,6 +8,7 @@ import path from "node:path"
 import { emptyNativePlayerState, type NativeLabControl, type NativePlayerState } from "./native-player-contract.js"
 import { diagnosticProperties, projectPlaybackDiagnostics } from "./native-playback-diagnostics.js"
 import { validateSubtitleDisplay, type SubtitleDisplay } from "./subtitle-format.js"
+import { MAC_SUBTITLE_FONT } from "./mac-subtitle-fonts.js"
 
 interface PendingCommand { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
 const properties = ["time-pos", "duration", "pause", "speed", "volume", "frame-drop-count",
@@ -49,8 +50,10 @@ export class NativeMpvPlayer extends EventEmitter {
     if (process.platform === "darwin") this.ipcDirectory = await mkdtemp(`/tmp/curated-mpv-${process.pid}-`)
     const pipe = this.ipcDirectory ? path.join(this.ipcDirectory, "ipc") : `\\\\.\\pipe\\curated-native-${randomUUID()}`
     this.state.status = "starting"
+    // macOS 正式包不读 Homebrew fontconfig；显式指定系统 CJK 字体，避免中日文空白方框。
     const args = ["--no-config", "--idle=yes", "--keep-open=no", "--terminal=no", "--ytdl=no", "--sid=no", "--sub-auto=no",
       "--hwdec=auto-safe", "--screenshot-format=png", `--input-ipc-server=${pipe}`, `--start=${startSec}`,
+      ...(process.platform === "darwin" ? [`--sub-font=${MAC_SUBTITLE_FONT}`] : []),
       ...(initiallyPaused ? ["--pause=yes"] : []),
       ...(this.windowId && !headless ? [`--wid=${this.windowId}`, "--osc=no", "--input-default-bindings=no", "--input-vo-keyboard=no", "--input-cursor=no"] : []),
       ...(headless ? ["--vo=null", "--ao=null"] : ["--force-window=yes", "--title=Curated"])]
@@ -241,6 +244,8 @@ export class NativeMpvPlayer extends EventEmitter {
     if (display.mode === "off" || !filename) { await this.command(["set_property", "sid", "no"]); return }
     if (this.subtitleFile !== filename) { await this.command(["sub-add", filename, "select"]); this.subtitleFile = filename }
     else await this.command(["set_property", "sid", "auto"])
+    // 再次固定字体：sub-add 后部分引擎会回落到缺字字体；Mac 尤其依赖系统 CJK 族。
+    if (process.platform === "darwin") await this.command(["set_property", "sub-font", MAC_SUBTITLE_FONT])
     await this.command(["set_property", "sub-font-size", display.size])
     await this.command(["set_property", "sub-pos", 100 - display.position])
     await this.command(["set_property", "sub-delay", display.offset])

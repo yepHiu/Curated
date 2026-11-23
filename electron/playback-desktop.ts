@@ -10,6 +10,7 @@ import type { DesktopPlaybackCapabilities, DesktopPlaybackCommand, DesktopPlayba
 import { isTrustedDesktopSender } from "./desktop-updates.js"
 import { playbackResources } from "./playback-resources.js"
 import { macNativeLauncher } from "./native-player-macos.js"
+import { prepareMacSubtitleFonts } from "./mac-subtitle-fonts.js"
 
 export interface DesktopPlaybackOptions {
   directory: string
@@ -97,6 +98,8 @@ export function installDesktopPlayback(options: DesktopPlaybackOptions) {
   }
   async function createMacSurface(): Promise<PlaybackSurface> {
     let disposing = false
+    // libmpv 进程内加载，须在首个引擎实例前准备系统字体 fontconfig。
+    await prepareMacSubtitleFonts(path.join(options.userData, "fontconfig"))
     const window = new BrowserWindow({ width: 1000, height: 720, minWidth: 720, minHeight: 480,
       title: "Curated", show: false, transparent: true, backgroundColor: "#00000000",
       titleBarStyle: "hidden", trafficLightPosition: { x: 14, y: 12 },
