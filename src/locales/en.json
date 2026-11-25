@@ -7,7 +7,11 @@
   "saveFailed": "Unable to save Desktop playback settings.",
   "localPreference": "Preview · Applies to this Desktop, using the current login session.",
   "preferNative": "Prefer the Desktop native player",
-  "unavailable": "The native engine is unavailable on this client. Web playback remains available."
+  "unavailable": "The native engine is unavailable on this client. Web playback remains available.",
+  "unavailablePlatform": "This system has no Desktop native player. Web playback remains available.",
+  "unavailableEngine": "The native playback engine was not found. Windows needs the bundled mpv, or an absolute CURATED_NATIVE_MPV path during development.",
+  "unavailableHost": "The native player window component is missing. Web playback remains available.",
+  "unavailablePage": "The native player page is missing. Web playback remains available."
 },
   "mediaEmpty": {
     "title": "Nothing here yet",

@@ -7,7 +7,11 @@
   "saveFailed": "Desktop の再生設定を保存できません。",
   "localPreference": "試用 · この Desktop のみに適用し、現在のログインを使用します。",
   "preferNative": "Desktop ネイティブプレイヤーを優先",
-  "unavailable": "このクライアントではネイティブエンジンが利用できません。Web 再生を使用します。"
+  "unavailable": "このクライアントではネイティブエンジンが利用できません。Web 再生を使用します。",
+  "unavailablePlatform": "このシステムには Desktop ネイティブプレイヤーがありません。Web 再生を使用します。",
+  "unavailableEngine": "ネイティブ再生エンジンが見つかりません。Windows では同梱の mpv、開発時は絶対パスの CURATED_NATIVE_MPV が必要です。",
+  "unavailableHost": "ネイティブ再生ウィンドウの部品がありません。Web 再生を使用します。",
+  "unavailablePage": "ネイティブ再生ページがありません。Web 再生を使用します。"
 },
   "mediaEmpty": {
     "title": "ここはまだ空っぽです",
