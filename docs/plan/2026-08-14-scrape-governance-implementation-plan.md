@@ -69,6 +69,8 @@
 
 ### G2 全局资源下载上限
 
+2026-11-25：`assets.Service` 改为进程级下载名额。同一次调用里的封面和缩略图先完成，再开始预览图；演员头像下载共用这个名额。取消等待名额时不再占槽。G3–G6 仍未做。
+
 `assets.maxConcurrentDownloads` 改为进程级上限，而不是每个 `asset.download` 任务各自 3 路。封面优先于预览图。关闭应用时 drain 资源 goroutine。
 
 ### G3 健康状态参与 chain，详情失败继续

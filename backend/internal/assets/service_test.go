@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -193,5 +195,115 @@ func TestDownloadActorAvatarRejectsNonImage(t *testing.T) {
 	}
 	if status != http.StatusOK {
 		t.Fatalf("status=%d want %d", status, http.StatusOK)
+	}
+}
+
+// TestDownloadSlotsAreProcessWide 确认两部影片同时下载时共享一个名额。
+func TestDownloadSlotsAreProcessWide(t *testing.T) {
+	t.Parallel()
+	var inflight atomic.Int32
+	var maxSeen atomic.Int32
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		current := inflight.Add(1)
+		for {
+			seen := maxSeen.Load()
+			if current <= seen || maxSeen.CompareAndSwap(seen, current) {
+				break
+			}
+		}
+		<-release
+		inflight.Add(-1)
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("shared-slot-image"))
+	}))
+	defer server.Close()
+	service := NewService(zap.NewNop(), t.TempDir(), 5*time.Second, 1, 1)
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for _, movieID := range []string{"movie-a", "movie-b"} {
+		wg.Add(1)
+		go func(movieID string) {
+			defer wg.Done()
+			_, err := service.DownloadAll(context.Background(), scraper.Metadata{
+				MovieID: movieID, Number: movieID, CoverURL: server.URL + "/" + movieID + ".jpg",
+			})
+			errs <- err
+		}(movieID)
+	}
+	time.Sleep(150 * time.Millisecond)
+	if maxSeen.Load() != 1 {
+		t.Fatalf("in-flight downloads = %d, want 1", maxSeen.Load())
+	}
+	close(release)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// TestDownloadPrefersCoverBeforePreviews 确认名额为 1 时封面请求先于预览图。
+func TestDownloadPrefersCoverBeforePreviews(t *testing.T) {
+	t.Parallel()
+	var order []string
+	var mu sync.Mutex
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		order = append(order, r.URL.Path)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("ordered-image"))
+	}))
+	defer server.Close()
+	service := NewService(zap.NewNop(), t.TempDir(), 5*time.Second, 1, 1)
+	_, err := service.DownloadAll(context.Background(), scraper.Metadata{
+		MovieID: "movie-order", Number: "ORDER-1",
+		CoverURL: server.URL + "/cover.jpg", PreviewImages: []string{server.URL + "/preview.jpg"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(order) != 2 || order[0] != "/cover.jpg" || order[1] != "/preview.jpg" {
+		t.Fatalf("request order = %v", order)
+	}
+}
+
+// TestDownloadSlotWaitCanBeCancelled 确认等待名额时取消不会占住槽位。
+func TestDownloadSlotWaitCanBeCancelled(t *testing.T) {
+	t.Parallel()
+	release := make(chan struct{})
+	started := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-release
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("held-slot-image"))
+	}))
+	defer server.Close()
+	service := NewService(zap.NewNop(), t.TempDir(), 5*time.Second, 1, 1)
+	holderDone := make(chan error, 1)
+	go func() {
+		_, err := service.DownloadAll(context.Background(), scraper.Metadata{
+			MovieID: "holder", Number: "HOLD-1", CoverURL: server.URL + "/hold.jpg",
+		})
+		holderDone <- err
+	}()
+	<-started
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := service.DownloadAll(ctx, scraper.Metadata{
+		MovieID: "waiter", Number: "WAIT-1", CoverURL: server.URL + "/wait.jpg",
+	})
+	if err == nil {
+		t.Fatal("expected cancelled waiter")
+	}
+	close(release)
+	if err := <-holderDone; err != nil {
+		t.Fatal(err)
 	}
 }

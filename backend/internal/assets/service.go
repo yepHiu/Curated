@@ -41,6 +41,7 @@ type Service struct {
 	cacheDir        string
 	client          *http.Client
 	maxConcurrent   int
+	downloadSem     chan struct{}
 	maxResponseBody int64
 }
 
@@ -65,6 +66,7 @@ func NewService(logger *zap.Logger, cacheDir string, requestTimeout time.Duratio
 			Timeout: requestTimeout,
 		},
 		maxConcurrent:   maxConcurrentDownloads,
+		downloadSem:     make(chan struct{}, maxConcurrentDownloads),
 		maxResponseBody: maxBytes,
 	}
 }
@@ -94,12 +96,35 @@ func (s *Service) DownloadAllTo(ctx context.Context, metadata scraper.Metadata, 
 	if len(specs) == 0 {
 		return nil, nil
 	}
+	priority := make([]DownloadedAsset, 0, 2)
+	previews := make([]DownloadedAsset, 0, len(specs))
+	for _, spec := range specs {
+		if spec.Type == "preview_image" {
+			previews = append(previews, spec)
+			continue
+		}
+		priority = append(priority, spec)
+	}
+	// 封面和缩略图先占用进程级名额，避免同一批预览图挤掉海报。
+	downloaded, err := s.downloadBatch(ctx, destDir, metadata.Number, priority)
+	if err != nil {
+		return nil, err
+	}
+	rest, err := s.downloadBatch(ctx, destDir, metadata.Number, previews)
+	if err != nil {
+		return nil, err
+	}
+	return append(downloaded, rest...), nil
+}
 
+// downloadBatch 下载一批图片。并发名额来自 Service，而不是这次调用自己的信号量。
+func (s *Service) downloadBatch(ctx context.Context, destDir, number string, specs []DownloadedAsset) ([]DownloadedAsset, error) {
+	if len(specs) == 0 {
+		return nil, nil
+	}
 	results := make([]DownloadedAsset, len(specs))
 	errs := make([]error, len(specs))
-	sem := make(chan struct{}, s.maxConcurrent)
 	var wg sync.WaitGroup
-
 	previewIndex := 0
 	for i, spec := range specs {
 		i, spec := i, spec
@@ -111,14 +136,7 @@ func (s *Service) DownloadAllTo(ctx context.Context, metadata scraper.Metadata, 
 		wg.Add(1)
 		go func(i int, spec DownloadedAsset, seq int) {
 			defer wg.Done()
-			select {
-			case sem <- struct{}{}:
-				defer func() { <-sem }()
-			case <-ctx.Done():
-				errs[i] = ctx.Err()
-				return
-			}
-			localPath, err := s.downloadOne(ctx, destDir, metadata.Number, spec.Type, seq, spec.SourceURL)
+			localPath, err := s.downloadOne(ctx, destDir, number, spec.Type, seq, spec.SourceURL)
 			if err != nil {
 				errs[i] = err
 				return
@@ -127,20 +145,37 @@ func (s *Service) DownloadAllTo(ctx context.Context, metadata scraper.Metadata, 
 			results[i] = spec
 		}(i, spec, seq)
 	}
-
 	wg.Wait()
-
 	for _, err := range errs {
 		if err != nil {
 			return nil, err
 		}
 	}
-
 	out := make([]DownloadedAsset, 0, len(results))
-	for _, r := range results {
-		out = append(out, r)
+	for _, result := range results {
+		if result.LocalPath != "" {
+			out = append(out, result)
+		}
 	}
 	return out, nil
+}
+
+// acquireDownload 等待进程级下载名额；取消时不再占住槽位。
+func (s *Service) acquireDownload(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	select {
+	case s.downloadSem <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// releaseDownload 归还一个下载名额。
+func (s *Service) releaseDownload() {
+	<-s.downloadSem
 }
 
 func (s *Service) downloadOne(ctx context.Context, destDir, number, assetType string, sequence int, sourceURL string) (string, error) {
@@ -158,6 +193,10 @@ func (s *Service) downloadOne(ctx context.Context, destDir, number, assetType st
 			return localPath, nil
 		}
 	}
+	if err := s.acquireDownload(ctx); err != nil {
+		return "", err
+	}
+	defer s.releaseDownload()
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
 	if err != nil {
@@ -274,6 +313,10 @@ func (s *Service) downloadWithHeaders(ctx context.Context, sourceURL, localPath 
 	if v := strings.TrimSpace(opts.Referer); v != "" {
 		request.Header.Set("Referer", v)
 	}
+	if err := s.acquireDownload(ctx); err != nil {
+		return 0, err
+	}
+	defer s.releaseDownload()
 	response, err := s.client.Do(request)
 	if err != nil {
 		return 0, err
