@@ -1,7 +1,14 @@
 allowBuilds:
   vue-demi: true
+auditConfig:
+  ignoreCves:
+    - CVE-2026-118257
+  ignoreGhsas:
+    - GHSA-83rm-6c8r-g728
 overrides:
   defu: 6.1.7
   picomatch: 4.0.5
   postcss: 8.5.28
+  # 8.1.5 及更早的生产依赖路径（@tailwindcss/vite）命中 GHSA-587h-7wmj-h5pm。
+  vite: 8.1.7
   yaml: 2.8.3
