@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "backend:build:dev": "powershell -ExecutionPolicy Bypass -File scripts/dev/build-backend.ps1",
+    "backend:build:dev": "node scripts/dev/build-backend.cjs",
     "typecheck": "vue-tsc -b",
     "lint": "eslint .",
     "test": "vitest run --configLoader native --pool threads",

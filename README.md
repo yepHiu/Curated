@@ -108,9 +108,9 @@ pnpm dev
 
 - Backend default: `http://127.0.0.1:8080` (loopback), health name `curated-dev`.
 - Frontend default: `http://localhost:5173`.
-- Set `VITE_USE_WEB_API=true` in root `.env` for the real API; otherwise Mock mode.
+- Copy `.env.example` to `.env`. `VITE_USE_WEB_API=true` uses the real API; set it to `false` for Mock. Restart `pnpm dev` after edits.
 - Desktop shell: `pnpm dev:electron`.
-- Windows dev binary: `pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`.
+- Dev backend binary: `pnpm backend:build:dev` → `backend/runtime/curated-dev.exe` on Windows, `backend/runtime/curated-dev` elsewhere. Do not name that binary `curated.exe`.
 
 Backups support file-picker selection and guided offline recovery; backup scope, path migration, configuration keys, and release packaging are documented in [docs/guide.md](docs/guide.md). CD builds independent Windows Server / Desktop packages and Apple Silicon Mac Desktop, with version-tag releases and manual draft runs; see [release operations](docs/guide.md#8-release-and-packaging).
 
@@ -151,7 +151,7 @@ Build size monitoring allows normal growth, warns on unusual increases, and bloc
 - Remote settings retain device preferences; Server-wide administration requires the Server computer. See [settings access](docs/guide.md#remote-settings-access).
 - Server logs use a fixed default directory; local Desktop can open it. See [logging settings](docs/guide.md#server-logging).
 - Remote Desktop connections expose only Desktop updates; Server installer actions require a confirmed local connection. Desktop installation currently uses manual downloads. See [update behavior](docs/guide.md#update-target-and-remote-connections).
-- About shows independent numeric Server and Desktop versions, with the Server build timestamp retained separately; component naming rules are implemented, while split installers and migration remain pending. See [the guide](docs/guide.md#desktop-version-and-component-release-planning).
+- About shows independent Server and Desktop versions. Current numbers, the macOS libmpv bundle, and the implemented Server/Desktop split are in [component versions](docs/reference/component-versions.md). Do not copy version numbers from older notes.
 
 ## Models that helped build this project
 

@@ -82,9 +82,9 @@ pnpm dev
 
 - バックエンド既定値：`http://127.0.0.1:8080`（loopback のみ）、ヘルス名 `curated-dev`。
 - フロントエンド既定値：`http://localhost:5173`。
-- ルート `.env` で `VITE_USE_WEB_API=true` を設定すると実 API、それ以外は Mock。
+- `.env.example` をルートの `.env` にコピーする。`VITE_USE_WEB_API=true` で実 API、`false` で Mock。変更後は `pnpm dev` を再起動する。
 - デスクトップシェル：`pnpm dev:electron`。
-- Windows 開発バイナリ：`pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`。
+- 開発バックエンド：`pnpm backend:build:dev`。Windows は `backend/runtime/curated-dev.exe`、それ以外は `backend/runtime/curated-dev`。開発成果物を `curated.exe` と名付けない。
 
 バックアップ、復元、パス移行、設定キー、リリース手順は [docs/guide.md](docs/guide.md) を参照してください。CD は Windows Server / Desktop の単体パッケージと Apple Silicon Mac Desktop をビルドし、バッチタグによる公開と手動のドラフト実行に対応しています。[リリース操作](docs/guide.md#8-release-and-packaging)を参照してください。
 
@@ -120,7 +120,7 @@ icon/       ブランド原資料（wordmark / appicon / mark）
 - リモートでは端末の設定を利用できます。全体設定・セキュリティ・AI 管理・バックアップは Server 側で操作します。[設定ガイド](docs/guide.md#remote-settings-access)を参照。
 - Server ログは既定フォルダーを使用し、同じ PC の Desktop から開けます。[ログ設定](docs/guide.md#server-logging)を参照。
 - リモート接続時は Desktop の更新のみを提供し、Server のインストール操作は確認済みのローカル接続に限定します。Desktop は現在手動ダウンロード方式です。[更新ガイド](docs/guide.md#update-target-and-remote-connections)を参照。
-- Server と Desktop の独立した 3 要素のバージョンを表示し、Server のビルドタイムスタンプも別途保持します。コンポーネント命名規則は実装済みで、分離インストーラーと移行は未実装です。[ガイド](docs/guide.md#desktop-version-and-component-release-planning)を参照。
+- Server と Desktop のバージョンは独立しています。現行バージョン、macOS 同梱の libmpv、実装済みの Server/Desktop 分割は [component versions](docs/reference/component-versions.md) を参照してください。古いメモからバージョン番号を写さないでください。
 
 ## このプロジェクトを手伝ったモデル
 
