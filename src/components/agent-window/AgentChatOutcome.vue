@@ -14,6 +14,15 @@ const reasonKeys: Record<string, string> = {
   write_applied: "agentWindow.outcomeReasons.writeApplied",
   confirmation_unavailable: "agentWindow.outcomeReasons.confirmationUnavailable",
   confirmation_discarded: "agentWindow.outcomeReasons.confirmationDiscarded",
+  provider_timeout: "agentWindow.outcomeReasons.providerTimeout",
+  provider_unconfigured: "agentWindow.outcomeReasons.providerUnconfigured",
+  provider_authentication: "agentWindow.outcomeReasons.providerAuthentication",
+  provider_rate_limited: "agentWindow.outcomeReasons.providerRateLimited",
+  provider_stream_interrupted: "agentWindow.outcomeReasons.providerStreamInterrupted",
+  provider_network: "agentWindow.outcomeReasons.providerNetwork",
+  provider_stream_invalid: "agentWindow.outcomeReasons.providerStreamInvalid",
+  provider_failed: "agentWindow.outcomeReasons.providerFailed",
+  provider_empty: "agentWindow.outcomeReasons.providerEmpty",
 }
 const label = computed(() => t(props.outcome.reasonCode === "write_applied" ? "agentWindow.outcomeSaved" : `agentWindow.outcome.${props.outcome.status}`))
 const reason = computed(() => {

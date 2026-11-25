@@ -416,7 +416,16 @@
       "confirmationRequired": "プレビューの準備ができましたが、まだ保存されていません。確認カードで変更を確定してください。",
       "writeApplied": "確認した変更を保存しました。",
       "confirmationUnavailable": "この履歴のプレビューは確認できず、保存成功の記録もありません。新しいプレビューを依頼してください。",
-      "confirmationDiscarded": "プレビューを破棄しました。変更は保存されていません。"
+      "confirmationDiscarded": "プレビューを破棄しました。変更は保存されていません。",
+      "providerTimeout": "モデルの応答がタイムアウトしました。完了した参照結果は残っています。もう一度試してください。",
+      "providerUnconfigured": "利用できるモデル設定がありません。設定でアドレスとモデルを入力してください。",
+      "providerAuthentication": "モデルサービスが保存済みの資格情報を拒否しました。キーを確認して再試行してください。",
+      "providerRateLimited": "モデルサービスが一時的にリクエストを制限しています。しばらくしてから再試行してください。",
+      "providerStreamInterrupted": "完全な回答を受け取る前にモデルの応答が中断しました。",
+      "providerNetwork": "モデルサービスに接続できません。ネットワークまたはプロキシを確認してください。",
+      "providerStreamInvalid": "モデルの応答を読み取れなかったため、未完成の下書きは表示していません。",
+      "providerFailed": "モデルはこの回答を完了できませんでした。完了した参照結果は残っています。",
+      "providerEmpty": "利用できる回答が返りませんでした。別の聞き方で試してください。"
     },
     "outcomeRetryable": "ネットワークまたは提供元を確認してから再試行できます。",
     "confirmTitle": "書き込みを確認",
