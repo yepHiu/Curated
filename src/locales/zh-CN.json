@@ -424,7 +424,16 @@
       "confirmationRequired": "预览已就绪，尚未保存。请在确认卡片中确认写入。",
       "writeApplied": "已确认的更改已保存。",
       "confirmationUnavailable": "这条历史预览无法继续确认，且没有成功保存回执。请重新请求生成预览。",
-      "confirmationDiscarded": "已放弃本次预览，没有保存更改。"
+      "confirmationDiscarded": "已放弃本次预览，没有保存更改。",
+      "providerTimeout": "模型请求超时。已完成的只读结果仍保留，可以再试一次。",
+      "providerUnconfigured": "还没有可用的模型配置。请先在设置中填写地址和模型。",
+      "providerAuthentication": "模型服务拒绝了已保存的凭据。请检查密钥后重试。",
+      "providerRateLimited": "模型服务暂时限制了请求频率。稍后再试。",
+      "providerStreamInterrupted": "模型响应中断，没有收到完整回答。",
+      "providerNetwork": "暂时连不上模型服务。请检查网络或代理。",
+      "providerStreamInvalid": "模型返回的内容无法读取，没有展示未完成的草稿。",
+      "providerFailed": "模型没有完成这次回答。已完成的只读结果仍保留。",
+      "providerEmpty": "模型没有返回可用回答。可以换一种说法再试。"
     },
     "outcomeRetryable": "可在确认网络或数据源后重试。",
     "confirmTitle": "确认写入",

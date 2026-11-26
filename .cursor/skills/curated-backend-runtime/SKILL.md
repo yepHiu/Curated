@@ -14,15 +14,15 @@ Use this repo-local skill for Curated backend build and runtime choices. The goa
 | Request | Use | Output / Runtime |
 | --- | --- | --- |
 | Run the dev backend now, without needing an exe | `cd backend && go run ./cmd/curated` | dev backend on `:8080`, health name `curated-dev` |
-| Compile the dev backend on Windows | `pnpm backend:build:dev` | `backend/runtime/curated-dev.exe` |
-| Run the compiled dev backend | `.\backend\runtime\curated-dev.exe` | dev backend on `:8080`, health name `curated-dev` |
+| Compile the dev backend | `pnpm backend:build:dev` | Windows: `backend/runtime/curated-dev.exe`. Other OS: `backend/runtime/curated-dev` |
+| Run the compiled dev backend | Windows: `.\backend\runtime\curated-dev.exe`. Other OS: `./backend/runtime/curated-dev` | dev backend on `:8080`, health name `curated-dev` |
 | Build a release-shaped backend binary only | `pnpm release:backend` | `release/backend/curated.exe` with package script version |
 | Build the production package | `pnpm release:publish` | portable zip, installer, manifest, and release `curated.exe` |
 
 ## Hard Rules
 
-- Development Windows backend binaries must be named `curated-dev.exe`.
-- Do not compile or leave a development Windows backend binary named `curated.exe`.
+- Development backend binaries are `curated-dev.exe` on Windows and `curated-dev` elsewhere.
+- Do not compile or leave a development backend binary named `curated.exe`.
 - Reserve `curated.exe` for release / packaged builds only.
 - Do not run Go commands from the repository root when the package path is `./cmd/curated`; run from `backend/`.
 - Do not use `go run` for production-package validation. Use release scripts.
@@ -36,17 +36,13 @@ cd backend
 go run ./cmd/curated
 ```
 
-Compile dev backend:
+Compile dev backend from the repo root:
 
-```powershell
+```bash
 pnpm backend:build:dev
 ```
 
-Run compiled dev backend from the repo root:
-
-```powershell
-.\backend\runtime\curated-dev.exe
-```
+Run the compiled binary from the repo root: `.\backend\runtime\curated-dev.exe` on Windows, `./backend/runtime/curated-dev` elsewhere.
 
 Expected dev identity:
 
@@ -81,6 +77,6 @@ Expected release identity:
 | --- | --- |
 | User asks to run dev backend and agent compiles an exe first | Use `cd backend && go run ./cmd/curated` unless a binary is requested |
 | User asks to compile dev backend and agent runs `go run` | Use `pnpm backend:build:dev` |
-| Agent builds dev backend as `curated.exe` | Stop and rebuild as `backend/runtime/curated-dev.exe` |
+| Agent builds dev backend as `curated.exe` | Stop and rebuild with `pnpm backend:build:dev` |
 | Agent runs `go run ./cmd/curated` from repo root | Change directory to `backend` first |
 | Agent uses `pnpm release:backend` for full production package | Use `pnpm release:publish` |

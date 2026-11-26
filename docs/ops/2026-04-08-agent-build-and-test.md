@@ -6,7 +6,7 @@
 
 ## macOS 原生播放（2026-10-09）
 
-根目录 `pnpm build:electron:main` 自动编译 Cocoa Node-API 适配层，依赖 Xcode Command Line Tools 与 Node include/node（非标准安装可设置 `CURATED_NODE_INCLUDE`）。只使用仓库内固定的 ISC mpv API 头文件，不要求构建机安装或链接 libmpv。运行使用本机 Homebrew mpv / 绝对 `CURATED_NATIVE_LIBMPV`，不在 Mac 包中分发引擎。
+根目录 `pnpm build:electron:main` 自动编译 Cocoa Node-API 适配层，依赖 Xcode Command Line Tools 与 Node include/node（非标准安装可设置 `CURATED_NODE_INCLUDE`）。仓库内 `electron/native/include/mpv/` 只有 ISC 头文件，构建机不必为了编译去链接 libmpv。未打包的开发运行可以使用 Homebrew 的 libmpv 或绝对路径 `CURATED_NATIVE_LIBMPV`。正式 Mac 包内置 libmpv，安装后的应用不再探测 Homebrew。版本与打包边界只看 [组件版本](../reference/component-versions.md)。
 
 编译后执行 `CURATED_NATIVE_MAC_TEST=1 CURATED_NATIVE_MPV=/opt/homebrew/bin/mpv NODE_OPTIONS=--no-experimental-webstorage pnpm test:electron`，验证真实 Electron/Cocoa/libmpv 和独立 CLI 引擎；ffmpeg 需可执行（可设 `CURATED_NATIVE_FFMPEG`）。Intel/自定义安装调整路径。未显式启用 Mac 集成时跳过该项；Windows 窗口项在 Mac 跳过。不要将这些跳过视为验收。发布 staging 检查 `native-player-macos.node`、`playback-preload.cjs` 与 `player/index.html`；Python Mac 打包测试沿用 `python3 -m unittest scripts.release.tests.test_macos_desktop`。详见 guide 的 macOS native playback。
 
@@ -58,7 +58,7 @@ This supersedes earlier Full release plans below. New production releases use on
 | 后端工作目录 | **`backend/`**（Go 模块 `curated-backend`） |
 | Go 构建/模块缓存 | **默认使用** `go env GOCACHE`、`go env GOMODCACHE`（一般在用户目录）；**禁止**为跑测试而把缓存指到仓库内路径（见 §5.1） |
 | 联调端口 | 前端 Vite 常见 **5173**；后端开发 HTTP 默认 **`127.0.0.1:8080`**（`vite` 仍提供 `/api` 代理；本地 loopback Web API 开发态默认直连，避免大上传经过代理）；release 默认 **`127.0.0.1:8081`** 仍走同源 `/api` |
-| 环境变量 | 前端见根目录 `.env` / `.env.example`；联调常用 `VITE_USE_WEB_API=true` |
+| 环境变量 | 复制根目录 `.env.example` 为 `.env`；`VITE_USE_WEB_API=true` 走真实 API，`false` 为 Mock |
 
 **禁止（除非用户明确要求）**
 
@@ -126,7 +126,7 @@ pnpm dev
 
 **与后端真实联调（非 Mock）**
 
-1. 在仓库根目录 `.env` 中设置 **`VITE_USE_WEB_API=true`**（可参考 `.env.example`）。
+1. 把根目录 `.env.example` 复制为 `.env`，保持 **`VITE_USE_WEB_API=true`**。要只看 Mock，把该值改为 `false`。
 2. 确保后端已启动在默认 **`http://127.0.0.1:8080`**（本地 loopback Web API 开发态会直连该端口；非 loopback / fallback 仍由 **`vite.config.ts`** 里的 `/api` 代理转发）。
 3. 改 `.env` 后需**重启** `pnpm dev` 才会生效。
 
@@ -220,7 +220,7 @@ cd backend && go test ./...
 
 **运行二进制（开发）**：见第 3 节 `go run ./cmd/curated`。
 
-**Windows 开发构建辅助**（可选，见 `package.json`）：在仓库根目录 `pnpm backend:build:dev`，产出以脚本与 `workspace-quick-reference` 为准。
+**开发后端二进制**（可选）：仓库根目录 `pnpm backend:build:dev`（`node scripts/dev/build-backend.cjs`）。Windows 写入 `backend/runtime/curated-dev.exe`，其它系统写入 `backend/runtime/curated-dev`。不要生成开发态 `curated.exe`。
 
 ### 5.1 Go 缓存与测试产物（避免在仓库里「长」一大坨）
 

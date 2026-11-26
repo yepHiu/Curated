@@ -420,7 +420,16 @@
       "confirmationRequired": "The preview is ready but has not been saved. Confirm the changes in the confirmation card.",
       "writeApplied": "The confirmed changes were saved.",
       "confirmationUnavailable": "This historical preview cannot be confirmed and has no successful save receipt. Request a new preview.",
-      "confirmationDiscarded": "The preview was discarded. No changes were saved."
+      "confirmationDiscarded": "The preview was discarded. No changes were saved.",
+      "providerTimeout": "The model request timed out. Completed read-only results are kept. Try again.",
+      "providerUnconfigured": "No usable model configuration is saved. Add the address and model in Settings.",
+      "providerAuthentication": "The model service rejected the saved credentials. Check the key and try again.",
+      "providerRateLimited": "The model service is limiting requests. Try again later.",
+      "providerStreamInterrupted": "The model response stopped before a complete answer.",
+      "providerNetwork": "The model service could not be reached. Check the network or proxy.",
+      "providerStreamInvalid": "The model response could not be read. The unfinished draft was not shown.",
+      "providerFailed": "The model did not finish this answer. Completed read-only results are kept.",
+      "providerEmpty": "The model returned no usable answer. Try asking in another way."
     },
     "outcomeRetryable": "Retry after checking the network or source.",
     "confirmTitle": "Confirm write",
