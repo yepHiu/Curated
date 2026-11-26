@@ -7,7 +7,11 @@
   "saveFailed": "无法保存 Desktop 播放设置。",
   "localPreference": "试用 · 仅影响此 Desktop，使用当前登录会话。",
   "preferNative": "优先使用桌面原生播放器",
-  "unavailable": "此客户端的原生播放引擎尚未就绪，继续使用 Web 播放器。"
+  "unavailable": "此客户端的原生播放引擎尚未就绪，继续使用 Web 播放器。",
+  "unavailablePlatform": "这个系统没有桌面原生播放器，继续使用 Web 播放器。",
+  "unavailableEngine": "没有找到原生播放引擎。Windows 需要随包的 mpv，或在开发环境设置绝对路径 CURATED_NATIVE_MPV。",
+  "unavailableHost": "原生播放窗口组件缺失，继续使用 Web 播放器。",
+  "unavailablePage": "原生播放页面缺失，继续使用 Web 播放器。"
 },
   "mediaEmpty": {
     "title": "目前这里空空如也",
