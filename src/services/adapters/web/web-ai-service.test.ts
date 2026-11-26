@@ -60,6 +60,19 @@ describe("AI transport termination", () => {
     expect(onDelta).toHaveBeenCalledExactlyOnceWith("checked")
     expect(vi.getTimerCount()).toBe(0)
   })
+  it("skips a malformed event and still accepts the following completion", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response('data: {not-json}\n\ndata: {"type":"text_delta","delta":"kept"}\n\ndata: {"type":"message_done","outcome":{"status":"failed","reasonCode":"provider_stream_invalid"}}\n\n')))
+    const onDelta = vi.fn(), onOutcome = vi.fn()
+    await webAIService.streamChat(input, { onDelta, onOutcome })
+    expect(onDelta).toHaveBeenCalledExactlyOnceWith("kept")
+    expect(onOutcome).toHaveBeenCalledWith({ status: "failed", reasonCode: "provider_stream_invalid" })
+  })
+  it("surfaces a provider error event without treating later text as success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response('data: {"type":"error","code":"AI_PROVIDER_UNAVAILABLE","message":"model is required"}\n\ndata: {"type":"text_delta","delta":"ignored"}\n\n')))
+    const onDelta = vi.fn()
+    await expect(webAIService.streamChat(input, { onDelta })).rejects.toMatchObject({ code: "AI_PROVIDER_UNAVAILABLE", message: "model is required" })
+    expect(onDelta).not.toHaveBeenCalled()
+  })
   it("preserves partial text and reports an EOF without a terminal event", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response([{ type: "text_delta", delta: "partial" }])))
     const onDelta = vi.fn()
