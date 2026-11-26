@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+Current Server and Desktop versions, and whether macOS libmpv is bundled, are only in [docs/reference/component-versions.md](docs/reference/component-versions.md). Dated sections below are snapshots. Do not copy their version numbers forward.
+
 ## Internal Code Atlas — 2026-10-18
 
 `scripts/analysis/` contains the Vue/Vite/shadcn-vue + Node internal analyzer. `pnpm code:atlas` starts loopback port 8795; scan work runs in a Worker, retains last successful results, and coalesces concurrent refreshes. Tool-only APIs: GET `/api/atlas/status`, GET `/api/atlas/snapshot`, POST `/api/atlas/scan` (same origin and `X-Code-Atlas: 1`), GET `/api/atlas/export`. These are not Go product APIs; no database or library-config changes. Build/preview/export/check commands and scope are in guide “Code Atlas”.
@@ -8,7 +10,7 @@
 
 Mac 正式包内置固定版本 libmpv、arm64 dylib 依赖闭包、对应源码/资源、配方/SBOM 与许可；用户无需安装 MPV、Homebrew 或设置环境变量。新 Mac 安装（未保存播放偏好）默认使用原生播放器，已保存选择保留。正式包仅加载 app 内引擎，忽略开发覆盖变量；开发态仍允许 Homebrew/绝对 CURATED_NATIVE_LIBMPV。
 
-维护者先运行 `python3 scripts/release/prepare_macos_native.py`，再设置绝对 `CURATED_NATIVE_MAC_BUNDLE` 后打包。缺资料、SHA 不符、非 arm64、外部 dylib/rpath 或最低系统不符时构建失败。当前目标 Apple Silicon + macOS 15；签名仍为 ad-hoc，未完成 Apple 公证，尚未发布。安装后的合成媒体测试禁止读取 /opt/homebrew 和 /usr/local。无新增公共 HTTP API 或 library-config 字段；详见 guide 与 macOS 计划。
+维护者先运行 `python3 scripts/release/prepare_macos_native.py`，再设置绝对 `CURATED_NATIVE_MAC_BUNDLE` 后打包。缺资料、SHA 不符、非 arm64、外部 dylib/rpath 或最低系统不符时构建失败。当前目标 Apple Silicon + macOS 15；准备脚本是 ad-hoc 签名，没有 Apple 公证步骤。是否已有公开安装包以 GitHub Release 为准。安装后的合成媒体测试禁止读取 /opt/homebrew 和 /usr/local。无新增公共 HTTP API 或 library-config 字段；引擎与版本见 `docs/reference/component-versions.md`。
 
 Cocoa Render API + private Unix IPC reuse existing authenticated Session/proxy/progress/capture APIs. Build requires Xcode CLI and Node headers. GPU advanced control supports hardware frame capture. Native faults may affect Desktop main process.
 
@@ -160,7 +162,7 @@ go run ./cmd/curated -maintenance path-migrate-apply -path-from D:\Media -path-t
 Backup format v2 contains a ZIP with a SQLite snapshot (including static capture images/thumbnails), optional `library-config.cfg`, manifest and managed wishlist assets. External media, posters/previews, motion clips and comic/photo originals are excluded; v1 remains readable. Normal runtime holds `<databasePath>.runtime.lock`; offline restore and path migration must acquire the same cross-process lock. Restore retains `.pre-restore-*` rollback files. Path migration uses a read-only plan, a strict path-column whitelist, segment-aware Windows/Unix mapping, target/conflict checks, an automatically created and verified backup, one transaction for updates plus `path_migration_audits`, and storage-binding reset. Cross-platform missing/unchecked targets require explicit `-allow-missing-paths`; target type errors and conflicts cannot be overridden. In Web API mode, Settings -> Maintenance calls the PIN-protected create, verify, and preflight endpoints with absolute paths on the backend machine; it intentionally exposes no online restore or path-migration action.
 
 Windows binary naming rule:
-- Development backend builds must use `curated-dev.exe`.
+- Development backend builds use `pnpm backend:build:dev` (`scripts/dev/build-backend.cjs`): `curated-dev.exe` on Windows and `curated-dev` elsewhere.
 - Release/package backend builds use `curated.exe`.
 - Do not generate a dev Windows backend binary named `curated.exe`, because it can conflict with the installed production backend on the same machine.
 
@@ -169,8 +171,8 @@ Windows binary naming rule:
 ```bash
 # Terminal 1: Start backend (from repo root or backend/)
 cd backend && go run ./cmd/curated
-# Or build a Windows dev binary with: pnpm backend:build:dev
-# Then run: ./backend/runtime/curated-dev.exe
+# Or build the dev binary with: pnpm backend:build:dev
+# Then run: ./backend/runtime/curated-dev.exe on Windows, ./backend/runtime/curated-dev elsewhere
 
 # Terminal 2: Start frontend dev server
 pnpm dev
@@ -421,9 +423,9 @@ POST   /api/providers/ping-all              # Ping all providers
 
 **Library storage presence:** `GET /api/library/paths/storage-status`, `POST /api/library/paths/storage-status/check`, and `POST /api/library/paths/{id}/storage-binding/rebind` report whether configured library roots are online, offline, mismatched to their previously bound volume, missing, permission denied, or unknown. Windows is the primary supported volume-identity implementation; macOS/Linux currently rely on the fallback path probe and are future adaptation targets. The frontend checks storage on Web API startup, surfaces abnormal paths through the new toast/notification center, blocks scan/import actions when `canRescan` or `canImport` is false, and exposes manual rebind in Settings -> Video library for deliberate disk replacement or path migration.
 
-**Server version:** Health (HTTP and stdio) now separates numeric `version` (1.5.8) from UTC `buildStamp` and `channel`. Go embeds the canonical `backend/internal/version/server.json`; the release planner reads the same file. About shows both version and timestamp. Explicit BuildStamp injection is compilation time; the existing Git-time fallback is commit time. Legacy installer version/update comparison remains separate.
+**Server version:** Health (HTTP and stdio) separates numeric `version` from UTC `buildStamp` and `channel`. Go embeds `backend/internal/version/server.json`; the release planner reads the same file. The 2026-09-26 snapshot was 1.5.8. Current numbers are in `docs/reference/component-versions.md`. About shows both version and timestamp. Explicit BuildStamp injection is compilation time; the existing Git-time fallback is commit time. Legacy installer version/update comparison remains separate.
 
-**Desktop version bridge:** `window.javLibrary.getDesktopInfo()` returns local build metadata (Desktop 0.1.0, development flag, distribution, platform, arch and actual `serverOrigin`); `checkDesktopUpdate()` performs local manifest checking. Both IPC handlers validate the current main window/frame/origin. No new HTTP endpoint. Development builds never request production updates; current legacy bundles still update via the old installer. The About page hides Desktop in browsers. Component version sources and read-only `plan-component` naming are implemented; standalone packaging/migration and automatic Desktop installation remain pending. See plan §11.5 and the guide.
+**Desktop version bridge:** `window.javLibrary.getDesktopInfo()` returns local build metadata (development flag, distribution, platform, arch, actual `serverOrigin`, and the Desktop version from `scripts/release/versions/desktop.json`). The 2026-09-26 snapshot was 0.1.0. `checkDesktopUpdate()` performs local manifest checking. Both IPC handlers validate the current main window/frame/origin. No new HTTP endpoint. Development builds never request production updates. The About page hides Desktop in browsers. Standalone Server/Desktop packages and legacy migration are implemented; the checked-in Electron config can still be legacy with no update feed. Automatic Desktop installation is not the default. See `docs/reference/component-versions.md` and the guide.
 
 **Curated Desktop client marker:** Electron injects `X-Curated-Client: desktop-electron`, `X-Curated-Client-Version`, `X-Curated-OS`, and `X-Curated-OS-Version` on requests to the backend origin. `backend/internal/clienttracker` uses that marker before User-Agent parsing, reports the browser name as `Curated Desktop`, includes the marker in its in-memory client key so the desktop shell is not merged with a normal Chrome tab on the same machine, and trusts the desktop OS headers to show Windows 11 instead of Chromium's legacy `Windows NT 10.0` token. For regular browsers, the backend also uses `Sec-CH-UA-Platform` and `Sec-CH-UA-Platform-Version` when present.
 
@@ -657,7 +659,7 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - The frontend Vite dev server proxies `/api` to `http://127.0.0.1:8080` (backend)
 - Backend supports three modes: `http` (default), `stdio`, `both`
 - Dev builds now expose backend name `curated-dev`; release builds keep `curated`
-- Windows dev backend binary naming is an explicit constraint: keep dev builds as `curated-dev.exe` and reserve `curated.exe` for release/package builds only
+- Dev backend binary naming is an explicit constraint: `pnpm backend:build:dev` writes `curated-dev.exe` on Windows and `curated-dev` elsewhere. Reserve `curated.exe` for release/package builds only
 - Current state: Frontend uses web adapter when `VITE_USE_WEB_API=true` (default in `.env`), mock adapter otherwise
 - Settings -> About & updates now includes packaged-app update status, a manual update-check action, in-app latest `.exe` installer download with SHA256 verification, explicit installer launch when ready, and a release-page fallback link; Settings -> About & updates also provides persisted `autoDownloadUpdates` for opt-in startup background download-and-verify behavior; when an update is available, the sidebar shows a lightweight `New` badge (expanded) or dot (compact) that links to `Settings -> About & updates`, while the `Curated` brand text/icon links to the home page
 - In development only, `src/layouts/AppShell.vue` mounts `DevDebugTools.vue`. The bottom-right DEBUG entry opens the shared dialog, whose Performance tab aggregates frontend runtime sampling, request stats from `src/api/http-client.ts`, backend health, and `GET /api/dev/performance`. The bottom performance bar and its restore entry have been removed.

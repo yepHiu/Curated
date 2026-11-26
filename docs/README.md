@@ -12,7 +12,7 @@
 
 | 目录 | 内容 |
 |------|------|
-| **`reference/`** | 长期有效的规范与事实：前后端与 UI 规范、合约约束、**项目记忆**（`2026-03-20-project-memory`）、`library-config` 与资料库整理说明、**实现与功能对照** `architecture-and-implementation.html` 等 |
+| **`reference/`** | 长期有效的规范与事实：前后端与 UI 规范、合约约束、**项目记忆**（`2026-03-20-project-memory`）、`library-config` 与资料库整理说明、**现行组件版本**（`component-versions.md`）、**实现与功能对照** `architecture-and-implementation.html` 等 |
 | **`product/`** | 产品设计/域设计长文（如主设计文档、演员库设计等） |
 | **`ops/`** | 研发与发版向：Agent 构建与测试说明、**打包历史 CSV** 与相关 Markdown、CI/CD 与双库/假库/转型类方案文档等 |
 | **`review/`** | 一次性架构评审、代码/前端质量与性能类审计（历史快照性质） |
