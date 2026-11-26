@@ -82,9 +82,9 @@ pnpm dev
 
 - 后端默认：`http://127.0.0.1:8080`（仅 loopback），健康名 `curated-dev`。
 - 前端默认：`http://localhost:5173`。
-- 根目录 `.env` 设置 `VITE_USE_WEB_API=true` 走真实 API，否则为 Mock。
+- 把 `.env.example` 复制为根目录 `.env`。`VITE_USE_WEB_API=true` 走真实 API，改为 `false` 则用 Mock。修改后需重启 `pnpm dev`。
 - 桌面壳：`pnpm dev:electron`。
-- Windows 开发二进制：`pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`。
+- 开发后端二进制：`pnpm backend:build:dev`。Windows 产物是 `backend/runtime/curated-dev.exe`，其它系统是 `backend/runtime/curated-dev`。不要把开发产物命名为 `curated.exe`。
 
 备份、恢复、路径迁移、配置项和发布打包见 [docs/guide.md](docs/guide.md)。CD 构建 Windows Server / Desktop 独立包与 Apple Silicon Mac Desktop，支持批次标签发布和手动草稿运行，详见[发布操作](docs/guide.md#8-release-and-packaging)。
 
@@ -120,7 +120,7 @@ icon/       品牌源文件（wordmark / appicon / mark）
 - 远程端保留设备偏好；全局设置、安全、AI 管理和备份维护在 Server 本机操作，见[远程设置说明](docs/guide.md#remote-settings-access)。
 - 服务端日志固定使用默认目录，本机 Desktop 可直接打开，见[日志设置](docs/guide.md#server-logging)。
 - 远程 Desktop 仅提供自身更新入口；Server 安装操作仅限明确本机直连。Desktop 目前提供手动下载，见[更新说明](docs/guide.md#update-target-and-remote-connections)。
-- 关于页分别显示 Server 与 Desktop 的独立三段数字版本，并保留 Server 构建时间戳；组件包名规则已落地，独立安装器和迁移仍待完成，见[操作指南](docs/guide.md#desktop-version-and-component-release-planning)。
+- 关于页分别显示 Server 与 Desktop 版本。现行版本号、macOS 内置 libmpv，以及已经实现的 Server/Desktop 拆分，见[组件版本](docs/reference/component-versions.md)。不要从旧说明里抄版本号。
 
 ## 参与过本仓库的模型
 
