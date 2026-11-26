@@ -349,13 +349,13 @@ go run ./cmd/curated
 
 Development defaults: `127.0.0.1:8080` (loopback only), health name `curated-dev`.
 
-Windows development helper:
+Development binary, any OS:
 
 ```bash
 pnpm backend:build:dev
 ```
 
-This produces `backend/runtime/curated-dev.exe`. Do not name a development Windows backend `curated.exe`; that name is reserved for release builds.
+This runs `node scripts/dev/build-backend.cjs` and writes `backend/runtime/curated-dev.exe` on Windows or `backend/runtime/curated-dev` elsewhere. It does not pass `-tags release`. Do not name a development backend `curated.exe`; that name is reserved for release builds. Electron prefers this binary and falls back to `go run ./cmd/curated` when it is absent.
 
 ### Frontend
 
@@ -368,8 +368,8 @@ Vite usually serves `http://localhost:5173`.
 
 ### Real API vs Mock
 
-- Root `.env` with `VITE_USE_WEB_API=true` uses the real backend.
-- Any other value keeps Mock mode.
+- Copy `.env.example` to root `.env`. `VITE_USE_WEB_API=true` uses the real backend; `false` or omitting the variable keeps Mock mode.
+- Restart `pnpm dev` after changing `.env`.
 - Local loopback Web API development talks to `http://127.0.0.1:8080` directly; the Vite `/api` proxy remains as fallback.
 - Optional `VITE_API_BASE_URL` overrides the API base. Optional `VITE_LOG_LEVEL` sets the default browser log level.
 
@@ -389,7 +389,7 @@ The macOS Dock and packaged ICNS use `public/Curated-desktop-icon-macos.png`, wi
 pnpm dev:electron
 ```
 
-This builds `backend/runtime/curated-dev.exe` and `electron-dist/`, starts or reuses the Go backend and Vite, then opens the Curated window. Packaged releases install `Curated.exe` as the Electron shell and run the bundled Go backend from `resources/app/curated.exe` on `http://127.0.0.1:8081`.
+`pnpm dev:electron` builds `electron-dist/` and opens the Curated window. It starts or reuses the Go backend on `127.0.0.1:8080` and Vite. Build the dev backend first with `pnpm backend:build:dev` when you want the `backend/runtime` binary; otherwise Electron runs `go run`. Packaged releases install `Curated.exe` as the Electron shell and run the bundled Go backend from `resources/app/curated.exe` on `http://127.0.0.1:8081`.
 
 ---
 
@@ -829,7 +829,7 @@ Load `dist` in Chrome and reload the extension and source website after code cha
 
 This section records the initial split implementation. Current versions and publishing commands are governed by §8 above.
 
-About & Updates shows the local Desktop component version (currently `0.1.0`) with a separate development badge and UTC build timestamp, via the trusted main-process bridge. Desktop and Server appear side by side; both headings use their product names. The Desktop timestamp is captured during `build:electron:main` and persisted in local build metadata, so restarting the app does not change it. Browsers omit this section. One shared Check updates button checks the local legacy installation package and Desktop in parallel only when local updates are allowed. Remote or unverified Desktop connections check Desktop only; Server version information stays visible. `pnpm build:electron:main` generates `electron-dist/desktop-release.json` from the component source and `electron/release-config.json`; restart Electron after changing it. The old npm/app package version remains the legacy installation identity, not the displayed Desktop component version.
+About & Updates shows the local Desktop component version from [`scripts/release/versions/desktop.json`](../reference/component-versions.md), with a separate development badge and UTC build timestamp, via the trusted main-process bridge. Desktop and Server appear side by side; both headings use their product names. The Desktop timestamp is captured during `build:electron:main` and persisted in local build metadata, so restarting the app does not change it. Browsers omit this section. One shared Check updates button checks the local legacy installation package and Desktop in parallel only when local updates are allowed. Remote or unverified Desktop connections check Desktop only; Server version information stays visible. `pnpm build:electron:main` generates `electron-dist/desktop-release.json` from the component source and `electron/release-config.json`; restart Electron after changing it. The old npm/app package version remains the legacy installation identity, not the displayed Desktop component version.
 
 Preview a future package name without building, publishing or incrementing versions:
 
@@ -840,7 +840,7 @@ python3 scripts/release/release_cli.py plan-component --component full --platfor
 
 Plans carry `status: planned`; Full includes exact component versions. Unsupported combinations and prerelease version suffixes are rejected. That initial legacy `release:publish` path is now retired; use the batch preparation/CD procedure in §8.
 
-Desktop checks run in the main process. Development builds return a development status; legacy bundles update through their existing installer. The checked-in config is `distribution: legacy, updateFeed: null`. Once standalone installation identity and migration are implemented, a separately deployed HTTPS feed can use this schema:
+Desktop checks run in the main process. Development builds return a development status; legacy bundles update through their existing installer. Standalone Server and Desktop installers, and legacy all-in-one migration, are implemented. Current version files are [component versions](../reference/component-versions.md). The checked-in `electron/release-config.json` is still `distribution: legacy` with `updateFeed: null`, so a default Electron build does not call a production Desktop feed. A separately deployed HTTPS feed can use this schema:
 
 ```json
 {
@@ -869,9 +869,9 @@ Restart Server and Desktop after updating their code to enable the new capabilit
 
 ### Server version and build timestamp
 
-`GET /api/health` and stdio `system.health` now return `version: "1.5.8"` (independent Server SemVer), `buildStamp: "YYYYMMDD.HHMMSS"` (UTC), and `channel` separately. About shows the numeric Server version, a separate development badge, and the timestamp below it. The sidebar uses the product version; logs and export metadata retain both identities. `installerVersion` remains the legacy installer version used by its updater.
+`GET /api/health` and stdio `system.health` return `version` (independent Server SemVer), `buildStamp` (`YYYYMMDD.HHMMSS`, UTC), and `channel` separately. The numeric value is whatever [`backend/internal/version/server.json`](../reference/component-versions.md) currently contains. About shows that version, a separate development badge, and the timestamp below it. The sidebar uses the product version; logs and export metadata retain both identities. `installerVersion` remains the legacy installer version used by its updater.
 
-The Server version source is `backend/internal/version/server.json`, moved from `scripts/release/versions/server.json` so Go can embed the same source during ordinary `go run` / `go build`. The component release planner reads this same file; there is no generated duplicate. Desktop remains `scripts/release/versions/desktop.json` at `0.1.0`. Bump each component only for its own releases.
+Go embeds `backend/internal/version/server.json` during ordinary `go run` / `go build`. The component release planner reads that same file. Desktop version stays in `scripts/release/versions/desktop.json`. Bump each component only for its own releases. Do not copy older numbers from this handbook.
 
 Release tooling continues injecting `-X curated-backend/internal/version.BuildStamp=<UTC timestamp>`. For direct Go builds without that flag, the existing fallback is Git commit time, then revision / unknown; that fallback is not the actual compilation time. Older clients still receive a string in `version`; consumers that used it as a timestamp must switch to `buildStamp`.
 

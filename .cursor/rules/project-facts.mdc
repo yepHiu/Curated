@@ -3,6 +3,8 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+现行 Server / Desktop 版本和 macOS libmpv 是否随包，只看 `docs/reference/component-versions.md`。下文日期段落里的版本号是当时快照。
+
 ## Internal Code Atlas — 2026-10-18
 
 `scripts/analysis/` is a standalone developer tool: Vue 3/Vite/shadcn-vue shell, shared isolated explorer, Node HTTP API and Worker-based TS/Vue/Go AST scanner. `pnpm code:atlas` serves `127.0.0.1:8795`; startup scans automatically, manual refresh replaces in-memory results while preserving filters. Build output is `.workspace/code-atlas-dist/`; `code:atlas:preview` runs it, `code:atlas:export` writes an offline HTML. `/api/atlas/{status,snapshot,scan,export}` belong only to this local tool, not Curated Server. No DB/config changes. See guide and 2026-10-17 code-atlas plan.
@@ -19,7 +21,7 @@ Web使用绝对媒体时间的纯文本字幕层；原生由main认证下载到�
 
 Mac 正式包内置固定版本 libmpv、arm64 dylib 依赖闭包、对应源码/资源、配方/SBOM 与许可；用户无需安装 MPV、Homebrew 或设置环境变量。新 Mac 安装（未保存播放偏好）默认使用原生播放器，已保存选择保留。正式包仅加载 app 内引擎，忽略开发覆盖变量；开发态仍允许 Homebrew/绝对 CURATED_NATIVE_LIBMPV。
 
-维护者先运行 `python3 scripts/release/prepare_macos_native.py`，再设置绝对 `CURATED_NATIVE_MAC_BUNDLE` 后打包。缺资料、SHA 不符、非 arm64、外部 dylib/rpath 或最低系统不符时构建失败。当前目标 Apple Silicon + macOS 15；签名仍为 ad-hoc，未完成 Apple 公证，尚未发布。安装后的合成媒体测试禁止读取 /opt/homebrew 和 /usr/local。无新增公共 HTTP API 或 library-config 字段；详见 guide 与 macOS 计划。
+维护者先运行 `python3 scripts/release/prepare_macos_native.py`，再设置绝对 `CURATED_NATIVE_MAC_BUNDLE` 后打包。缺资料、SHA 不符、非 arm64、外部 dylib/rpath 或最低系统不符时构建失败。当前目标 Apple Silicon + macOS 15；准备脚本是 ad-hoc 签名，没有 Apple 公证步骤。公开安装包以 GitHub Release 为准。安装后的合成媒体测试禁止读取 /opt/homebrew 和 /usr/local。无新增公共 HTTP API 或 library-config 字段；详见 `docs/reference/component-versions.md`。
 
 实现使用 Node-API/Cocoa NSOpenGLView + libmpv Render API，透明 Electron 控件同窗叠加。VideoToolbox/advanced control 支持 GPU 原图截图；Unix IPC 复用现有 Session、代理、协调器、分片进度和萃取。系统按钮、Retina、系统全屏和最小化恢复已适配；引擎仍在主进程中。
 
@@ -142,11 +144,11 @@ HTTP health 新增请求级 `canManageLibraryPaths`（no-store）。三库设置
 
 ## 2026-09-26 Server 产品版本与构建时间戳
 
-`GET /api/health` / stdio `system.health` 的 `version` 为 Server 三段数字版本（当前 1.5.8），新增 `buildStamp` 单独保留 UTC 构建戳，`channel` 与 legacy `installerVersion` 保持独立。关于页显示版本、开发版标签和构建时间戳，侧栏显示产品版本。唯一 Server 版本源为 `backend/internal/version/server.json`，由 Go embed，发行命名工具也读取同一文件；Desktop 仍从 `scripts/release/versions/desktop.json` 读取 0.1.0。BuildStamp 仍由正式打包注入，直接 Go 构建未注入时回退 Git 提交时间或 revision/unknown。详情见版本计划 §11.6。
+`GET /api/health` / stdio `system.health` 的 `version` 为 Server 三段数字版本（2026-09-26 记录为 1.5.8；现行数字见 `docs/reference/component-versions.md`），`buildStamp` 单独保留 UTC 构建戳，`channel` 与 legacy `installerVersion` 保持独立。关于页显示版本、开发版标签和构建时间戳，侧栏显示产品版本。唯一 Server 版本源为 `backend/internal/version/server.json`，由 Go embed，发行命名工具也读取同一文件。Desktop 版本源仍是 `scripts/release/versions/desktop.json`，不要把本节当时的 0.1.0 当成文件现值。BuildStamp 仍由正式打包注入，直接 Go 构建未注入时回退 Git 提交时间或 revision/unknown。详情见版本计划 §11.6。
 
 ## 2026-09-26 Desktop 组件版本与检查入口
 
-Desktop/Full 版本源位于 `scripts/release/versions/`，Server 位于 `backend/internal/version/server.json`：Desktop 0.1.0、Server 1.5.8、Full 1.6.0（开发目标，不代表已发布）。`release_cli.py plan-component` 只读生成新包名和 tag；现有 `release:publish` 仍为旧一体包。Electron 构建生成本地 `desktop-release.json`，preload 新增 `getDesktopInfo()` / `checkDesktopUpdate()`，主进程验证当前主窗口 frame 与 renderer origin；关于页并列显示 Desktop/Server；Desktop 显示数字版本、独立开发版标签和构建时生成的 UTC `buildStamp`（由本地 metadata 经 getDesktopInfo 提供），Server 标题仅为 Curated Server；Web 隐藏 Desktop。检查逻辑按组件/平台/架构/通道筛选 HTTPS manifest；当前配置 legacy + 无 feed，开发版不请求正式更新、一体包仍随原安装器更新。Desktop 自动下载安装、独立三包构建与安装身份迁移未实现。详情见版本计划 §11.5。
+2026-09-26 的版本快照是 Desktop 0.1.0、Server 1.5.8、Full 1.6.0，不是现行版本。现行 Server / Desktop 只读 `docs/reference/component-versions.md`。`release_cli.py plan-component` 只读生成新包名和 tag。Electron 构建生成本地 `desktop-release.json`，preload 的 `getDesktopInfo()` / `checkDesktopUpdate()` 验证当前主窗口 frame 与 renderer origin；关于页并列显示 Desktop/Server。仓库提交的 Electron 更新配置仍可能是 legacy 且没有 feed。独立 Server/Desktop 安装包和旧一体包迁移已经实现；Desktop 自动安装不是默认行为。详情见版本计划 §11.5 与组件版本说明。
 
 ## 2026-09-21 Agent 上下文连续性
 
