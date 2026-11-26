@@ -10,4 +10,6 @@
 | render.h | 192691941602052f00df0587f126246c48785a1cf21de68d22a92ea1908d1c55 |
 | render_gl.h | 48662c0ed9872a14dd9e1684105c97f69f94a0414709c254c5d372adc41d2e69 |
 
-Build with Xcode Command Line Tools and the installed Node distribution's `include/node` headers (`CURATED_NODE_INCLUDE` overrides the directory). Node-API v8 avoids Electron ABI-specific rebuilding. The module does not link against Homebrew dylib paths. The runtime is supplied separately by the user via Homebrew mpv or `CURATED_NATIVE_LIBMPV`; it is not copied into the macOS package. The header license does not cover the actual runtime or its dependencies. Self-contained distribution requires separate engine/source/license validation.
+Build with Xcode Command Line Tools and the installed Node distribution's `include/node` headers (`CURATED_NODE_INCLUDE` overrides the directory). Node-API v8 avoids Electron ABI-specific rebuilding. The module does not link against Homebrew dylib paths at compile time.
+
+These headers are not the packaged runtime. A packaged Mac Desktop loads only `native-player-macos/libmpv.dylib` inside the app and ignores Homebrew and `CURATED_NATIVE_LIBMPV`. Unpackaged development may use that override or the Homebrew libmpv paths. Preparing the bundle is `scripts/release/release_lib/macos_native.py`; Homebrew bottles are a build-time input only. Versions and the lock file are in [component versions](../../docs/reference/component-versions.md). The header license does not cover the bundled dylibs or their dependencies.

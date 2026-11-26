@@ -194,7 +194,8 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 				emitDone(status, "The provider's context limit was reached after recovery. Shorten the current request and continue in this conversation.", false, "context_input_too_large")
 				return nil
 			}
-			emitDone("failed", "The model response could not be completed.", true, "")
+			reason, code := providerFailureReason(err)
+			emitDone("failed", reason, true, code)
 			return fmt.Errorf("model response could not be completed")
 		}
 		if len(turn.ToolCalls) == 0 {
@@ -206,7 +207,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			}
 			emitText(turn.Content)
 			if strings.TrimSpace(turn.Content) == "" {
-				emitDone("failed", "The model returned no answer.", true, "")
+				emitDone("failed", "The model returned no answer.", true, "provider_empty")
 			} else if needsInput {
 				emitDone("needs_input", "A local entity needs the user's selection or a more specific name.", false, "")
 			} else if hadFailure || hadTruncation {
@@ -447,6 +448,28 @@ func evidenceForTool(name string, result core.Result) *contracts.AIEvidenceDTO {
 		evidence.Filters = evidenceFilters(result.Data)
 	}
 	return evidence
+}
+
+// providerFailureReason 把模型调用失败收成稳定原因码，不把供应商原文放进聊天结果。
+func providerFailureReason(err error) (string, string) {
+	switch llm.ErrorCategory(err) {
+	case "timeout":
+		return "The model request timed out.", "provider_timeout"
+	case "configuration":
+		return "The AI provider is not configured.", "provider_unconfigured"
+	case "authentication":
+		return "The AI provider rejected the saved credentials.", "provider_authentication"
+	case "rate_limit":
+		return "The AI provider rate limit was reached.", "provider_rate_limited"
+	case "stream_interrupted":
+		return "The model stream ended before a complete answer.", "provider_stream_interrupted"
+	case "network":
+		return "The AI provider could not be reached.", "provider_network"
+	case "invalid_response":
+		return "The model stream could not be read.", "provider_stream_invalid"
+	default:
+		return "The model response could not be completed.", "provider_failed"
+	}
 }
 
 func evidenceSource(name string) string {

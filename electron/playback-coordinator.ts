@@ -162,6 +162,13 @@ export class NativePlaybackCoordinator extends EventEmitter {
     }
   }
   private async start(context: PlaybackContext, input: DesktopPlaybackOpen): Promise<void> {
+    if (!this.executable.trim()) {
+      // 没有绝对路径的引擎时不要请求 Server，也不要创建播放窗口。
+      this.snapshotState.state.status = "error"
+      this.snapshotState.state.error = "NATIVE_ENGINE_MISSING"
+      this.publish()
+      throw new Error("NATIVE_ENGINE_MISSING")
+    }
     await this.ensureUnlocked(context)
     const movie = await this.detail(context, input.movieId).catch(async error => {
       if (error instanceof Error && error.message === "SERVER_LOCKED") await this.finish("SERVER_LOCKED")
